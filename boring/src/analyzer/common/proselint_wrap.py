@@ -9,6 +9,7 @@ We disable proselint's own checks for hedging, weasel_words, and a few
 others where our curated lists are tighter and we'd otherwise double-flag
 the same span. See `_DISABLED_CHECK_PATHS`.
 """
+
 from __future__ import annotations
 
 import copy
@@ -19,8 +20,8 @@ from typing import Any
 # to suppress because our curated lists in `word_lists` cover the same ground
 # and we don't want both flagging the same span.
 _DISABLED_CHECK_PATHS: tuple[str, ...] = (
-    "hedging",        # ours: HEDGE_WORDS / HEDGE_PHRASES (D2.7)
-    "weasel_words",   # ours: VAGUE_QUANTIFIERS / VAGUE_INTENSIFIERS (D4.4)
+    "hedging",  # ours: HEDGE_WORDS / HEDGE_PHRASES (D2.7)
+    "weasel_words",  # ours: VAGUE_QUANTIFIERS / VAGUE_INTENSIFIERS (D4.4)
 )
 
 _registered = False
@@ -31,8 +32,11 @@ def _ensure_registered() -> None:
     global _registered
     if _registered:
         return
-    from proselint.checks import __register__ as built_checks
-    from proselint.registry import CheckRegistry
+    from proselint.checks import __register__ as built_checks  # type: ignore
+    from proselint.registry import (  # ty:ignore[unresolved-import] # type: ignore
+        CheckRegistry,  # type: ignore # ty:ignore[unresolved-import]
+    )
+
     reg = CheckRegistry()
     # Avoid double-registering across runs in the same process
     if not reg.checks:
@@ -43,7 +47,8 @@ def _ensure_registered() -> None:
 @dataclass
 class ProselintHit:
     """A single proselint match, normalized for our use."""
-    check_path: str         # e.g., "cliches.misc.write_good"
+
+    check_path: str  # e.g., "cliches.misc.write_good"
     message: str
     char_start: int
     char_end: int
@@ -64,7 +69,10 @@ def lint_text(text: str) -> list[ProselintHit]:
     out. Hits are returned in document order.
     """
     _ensure_registered()
-    from proselint.tools import DEFAULT, LintFile
+    from proselint.tools import (  # type: ignore # ty:ignore[unresolved-import]
+        DEFAULT,
+        LintFile,
+    )
 
     cfg = copy.deepcopy(DEFAULT)
     for path in _DISABLED_CHECK_PATHS:
@@ -111,7 +119,9 @@ def lint_document(doc: Any) -> list[ProselintHit]:
     return hits
 
 
-def filter_by_category(hits: list[ProselintHit], categories: tuple[str, ...]) -> list[ProselintHit]:
+def filter_by_category(
+    hits: list[ProselintHit], categories: tuple[str, ...]
+) -> list[ProselintHit]:
     """Subset of hits whose top-level category is in `categories`."""
     cat_set = set(categories)
     return [h for h in hits if h.category in cat_set]

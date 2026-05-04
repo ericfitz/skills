@@ -18,15 +18,15 @@ from typing import Any
 
 from .. import locator as loc_mod
 from ..document import Document
+from . import register_check
 from .base import (
+    SEVERITY_SEVERE,
+    SEVERITY_WARN,
     Finding,
     Flag,
     Summary,
-    SEVERITY_SEVERE,
-    SEVERITY_WARN,
     score_against_thresholds,
 )
-from . import register_check
 
 
 class SentenceLengthMonotonyCheck:
@@ -107,7 +107,10 @@ class SentenceLengthMonotonyCheck:
                 Flag(
                     flag_id=f"{self.code}-{idx:03d}",
                     severity=severity,
-                    message=f"Run of {run['length']} sentences within \u00b1{int(sim_band*100)}% of each other in length",
+                    message=(
+                        f"Run of {run['length']} sentences within "
+                        f"\u00b1{int(sim_band * 100)}% of each other in length"
+                    ),
                     locator=flag_locator,
                     evidence={
                         "run_length": run["length"],

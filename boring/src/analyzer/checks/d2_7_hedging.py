@@ -24,15 +24,15 @@ from ..common.word_lists import (
     find_phrase_matches,
 )
 from ..document import Document
+from . import register_check
 from .base import (
+    SEVERITY_SEVERE,
+    SEVERITY_WARN,
     Finding,
     Flag,
     Summary,
-    SEVERITY_SEVERE,
-    SEVERITY_WARN,
     score_against_thresholds,
 )
-from . import register_check
 
 
 class HedgingCheck:

@@ -1,8 +1,8 @@
 {
   "schema_version": "0.1.0",
   "meta": {
-    "run_id": "b6022e24-92d4-4d49-8d0b-d8ff200f824c",
-    "run_timestamp_utc": "2026-05-04T20:03:23.031459Z",
+    "run_id": "90ea47b6-0050-4950-b50e-1344476090a2",
+    "run_timestamp_utc": "2026-05-04T20:12:54.342433Z",
     "skill_version": "0.1.0",
     "script_version": "0.1.0",
     "spacy_model": "en_core_web_sm-3.8.0",
@@ -182,6 +182,46 @@
           "supplemental": 0
         },
         "wordy_phrases_per_1000_words": 0.0,
+        "word_count": 148
+      },
+      "flags": [],
+      "notes": []
+    },
+    "D2.2": {
+      "code": "D2.2",
+      "name": "Nominalization fog",
+      "axis": "density",
+      "checked": true,
+      "summary": {
+        "metric_name": "nominalizations_per_sentence",
+        "metric_value": 0.714,
+        "threshold_warn": 1.5,
+        "threshold_severe": 2.5,
+        "score": "pass",
+        "rationale": "10 nominalizations across 14 sentences (0.71/sentence; warn at 1.5, severe at 2.5). 0 light-verb + nominalization patterns (0.0/1000 words; warn at 2.0, severe at 5.0). 0/14 sentences (0%) have 'to be' as the main verb."
+      },
+      "measurements": {
+        "total_nominalizations": 10,
+        "nominalizations_per_sentence": 0.7143,
+        "suffix_breakdown": {
+          "tion": 6,
+          "sion": 0,
+          "ment": 0,
+          "ance": 2,
+          "ence": 1,
+          "ity": 0,
+          "ness": 0,
+          "ism": 0,
+          "cy": 0,
+          "sis": 1,
+          "ure": 0,
+          "al": 0
+        },
+        "light_verb_nominalization_count": 0,
+        "light_verb_nom_per_1000_words": 0.0,
+        "be_main_verb_count": 0,
+        "be_main_verb_ratio": 0.0,
+        "total_sentences": 14,
         "word_count": 148
       },
       "flags": [],

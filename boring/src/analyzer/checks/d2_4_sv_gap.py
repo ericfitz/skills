@@ -18,15 +18,15 @@ from typing import Any
 
 from .. import locator as loc_mod
 from ..document import Document
+from . import register_check
 from .base import (
+    SEVERITY_SEVERE,
+    SEVERITY_WARN,
     Finding,
     Flag,
     Summary,
-    SEVERITY_SEVERE,
-    SEVERITY_WARN,
     score_against_thresholds,
 )
-from . import register_check
 
 
 class SubjectVerbGapCheck:

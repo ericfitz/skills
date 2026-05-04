@@ -3,6 +3,7 @@
 Loads the document, loads the calibration, runs every registered check,
 assembles the JSON output. This is the function the CLI calls.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
@@ -11,7 +12,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from . import checks as _checks_pkg  # noqa: F401  # side-effect: triggers registry population
+from . import (
+    checks as _checks_pkg,  # noqa: F401  # side-effect: triggers registry population
+)
 from .checks import all_checks, all_deferred
 from .common.readability import compute_readability
 from .config import Config, load_config
@@ -58,10 +61,14 @@ def _build_meta(config: Config) -> dict[str, Any]:
     spacy_version, model_version = _resolve_spacy_versions(config.spacy_model_name)
     return {
         "run_id": str(uuid.uuid4()),
-        "run_timestamp_utc": _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "run_timestamp_utc": _dt.datetime.now(_dt.UTC)
+        .isoformat()
+        .replace("+00:00", "Z"),
         "skill_version": SKILL_VERSION,
         "script_version": SCRIPT_VERSION,
-        "spacy_model": f"{config.spacy_model_name}-{model_version}" if model_version else config.spacy_model_name,
+        "spacy_model": f"{config.spacy_model_name}-{model_version}"
+        if model_version
+        else config.spacy_model_name,
         "spacy_version": spacy_version,
         "proselint_version": _try_version("proselint"),
         "textstat_version": _try_version("textstat"),
@@ -69,7 +76,9 @@ def _build_meta(config: Config) -> dict[str, Any]:
     }
 
 
-def _build_document_block(doc: Document, declared_genre: str | None, genre_source: str) -> dict[str, Any]:
+def _build_document_block(
+    doc: Document, declared_genre: str | None, genre_source: str
+) -> dict[str, Any]:
     return {
         "source_path": doc.source_path,
         "source_format": doc.source_format,
@@ -121,7 +130,9 @@ def _heading_dict(doc: Document, h: Any) -> dict[str, Any]:
 
 
 def _sentence_word_count(doc: Document, sent_ref: Any) -> int:
-    span = doc.spacy_doc.char_span(sent_ref.char_start, sent_ref.char_end, alignment_mode="contract")
+    span = doc.spacy_doc.char_span(
+        sent_ref.char_start, sent_ref.char_end, alignment_mode="contract"
+    )
     if span is None:
         return 0
     return sum(1 for tok in span if tok.is_alpha)
@@ -133,11 +144,18 @@ def _paragraph_word_count(text: str) -> int:
 
 def _stats(values: list[int]) -> dict[str, Any]:
     if not values:
-        return {"mean": 0, "median": 0, "stdev": 0, "coefficient_of_variation": 0, "p10": 0, "p90": 0}
+        return {
+            "mean": 0,
+            "median": 0,
+            "stdev": 0,
+            "coefficient_of_variation": 0,
+            "p10": 0,
+            "p90": 0,
+        }
     n = len(values)
     mean = sum(values) / n
     var = sum((x - mean) ** 2 for x in values) / n
-    stdev = var ** 0.5
+    stdev = var**0.5
     cv = stdev / mean if mean else 0.0
     sorted_v = sorted(values)
     median = sorted_v[n // 2]
@@ -154,24 +172,28 @@ def _stats(values: list[int]) -> dict[str, Any]:
 
 
 def _try_version(pkg: str) -> str | None:
+    from importlib.metadata import PackageNotFoundError, version
     try:
-        from importlib.metadata import version
         return version(pkg)
-    except Exception:
+    except PackageNotFoundError:
         return None
 
 
 def _resolve_spacy_versions(model_name: str) -> tuple[str | None, str | None]:
+    from importlib.metadata import PackageNotFoundError, version
+
     spacy_v = _try_version("spacy")
-    model_v = None
+    model_v: str | None = None
     try:
-        from importlib.metadata import version
         model_v = version(model_name)
-    except Exception:
+    except PackageNotFoundError:
+        # Model wasn't installed via pip (common with spaCy `download` flow).
+        # Fall back to loading the model and reading its meta.
         try:
-            import spacy
+            import spacy  # type: ignore # ty:ignore[unresolved-import]
+
             nlp = spacy.load(model_name)
             model_v = nlp.meta.get("version")
-        except Exception:
+        except (OSError, ImportError):
             model_v = None
     return spacy_v, model_v
