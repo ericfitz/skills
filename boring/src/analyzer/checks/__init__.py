@@ -59,6 +59,9 @@ def all_deferred() -> list[DeferredCheck]:
 # Deferred (LLM-only) sub-dimensions: _deferred_decls.
 from . import (  # noqa: E402, F401
     _deferred_decls,
+    d1_1_buried_thesis,
+    d1_4_signposting,
+    d1_6_topic_drift,
     d2_1_padding,
     d2_2_nominalization,
     d2_3_passive,
@@ -66,4 +69,9 @@ from . import (  # noqa: E402, F401
     d2_7_hedging,
     d2_8_throat_clearing,
     d3_1_sentence_length,
+    d3_3_opener_monotony,
+    d3_4_paragraph_monotony,
+    d3_5_vocabulary_flatness,
+    d4_1_concrete_examples,
+    d4_4_specificity,
 )

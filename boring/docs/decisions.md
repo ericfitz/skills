@@ -4,6 +4,78 @@ Short notes on choices made during development. Date-ordered. Add to the top whe
 
 ---
 
+## 2026-05-04 — Direction-axis checks (D1.1, D1.4, D1.6)
+
+### D1.1 buried thesis: claim detection is conservative
+
+A sentence is "claim-shaped" if it (a) opens with a strong claim phrase
+("we recommend", "this document concludes", "TL;DR"), (b) has a "we"
+subject + a claim verb (recommend / propose / find / argue / ...), or
+(c) has an obligation modal (must / should / ought to) with a real
+(non-expletive) subject. Expletive-subject sentences ("It is critical
+that...") are deliberately *not* counted — they're meta-commentary that
+D1.6 already flags.
+
+Trade-off: high precision, low recall. A writer can make a strong claim
+with phrasing none of these patterns catch (e.g., "Database X is the
+right choice"). The LLM phase is the right place for residual judgment;
+the mechanical check just answers "is there an obvious BLUF?" which is
+the question BLUF doctrine actually cares about.
+
+A summary/recommendation/TL;DR heading near the top of the document
+(within the first ~10% by char) softens the score by one level: the
+document is structurally signaling its claim location even when
+sentence-level patterns don't match.
+
+### D1.4 signposting: only top-level boundaries are evaluated
+
+Section transitions matter most at the level-1 (top-level) heading
+boundaries. Sub-heading boundaries (`##`, `###`) often don't need an
+explicit transition because they live inside a flow that's already
+established. We evaluate only level-1 boundaries; if a doc has none, we
+fall back to all headings.
+
+Roadmap detection is a phrase lookup ("this document covers", "the
+following sections", "we begin by", ...) plus a regex hint for
+enumeration ("first ... then ... finally ..."). Whether a roadmap is
+*required* is genre-dependent (per `checks_required.roadmap` in the
+calibration profile).
+
+### D1.6 topic-position drift: continuity is a soft proxy
+
+Subject-continuity scoring is unavoidably rough — a sentence's subject
+"links back" to the prior sentence if it's a pronoun, or its lemma
+appears among the prior sentence's content lemmas. This misses synonyms
+and paraphrases; it over-counts incidental lemma overlap. The threshold
+on the average score (`warn_mean_continuity_below = 0.40`) is the
+calibration item most in need of corpus tuning.
+
+Expletive-subject detection is reliable: spaCy's `expl` dep tag plus a
+custom rule for "It is X" / "It was Y" with a copular head verb covers
+the cases that matter.
+
+---
+
+## 2026-05-04 — Texture-axis checks (D3.3, D3.4, D3.5)
+
+### D3.4 filters out heading-only paragraphs
+
+The markdown parser segments `# Background` lines into their own
+"paragraphs" with word count 1. Counting them in the paragraph-length
+distribution distorts the CV. D3.4 filters them via a regex
+(`^\s*#{1,6}\s+...`) before computing stats. Other checks may want
+to do the same — there's no shared `body_paragraphs` helper yet
+because only D3.4 needs it so far.
+
+### D3.5 uses lemmas for MATTR
+
+MATTR is computed over content-word *lemmas* (NOUN/PROPN/VERB/ADJ/ADV)
+rather than surface forms. Reason: "system / systems" should count as
+one type, not two — the writer hasn't varied vocabulary by inflecting
+the same word.
+
+---
+
 ## 2026-05-04 — Mechanical checks expansion
 
 ### proselint integration: keep our own lists for hedging and weasel words

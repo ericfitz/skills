@@ -1,8 +1,8 @@
 {
   "schema_version": "0.1.0",
   "meta": {
-    "run_id": "90ea47b6-0050-4950-b50e-1344476090a2",
-    "run_timestamp_utc": "2026-05-04T20:12:54.342433Z",
+    "run_id": "b1e02637-11e2-4ca6-b3dc-f9651e360ff9",
+    "run_timestamp_utc": "2026-05-04T20:26:55.688910Z",
     "skill_version": "0.1.0",
     "script_version": "0.1.0",
     "spacy_model": "en_core_web_sm-3.8.0",
@@ -163,6 +163,323 @@
     }
   },
   "findings": {
+    "D1.1": {
+      "code": "D1.1",
+      "name": "Buried thesis",
+      "axis": "direction",
+      "checked": true,
+      "summary": {
+        "metric_name": "position_of_first_claim_pct",
+        "metric_value": 0.7977,
+        "threshold_warn": 0.05,
+        "threshold_severe": 0.15,
+        "score": "severe",
+        "rationale": "First claim-shaped sentence (we_verb) at char offset 840 = 80% of document (warn at 5%, severe at 15%). 2 claim-shaped sentences total. Summary heading near top: no."
+      },
+      "measurements": {
+        "first_claim_found": true,
+        "first_claim": {
+          "sentence_index": 12,
+          "char_offset": 840,
+          "position_pct": 0.7977,
+          "kind": "we_verb"
+        },
+        "claim_count": 2,
+        "all_claim_positions": [
+          {
+            "sentence_index": 12,
+            "char_offset": 840,
+            "position_pct": 0.7977,
+            "kind": "we_verb"
+          },
+          {
+            "sentence_index": 13,
+            "char_offset": 993,
+            "position_pct": 0.943,
+            "kind": "opener"
+          }
+        ],
+        "summary_heading_near_top": null,
+        "early_cutoff_chars": 105,
+        "warn_position_pct": 0.05,
+        "severe_position_pct": 0.15
+      },
+      "flags": [
+        {
+          "flag_id": "D1.1-001",
+          "severity": "severe",
+          "message": "First claim-shaped sentence at 80% of document (warn at 5%, severe at 15%)",
+          "locator": {
+            "scope": "span",
+            "char_start": 840,
+            "char_end": 992,
+            "line_start": 9,
+            "line_col_start": 1,
+            "line_end": 11,
+            "line_col_end": 135,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:c7799fea92daf1d9b83de980b02ae916374a78d51689c50b9963931a34e5d109",
+            "text_preview": "# Recommendation\n\nIt could perhaps be argued that there is some evidence to suggest that we should possibly consider implementing certain optimizations.",
+            "context_before": " were assessed. Many alternatives were reviewed.\n\n",
+            "context_after": " We recommend the optimizations be implemented nex",
+            "sentence_index_start": 12,
+            "sentence_index_end": 12,
+            "paragraph_index": 4
+          },
+          "evidence": {
+            "kind": "we_verb",
+            "position_pct": 0.7977,
+            "summary_heading_present": false
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D1.4": {
+      "code": "D1.4",
+      "name": "No signposting",
+      "axis": "direction",
+      "checked": true,
+      "summary": {
+        "metric_name": "transition_marker_ratio_at_section_boundaries",
+        "metric_value": 0.0,
+        "threshold_warn": 0.4,
+        "threshold_severe": 0.2,
+        "score": "severe",
+        "rationale": "0/2 section boundaries (0%) have a transition marker (warn below 40%, severe below 20%). Roadmap not detected; not required by genre."
+      },
+      "measurements": {
+        "section_boundary_count": 2,
+        "boundaries_with_transition": 0,
+        "transition_marker_ratio": 0.0,
+        "per_boundary": [
+          {
+            "heading_text": "Analysis",
+            "has_transition": false,
+            "sentence_index": 7,
+            "char_start": 658,
+            "char_end": 695
+          },
+          {
+            "heading_text": "Recommendation",
+            "has_transition": false,
+            "sentence_index": 13,
+            "char_start": 993,
+            "char_end": 1053
+          }
+        ],
+        "roadmap_detected": false,
+        "roadmap_required": false,
+        "roadmap_phrase_hit_count": 0,
+        "roadmap_enumeration_detected": false,
+        "warn_transition_marker_ratio_below": 0.4,
+        "severe_transition_marker_ratio_below": 0.2
+      },
+      "flags": [
+        {
+          "flag_id": "D1.4-001",
+          "severity": "severe",
+          "message": "Section 'Analysis' opens without a transition marker",
+          "locator": {
+            "scope": "span",
+            "char_start": 658,
+            "char_end": 695,
+            "line_start": 7,
+            "line_col_start": 289,
+            "line_end": 7,
+            "line_col_end": 326,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:dc56f76360746070a1e70b2082c4d353ffc7b12ab024408740ccf84860d9f54c",
+            "text_preview": "Several improvements were identified.",
+            "context_before": "nerally found to be within acceptable parameters. ",
+            "context_after": " Various optimizations were considered. Different ",
+            "sentence_index_start": 7,
+            "sentence_index_end": 7,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "heading_text": "Analysis"
+          }
+        },
+        {
+          "flag_id": "D1.4-002",
+          "severity": "severe",
+          "message": "Section 'Recommendation' opens without a transition marker",
+          "locator": {
+            "scope": "span",
+            "char_start": 993,
+            "char_end": 1053,
+            "line_start": 11,
+            "line_col_start": 136,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [
+              "Recommendation"
+            ],
+            "text_sha256": "sha256:5057d6760581272cb31fab08a4a6aa92ff1cbce9ce429306d2cb9ae3e872ac97",
+            "text_preview": "We recommend the optimizations be implemented next quarter.\n",
+            "context_before": "ibly consider implementing certain optimizations. ",
+            "context_after": "",
+            "sentence_index_start": 13,
+            "sentence_index_end": 13,
+            "paragraph_index": 5
+          },
+          "evidence": {
+            "heading_text": "Recommendation"
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D1.6": {
+      "code": "D1.6",
+      "name": "Topic-position drift",
+      "axis": "direction",
+      "checked": true,
+      "summary": {
+        "metric_name": "expletive_subject_ratio",
+        "metric_value": 0.2143,
+        "threshold_warn": 0.1,
+        "threshold_severe": 0.2,
+        "score": "severe",
+        "rationale": "3/14 sentences (21%) have an expletive subject (warn at 10%, severe at 20%). Mean within-paragraph subject continuity is 0.25 (warn below 0.4, severe below 0.25)."
+      },
+      "measurements": {
+        "total_sentences": 14,
+        "expletive_subject_count": 3,
+        "expletive_subject_ratio": 0.2143,
+        "mean_subject_continuity": 0.25,
+        "per_paragraph_continuity": [
+          {
+            "paragraph_index": 1,
+            "mean_continuity": 0.5,
+            "pair_count": 4
+          },
+          {
+            "paragraph_index": 3,
+            "mean_continuity": 0.0,
+            "pair_count": 4
+          }
+        ],
+        "warn_expletive_subject_ratio": 0.1,
+        "severe_expletive_subject_ratio": 0.2,
+        "warn_mean_continuity_below": 0.4,
+        "severe_mean_continuity_below": 0.25
+      },
+      "flags": [
+        {
+          "flag_id": "D1.6-001",
+          "severity": "severe",
+          "message": "Expletive subject in topic position",
+          "locator": {
+            "scope": "span",
+            "char_start": 0,
+            "char_end": 104,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 3,
+            "line_col_end": 91,
+            "section_path": [],
+            "text_sha256": "sha256:cfa56ceddb756121b1606bfc0f9776cfd8b5ea28c30eea02fc8033a795b20b70",
+            "text_preview": "# Background\n\nIn recent years there has been growing interest in the optimization of system performance.",
+            "context_before": "",
+            "context_after": " The system was designed by the team. The design w",
+            "sentence_index_start": 0,
+            "sentence_index_end": 0,
+            "paragraph_index": 0
+          },
+          "evidence": {
+            "sentence_index": 0
+          }
+        },
+        {
+          "flag_id": "D1.6-002",
+          "severity": "severe",
+          "message": "Expletive subject in topic position",
+          "locator": {
+            "scope": "span",
+            "char_start": 358,
+            "char_end": 657,
+            "line_start": 5,
+            "line_col_start": 1,
+            "line_end": 7,
+            "line_col_end": 288,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:c495a64f87f6fb02454b0620bef98062ef267e7e6d68d0df377859e6846aa41a",
+            "text_preview": "# Analysis\n\nIt is important to note that the performance metrics, which were collected over a period of approximately six months by a team consisting of three engineers and two analysts working in cl…",
+            "context_before": ". The review was conducted by external auditors.\n\n",
+            "context_after": " Several improvements were identified. Various opt",
+            "sentence_index_start": 6,
+            "sentence_index_end": 6,
+            "paragraph_index": 2
+          },
+          "evidence": {
+            "sentence_index": 6
+          }
+        },
+        {
+          "flag_id": "D1.6-003",
+          "severity": "severe",
+          "message": "Expletive subject in topic position",
+          "locator": {
+            "scope": "span",
+            "char_start": 840,
+            "char_end": 992,
+            "line_start": 9,
+            "line_col_start": 1,
+            "line_end": 11,
+            "line_col_end": 135,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:c7799fea92daf1d9b83de980b02ae916374a78d51689c50b9963931a34e5d109",
+            "text_preview": "# Recommendation\n\nIt could perhaps be argued that there is some evidence to suggest that we should possibly consider implementing certain optimizations.",
+            "context_before": " were assessed. Many alternatives were reviewed.\n\n",
+            "context_after": " We recommend the optimizations be implemented nex",
+            "sentence_index_start": 12,
+            "sentence_index_end": 12,
+            "paragraph_index": 4
+          },
+          "evidence": {
+            "sentence_index": 12
+          }
+        },
+        {
+          "flag_id": "D1.6-004",
+          "severity": "severe",
+          "message": "Low subject continuity (0.00) across 4 sentence pair(s)",
+          "locator": {
+            "scope": "paragraph",
+            "char_start": 370,
+            "char_end": 838,
+            "line_start": 7,
+            "line_col_start": 1,
+            "line_end": 7,
+            "line_col_end": 469,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:0344c2fb23cc90c2062f2e01fa6eac5671edd9679c7200a3377dda43ab653230",
+            "text_preview": "It is important to note that the performance metrics, which were collected over a period of approximately six months by a team consisting of three engineers and two analysts working in close coordina…",
+            "context_before": "",
+            "context_after": "",
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "paragraph_index": 3,
+            "mean_continuity": 0.0,
+            "pair_count": 4
+          }
+        }
+      ],
+      "notes": []
+    },
     "D2.1": {
       "code": "D2.1",
       "name": "Padding / wordiness",
@@ -866,6 +1183,819 @@
         ]
       },
       "flags": [],
+      "notes": []
+    },
+    "D3.3": {
+      "code": "D3.3",
+      "name": "Opener monotony",
+      "axis": "texture",
+      "checked": true,
+      "summary": {
+        "metric_name": "longest_same_first_token_run",
+        "metric_value": 5,
+        "threshold_warn": 3,
+        "threshold_severe": 5,
+        "score": "severe",
+        "rationale": "Longest same-first-token run: 5 (warn at 3, severe at 5). Longest same-first-POS run: 5 (warn at 5, severe at 9). First-token entropy: 2.98 bits (warn below 4.0, severe below 3.0)."
+      },
+      "measurements": {
+        "longest_same_first_token_run": 5,
+        "longest_same_first_pos_run": 5,
+        "first_token_entropy_bits": 2.9781,
+        "total_sentences_evaluated": 14,
+        "top_first_tokens": [
+          [
+            "the",
+            5
+          ],
+          [
+            "background",
+            1
+          ],
+          [
+            "analysis",
+            1
+          ],
+          [
+            "several",
+            1
+          ],
+          [
+            "various",
+            1
+          ],
+          [
+            "different",
+            1
+          ],
+          [
+            "numerous",
+            1
+          ],
+          [
+            "many",
+            1
+          ],
+          [
+            "recommendation",
+            1
+          ],
+          [
+            "we",
+            1
+          ]
+        ],
+        "first_pos_distribution": {
+          "NOUN": 3,
+          "DET": 5,
+          "ADJ": 5,
+          "PRON": 1
+        },
+        "warn_max_run_same_first_token": 3,
+        "severe_max_run_same_first_token": 5,
+        "warn_max_run_same_first_pos": 5,
+        "severe_max_run_same_first_pos": 9,
+        "warn_first_token_entropy_below": 4.0,
+        "severe_first_token_entropy_below": 3.0
+      },
+      "flags": [
+        {
+          "flag_id": "D3.3-001",
+          "severity": "severe",
+          "message": "Run of 5 sentences starting with 'the'",
+          "locator": {
+            "scope": "span",
+            "char_start": 105,
+            "char_end": 358,
+            "line_start": 3,
+            "line_col_start": 92,
+            "line_end": 5,
+            "line_col_end": 1,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:2a1188993e4d690954f494c69e816c1f3f384ed7e31db05c34d300fd543034b0",
+            "text_preview": "The system was designed by the team. The design was implemented in three phases. The implementation was completed last quarter. The completion of the implementation was followed by a comprehensive re…",
+            "context_before": "terest in the optimization of system performance. ",
+            "context_after": "# Analysis\n\nIt is important to note that the perfo",
+            "sentence_index_start": 1,
+            "sentence_index_end": 5,
+            "paragraph_index": 1
+          },
+          "evidence": {
+            "first_token": "the",
+            "run_length": 5
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D3.4": {
+      "code": "D3.4",
+      "name": "Paragraph monotony",
+      "axis": "texture",
+      "checked": true,
+      "summary": {
+        "metric_name": "paragraph_length_coefficient_of_variation",
+        "metric_value": 0.3171,
+        "threshold_warn": 0.4,
+        "threshold_severe": 0.25,
+        "score": "warn",
+        "rationale": "Paragraph-length CV is 0.317 (warn below 0.4, severe below 0.25). Longest run of similar-length paragraphs (±25%) is 2 (warn at 5, severe at 8). 0 paragraphs ≥ 200 words (0 ≥ 350)."
+      },
+      "measurements": {
+        "paragraph_count": 3,
+        "mean_words": 48.33,
+        "median_words": 52,
+        "stdev_words": 15.33,
+        "coefficient_of_variation": 0.3171,
+        "p10_words": 28,
+        "p90_words": 65,
+        "longest_similar_length_run": 2,
+        "wall_of_text_warn_count": 0,
+        "wall_of_text_severe_count": 0,
+        "paragraph_length_distribution": [
+          52,
+          65,
+          28
+        ],
+        "warn_cv_below": 0.4,
+        "severe_cv_below": 0.25,
+        "warn_max_run": 5,
+        "severe_max_run": 8,
+        "warn_paragraph_words_above": 200,
+        "severe_paragraph_words_above": 350
+      },
+      "flags": [],
+      "notes": []
+    },
+    "D3.5": {
+      "code": "D3.5",
+      "name": "Vocabulary flatness",
+      "axis": "texture",
+      "checked": true,
+      "summary": {
+        "metric_name": "mattr",
+        "metric_value": 0.825,
+        "threshold_warn": 0.55,
+        "threshold_severe": 0.45,
+        "score": "warn",
+        "rationale": "MATTR (window 100) is 0.825 (warn below 0.55, severe below 0.45). Verb diversity is 0.870 (20 unique / 23 total; warn below 0.35, severe below 0.25). Top verb 'implement' is 13% of all verbs (warn at 10%, severe at 20%)."
+      },
+      "measurements": {
+        "mattr": 0.825,
+        "mattr_window": 100,
+        "content_token_count": 80,
+        "verb_count": 23,
+        "unique_verb_lemmas": 20,
+        "verb_diversity_ratio": 0.8696,
+        "top_verb_lemma": "implement",
+        "top_verb_share": 0.1304,
+        "top_verbs": [
+          [
+            "implement",
+            3
+          ],
+          [
+            "consider",
+            2
+          ],
+          [
+            "grow",
+            1
+          ],
+          [
+            "design",
+            1
+          ],
+          [
+            "complete",
+            1
+          ],
+          [
+            "follow",
+            1
+          ],
+          [
+            "conduct",
+            1
+          ],
+          [
+            "note",
+            1
+          ],
+          [
+            "collect",
+            1
+          ],
+          [
+            "consist",
+            1
+          ]
+        ],
+        "noun_count": 39,
+        "unique_noun_lemmas": 30,
+        "noun_diversity_ratio": 0.7692,
+        "top_nouns": [
+          [
+            "optimization",
+            4
+          ],
+          [
+            "system",
+            2
+          ],
+          [
+            "performance",
+            2
+          ],
+          [
+            "team",
+            2
+          ],
+          [
+            "implementation",
+            2
+          ],
+          [
+            "quarter",
+            2
+          ],
+          [
+            "review",
+            2
+          ],
+          [
+            "background",
+            1
+          ],
+          [
+            "year",
+            1
+          ],
+          [
+            "interest",
+            1
+          ]
+        ],
+        "warn_mattr_below": 0.55,
+        "severe_mattr_below": 0.45,
+        "warn_verb_diversity_below": 0.35,
+        "severe_verb_diversity_below": 0.25,
+        "warn_top_verb_share": 0.1,
+        "severe_top_verb_share": 0.2
+      },
+      "flags": [
+        {
+          "flag_id": "D3.5-V01",
+          "severity": "warn",
+          "message": "Over-used verb 'implement' (3 occurrences, 13% of all verbs)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "implement",
+            "count": 3,
+            "share": 0.1304,
+            "pos": "VERB"
+          }
+        },
+        {
+          "flag_id": "D3.5-V02",
+          "severity": "info",
+          "message": "Over-used verb 'consider' (2 occurrences, 9% of all verbs)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "consider",
+            "count": 2,
+            "share": 0.087,
+            "pos": "VERB"
+          }
+        },
+        {
+          "flag_id": "D3.5-V03",
+          "severity": "info",
+          "message": "Over-used verb 'grow' (1 occurrences, 4% of all verbs)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "grow",
+            "count": 1,
+            "share": 0.0435,
+            "pos": "VERB"
+          }
+        },
+        {
+          "flag_id": "D3.5-V04",
+          "severity": "info",
+          "message": "Over-used verb 'design' (1 occurrences, 4% of all verbs)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "design",
+            "count": 1,
+            "share": 0.0435,
+            "pos": "VERB"
+          }
+        },
+        {
+          "flag_id": "D3.5-V05",
+          "severity": "info",
+          "message": "Over-used verb 'complete' (1 occurrences, 4% of all verbs)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "complete",
+            "count": 1,
+            "share": 0.0435,
+            "pos": "VERB"
+          }
+        },
+        {
+          "flag_id": "D3.5-N01",
+          "severity": "info",
+          "message": "Most-used noun 'optimization' (4 occurrences, 10% of all nouns)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "optimization",
+            "count": 4,
+            "share": 0.1026,
+            "pos": "NOUN"
+          }
+        },
+        {
+          "flag_id": "D3.5-N02",
+          "severity": "info",
+          "message": "Most-used noun 'system' (2 occurrences, 5% of all nouns)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "system",
+            "count": 2,
+            "share": 0.0513,
+            "pos": "NOUN"
+          }
+        },
+        {
+          "flag_id": "D3.5-N03",
+          "severity": "info",
+          "message": "Most-used noun 'performance' (2 occurrences, 5% of all nouns)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "performance",
+            "count": 2,
+            "share": 0.0513,
+            "pos": "NOUN"
+          }
+        },
+        {
+          "flag_id": "D3.5-N04",
+          "severity": "info",
+          "message": "Most-used noun 'team' (2 occurrences, 5% of all nouns)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "team",
+            "count": 2,
+            "share": 0.0513,
+            "pos": "NOUN"
+          }
+        },
+        {
+          "flag_id": "D3.5-N05",
+          "severity": "info",
+          "message": "Most-used noun 'implementation' (2 occurrences, 5% of all nouns)",
+          "locator": {
+            "scope": "document",
+            "char_start": 0,
+            "char_end": 1053,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [],
+            "text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+            "text_preview": "",
+            "context_before": "",
+            "context_after": ""
+          },
+          "evidence": {
+            "lemma": "implementation",
+            "count": 2,
+            "share": 0.0513,
+            "pos": "NOUN"
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D4.1": {
+      "code": "D4.1",
+      "name": "No concrete examples",
+      "axis": "surprise",
+      "checked": true,
+      "summary": {
+        "metric_name": "longest_abstract_paragraph_run",
+        "metric_value": 0,
+        "threshold_warn": 3,
+        "threshold_severe": 6,
+        "score": "pass",
+        "rationale": "Longest run of paragraphs without concreteness signals: 0 (warn at 3, severe at 6). 1 example markers in 148 words (148 words per marker; warn above 500, severe above 1500)."
+      },
+      "measurements": {
+        "body_paragraph_count": 3,
+        "longest_abstract_paragraph_run": 0,
+        "abstract_runs_above_warn": 0,
+        "example_marker_count": 1,
+        "words_per_example_marker": 148.0,
+        "per_paragraph_signals": [
+          {
+            "paragraph_index": 1,
+            "ner": 3,
+            "numbers": 1,
+            "markers": 0
+          },
+          {
+            "paragraph_index": 3,
+            "ner": 3,
+            "numbers": 3,
+            "markers": 0
+          },
+          {
+            "paragraph_index": 5,
+            "ner": 1,
+            "numbers": 0,
+            "markers": 1
+          }
+        ],
+        "warn_max_paragraphs_without_concreteness": 3,
+        "severe_max_paragraphs_without_concreteness": 6,
+        "warn_word_count_per_example_marker_above": 500,
+        "severe_word_count_per_example_marker_above": 1500,
+        "word_count": 148
+      },
+      "flags": [],
+      "notes": []
+    },
+    "D4.4": {
+      "code": "D4.4",
+      "name": "No specificity",
+      "axis": "surprise",
+      "checked": true,
+      "summary": {
+        "metric_name": "vague_terms_per_1000_words",
+        "metric_value": 54.05,
+        "threshold_warn": 4.0,
+        "threshold_severe": 8.0,
+        "score": "severe",
+        "rationale": "8 vague terms in 148 words (54.1 per 1000 words; warn at 4.0, severe at 8.0). By category: quantifier=7, intensifier=1, modifier=0."
+      },
+      "measurements": {
+        "total_matches": 8,
+        "matches_by_category": {
+          "quantifier": 7,
+          "intensifier": 1,
+          "modifier": 0
+        },
+        "vague_terms_per_1000_words": 54.0541,
+        "word_count": 148
+      },
+      "flags": [
+        {
+          "flag_id": "D4.4-001",
+          "severity": "severe",
+          "message": "Vague intensifier: 'important'",
+          "locator": {
+            "scope": "span",
+            "char_start": 376,
+            "char_end": 385,
+            "line_start": 7,
+            "line_col_start": 7,
+            "line_end": 7,
+            "line_col_end": 16,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:34a989eb3e220e6b0b19fcb3c08c06f3a5eb237313b66b5766fa6e629783a7d5",
+            "text_preview": "important",
+            "context_before": "onducted by external auditors.\n\n# Analysis\n\nIt is ",
+            "context_after": " to note that the performance metrics, which were ",
+            "sentence_index_start": 6,
+            "sentence_index_end": 6,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "phrase": "important",
+            "category": "intensifier"
+          }
+        },
+        {
+          "flag_id": "D4.4-002",
+          "severity": "severe",
+          "message": "Vague quantifier: 'Several'",
+          "locator": {
+            "scope": "span",
+            "char_start": 658,
+            "char_end": 665,
+            "line_start": 7,
+            "line_col_start": 289,
+            "line_end": 7,
+            "line_col_end": 296,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:fc7323a303ad0d3951138cb3b79a417065907cbdd3a90b3c07b9a96b8f866c85",
+            "text_preview": "Several",
+            "context_before": "nerally found to be within acceptable parameters. ",
+            "context_after": " improvements were identified. Various optimizatio",
+            "sentence_index_start": 7,
+            "sentence_index_end": 7,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "phrase": "Several",
+            "category": "quantifier"
+          }
+        },
+        {
+          "flag_id": "D4.4-003",
+          "severity": "severe",
+          "message": "Vague quantifier: 'Various'",
+          "locator": {
+            "scope": "span",
+            "char_start": 696,
+            "char_end": 703,
+            "line_start": 7,
+            "line_col_start": 327,
+            "line_end": 7,
+            "line_col_end": 334,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:dc674d9ae5b0a7c8287ec2e33b8c62c326095b47c6fec1b2924b1205225dfad1",
+            "text_preview": "Various",
+            "context_before": "parameters. Several improvements were identified. ",
+            "context_after": " optimizations were considered. Different approach",
+            "sentence_index_start": 8,
+            "sentence_index_end": 8,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "phrase": "Various",
+            "category": "quantifier"
+          }
+        },
+        {
+          "flag_id": "D4.4-004",
+          "severity": "severe",
+          "message": "Vague quantifier: 'Different'",
+          "locator": {
+            "scope": "span",
+            "char_start": 735,
+            "char_end": 744,
+            "line_start": 7,
+            "line_col_start": 366,
+            "line_end": 7,
+            "line_col_end": 375,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:e9cdbd4dd56c72ee4be54e807000aed933a32ee8f6732ffa276def48d08d097d",
+            "text_preview": "Different",
+            "context_before": "dentified. Various optimizations were considered. ",
+            "context_after": " approaches were evaluated. Numerous tradeoffs wer",
+            "sentence_index_start": 9,
+            "sentence_index_end": 9,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "phrase": "Different",
+            "category": "quantifier"
+          }
+        },
+        {
+          "flag_id": "D4.4-005",
+          "severity": "severe",
+          "message": "Vague quantifier: 'Numerous'",
+          "locator": {
+            "scope": "span",
+            "char_start": 772,
+            "char_end": 780,
+            "line_start": 7,
+            "line_col_start": 403,
+            "line_end": 7,
+            "line_col_end": 411,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:20bd974bfcff30ddecb78aee846bde071eb324a1c632ba6262503ba1637626d7",
+            "text_preview": "Numerous",
+            "context_before": " considered. Different approaches were evaluated. ",
+            "context_after": " tradeoffs were assessed. Many alternatives were r",
+            "sentence_index_start": 10,
+            "sentence_index_end": 10,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "phrase": "Numerous",
+            "category": "quantifier"
+          }
+        },
+        {
+          "flag_id": "D4.4-006",
+          "severity": "severe",
+          "message": "Vague quantifier: 'Many'",
+          "locator": {
+            "scope": "span",
+            "char_start": 806,
+            "char_end": 810,
+            "line_start": 7,
+            "line_col_start": 437,
+            "line_end": 7,
+            "line_col_end": 441,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:98801fd897f5f12b39e427fd4aede461e7e33d9c66a7593f31679cedf578192a",
+            "text_preview": "Many",
+            "context_before": "were evaluated. Numerous tradeoffs were assessed. ",
+            "context_after": " alternatives were reviewed.\n\n# Recommendation\n\nIt",
+            "sentence_index_start": 11,
+            "sentence_index_end": 11,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "phrase": "Many",
+            "category": "quantifier"
+          }
+        },
+        {
+          "flag_id": "D4.4-007",
+          "severity": "severe",
+          "message": "Vague quantifier: 'some'",
+          "locator": {
+            "scope": "span",
+            "char_start": 899,
+            "char_end": 903,
+            "line_start": 11,
+            "line_col_start": 42,
+            "line_end": 11,
+            "line_col_end": 46,
+            "section_path": [
+              "Recommendation"
+            ],
+            "text_sha256": "sha256:a6b46dd0d1ae5e86cbc8f37e75ceeb6760230c1ca4ffbcb0c97b96dd7d9c464b",
+            "text_preview": "some",
+            "context_before": "ndation\n\nIt could perhaps be argued that there is ",
+            "context_after": " evidence to suggest that we should possibly consi",
+            "sentence_index_start": 12,
+            "sentence_index_end": 12,
+            "paragraph_index": 5
+          },
+          "evidence": {
+            "phrase": "some",
+            "category": "quantifier"
+          }
+        },
+        {
+          "flag_id": "D4.4-008",
+          "severity": "severe",
+          "message": "Vague quantifier: 'certain'",
+          "locator": {
+            "scope": "span",
+            "char_start": 970,
+            "char_end": 977,
+            "line_start": 11,
+            "line_col_start": 113,
+            "line_end": 11,
+            "line_col_end": 120,
+            "section_path": [
+              "Recommendation"
+            ],
+            "text_sha256": "sha256:70d16cbbf8e41719a0915a8b7390c4bfc08e903bae00a7646055015ca0161103",
+            "text_preview": "certain",
+            "context_before": "est that we should possibly consider implementing ",
+            "context_after": " optimizations. We recommend the optimizations be ",
+            "sentence_index_start": 12,
+            "sentence_index_end": 12,
+            "paragraph_index": 5
+          },
+          "evidence": {
+            "phrase": "certain",
+            "category": "quantifier"
+          }
+        }
+      ],
       "notes": []
     }
   },
