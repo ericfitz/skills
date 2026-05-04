@@ -1,0 +1,869 @@
+{
+  "schema_version": "0.1.0",
+  "meta": {
+    "run_id": "b6022e24-92d4-4d49-8d0b-d8ff200f824c",
+    "run_timestamp_utc": "2026-05-04T20:03:23.031459Z",
+    "skill_version": "0.1.0",
+    "script_version": "0.1.0",
+    "spacy_model": "en_core_web_sm-3.8.0",
+    "spacy_version": "3.8.14",
+    "proselint_version": "0.16.0",
+    "textstat_version": "0.7.13",
+    "python_version": "3.12.13"
+  },
+  "document": {
+    "source_path": "samples/input.md",
+    "source_format": "markdown",
+    "source_bytes": 1053,
+    "source_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+    "extracted_text_sha256": "sha256:af160c35c64cd4883d339c6648885950f8d4ac42860371d58f048596e496bd49",
+    "char_count": 1053,
+    "line_count": 12,
+    "paragraph_count": 6,
+    "sentence_count": 14,
+    "word_count": 148,
+    "declared_genre": "executive_brief",
+    "genre_source": "default"
+  },
+  "calibration": {
+    "calibration_file_sha256": "sha256:8e223be798dbceff48d35ae7e1be2f76c4c24f08d55602a604ce9078250a8da8",
+    "genre_profile_applied": "executive_brief",
+    "active_thresholds": {
+      "direction.buried_thesis.warn_position_pct": 0.05,
+      "direction.buried_thesis.severe_position_pct": 0.15,
+      "density.passive.warn_ratio": 0.15,
+      "density.passive.severe_ratio": 0.25,
+      "density.hedging.warn_per_100_sentences": 20,
+      "density.hedging.severe_per_100_sentences": 40,
+      "density.throat_clearing.warn_phrases_per_1000_words": 1.0,
+      "density.throat_clearing.severe_phrases_per_1000_words": 3.0,
+      "surprise.no_specificity.warn_per_1000_words": 4.0,
+      "surprise.no_specificity.severe_per_1000_words": 8.0
+    }
+  },
+  "readability": {
+    "document": {
+      "flesch_reading_ease": 29.76,
+      "flesch_kincaid_grade": 11.73,
+      "gunning_fog": 15.58,
+      "smog_index": 13.26,
+      "dale_chall": 10.67,
+      "automated_readability_index": 11.83
+    },
+    "longest_paragraphs": [
+      {
+        "paragraph_index": 3,
+        "word_count": 65,
+        "flesch_reading_ease": 22.73,
+        "flesch_kincaid_grade": 12.78,
+        "locator": {
+          "scope": "paragraph",
+          "char_start": 370,
+          "char_end": 838,
+          "line_start": 7,
+          "line_col_start": 1,
+          "line_end": 7,
+          "line_col_end": 469,
+          "section_path": [
+            "Analysis"
+          ],
+          "text_sha256": "sha256:0344c2fb23cc90c2062f2e01fa6eac5671edd9679c7200a3377dda43ab653230",
+          "text_preview": "It is important to note that the performance metrics, which were collected over a period of approximately six months by a team consisting of three engineers and two analysts working in close coordina…",
+          "context_before": "",
+          "context_after": "",
+          "paragraph_index": 3
+        }
+      },
+      {
+        "paragraph_index": 1,
+        "word_count": 52,
+        "flesch_reading_ease": 45.11,
+        "flesch_kincaid_grade": 9.12,
+        "locator": {
+          "scope": "paragraph",
+          "char_start": 14,
+          "char_end": 356,
+          "line_start": 3,
+          "line_col_start": 1,
+          "line_end": 3,
+          "line_col_end": 343,
+          "section_path": [
+            "Background"
+          ],
+          "text_sha256": "sha256:3564b6b9a4ba4984f9eb94a3087b6807d609563fc1bc6b1cadbd4741fe55625f",
+          "text_preview": "In recent years there has been growing interest in the optimization of system performance. The system was designed by the team. The design was implemented in three phases. The implementation was comp…",
+          "context_before": "",
+          "context_after": "",
+          "paragraph_index": 1
+        }
+      }
+    ]
+  },
+  "structure": {
+    "headings": [
+      {
+        "level": 1,
+        "text": "Background",
+        "shape": "unknown",
+        "char_start": 2,
+        "char_end": 12,
+        "line_start": 1
+      },
+      {
+        "level": 1,
+        "text": "Analysis",
+        "shape": "unknown",
+        "char_start": 360,
+        "char_end": 368,
+        "line_start": 5
+      },
+      {
+        "level": 1,
+        "text": "Recommendation",
+        "shape": "unknown",
+        "char_start": 842,
+        "char_end": 856,
+        "line_start": 9
+      }
+    ],
+    "paragraph_lengths_words": [
+      1,
+      52,
+      1,
+      65,
+      1,
+      28
+    ],
+    "sentence_lengths_words": [
+      15,
+      7,
+      7,
+      6,
+      11,
+      7,
+      46,
+      4,
+      4,
+      4,
+      4,
+      4,
+      21,
+      8
+    ],
+    "sentence_lengths_stats": {
+      "mean": 10.57,
+      "median": 7,
+      "stdev": 10.91,
+      "coefficient_of_variation": 1.0317,
+      "p10": 4,
+      "p90": 21
+    },
+    "first_claim_position": {
+      "found": false
+    }
+  },
+  "findings": {
+    "D2.1": {
+      "code": "D2.1",
+      "name": "Padding / wordiness",
+      "axis": "density",
+      "checked": true,
+      "summary": {
+        "metric_name": "wordy_phrases_per_1000_words",
+        "metric_value": 0.0,
+        "threshold_warn": 4.0,
+        "threshold_severe": 8.0,
+        "score": "pass",
+        "rationale": "0 wordy/padding phrases in 148 words (0.0 per 1000 words; warn at 4.0, severe at 8.0). Sources: 0 proselint, 0 supplemental."
+      },
+      "measurements": {
+        "total_matches": 0,
+        "matches_by_category": {
+          "supplemental": 0
+        },
+        "wordy_phrases_per_1000_words": 0.0,
+        "word_count": 148
+      },
+      "flags": [],
+      "notes": []
+    },
+    "D2.3": {
+      "code": "D2.3",
+      "name": "Passive overhang",
+      "axis": "density",
+      "checked": true,
+      "summary": {
+        "metric_name": "passive_sentence_ratio",
+        "metric_value": 0.9286,
+        "threshold_warn": 0.15,
+        "threshold_severe": 0.25,
+        "score": "severe",
+        "rationale": "13 of 14 sentences (93%) use passive voice. Threshold warn 15%, severe 25%. 9 (69% of passives) are agentless."
+      },
+      "measurements": {
+        "total_sentence_count": 14,
+        "passive_sentence_count": 13,
+        "agentless_passive_count": 9,
+        "passive_sentence_ratio": 0.9286,
+        "agentless_ratio_of_passives": 0.6923,
+        "warn_agentless_ratio_of_passives": 0.6,
+        "severe_agentless_ratio_of_passives": 0.8
+      },
+      "flags": [
+        {
+          "flag_id": "D2.3-001",
+          "severity": "severe",
+          "message": "Passive voice",
+          "locator": {
+            "scope": "span",
+            "char_start": 105,
+            "char_end": 141,
+            "line_start": 3,
+            "line_col_start": 92,
+            "line_end": 3,
+            "line_col_end": 128,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:9e828d2960657b913dd980c7b41a1ff77add1377ecc3672b236f2c6981d1c68f",
+            "text_preview": "The system was designed by the team.",
+            "context_before": "terest in the optimization of system performance. ",
+            "context_after": " The design was implemented in three phases. The i",
+            "sentence_index_start": 1,
+            "sentence_index_end": 1,
+            "paragraph_index": 1
+          },
+          "evidence": {
+            "agent_present": true
+          }
+        },
+        {
+          "flag_id": "D2.3-002",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 142,
+            "char_end": 185,
+            "line_start": 3,
+            "line_col_start": 129,
+            "line_end": 3,
+            "line_col_end": 172,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:52b1f9efa2046ce0b42812c386b03a870f37f9f921359f228603a8a0edfc6e0c",
+            "text_preview": "The design was implemented in three phases.",
+            "context_before": "performance. The system was designed by the team. ",
+            "context_after": " The implementation was completed last quarter. Th",
+            "sentence_index_start": 2,
+            "sentence_index_end": 2,
+            "paragraph_index": 1
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-003",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 186,
+            "char_end": 232,
+            "line_start": 3,
+            "line_col_start": 173,
+            "line_end": 3,
+            "line_col_end": 219,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:d51f332bdce14459db68030319677b3721d373cdf029d552872cc4f537b8afc8",
+            "text_preview": "The implementation was completed last quarter.",
+            "context_before": "team. The design was implemented in three phases. ",
+            "context_after": " The completion of the implementation was followed",
+            "sentence_index_start": 3,
+            "sentence_index_end": 3,
+            "paragraph_index": 1
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-004",
+          "severity": "severe",
+          "message": "Passive voice",
+          "locator": {
+            "scope": "span",
+            "char_start": 233,
+            "char_end": 309,
+            "line_start": 3,
+            "line_col_start": 220,
+            "line_end": 3,
+            "line_col_end": 296,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:05c5455f7161a6ade7b6a543ab45829aa2741c4989d28dd30944f6f5a112b712",
+            "text_preview": "The completion of the implementation was followed by a comprehensive review.",
+            "context_before": "s. The implementation was completed last quarter. ",
+            "context_after": " The review was conducted by external auditors.\n\n#",
+            "sentence_index_start": 4,
+            "sentence_index_end": 4,
+            "paragraph_index": 1
+          },
+          "evidence": {
+            "agent_present": true
+          }
+        },
+        {
+          "flag_id": "D2.3-005",
+          "severity": "severe",
+          "message": "Passive voice",
+          "locator": {
+            "scope": "span",
+            "char_start": 310,
+            "char_end": 358,
+            "line_start": 3,
+            "line_col_start": 297,
+            "line_end": 5,
+            "line_col_end": 1,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:b1fb0e7481667ff27ddd14c71a274d6bd997ba4acf265752e5e17c0eb98c4210",
+            "text_preview": "The review was conducted by external auditors.\n\n",
+            "context_before": "mentation was followed by a comprehensive review. ",
+            "context_after": "# Analysis\n\nIt is important to note that the perfo",
+            "sentence_index_start": 5,
+            "sentence_index_end": 5,
+            "paragraph_index": 1
+          },
+          "evidence": {
+            "agent_present": true
+          }
+        },
+        {
+          "flag_id": "D2.3-006",
+          "severity": "severe",
+          "message": "Passive voice",
+          "locator": {
+            "scope": "span",
+            "char_start": 358,
+            "char_end": 657,
+            "line_start": 5,
+            "line_col_start": 1,
+            "line_end": 7,
+            "line_col_end": 288,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:c495a64f87f6fb02454b0620bef98062ef267e7e6d68d0df377859e6846aa41a",
+            "text_preview": "# Analysis\n\nIt is important to note that the performance metrics, which were collected over a period of approximately six months by a team consisting of three engineers and two analysts working in cl…",
+            "context_before": ". The review was conducted by external auditors.\n\n",
+            "context_after": " Several improvements were identified. Various opt",
+            "sentence_index_start": 6,
+            "sentence_index_end": 6,
+            "paragraph_index": 2
+          },
+          "evidence": {
+            "agent_present": true
+          }
+        },
+        {
+          "flag_id": "D2.3-007",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 658,
+            "char_end": 695,
+            "line_start": 7,
+            "line_col_start": 289,
+            "line_end": 7,
+            "line_col_end": 326,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:dc56f76360746070a1e70b2082c4d353ffc7b12ab024408740ccf84860d9f54c",
+            "text_preview": "Several improvements were identified.",
+            "context_before": "nerally found to be within acceptable parameters. ",
+            "context_after": " Various optimizations were considered. Different ",
+            "sentence_index_start": 7,
+            "sentence_index_end": 7,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-008",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 696,
+            "char_end": 734,
+            "line_start": 7,
+            "line_col_start": 327,
+            "line_end": 7,
+            "line_col_end": 365,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:7334f88aab8da876510f230827d7e88f684f661941f0fa3a142e8accfc925fd0",
+            "text_preview": "Various optimizations were considered.",
+            "context_before": "parameters. Several improvements were identified. ",
+            "context_after": " Different approaches were evaluated. Numerous tra",
+            "sentence_index_start": 8,
+            "sentence_index_end": 8,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-009",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 735,
+            "char_end": 771,
+            "line_start": 7,
+            "line_col_start": 366,
+            "line_end": 7,
+            "line_col_end": 402,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:dadd5237e6f774fd39e64ce0fd29ca0cc56ec0ab071dc0b2190ecc3b5f9993bb",
+            "text_preview": "Different approaches were evaluated.",
+            "context_before": "dentified. Various optimizations were considered. ",
+            "context_after": " Numerous tradeoffs were assessed. Many alternativ",
+            "sentence_index_start": 9,
+            "sentence_index_end": 9,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-010",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 772,
+            "char_end": 805,
+            "line_start": 7,
+            "line_col_start": 403,
+            "line_end": 7,
+            "line_col_end": 436,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:c941c7077d243ffd973bd996a1307e73063433de683de10cb140aa072a3a37a7",
+            "text_preview": "Numerous tradeoffs were assessed.",
+            "context_before": " considered. Different approaches were evaluated. ",
+            "context_after": " Many alternatives were reviewed.\n\n# Recommendatio",
+            "sentence_index_start": 10,
+            "sentence_index_end": 10,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-011",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 806,
+            "char_end": 840,
+            "line_start": 7,
+            "line_col_start": 437,
+            "line_end": 9,
+            "line_col_end": 1,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:10a24d7f5a9a4a8de8dbced5a7359a1206cf8b47df188e633a0ce2d4f119de4c",
+            "text_preview": "Many alternatives were reviewed.\n\n",
+            "context_before": "were evaluated. Numerous tradeoffs were assessed. ",
+            "context_after": "# Recommendation\n\nIt could perhaps be argued that ",
+            "sentence_index_start": 11,
+            "sentence_index_end": 11,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-012",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 840,
+            "char_end": 992,
+            "line_start": 9,
+            "line_col_start": 1,
+            "line_end": 11,
+            "line_col_end": 135,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:c7799fea92daf1d9b83de980b02ae916374a78d51689c50b9963931a34e5d109",
+            "text_preview": "# Recommendation\n\nIt could perhaps be argued that there is some evidence to suggest that we should possibly consider implementing certain optimizations.",
+            "context_before": " were assessed. Many alternatives were reviewed.\n\n",
+            "context_after": " We recommend the optimizations be implemented nex",
+            "sentence_index_start": 12,
+            "sentence_index_end": 12,
+            "paragraph_index": 4
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        },
+        {
+          "flag_id": "D2.3-013",
+          "severity": "severe",
+          "message": "Agentless passive",
+          "locator": {
+            "scope": "span",
+            "char_start": 993,
+            "char_end": 1053,
+            "line_start": 11,
+            "line_col_start": 136,
+            "line_end": 12,
+            "line_col_end": 1,
+            "section_path": [
+              "Recommendation"
+            ],
+            "text_sha256": "sha256:5057d6760581272cb31fab08a4a6aa92ff1cbce9ce429306d2cb9ae3e872ac97",
+            "text_preview": "We recommend the optimizations be implemented next quarter.\n",
+            "context_before": "ibly consider implementing certain optimizations. ",
+            "context_after": "",
+            "sentence_index_start": 13,
+            "sentence_index_end": 13,
+            "paragraph_index": 5
+          },
+          "evidence": {
+            "agent_present": false
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D2.4": {
+      "code": "D2.4",
+      "name": "Subject-verb separation",
+      "axis": "density",
+      "checked": true,
+      "summary": {
+        "metric_name": "pct_sentences_over_warn_threshold",
+        "metric_value": 0.0714,
+        "threshold_warn": 0.15,
+        "threshold_severe": 0.3,
+        "score": "pass",
+        "rationale": "1 of 14 sentences (7%) have a subject-verb gap >= 7 tokens. Threshold for severe is 30%, for warn is 15%."
+      },
+      "measurements": {
+        "total_sentences_evaluated": 14,
+        "sentences_over_warn_threshold": 1,
+        "mean_subject_verb_gap_tokens": 1.64,
+        "max_subject_verb_gap_tokens": 7,
+        "warn_token_distance": 7,
+        "severe_token_distance": 12
+      },
+      "flags": [
+        {
+          "flag_id": "D2.4-001",
+          "severity": "warn",
+          "message": "Subject-verb gap of 7 tokens",
+          "locator": {
+            "scope": "span",
+            "char_start": 0,
+            "char_end": 104,
+            "line_start": 1,
+            "line_col_start": 1,
+            "line_end": 3,
+            "line_col_end": 91,
+            "section_path": [],
+            "text_sha256": "sha256:cfa56ceddb756121b1606bfc0f9776cfd8b5ea28c30eea02fc8033a795b20b70",
+            "text_preview": "# Background\n\nIn recent years there has been growing interest in the optimization of system performance.",
+            "context_before": "",
+            "context_after": " The system was designed by the team. The design w",
+            "sentence_index_start": 0,
+            "sentence_index_end": 0,
+            "paragraph_index": 0
+          },
+          "evidence": {
+            "subject_verb_gap_tokens": 7
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D2.7": {
+      "code": "D2.7",
+      "name": "Hedging clutter",
+      "axis": "density",
+      "checked": true,
+      "summary": {
+        "metric_name": "hedges_per_100_sentences",
+        "metric_value": 35.71,
+        "threshold_warn": 20,
+        "threshold_severe": 40,
+        "score": "warn",
+        "rationale": "5 hedges across 14 sentences (35.7 per 100 sentences; warn at 20, severe at 40). 2 sentences stack 2+ hedges."
+      },
+      "measurements": {
+        "total_hedges": 5,
+        "hedge_word_count": 4,
+        "hedge_phrase_count": 1,
+        "stacked_hedge_sentences": 2,
+        "hedges_per_100_sentences": 35.7143,
+        "total_sentences": 14
+      },
+      "flags": [
+        {
+          "flag_id": "D2.7-001",
+          "severity": "warn",
+          "message": "Stacked hedging (2 hedges in one sentence)",
+          "locator": {
+            "scope": "span",
+            "char_start": 358,
+            "char_end": 657,
+            "line_start": 5,
+            "line_col_start": 1,
+            "line_end": 7,
+            "line_col_end": 288,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:c495a64f87f6fb02454b0620bef98062ef267e7e6d68d0df377859e6846aa41a",
+            "text_preview": "# Analysis\n\nIt is important to note that the performance metrics, which were collected over a period of approximately six months by a team consisting of three engineers and two analysts working in cl…",
+            "context_before": ". The review was conducted by external auditors.\n\n",
+            "context_after": " Several improvements were identified. Various opt",
+            "sentence_index_start": 6,
+            "sentence_index_end": 6,
+            "paragraph_index": 2
+          },
+          "evidence": {
+            "hedge_count": 2,
+            "hedges": [
+              "approximately",
+              "generally"
+            ]
+          }
+        },
+        {
+          "flag_id": "D2.7-002",
+          "severity": "warn",
+          "message": "Stacked hedging (3 hedges in one sentence)",
+          "locator": {
+            "scope": "span",
+            "char_start": 840,
+            "char_end": 992,
+            "line_start": 9,
+            "line_col_start": 1,
+            "line_end": 11,
+            "line_col_end": 135,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:c7799fea92daf1d9b83de980b02ae916374a78d51689c50b9963931a34e5d109",
+            "text_preview": "# Recommendation\n\nIt could perhaps be argued that there is some evidence to suggest that we should possibly consider implementing certain optimizations.",
+            "context_before": " were assessed. Many alternatives were reviewed.\n\n",
+            "context_after": " We recommend the optimizations be implemented nex",
+            "sentence_index_start": 12,
+            "sentence_index_end": 12,
+            "paragraph_index": 4
+          },
+          "evidence": {
+            "hedge_count": 3,
+            "hedges": [
+              "perhaps",
+              "there is some evidence",
+              "possibly"
+            ]
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D2.8": {
+      "code": "D2.8",
+      "name": "Throat-clearing",
+      "axis": "density",
+      "checked": true,
+      "summary": {
+        "metric_name": "throat_clearing_phrases_per_1000_words",
+        "metric_value": 13.51,
+        "threshold_warn": 1.0,
+        "threshold_severe": 3.0,
+        "score": "severe",
+        "rationale": "2 throat-clearing phrases in 148 words (13.5 per 1000 words; warn at 1.0, severe at 3.0). Of those, 2 open paragraphs, 0 open sentences, 0 are mid-sentence."
+      },
+      "measurements": {
+        "total_matches": 2,
+        "paragraph_opener_count": 2,
+        "sentence_opener_count": 0,
+        "mid_sentence_count": 0,
+        "throat_clearing_per_1000_words": 13.5135,
+        "word_count": 148
+      },
+      "flags": [
+        {
+          "flag_id": "D2.8-001",
+          "severity": "severe",
+          "message": "Throat-clearing phrase (paragraph opener)",
+          "locator": {
+            "scope": "span",
+            "char_start": 14,
+            "char_end": 29,
+            "line_start": 3,
+            "line_col_start": 1,
+            "line_end": 3,
+            "line_col_end": 16,
+            "section_path": [
+              "Background"
+            ],
+            "text_sha256": "sha256:de1e571ac3787298c08a66df3b6ee4e6bf1bf177346ea6fff200e956ebe38478",
+            "text_preview": "In recent years",
+            "context_before": "# Background\n\n",
+            "context_after": " there has been growing interest in the optimizati",
+            "sentence_index_start": 0,
+            "sentence_index_end": 0,
+            "paragraph_index": 1
+          },
+          "evidence": {
+            "phrase": "In recent years",
+            "position": "paragraph_opener"
+          }
+        },
+        {
+          "flag_id": "D2.8-002",
+          "severity": "severe",
+          "message": "Throat-clearing phrase (paragraph opener)",
+          "locator": {
+            "scope": "span",
+            "char_start": 370,
+            "char_end": 398,
+            "line_start": 7,
+            "line_col_start": 1,
+            "line_end": 7,
+            "line_col_end": 29,
+            "section_path": [
+              "Analysis"
+            ],
+            "text_sha256": "sha256:57b7caa5e2524592665b24c5e108d49688d817b6b793018f73e31cb33895b2cc",
+            "text_preview": "It is important to note that",
+            "context_before": " was conducted by external auditors.\n\n# Analysis\n\n",
+            "context_after": " the performance metrics, which were collected ove",
+            "sentence_index_start": 6,
+            "sentence_index_end": 6,
+            "paragraph_index": 3
+          },
+          "evidence": {
+            "phrase": "It is important to note that",
+            "position": "paragraph_opener"
+          }
+        }
+      ],
+      "notes": []
+    },
+    "D3.1": {
+      "code": "D3.1",
+      "name": "Sentence-length monotony",
+      "axis": "texture",
+      "checked": true,
+      "summary": {
+        "metric_name": "coefficient_of_variation",
+        "metric_value": 1.0317,
+        "threshold_warn": 0.35,
+        "threshold_severe": 0.2,
+        "score": "pass",
+        "rationale": "Sentence-length CV is 1.032 (warn below 0.35, severe below 0.2). Longest run of similar-length sentences (within ±20%) is 5 (warn at 6, severe at 10)."
+      },
+      "measurements": {
+        "mean": 10.57,
+        "median": 7,
+        "stdev": 10.91,
+        "coefficient_of_variation": 1.0317,
+        "p10": 4,
+        "p90": 21,
+        "longest_similar_length_run": 5,
+        "similar_length_runs_above_warn": 0,
+        "warn_max_run": 6,
+        "severe_max_run": 10,
+        "similarity_band_pct": 0.2,
+        "sentence_length_distribution": [
+          15,
+          7,
+          7,
+          6,
+          11,
+          7,
+          46,
+          4,
+          4,
+          4,
+          4,
+          4,
+          21,
+          8
+        ]
+      },
+      "flags": [],
+      "notes": []
+    }
+  },
+  "deferred_to_llm": [
+    {
+      "code": "D1.2",
+      "name": "Missing stakes",
+      "axis": "direction",
+      "reason": "semantic_judgment_required",
+      "hints": {}
+    },
+    {
+      "code": "D1.5",
+      "name": "Flat tension",
+      "axis": "direction",
+      "reason": "semantic_judgment_required",
+      "hints": {}
+    },
+    {
+      "code": "D2.5",
+      "name": "Obvious claims",
+      "axis": "density",
+      "reason": "semantic_judgment_required",
+      "hints": {}
+    },
+    {
+      "code": "D4.2",
+      "name": "No vivid imagery or analogy",
+      "axis": "surprise",
+      "reason": "semantic_judgment_required",
+      "hints": {}
+    },
+    {
+      "code": "D4.3",
+      "name": "No counterintuitive claims",
+      "axis": "surprise",
+      "reason": "semantic_judgment_required",
+      "hints": {}
+    }
+  ]
+}
