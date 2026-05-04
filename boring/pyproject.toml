@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "boring-analyzer"
+version = "0.1.0"
+description = "Mechanical analysis layer for the boring-writing detection skill"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Eric Fitz" }]
+dependencies = [
+    "spacy>=3.8,<4",
+    "textstat>=0.7",
+    "proselint>=0.14",
+    "python-docx>=1.0",
+]
+
+[project.scripts]
+boring-analyze = "analyzer.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Calibration is in the repo root, not in the package; pass --calibration explicitly
+# or rely on the analyzer's default-path resolution.
+
+# ---------------------------------------------------------------------------
+# Tooling — point linters and type-checkers at the project's .venv so they
+# resolve our deps (spacy, proselint, textstat, python-docx). uv creates the
+# venv at ./.venv; if you use a different venv path, override these.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+src = ["src"]
+target-version = "py311"
+
+[tool.ruff.lint.isort]
+known-first-party = ["analyzer"]
+
+[tool.ty.environment]
+# ty (Astral's type-checker) — point at the project's .venv so it can resolve
+# imports installed by `uv sync` / `uv pip install -e .`.
+python = ".venv"
+
+[tool.pyright]
+# Pylance / Pyright — same purpose as the [tool.ty] block above.
+venvPath = "."
+venv = ".venv"
+include = ["src"]
+extraPaths = ["src"]

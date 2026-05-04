@@ -1,0 +1,472 @@
+# =============================================================================
+# Boring-Writing Skill — Calibration File
+# =============================================================================
+#
+# This file holds all thresholds and per-genre profiles for the mechanical
+# analysis script. The script reads it at startup; the resolved (post-override)
+# values are echoed into the JSON output for traceability.
+#
+# Conventions:
+#   - Thresholds use rates/ratios where possible (so document length doesn't
+#     change behavior). Absolute counts only for inherently per-instance signals.
+#   - Three severities: pass, warn, severe. Each check has thresholds for the
+#     warn/severe boundaries.
+#   - Genre profiles are deltas on [default]. They list only what differs.
+#   - Every threshold has a comment explaining the intuition. When you
+#     recalibrate from a corpus, update both the value AND the comment.
+#
+# Status: v0.1 — intuitive defaults. NOT calibrated against a corpus yet.
+# =============================================================================
+
+[meta]
+version = "0.1.0"
+status = "intuitive_defaults_uncalibrated"
+notes = """
+These thresholds are starting guesses based on craft-tradition rules of thumb
+(Williams, Gopen-Swan, Provost, proselint norms) and rough sense of what
+'normal' technical business writing looks like. Recalibrate against a corpus of
+hand-labeled documents before relying on these for anything important.
+"""
+spacy_model_required = "en_core_web_sm"   # pin model — affects sentence segmentation
+spacy_model_version_min = "3.7.0"
+
+
+# =============================================================================
+# [default] — base thresholds applied to every document unless a genre
+# profile overrides them.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# DIRECTION axis (D1.*)
+# -----------------------------------------------------------------------------
+
+[default.direction.buried_thesis]                            # D1.1
+# Where in the document does the first claim-shaped sentence appear?
+# Measured as char-offset / total-char-count, so 0.0 = very start, 1.0 = very end.
+# Most business technical writing should land a claim in the first 10-15%.
+warn_position_pct = 0.15
+severe_position_pct = 0.30
+# Rationale: BLUF/Pyramid Principle says answer first. 15% of a 1000-word
+# doc is ~150 words / ~6-8 sentences in — generous. 30% means the claim is
+# definitely buried.
+
+[default.direction.no_signposting]                            # D1.4
+# What fraction of section boundaries (transitions between top-level sections)
+# have an explicit transition marker in the first sentence of the new section?
+# Markers: "However", "In contrast", "Building on", "Despite", "Therefore",
+# "Given this", "As a result", "Consequently", curated list in script.
+warn_transition_marker_ratio_below = 0.40
+severe_transition_marker_ratio_below = 0.20
+# Rationale: not every section needs a transition (a fresh topic is fine), but
+# fewer than 40% of boundaries having explicit linkage suggests the document
+# reads as a series of disconnected topics. Below 20% is severe.
+
+# Roadmap detection: does the intro contain a forward-pointing structural
+# sentence ("This document covers... / first... then...")? Boolean signal,
+# scored as warn-if-absent for genre profiles that expect a roadmap.
+roadmap_required = false      # default: not required
+# Rationale: short documents don't need a roadmap; longer ones often benefit.
+# Genre profiles for longer documents flip this to true.
+
+[default.direction.topic_position_drift]                     # D1.6
+# Expletive subjects ("It is...", "There are...", "It was found that...")
+# put nothing meaningful in the topic position. Some are unavoidable; many
+# in a row signal a writer who's lost the thread.
+warn_expletive_subject_ratio = 0.10        # 10% of sentences
+severe_expletive_subject_ratio = 0.20
+# Rationale: Williams advises avoiding these. Some occurrence is normal
+# (~5%); 10% is enough to feel impersonal/weak; 20% is dominant.
+
+# Subject continuity: between consecutive sentences within a paragraph,
+# does the subject of N+1 connect to the content of N? Score 0-1 per pair,
+# averaged per paragraph.
+warn_mean_continuity_below = 0.40
+severe_mean_continuity_below = 0.25
+# Rationale: this is a soft proxy — paragraphs with very low continuity
+# read as topic-hopping. The threshold is provisional; this metric needs
+# calibration most of all.
+
+
+# -----------------------------------------------------------------------------
+# DENSITY axis (D2.*)
+# -----------------------------------------------------------------------------
+
+[default.density.padding]                                    # D2.1
+# Wordy phrases per 1000 words (proselint matches + custom list).
+# proselint catches ~20-40 distinct patterns from Garner/Strunk/Pinker.
+warn_phrases_per_1000_words = 4.0
+severe_phrases_per_1000_words = 8.0
+# Rationale: in 1000 words you'd expect ~50 sentences. Catching wordy phrases
+# in ~10% of sentences (5/1000 words) is starting to feel padded. 8/1000
+# is severe — every 6th sentence has a flagged phrase.
+
+[default.density.nominalization]                             # D2.2
+# Nominalizations per sentence (avg). Williams' Style suggests aiming low.
+warn_per_sentence = 1.5
+severe_per_sentence = 2.5
+# Rationale: a normal sentence has 0-1 nominalizations. Sustained averages
+# above 1.5 indicate the "Official Style" is taking over. Above 2.5 the
+# prose has more nominalized abstractions than real verbs.
+
+# Light verb + nominalization pattern ("performed an analysis of",
+# "made a determination", "conducted an examination"). This is the
+# highest-precision signal; every match is almost always fixable.
+warn_light_verb_nom_per_1000_words = 2.0
+severe_light_verb_nom_per_1000_words = 5.0
+# Rationale: this anti-pattern is rare in good prose. Even one per
+# paragraph (roughly 2/1000 words) is noticeable.
+
+[default.density.passive]                                    # D2.3
+# Fraction of sentences in passive voice.
+warn_ratio = 0.25
+severe_ratio = 0.40
+# Rationale: scientific writing studies (Hyland, etc.) show ~15-25% passive
+# in good papers. Above 40% is Lanham's "Official Style" territory.
+# Genre profiles tighten this for executive briefs, loosen for
+# methods-heavy technical reports.
+
+# Agentless passives ("X was done") are worse than agented passives
+# ("X was done by Y"), because the actor disappears. Tracked separately.
+warn_agentless_ratio_of_passives = 0.60       # 60% of passives are agentless
+severe_agentless_ratio_of_passives = 0.80
+# Rationale: in technical writing some agentless passive is appropriate
+# (the actor is obvious or unimportant). But if 80% of passives are
+# agentless, the writer is systematically hiding agents.
+
+[default.density.subject_verb_gap]                           # D2.4
+# Tokens between grammatical subject and main verb. Long gaps tax working
+# memory; the reader has to hold the subject in mind through the gap.
+warn_token_distance = 7
+severe_token_distance = 12
+# Rationale: Williams suggests "subjects and verbs close." 7 leaves room
+# for one short modifier. 12 means a serious nested clause has intervened.
+
+# What fraction of sentences exceed the warn threshold?
+warn_pct_sentences_over = 0.15
+severe_pct_sentences_over = 0.30
+# Rationale: occasional long gaps are fine for emphasis or complex ideas.
+# When 30% of sentences have gaps >7, the document is structurally taxing.
+
+[default.density.hedging]                                    # D2.7
+# Hedge words/phrases per 100 sentences.
+warn_per_100_sentences = 30
+severe_per_100_sentences = 60
+# Rationale: ~3 sentences in 10 with hedges is starting to dilute. 6/10
+# means the document is more qualification than claim.
+
+# Stacked hedges (≥2 hedges in one sentence: "it could perhaps possibly...").
+# Per-instance flag — every stacked-hedge sentence is a flag.
+stack_minimum_count = 2
+# Rationale: one hedge per sentence is usually fine; two in one sentence
+# is almost always cuttable.
+
+[default.density.throat_clearing]                            # D2.8
+# Throat-clearing phrases per 1000 words.
+warn_phrases_per_1000_words = 2.0
+severe_phrases_per_1000_words = 5.0
+# Rationale: these are pure filler ("It is important to note that...",
+# "The next section will discuss..."). 2/1000 words = ~1 per page;
+# 5/1000 = chronic.
+
+# Specifically section-opener throat-clearing (sentences that exist only
+# to introduce the section's content): every match is a flag.
+flag_section_openers = true
+
+
+# -----------------------------------------------------------------------------
+# TEXTURE axis (D3.*)
+# -----------------------------------------------------------------------------
+
+[default.texture.sentence_length]                            # D3.1
+# Coefficient of variation of sentence lengths across the document.
+# CV = stdev / mean. Lower = more monotonous.
+warn_cv_below = 0.35
+severe_cv_below = 0.20
+# Rationale: a CV around 0.45-0.55 is typical of well-rhythmed prose.
+# Below 0.35, sentences cluster tightly around the mean. Below 0.20 is
+# Provost's "stuck record" territory.
+
+# Longest run of consecutive sentences within ±20% of each other in length.
+warn_max_run = 6
+severe_max_run = 10
+# Rationale: 5-6 similar-length sentences in a row is the threshold where
+# rhythm starts to feel mechanical. 10 in a row is hypnotic.
+
+similarity_band_pct = 0.20    # ±20% of each other to count as "similar"
+# Rationale: arbitrary but intuitive. Sentences of length 18 and 21 feel
+# similar; 18 and 26 don't.
+
+[default.texture.syntactic_monotony]                         # D3.2
+# Longest run of single-clause sentences in a row. Single-clause sentences
+# are fine occasionally; many in a row create flat texture.
+warn_max_single_clause_run = 5
+severe_max_single_clause_run = 9
+
+# Distribution of sentence types (simple/compound/complex/compound-complex).
+# Pure-simple-sentence documents feel underdeveloped.
+warn_simple_sentence_ratio_above = 0.70
+severe_simple_sentence_ratio_above = 0.85
+# Rationale: technical writing should have a mix. >70% simple sentences
+# suggests the writer isn't varying syntax; >85% is monotonous.
+
+[default.texture.opener_monotony]                            # D3.3
+# Longest run of sentences starting with the same first token.
+warn_max_run_same_first_token = 3
+severe_max_run_same_first_token = 5
+# Rationale: 3 sentences in a row starting with "The system..." is
+# noticeable. 5 is a pattern.
+
+# Longest run with same first POS (e.g., consecutive "Determiner-Noun..."
+# openings). Looser threshold because POS overlap is more common.
+warn_max_run_same_first_pos = 5
+severe_max_run_same_first_pos = 9
+
+# First-token entropy across the whole document. Low entropy = repetitive
+# openers across the document, even if no single run is long.
+warn_first_token_entropy_below = 4.0       # bits
+severe_first_token_entropy_below = 3.0
+# Rationale: rough — needs corpus calibration. A document where most
+# sentences open with one of ~16 tokens has entropy ~4 bits; ~8 tokens = 3.
+
+[default.texture.paragraph_monotony]                         # D3.4
+# Coefficient of variation of paragraph word counts.
+warn_cv_below = 0.40
+severe_cv_below = 0.25
+# Rationale: paragraph length should vary more than sentence length —
+# emphatic short paragraphs and developed long ones should both appear.
+
+# Longest run of paragraphs within ±25% of each other in word count.
+warn_max_run = 5
+severe_max_run = 8
+
+# Wall-of-text detection: paragraphs above this length are flagged.
+warn_paragraph_words_above = 200
+severe_paragraph_words_above = 350
+# Rationale: in business writing, 200-word paragraphs strain attention;
+# 350+ is genuinely hard to read on a screen.
+
+[default.texture.vocabulary_flatness]                        # D3.5
+# Moving-average type-token ratio (MATTR) over sliding window of 100 tokens.
+# Higher = more diverse vocabulary.
+warn_mattr_below = 0.55
+severe_mattr_below = 0.45
+# Rationale: technical writing legitimately repeats domain terms, so we
+# don't expect literary-grade MATTR (~0.75). 0.55 is moderate; below 0.45
+# suggests a small vocabulary.
+
+# Verb-lemma diversity specifically: unique verb lemmas / total verb tokens.
+# This catches the "uses/provides/enables" pattern even when overall MATTR
+# is fine.
+warn_verb_diversity_below = 0.35
+severe_verb_diversity_below = 0.25
+
+# Top-N most-repeated content lemmas (excluding stopwords): if the most
+# repeated verb appears more than this fraction of all verb tokens,
+# flag it.
+warn_top_verb_share = 0.10
+severe_top_verb_share = 0.20
+# Rationale: if "use" accounts for 20% of all verbs in a document, the
+# verb palette is collapsed.
+
+
+# -----------------------------------------------------------------------------
+# SURPRISE axis (D4.*)
+# -----------------------------------------------------------------------------
+
+[default.surprise.no_specificity]                            # D4.4
+# Vague quantifier density per 1000 words. Words like "various", "several",
+# "many", "significant", "substantial", "appropriate", "modern", curated list.
+warn_per_1000_words = 6.0
+severe_per_1000_words = 12.0
+# Rationale: occasional vague quantifiers are unavoidable. 6/1000 ~= every
+# 8th sentence has one; 12/1000 ~= every 4th. The latter signals systemic
+# imprecision.
+
+[default.surprise.no_concrete_examples]                      # D4.1
+# Per-paragraph concreteness signals. The script computes named-entity
+# density, number/percentage density, and example-marker density per
+# paragraph. The threshold here is for paragraphs that have NONE of these
+# signals across a stretch of body content.
+warn_max_paragraphs_without_concreteness = 3   # ≥3 in a row
+severe_max_paragraphs_without_concreteness = 6
+# Rationale: if 3+ paragraphs in a row have no named entities, no numbers,
+# no examples, the writer is in pure abstraction. 6+ is sustained
+# abstraction without grounding.
+
+# Document-level: at least one example marker ("for example", "e.g.",
+# "such as", "imagine", "consider") per N words.
+warn_word_count_per_example_marker_above = 500
+severe_word_count_per_example_marker_above = 1500
+# Rationale: a 1000-word document with zero example markers is suspicious
+# (warn). A 1500-word document with zero markers is severe.
+
+
+# =============================================================================
+# Genre profiles — overrides on top of [default]
+# =============================================================================
+#
+# Each profile lists only the keys that differ from default. Use dotted
+# paths matching the structure above. Add a `direction_strictness` and
+# `apply_check` flags to gate whole sub-dimensions on/off per genre.
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+[genre.executive_brief]
+# Short doc for senior leadership. BLUF expected. Almost no passive
+# tolerance. Strong roadmap not expected (too short to need one).
+description = "Short persuasive document targeting senior leadership. BLUF strongly expected."
+
+[genre.executive_brief.overrides]
+"direction.buried_thesis.warn_position_pct" = 0.05    # claim must be very early
+"direction.buried_thesis.severe_position_pct" = 0.15
+"density.passive.warn_ratio" = 0.15                   # tighter than default
+"density.passive.severe_ratio" = 0.25
+"density.hedging.warn_per_100_sentences" = 20         # don't hedge to leadership
+"density.hedging.severe_per_100_sentences" = 40
+"density.throat_clearing.warn_phrases_per_1000_words" = 1.0   # leadership has no patience for this
+"density.throat_clearing.severe_phrases_per_1000_words" = 3.0
+"surprise.no_specificity.warn_per_1000_words" = 4.0   # leadership wants specificity
+"surprise.no_specificity.severe_per_1000_words" = 8.0
+
+[genre.executive_brief.checks_disabled]
+items = []   # no check disabled — all apply
+
+[genre.executive_brief.checks_required]
+roadmap = false   # short doc, no roadmap needed
+
+# -----------------------------------------------------------------------------
+[genre.architecture_doc]
+# Architecture decision records, design docs. Context-then-decision is OK.
+# Some passive in methods sections. Roadmap helpful for longer ones.
+description = "Architectural design document or decision record. Context-then-decision structure is appropriate."
+
+[genre.architecture_doc.overrides]
+"direction.buried_thesis.warn_position_pct" = 0.25     # context first is fine
+"direction.buried_thesis.severe_position_pct" = 0.50
+"density.passive.warn_ratio" = 0.35                    # looser
+"density.passive.severe_ratio" = 0.50
+"density.subject_verb_gap.warn_pct_sentences_over" = 0.20   # technical detail = longer sentences
+
+[genre.architecture_doc.checks_required]
+roadmap = true   # longer docs benefit from a roadmap
+
+# -----------------------------------------------------------------------------
+[genre.technical_report]
+# Detailed report on a technical investigation, analysis, or finding.
+# Methods sections legitimately use passive. Hedging acceptable in findings.
+description = "Detailed technical investigation, analysis, or report."
+
+[genre.technical_report.overrides]
+"direction.buried_thesis.warn_position_pct" = 0.20
+"direction.buried_thesis.severe_position_pct" = 0.40
+"density.passive.warn_ratio" = 0.40                    # methods OK
+"density.passive.severe_ratio" = 0.55
+"density.hedging.warn_per_100_sentences" = 50          # legitimate uncertainty
+"density.hedging.severe_per_100_sentences" = 80
+
+[genre.technical_report.checks_required]
+roadmap = true
+
+# -----------------------------------------------------------------------------
+[genre.finding_writeup]
+# Security/audit/quality finding. Should be: problem-impact-recommendation,
+# in that order. Tight discipline expected.
+description = "Security, audit, or quality finding writeup. Problem-impact-recommendation structure expected."
+
+[genre.finding_writeup.overrides]
+"direction.buried_thesis.warn_position_pct" = 0.10
+"direction.buried_thesis.severe_position_pct" = 0.25
+"density.passive.warn_ratio" = 0.20
+"density.passive.severe_ratio" = 0.35
+"density.hedging.warn_per_100_sentences" = 25
+"density.hedging.severe_per_100_sentences" = 50
+"surprise.no_specificity.warn_per_1000_words" = 3.0    # findings need specifics
+"surprise.no_specificity.severe_per_1000_words" = 6.0
+
+[genre.finding_writeup.checks_required]
+roadmap = false   # finding writeups are typically templated
+
+# -----------------------------------------------------------------------------
+[genre.proposal]
+# Proposal document — pitching a project, contract, vendor, etc.
+# Persuasive, claim-forward, but allowed to develop the case.
+description = "Persuasive proposal pitching a project, vendor, or initiative."
+
+[genre.proposal.overrides]
+"direction.buried_thesis.warn_position_pct" = 0.10
+"direction.buried_thesis.severe_position_pct" = 0.25
+"density.passive.warn_ratio" = 0.20
+"density.passive.severe_ratio" = 0.35
+"surprise.no_specificity.warn_per_1000_words" = 4.0
+"surprise.no_specificity.severe_per_1000_words" = 8.0
+
+[genre.proposal.checks_required]
+roadmap = true
+
+# -----------------------------------------------------------------------------
+[genre.rfc]
+# RFC (request for comments) — technical proposal soliciting input.
+# Similar to architecture_doc but more conversational; some hedging is
+# legitimate (the author is genuinely uncertain).
+description = "Request for comments — technical proposal soliciting input."
+
+[genre.rfc.overrides]
+"direction.buried_thesis.warn_position_pct" = 0.20
+"direction.buried_thesis.severe_position_pct" = 0.40
+"density.passive.warn_ratio" = 0.30
+"density.passive.severe_ratio" = 0.45
+"density.hedging.warn_per_100_sentences" = 50          # uncertainty is OK
+"density.hedging.severe_per_100_sentences" = 80
+
+[genre.rfc.checks_required]
+roadmap = true
+
+# -----------------------------------------------------------------------------
+[genre.status_update]
+# Short status update. Almost pure BLUF. No tolerance for fluff.
+description = "Short status update or progress report. Pure BLUF expected."
+
+[genre.status_update.overrides]
+"direction.buried_thesis.warn_position_pct" = 0.05
+"direction.buried_thesis.severe_position_pct" = 0.15
+"density.passive.warn_ratio" = 0.10
+"density.passive.severe_ratio" = 0.20
+"density.hedging.warn_per_100_sentences" = 15
+"density.hedging.severe_per_100_sentences" = 30
+"density.throat_clearing.warn_phrases_per_1000_words" = 0.5
+"density.throat_clearing.severe_phrases_per_1000_words" = 2.0
+"density.padding.warn_phrases_per_1000_words" = 2.0
+"density.padding.severe_phrases_per_1000_words" = 5.0
+"surprise.no_specificity.warn_per_1000_words" = 3.0
+"surprise.no_specificity.severe_per_1000_words" = 6.0
+
+[genre.status_update.checks_disabled]
+items = ["surprise.no_concrete_examples"]
+# Rationale: status updates are typically too short and too direct to
+# need example markers. Disable this check.
+
+[genre.status_update.checks_required]
+roadmap = false
+
+
+# =============================================================================
+# Rate-of-finding caps for v1 reporting
+# =============================================================================
+#
+# To avoid overwhelming the user, the script limits how many flags it emits
+# per check. The user/LLM can re-run with raised caps if needed.
+#
+# These are NOT thresholds for severity; they're caps on detail emission.
+# =============================================================================
+
+[reporting]
+max_flags_per_check = 25         # per sub-dimension
+max_flags_total = 200             # absolute ceiling
+flag_selection = "severity_then_position"
+# When more flags exist than the cap, the script emits the highest-severity
+# ones first, then the earliest-occurring within each severity tier.
+
+include_low_severity_flags = false
+# By default, "info"-level flags (below warn threshold) are not emitted as
+# individual flags — only counted in measurements.
