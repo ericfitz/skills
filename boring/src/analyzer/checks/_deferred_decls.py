@@ -12,7 +12,6 @@ from __future__ import annotations
 from . import register_deferred
 from .base import DeferredCheck
 
-
 register_deferred(
     DeferredCheck(
         code="D1.2",

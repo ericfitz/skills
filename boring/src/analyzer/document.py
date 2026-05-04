@@ -17,6 +17,7 @@ Extending:
     `load_document`. The parser must return (extracted_text, headings)
     where headings is a list of (level, text, char_offset) tuples.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -33,7 +34,8 @@ def _get_nlp(model_name: str = "en_core_web_sm") -> Any:
     """Lazy-load spaCy. Cache at module level."""
     global _nlp
     if _nlp is None:
-        import spacy  # imported here so checks that don't need it stay fast
+        import spacy  # type: ignore # imported here so checks that don't need it stay fast  # ty:ignore[unresolved-import]
+
         _nlp = spacy.load(model_name)
     return _nlp
 
@@ -60,6 +62,7 @@ class Paragraph:
 @dataclass
 class SentenceRef:
     """Reference to a sentence in the document."""
+
     index: int
     char_start: int
     char_end: int
@@ -74,8 +77,9 @@ class Document:
     Most fields are populated by load_document(). Lazy fields (spacy_doc,
     sentences) are computed on first access.
     """
+
     source_path: str
-    source_format: str            # "markdown" | "plaintext" | "docx"
+    source_format: str  # "markdown" | "plaintext" | "docx"
     source_bytes: bytes
     source_sha256: str
     extracted_text: str
@@ -159,7 +163,9 @@ class Document:
 # ---------------------------------------------------------------------------
 
 
-def load_document(path: str | Path, spacy_model_name: str = "en_core_web_sm") -> Document:
+def load_document(
+    path: str | Path, spacy_model_name: str = "en_core_web_sm"
+) -> Document:
     """Load a document from disk. Dispatches by extension."""
     path = Path(path)
     raw_bytes = path.read_bytes()
@@ -241,7 +247,9 @@ def _parse_docx(path: Path) -> tuple[str, list[Heading]]:
     Note: char_start/line_start in returned Headings refer to the
     *extracted* text, not the .docx archive.
     """
-    from docx import Document as DocxDocument  # python-docx
+    from docx import (  # ty:ignore[unresolved-import] # type: ignore
+        Document as DocxDocument,  # type: ignore # python-docx  # ty:ignore[unresolved-import]
+    )
 
     doc = DocxDocument(str(path))
     text_parts: list[str] = []

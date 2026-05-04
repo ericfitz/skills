@@ -22,16 +22,15 @@ from .. import locator as loc_mod
 from ..common.proselint_wrap import lint_document
 from ..common.word_lists import find_phrase_matches
 from ..document import Document
+from . import register_check
 from .base import (
+    SEVERITY_SEVERE,
+    SEVERITY_WARN,
     Finding,
     Flag,
     Summary,
-    SEVERITY_SEVERE,
-    SEVERITY_WARN,
     score_against_thresholds,
 )
-from . import register_check
-
 
 # proselint top-level categories that we count as "padding/wordiness".
 # Skipped entirely (handled in our wrapper): hedging, weasel_words.

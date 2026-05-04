@@ -52,21 +52,18 @@ def all_deferred() -> list[DeferredCheck]:
 # Import all check modules here so they self-register on package import.
 # ---------------------------------------------------------------------------
 
-# Direction axis
-# (none implemented in v1 scaffold yet — D1.1, D1.4, D1.6 to be added)
-
-# Density axis
-from . import d2_1_padding          # noqa: E402,F401
-from . import d2_3_passive  # noqa: E402,F401
-from . import d2_4_sv_gap   # noqa: E402,F401
-from . import d2_7_hedging          # noqa: E402,F401
-from . import d2_8_throat_clearing  # noqa: E402,F401
-
-# Texture axis
-from . import d3_1_sentence_length  # noqa: E402,F401
-
-# Surprise axis
-# (D4.4 to be added; D4.1 is medium priority)
-
-# Deferred (LLM-only) sub-dimensions
-from . import _deferred_decls  # noqa: E402,F401
+# Direction axis: D1.1, D1.4, D1.6 to be added.
+# Density axis: D2.1, D2.2, D2.3, D2.4, D2.7, D2.8.
+# Texture axis: D3.1; D3.3, D3.4, D3.5 to be added.
+# Surprise axis: D4.4 to be added; D4.1 is medium priority.
+# Deferred (LLM-only) sub-dimensions: _deferred_decls.
+from . import (  # noqa: E402, F401
+    _deferred_decls,
+    d2_1_padding,
+    d2_2_nominalization,
+    d2_3_passive,
+    d2_4_sv_gap,
+    d2_7_hedging,
+    d2_8_throat_clearing,
+    d3_1_sentence_length,
+)

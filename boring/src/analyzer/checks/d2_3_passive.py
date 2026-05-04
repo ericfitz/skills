@@ -19,16 +19,16 @@ from typing import Any
 
 from .. import locator as loc_mod
 from ..document import Document
+from . import register_check
 from .base import (
+    SEVERITY_INFO,
+    SEVERITY_SEVERE,
+    SEVERITY_WARN,
     Finding,
     Flag,
     Summary,
-    SEVERITY_SEVERE,
-    SEVERITY_WARN,
-    SEVERITY_INFO,
     score_against_thresholds,
 )
-from . import register_check
 
 
 class PassiveOverhangCheck:
@@ -52,7 +52,9 @@ class PassiveOverhangCheck:
                 continue
             is_passive, agent_present, evidence = self._detect_passive(span)
             if is_passive:
-                passive_sentences.append((sent_ref.index, sent_ref.char_start, sent_ref.char_end, agent_present))
+                passive_sentences.append(
+                    (sent_ref.index, sent_ref.char_start, sent_ref.char_end, agent_present)
+                )
 
         total = len(doc.sentences)
         passive_count = len(passive_sentences)

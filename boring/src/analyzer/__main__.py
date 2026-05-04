@@ -32,7 +32,10 @@ def _default_calibration_path() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="analyzer", description="Mechanical analysis for boring-writing detection.")
+    p = argparse.ArgumentParser(
+        prog="analyzer",
+        description="Mechanical analysis for boring-writing detection.",
+    )
     p.add_argument("document", type=Path, help="Path to the document to analyze.")
     p.add_argument(
         "--calibration",

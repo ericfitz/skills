@@ -24,16 +24,16 @@ from ..common.word_lists import (
     find_phrase_matches_at_starts,
 )
 from ..document import Document
+from . import register_check
 from .base import (
-    Finding,
-    Flag,
-    Summary,
     SEVERITY_INFO,
     SEVERITY_SEVERE,
     SEVERITY_WARN,
+    Finding,
+    Flag,
+    Summary,
     score_against_thresholds,
 )
-from . import register_check
 
 
 class ThroatClearingCheck:
@@ -80,8 +80,16 @@ class ThroatClearingCheck:
 
             # Position classification: paragraph opener > sentence opener > mid
             position = "mid_sentence"
-            is_para_opener = sent_ref is not None and sent_ref.char_start in paragraph_opener_anchors and self._is_first_match_for_anchor(c_start, sent_ref.char_start, all_matches)
-            is_sent_opener = sent_ref is not None and sent_ref.char_start in sentence_opener_anchors and self._is_first_match_for_anchor(c_start, sent_ref.char_start, all_matches)
+            sent_anchor = sent_ref.char_start if sent_ref else None
+            is_at_sentence_start = sent_anchor is not None and self._is_first_match_for_anchor(
+                c_start, sent_anchor, all_matches
+            )
+            is_para_opener = (
+                is_at_sentence_start and sent_anchor in paragraph_opener_anchors
+            )
+            is_sent_opener = (
+                is_at_sentence_start and sent_anchor in sentence_opener_anchors
+            )
             if is_para_opener:
                 position = "paragraph_opener"
                 paragraph_opener_count += 1

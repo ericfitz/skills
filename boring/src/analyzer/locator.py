@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import hashlib
 
-from .checks.base import Locator, SCOPE_DOCUMENT, SCOPE_PARAGRAPH, SCOPE_SPAN
+from .checks.base import SCOPE_DOCUMENT, SCOPE_PARAGRAPH, SCOPE_SPAN, Locator
 from .document import Document
-
 
 # Number of chars of surrounding context to include in locators.
 CONTEXT_WINDOW = 50

@@ -36,6 +36,14 @@ where = ["src"]
 [tool.ruff]
 src = ["src"]
 target-version = "py311"
+# Many of our long lines are curated word lists, comment URLs, or threshold
+# rationales where line-breaking hurts readability more than it helps.
+line-length = 110
+
+[tool.ruff.lint]
+# Match what the IDE's Ruff integration enforces. Default rules (E, F, I)
+# plus blind-except detection.
+select = ["E", "F", "I", "BLE"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["analyzer"]

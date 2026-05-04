@@ -4,17 +4,20 @@ Computed for the document overall and for the longest paragraphs (where
 variance signals overload-pocket risk). Reported in the JSON output but
 not used for scoring — readability formulas are descriptive only.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
-from ..document import Document
 from .. import locator as loc_mod
+from ..document import Document
 
 
-def compute_readability(doc: Document, top_n_long_paragraphs: int = 5) -> dict[str, Any]:
+def compute_readability(
+    doc: Document, top_n_long_paragraphs: int = 5
+) -> dict[str, Any]:
     """Compute document-level and per-long-paragraph readability scores."""
-    import textstat
+    import textstat  # type: ignore
 
     text = doc.extracted_text
 
@@ -24,7 +27,9 @@ def compute_readability(doc: Document, top_n_long_paragraphs: int = 5) -> dict[s
         "gunning_fog": _safe(lambda: textstat.gunning_fog(text)),
         "smog_index": _safe(lambda: textstat.smog_index(text)),
         "dale_chall": _safe(lambda: textstat.dale_chall_readability_score(text)),
-        "automated_readability_index": _safe(lambda: textstat.automated_readability_index(text)),
+        "automated_readability_index": _safe(
+            lambda: textstat.automated_readability_index(text)
+        ),
     }
 
     # Per-paragraph: pick longest N paragraphs by word count
@@ -45,8 +50,12 @@ def compute_readability(doc: Document, top_n_long_paragraphs: int = 5) -> dict[s
             {
                 "paragraph_index": p.index,
                 "word_count": word_count,
-                "flesch_reading_ease": _safe(lambda t=p.text: textstat.flesch_reading_ease(t)),
-                "flesch_kincaid_grade": _safe(lambda t=p.text: textstat.flesch_kincaid_grade(t)),
+                "flesch_reading_ease": _safe(
+                    lambda t=p.text: textstat.flesch_reading_ease(t)
+                ),
+                "flesch_kincaid_grade": _safe(
+                    lambda t=p.text: textstat.flesch_kincaid_grade(t)
+                ),
                 "locator": loc_mod.make_paragraph_locator(doc, p.index).to_dict(),
             }
         )
@@ -58,10 +67,17 @@ def compute_readability(doc: Document, top_n_long_paragraphs: int = 5) -> dict[s
 
 
 def _safe(fn: Any) -> float | None:
+    """Run a textstat call and return its rounded float result, or None.
+
+    textstat raises a variety of exceptions on degenerate inputs (empty
+    text, no syllables, etc.). We treat any of those as "metric not
+    computable" and return None — readability scores are descriptive,
+    so a missing one shouldn't fail the run.
+    """
     try:
         v = fn()
         if v is None:
             return None
         return round(float(v), 2)
-    except Exception:
+    except (ZeroDivisionError, ValueError, IndexError, KeyError, AttributeError, TypeError):
         return None
