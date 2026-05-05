@@ -10,6 +10,35 @@ taxonomy on four axes: **Direction**, **Density**, **Texture**, and
 **Skill entry point**: `src/SKILL.md`. Invoke from a Claude Code or
 Anthropic-Console session.
 
+## Install
+
+The shipped artifact is a versioned zip in `dist/`. Build it with:
+
+```sh
+boring/tools/build.sh
+# → boring/dist/boring-<version>.zip
+```
+
+To install into a Claude Code skills directory:
+
+```sh
+# 1. Copy the zip into your skills dir (user-global shown; project-
+#    local would be <repo>/.claude/skills/ instead).
+cp boring/dist/boring-<version>.zip ~/.claude/skills/
+
+# 2. Unzip — produces ~/.claude/skills/boring/
+cd ~/.claude/skills && unzip boring-<version>.zip && rm boring-<version>.zip
+
+# 3. Build the analyzer's Python venv. Requires `uv`
+#    (https://docs.astral.sh/uv/). Takes ~30s the first time.
+cd boring && uv sync
+```
+
+Step 3 is technically optional — SKILL.md's setup decision tree runs
+`uv sync` on first invocation if the venv is missing — but doing it
+eagerly fails fast if `uv` isn't installed or the network is down,
+instead of discovering that mid-conversation.
+
 ## Status
 
 **v0.1.0 — full pipeline complete.** 15 mechanical sub-dimensions run
