@@ -1,6 +1,0 @@
-boring/calibration/not-boring/HAZARDLOG-64.doc
-boring/calibration/not-boring/HAZARDLOG-65.doc
-boring/calibration/not-boring/HAZARDLOG-66.doc
-boring/calibration/not-boring/HAZARDLOG-225.doc
-boring/calibration/not-boring/ODBX-9506.doc
-boring/calibration/not-boring/ODBX-9563.doc

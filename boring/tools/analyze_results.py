@@ -22,7 +22,7 @@ The report intentionally stops short of editing calibration.toml — the
 human reviews and applies.
 
 Usage (from the repo root):
-    uv --project boring run python ../tooling/calibration/analyze_results.py
+    uv --project boring/src run python boring/tools/analyze_results.py
 """
 from __future__ import annotations
 
@@ -33,11 +33,9 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-_TOOLING_DIR = Path(__file__).resolve().parent.parent
-_REPO_ROOT = _TOOLING_DIR.parent
-_SKILL_DIR = _REPO_ROOT / "boring"
-RESULTS_CSV = _SKILL_DIR / "calibration" / "results.csv"
-REPORT_MD = _SKILL_DIR / "calibration" / "recommendations.md"
+_BORING_DIR = Path(__file__).resolve().parent.parent
+RESULTS_CSV = _BORING_DIR / "calibration" / "results.csv"
+REPORT_MD = _BORING_DIR / "calibration" / "recommendations.md"
 
 # For each sub-dimension, declare whether higher metric_value = worse.
 # This matches the higher_is_worse argument the checks pass into

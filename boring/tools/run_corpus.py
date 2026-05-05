@@ -2,8 +2,8 @@
 emit a flat CSV of (filename, label, genre, code, score, metric_value,
 flag_count) rows for downstream separability analysis.
 
-Usage (from the repo root, where the .venv lives next to boring/):
-    uv --project boring run python ../tooling/calibration/run_corpus.py
+Usage (from the repo root):
+    uv --project boring/src run python boring/tools/run_corpus.py
 
 Outputs:
     boring/calibration/results.csv
@@ -21,17 +21,16 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-# This script lives at  <repo>/tooling/calibration/run_corpus.py
-# The skill (and analyzer) live at  <repo>/boring/
-_TOOLING_DIR = Path(__file__).resolve().parent.parent
-_REPO_ROOT = _TOOLING_DIR.parent
-_SKILL_DIR = _REPO_ROOT / "boring"
-sys.path.insert(0, str(_SKILL_DIR / "scripts"))
+# This script lives at  <repo>/boring/tools/run_corpus.py
+# The skill source (and analyzer) live at  <repo>/boring/src/
+_BORING_DIR = Path(__file__).resolve().parent.parent
+_SRC_DIR = _BORING_DIR / "src"
+sys.path.insert(0, str(_SRC_DIR / "scripts"))
 
 from analyzer.pipeline import run_analysis  # noqa: E402  # ty:ignore[unresolved-import]
 
-CALIBRATION_DIR = _SKILL_DIR / "calibration"
-CALIBRATION_TOML = _SKILL_DIR / "calibration.toml"
+CALIBRATION_DIR = _BORING_DIR / "calibration"
+CALIBRATION_TOML = _SRC_DIR / "calibration.toml"
 RESULTS_CSV = CALIBRATION_DIR / "results.csv"
 
 # Default genre for every doc in the corpus. The corpus is predominantly
