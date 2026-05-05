@@ -5,6 +5,19 @@ __pycache__/
 .DS_Store
 .envrc
 
-# Calibration corpus — mostly third-party / copyrighted source documents
-# we use locally to tune thresholds. Not for the public repo.
-boring/calibration/
+# Calibration corpus and per-run outputs — mostly third-party /
+# copyrighted source documents and large CSV artifacts we use locally
+# to tune thresholds. Not for the public repo. The tooling
+# (run_corpus.py, run_one.py, analyze_results.py) IS tracked — only the
+# data directories and per-run output files are ignored.
+boring/calibration/boring/
+boring/calibration/not-boring/
+boring/calibration/test/
+boring/calibration/corpus/
+boring/calibration/results.csv
+boring/calibration/recommendations.md
+boring/calibration/manifest.csv
+boring/calibration/README.md
+
+# IDE local state
+.vscode/
