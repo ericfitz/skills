@@ -16,7 +16,8 @@ technical reports — across a 20-sub-dimension taxonomy on four axes:
 
 The taxonomy is grounded in the MAC model of boredom (Westgate &
 Wilson, 2018) plus the craft tradition (Gopen-Swan, Williams, Provost,
-Minto). Full theoretical grounding: `docs/research-report.md`.
+Minto). Full theoretical grounding lives in the development repo
+(`boring/docs/research-report.md`) and is not shipped with the skill.
 
 ## When to invoke
 
@@ -235,8 +236,9 @@ user specifies otherwise).
 
 After producing the merged JSON, summarize for the user. Lead with
 the four axis verdicts; then enumerate the most important sub-
-dimensions to address. Apply this priority ordering (from
-`docs/research-report.md` Part III §Phase 3):
+dimensions to address. Apply this priority ordering (derived from
+the MAC model; see the development repo's research report for full
+detail):
 
 1. Direction failures first — fix these and the document becomes
    worth reading even if other problems remain.
@@ -274,32 +276,27 @@ should make deliberately.
 ## Files in this skill
 
 ```
-boring/
+boring/                         ← (this file lives in src/; tree shows shipped layout)
 ├── SKILL.md                    ← this file
-├── README.md                   ← project overview
 ├── calibration.toml            ← thresholds (uncalibrated as of v0.1)
 ├── docs/
-│   ├── research-report.md      ← MAC model + craft-tradition grounding
 │   ├── schema-mechanical.md    ← Phase 1 output schema
 │   ├── schema-llm.md           ← Phase 2 output schema
-│   ├── schema-merged.md        ← Phase 3 output schema
-│   ├── decisions.md            ← design decisions log
-│   └── calibration-findings-2026-05-04.md  ← v0.1 corpus calibration result
+│   └── schema-merged.md        ← Phase 3 output schema
 ├── rubrics/
 │   ├── D1_2_missing_stakes.md
 │   ├── D1_5_flat_tension.md
 │   ├── D2_5_obvious_claims.md
 │   ├── D4_2_no_vivid_imagery.md
 │   └── D4_3_no_counterintuitive_claims.md
-├── samples/
-│   ├── input.md                ← deliberately bad sample for testing
-│   └── output.json             ← Phase 1 output for the sample
 ├── scripts/
 │   └── analyzer/               ← the Python analyzer package
 ├── pyproject.toml              ← Python deps (spacy, proselint, textstat, ...)
 └── uv.lock
 ```
 
-The `tooling/` directory at the parent level (outside the skill)
-holds calibration scripts used during development; not needed at
-runtime.
+In the development repo this skill is built from `boring/src/`. The
+parent `boring/` directory also contains `docs/` (full design notes
+and research grounding), `samples/` (smoke-test fixtures), `tools/`
+(calibration scripts), and `calibration/` (gitignored corpus) — none
+of which ship with the skill.

@@ -7,7 +7,7 @@ taxonomy on four axes: **Direction**, **Density**, **Texture**, and
 **Surprise**. Grounded in the MAC model of boredom (Westgate & Wilson,
 2018) plus the craft tradition (Gopen-Swan, Williams, Provost, Minto).
 
-**Skill entry point**: `SKILL.md`. Invoke from a Claude Code or
+**Skill entry point**: `src/SKILL.md`. Invoke from a Claude Code or
 Anthropic-Console session.
 
 ## Status
@@ -15,78 +15,79 @@ Anthropic-Console session.
 **v0.1.0 — full pipeline complete.** 15 mechanical sub-dimensions run
 as a Python script (deterministic, locator-rich JSON output);
 5 LLM-judged sub-dimensions are handled by the host LLM via the
-rubrics in `rubrics/`. Calibration thresholds are intuitive defaults,
-not yet tuned against a labeled corpus of business writing — see
-`docs/calibration-findings-2026-05-04.md` for the first calibration
-attempt and why it punted on threshold updates.
+rubrics in `src/rubrics/`. Calibration thresholds are intuitive
+defaults, not yet tuned against a labeled corpus of business writing —
+see `docs/calibration-findings-2026-05-04.md` for the first
+calibration attempt and why it punted on threshold updates.
 
-## Structure
+## Repository layout
+
+This directory is split into the shipped skill and the dev-side
+tooling around it:
 
 ```
 boring/
-├── SKILL.md                    ← entry point: invocation, workflow, rubrics index
-├── README.md                   ← this file (project overview)
-├── calibration.toml            ← thresholds + per-genre profiles
-├── pyproject.toml              ← Python deps for the analyzer
-├── docs/
+├── README.md                   ← this file
+├── src/                        ← the skill (everything that ships)
+│   ├── SKILL.md                ← entry point: invocation, workflow, rubrics index
+│   ├── calibration.toml        ← thresholds + per-genre profiles
+│   ├── pyproject.toml          ← Python deps for the analyzer
+│   ├── uv.lock
+│   ├── docs/
+│   │   ├── schema-mechanical.md    ← Phase 1 (analyzer) output schema
+│   │   ├── schema-llm.md           ← Phase 2 (LLM judgment) output schema
+│   │   └── schema-merged.md        ← Phase 3 (merged) output schema
+│   ├── rubrics/                ← Phase 2 judge rubrics (read by the host LLM)
+│   │   ├── D1_2_missing_stakes.md
+│   │   ├── D1_5_flat_tension.md
+│   │   ├── D2_5_obvious_claims.md
+│   │   ├── D4_2_no_vivid_imagery.md
+│   │   └── D4_3_no_counterintuitive_claims.md
+│   └── scripts/
+│       └── analyzer/           ← the Python analyzer package
+│           ├── __main__.py     ← CLI entry point
+│           ├── pipeline.py     ← orchestrator
+│           ├── document.py     ← parsing (md / txt / docx / pdf), spaCy caching
+│           ├── locator.py      ← composite-locator construction
+│           ├── config.py       ← calibration loading + genre overrides
+│           ├── checks/         ← one file per check, registered into the pipeline
+│           └── common/
+│               ├── proselint_wrap.py    ← cached proselint pass + span-offset fix
+│               ├── readability.py
+│               └── word_lists.py        ← curated phrase tables
+├── docs/                       ← dev-side reference (not shipped)
 │   ├── research-report.md      ← MAC + craft-tradition grounding, taxonomy
-│   ├── schema-mechanical.md    ← Phase 1 (analyzer) output schema
-│   ├── schema-llm.md           ← Phase 2 (LLM judgment) output schema
-│   ├── schema-merged.md        ← Phase 3 (merged) output schema
 │   ├── decisions.md            ← design decisions log
 │   └── calibration-findings-2026-05-04.md
-├── rubrics/                    ← Phase 2 judge rubrics (read by the host LLM)
-│   ├── D1_2_missing_stakes.md
-│   ├── D1_5_flat_tension.md
-│   ├── D2_5_obvious_claims.md
-│   ├── D4_2_no_vivid_imagery.md
-│   └── D4_3_no_counterintuitive_claims.md
-├── samples/
-│   ├── input.md                ← deliberately bad sample for testing
-│   └── output.json             ← Phase 1 output for the sample
-└── scripts/
-    └── analyzer/               ← the Python analyzer package
-        ├── __main__.py         ← CLI entry point
-        ├── pipeline.py         ← orchestrator
-        ├── document.py         ← parsing (md / txt / docx / pdf), spaCy caching
-        ├── locator.py          ← composite-locator construction
-        ├── config.py           ← calibration loading + genre overrides
-        ├── checks/             ← one file per check, registered into the pipeline
-        └── common/
-            ├── proselint_wrap.py    ← cached proselint pass + span-offset fix
-            ├── readability.py
-            └── word_lists.py        ← curated phrase tables
+├── samples/                    ← smoke-test fixtures (not shipped)
+│   ├── input.md
+│   └── output.json
+├── tools/                      ← calibration scripts (not shipped)
+│   ├── run_corpus.py           ← runs the analyzer over a labeled corpus
+│   ├── run_one.py              ← re-runs a single doc, patches results.csv
+│   └── analyze_results.py      ← per-check separability + threshold recs
+├── calibration/                ← gitignored corpus + per-run outputs
+└── dist/                       ← gitignored build output (copy of src/)
 ```
 
-The `tooling/` directory at the repo root (outside the skill) holds
-calibration scripts used during development:
-
-```
-tooling/
-└── calibration/
-    ├── run_corpus.py           ← runs the analyzer over a labeled corpus
-    ├── run_one.py              ← re-runs a single doc, patches results.csv
-    └── analyze_results.py      ← per-check separability + threshold recs
-```
-
-These are **not part of the skill** — they're for tuning
-`calibration.toml` against a hand-labeled corpus. Don't ship them as
-part of the skill distribution.
+To produce a distributable skill, copy `src/` into `dist/boring/`.
+Everything outside `src/` is dev-side and intentionally not shipped.
 
 ## Quickstart
 
 ```sh
-# from the boring/ directory — uv handles the venv + deps
+# from boring/src/ — uv handles the venv + deps (model is bundled
+# via pyproject.toml, no separate spaCy install needed)
+cd src
 uv sync
-uv pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl  # one-time
 
-# run the mechanical analyzer
-uv run python -m analyzer samples/input.md --genre executive_brief --output result.json
+# run the mechanical analyzer against the bundled sample
+uv run python -m analyzer ../samples/input.md --genre executive_brief --output /tmp/result.json
 ```
 
 If your IDE (VS Code, ty, Pylance) reports spurious "unresolved import"
 errors for `spacy`, `proselint`, `textstat`, `docx`, or `pypdf`, point
-the IDE's Python interpreter at `./.venv/bin/python`. The
+the IDE's Python interpreter at `boring/src/.venv/bin/python`. The
 `pyproject.toml` already configures `tool.ty.environment`,
 `tool.pyright`, and `tool.ruff` for that path; some IDEs also need an
 explicit interpreter selection.
@@ -123,21 +124,21 @@ claims. Their rubrics live in `rubrics/`.
 
 ## Adding a new mechanical check
 
-1. Create a new module in `scripts/analyzer/checks/` (e.g.
+1. Create a new module in `src/scripts/analyzer/checks/` (e.g.
    `d2_6_idea_overload.py`).
 2. Define a class with class-level `code`, `name`, `axis` and a
    `run(doc, config)` method returning a `Finding`.
 3. Call `register_check(YourCheck())` at the bottom of the file.
-4. Add the import to `scripts/analyzer/checks/__init__.py`.
-5. Add the corresponding threshold block to `calibration.toml`.
+4. Add the import to `src/scripts/analyzer/checks/__init__.py`.
+5. Add the corresponding threshold block to `src/calibration.toml`.
 
 The pipeline picks it up automatically.
 
 ## See also
 
-- `SKILL.md` — the invocation contract
+- `src/SKILL.md` — the invocation contract
 - `docs/research-report.md` — taxonomy and theoretical grounding
-- `docs/schema-mechanical.md` / `docs/schema-llm.md` /
-  `docs/schema-merged.md` — output schemas
+- `src/docs/schema-mechanical.md` / `src/docs/schema-llm.md` /
+  `src/docs/schema-merged.md` — output schemas (shipped with the skill)
 - `docs/decisions.md` — design decisions log
-- `calibration.toml` — every threshold, with rationale comments
+- `src/calibration.toml` — every threshold, with rationale comments

@@ -9,9 +9,13 @@ __pycache__/
 # Calibration corpus and per-run outputs — mostly third-party /
 # copyrighted source documents and large CSV artifacts we use locally
 # to tune thresholds. Not for the public repo. The tooling
-# (run_corpus.py, run_one.py, analyze_results.py) IS tracked — only the
-# data directories and per-run output files are ignored.
+# (boring/tools/*.py) IS tracked — only the data directories and
+# per-run output files are ignored.
 boring/calibration/
+
+# Built skill output — produced by copying boring/src/ into a
+# distributable tree. Regenerated; not tracked.
+boring/dist/
 
 # IDE local state
 .vscode/
