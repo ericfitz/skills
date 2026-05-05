@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "boring-analyzer"
 version = "0.1.0"
-description = "Mechanical analysis layer for the boring-writing detection skill"
+description = "Mechanical-analysis runtime for the boring-writing skill"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -22,41 +22,39 @@ dependencies = [
 boring-analyze = "analyzer.__main__:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["scripts"]
 
 [tool.setuptools.package-data]
-# Calibration is in the repo root, not in the package; pass --calibration explicitly
-# or rely on the analyzer's default-path resolution.
+# Calibration lives at the skill root; pass --calibration explicitly or
+# rely on the analyzer's default-path resolution.
 
 # ---------------------------------------------------------------------------
 # Tooling — point linters and type-checkers at the project's .venv so they
-# resolve our deps (spacy, proselint, textstat, python-docx). uv creates the
-# venv at ./.venv; if you use a different venv path, override these.
+# resolve our deps (spacy, proselint, textstat, python-docx, pypdf).
+# uv creates the venv at ./.venv; override these if you use a different path.
 # ---------------------------------------------------------------------------
 
 [tool.ruff]
-src = ["src"]
+src = ["scripts"]
 target-version = "py311"
-# Many of our long lines are curated word lists, comment URLs, or threshold
-# rationales where line-breaking hurts readability more than it helps.
+# Many long lines are curated word lists, threshold-rationale comments,
+# or rubric prose where breaking lines hurts readability more than it helps.
 line-length = 110
 
 [tool.ruff.lint]
-# Match what the IDE's Ruff integration enforces. Default rules (E, F, I)
-# plus blind-except detection.
+# Match the IDE's Ruff integration: default rules (E, F, I) plus blind-except.
 select = ["E", "F", "I", "BLE"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["analyzer"]
 
 [tool.ty.environment]
-# ty (Astral's type-checker) — point at the project's .venv so it can resolve
-# imports installed by `uv sync` / `uv pip install -e .`.
+# ty (Astral's type-checker) — point at the project's .venv.
 python = ".venv"
 
 [tool.pyright]
-# Pylance / Pyright — same purpose as the [tool.ty] block above.
+# Pylance / Pyright — same purpose as [tool.ty].
 venvPath = "."
 venv = ".venv"
-include = ["src"]
-extraPaths = ["src"]
+include = ["scripts"]
+extraPaths = ["scripts"]

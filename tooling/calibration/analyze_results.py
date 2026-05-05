@@ -17,12 +17,12 @@ flip + slack) flags as "drop or rethink". AUC in [0.55, 0.65] = "weak,
 keep but down-weight". AUC >= 0.65 = "useful". Heuristic, not a hard
 rule.
 
-Output: a Markdown report at calibration/recommendations.md. The report
-intentionally stops short of editing calibration.toml — the human
-reviews and applies.
+Output: a Markdown report at boring/calibration/recommendations.md.
+The report intentionally stops short of editing calibration.toml — the
+human reviews and applies.
 
-Usage (from boring/):
-    uv run python calibration/analyze_results.py
+Usage (from the repo root):
+    uv --project boring run python ../tooling/calibration/analyze_results.py
 """
 from __future__ import annotations
 
@@ -33,9 +33,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-RESULTS_CSV = _REPO_ROOT / "calibration" / "results.csv"
-REPORT_MD = _REPO_ROOT / "calibration" / "recommendations.md"
+_TOOLING_DIR = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _TOOLING_DIR.parent
+_SKILL_DIR = _REPO_ROOT / "boring"
+RESULTS_CSV = _SKILL_DIR / "calibration" / "results.csv"
+REPORT_MD = _SKILL_DIR / "calibration" / "recommendations.md"
 
 # For each sub-dimension, declare whether higher metric_value = worse.
 # This matches the higher_is_worse argument the checks pass into

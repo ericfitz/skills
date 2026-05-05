@@ -1,11 +1,13 @@
 """Run the analyzer over a single document and append its rows to
-calibration/results.csv (replacing any existing rows for that filename).
+boring/calibration/results.csv (replacing any existing rows for that filename).
 
-Usage (from the boring/ directory):
-    uv run python calibration/run_one.py <relative_path_under_calibration> [genre]
+Usage (from the repo root):
+    uv --project boring run python ../tooling/calibration/run_one.py \\
+        <relative_path_under_calibration> [genre]
 
 Example:
-    uv run python calibration/run_one.py boring/03_nist_sp_800-53_rev5_2020.pdf
+    uv --project boring run python ../tooling/calibration/run_one.py \\
+        boring/03_nist_sp_800-53_rev5_2020.pdf
 """
 
 from __future__ import annotations
@@ -15,13 +17,15 @@ import sys
 import time
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_REPO_ROOT / "src"))
+_TOOLING_DIR = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _TOOLING_DIR.parent
+_SKILL_DIR = _REPO_ROOT / "boring"
+sys.path.insert(0, str(_SKILL_DIR / "scripts"))
 
 from analyzer.pipeline import run_analysis  # noqa: E402  # ty:ignore[unresolved-import]
 
-CALIBRATION_DIR = _REPO_ROOT / "calibration"
-CALIBRATION_TOML = _REPO_ROOT / "calibration.toml"
+CALIBRATION_DIR = _SKILL_DIR / "calibration"
+CALIBRATION_TOML = _SKILL_DIR / "calibration.toml"
 RESULTS_CSV = CALIBRATION_DIR / "results.csv"
 
 
