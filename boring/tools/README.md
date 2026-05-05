@@ -1,8 +1,23 @@
 # boring/tools/
 
 Development tooling for the boring skill. Not shipped with the skill,
-not invoked at skill runtime — used during skill development and
-calibration.
+not invoked at skill runtime — used during skill development,
+calibration, and packaging.
+
+## Build script
+
+`build.sh` produces a distributable zip:
+
+```sh
+boring/tools/build.sh
+# → boring/dist/boring/             (staged tree, kept for inspection)
+# → boring/dist/boring-<version>.zip (artifact for distribution)
+```
+
+Version is read from `boring/src/pyproject.toml`. The zip wraps a
+top-level `boring/` directory so `unzip` produces a single drop-in
+folder. Excludes `.venv`, `__pycache__`, `*.egg-info`, `.envrc`,
+`.ruff_cache`, and `.DS_Store`.
 
 ## Calibration scripts
 
