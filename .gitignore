@@ -4,3 +4,8 @@ __pycache__/
 *.egg-info/
 .DS_Store
 .envrc
+
+# Calibration corpus — mostly third-party / copyrighted source documents
+# we use locally to tune thresholds. Not for the public repo.
+boring/calibration/test/
+boring/calibration/corpus/

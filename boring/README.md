@@ -68,6 +68,8 @@ IDEs also need an explicit interpreter selection.
 
 Genres recognized: `executive_brief`, `architecture_doc`, `technical_report`, `finding_writeup`, `proposal`, `rfc`, `status_update`. Omit `--genre` to use default thresholds.
 
+Input formats: `.md` / `.markdown`, `.txt`, `.docx`, `.pdf`. PDFs use `pypdf` for text extraction and carry `page_number` on every locator. Image-only / scanned PDFs are rejected with a clear error (OCR is not supported).
+
 ## What's implemented
 
 All 15 mechanical checks are working end-to-end:

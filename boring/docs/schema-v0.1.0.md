@@ -248,6 +248,12 @@ Behavior across source formats:
 
 - **Markdown / plaintext**: all fields populated. `char_start/end` and `line_start/end` are into the source file directly.
 - **docx**: `char_start/end` and `line_start/end` are into the *extracted normalized text*, not the .docx archive. `paragraph_index` is the primary navigation aid for the writer. `text_preview` lets them search for the span in Word.
+- **pdf**: `char_start/end` and `line_start/end` are into the *extracted normalized text* (page text joined with `\n\n`). `page_number` (1-indexed) is the primary navigation aid; `page_number_end` is emitted only when the span crosses a page. Headings are not extracted from PDFs (PDF has no reliable heading model), so `section_path` is always empty.
+
+PDF-specific locator fields:
+
+- `page_number`: 1-indexed page where the span starts. Emitted only for PDF source.
+- `page_number_end`: 1-indexed page where the span ends. Emitted only when the span crosses pages (different from `page_number`).
 
 `scope` distinguishes:
 - `"span"` — a specific token range; all locator fields populated.

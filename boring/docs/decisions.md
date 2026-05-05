@@ -4,6 +4,55 @@ Short notes on choices made during development. Date-ordered. Add to the top whe
 
 ---
 
+## 2026-05-04 — PDF support
+
+### pypdf, no OCR, no PDF heading detection
+
+Library: **pypdf** (MIT, pure-Python, no native deps). Considered
+pdfminer.six (more layout-aware, slower), pymupdf (best quality but
+AGPL — incompatible with downstream repackaging), and pdfplumber
+(table-oriented, we don't need tables). pypdf is good enough for the
+typical business-PDF corpus we'd label for calibration; we can swap if
+extraction quality becomes a corpus problem.
+
+**Image-only / scanned PDFs hard-fail** with a clear ValueError. OCR is a
+v2 decision — adding tesseract or ocrmypdf would be significant scope
+creep for a niche of input documents.
+
+**No heading extraction from PDFs.** PDF has no reliable heading model
+and pypdf doesn't expose font sizes well. Heuristic detection (short
+lines surrounded by blank lines, all-caps lines) was considered and
+rejected as too noisy. Consequence: D1.4 (signposting) yields "no
+boundaries to evaluate" on most PDFs — a known false negative we accept
+in exchange for not misleading the other Direction-axis checks with
+wrong heading detection.
+
+### page_number in the Locator schema
+
+The `Locator` dataclass gains an optional `page_number` field
+(1-indexed) and `page_number_end` (only emitted when a span crosses a
+page). Populated for PDF source only; omitted from the JSON output for
+all other formats. This is a backwards-compatible minor-version bump
+per the schema versioning policy.
+
+The page-number lookup uses a side table on `Document.page_boundaries`
+— a list of `(char_start, char_end, page_number)` tuples built during
+parse. `Document.page_number_for_offset(offset)` does the lookup; the
+locator helpers call it automatically. No check code needs to know
+about pages.
+
+### Page join with `\n\n`
+
+PDF pages are joined with `\n\n` so paragraph segmentation works
+naturally across page breaks (a paragraph that wraps from page 1 to
+page 2 is still one paragraph). This does mean the last paragraph of
+one page and first of the next sometimes get merged when a writer
+deliberately splits them at page breaks — but in business PDFs the
+page break is usually a layout decision, not a paragraph-boundary
+decision, so this is the right default.
+
+---
+
 ## 2026-05-04 — Direction-axis checks (D1.1, D1.4, D1.6)
 
 ### D1.1 buried thesis: claim detection is conservative
