@@ -101,9 +101,24 @@ class Document:
 
     @property
     def spacy_doc(self) -> Any:
-        """The spaCy-parsed document, computed once."""
+        """The spaCy-parsed document, computed once.
+
+        spaCy's default `nlp.max_length` (1,000,000 characters) is too low
+        for some long documents in our corpus (e.g., NIST SP 800-53 at
+        ~1.65M chars). We raise it per-call to fit the document, with a
+        safety ceiling of 10M to avoid OOM on malformed input.
+        """
         if self._spacy_doc is None:
             nlp = _get_nlp(self._spacy_model_name)
+            text_len = len(self.extracted_text)
+            if text_len > nlp.max_length:
+                if text_len > 10_000_000:
+                    raise ValueError(
+                        f"Document is {text_len:,} characters, exceeding the 10,000,000 "
+                        "character safety ceiling. Refusing to parse."
+                    )
+                # Bump just enough to fit, with headroom.
+                nlp.max_length = max(nlp.max_length, text_len + 100_000)
             self._spacy_doc = nlp(self.extracted_text)
         return self._spacy_doc
 
