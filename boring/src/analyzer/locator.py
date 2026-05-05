@@ -71,6 +71,9 @@ def make_span_locator(
     # Section path at this offset
     section_path = doc.section_path_for_offset(char_start)
 
+    page_number = doc.page_number_for_offset(char_start)
+    page_number_end = doc.page_number_for_offset(max(char_start, char_end - 1))
+
     return Locator(
         scope=SCOPE_SPAN,
         char_start=char_start,
@@ -82,6 +85,8 @@ def make_span_locator(
         sentence_index_start=sentence_index_start,
         sentence_index_end=sentence_index_end,
         paragraph_index=paragraph_index,
+        page_number=page_number,
+        page_number_end=page_number_end,
         section_path=section_path,
         text_sha256=_hash_text(span_text),
         text_preview=_truncate_preview(span_text),
@@ -109,6 +114,8 @@ def make_paragraph_locator(doc: Document, paragraph_index: int) -> Locator:
         line_end=line_end,
         line_col_end=col_end,
         paragraph_index=paragraph_index,
+        page_number=doc.page_number_for_offset(p.char_start),
+        page_number_end=doc.page_number_for_offset(max(p.char_start, p.char_end - 1)),
         section_path=doc.section_path_for_offset(p.char_start),
         text_sha256=_hash_text(para_text),
         text_preview=_truncate_preview(para_text),

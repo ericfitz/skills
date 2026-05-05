@@ -32,7 +32,9 @@ class Locator:
     See schema-v0.1.0.md for full semantics. For markdown/plaintext, all
     char/line fields refer to the source file. For docx, they refer to
     the extracted normalized text — paragraph_index and text_preview are
-    the primary navigation aids in that case.
+    the primary navigation aids in that case. For pdf, char/line refer to
+    the extracted normalized text and page_number is populated as the
+    primary navigation aid.
     """
     scope: str = SCOPE_SPAN
     char_start: int = 0
@@ -44,6 +46,8 @@ class Locator:
     sentence_index_start: int | None = None
     sentence_index_end: int | None = None
     paragraph_index: int | None = None
+    page_number: int | None = None  # 1-indexed; populated for PDF source only
+    page_number_end: int | None = None  # 1-indexed; differs from page_number when span crosses pages
     section_path: list[str] = field(default_factory=list)
     text_sha256: str = ""
     text_preview: str = ""
@@ -70,6 +74,10 @@ class Locator:
             d["sentence_index_end"] = self.sentence_index_end
         if self.paragraph_index is not None:
             d["paragraph_index"] = self.paragraph_index
+        if self.page_number is not None:
+            d["page_number"] = self.page_number
+            if self.page_number_end is not None and self.page_number_end != self.page_number:
+                d["page_number_end"] = self.page_number_end
         return d
 
 

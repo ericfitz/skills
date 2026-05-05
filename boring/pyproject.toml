@@ -15,6 +15,7 @@ dependencies = [
     "textstat>=0.7",
     "proselint>=0.14",
     "python-docx>=1.0",
+    "pypdf>=6.10.2",
 ]
 
 [project.scripts]

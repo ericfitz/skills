@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -79,13 +79,18 @@ class Document:
     """
 
     source_path: str
-    source_format: str  # "markdown" | "plaintext" | "docx"
+    source_format: str  # "markdown" | "plaintext" | "docx" | "pdf"
     source_bytes: bytes
     source_sha256: str
     extracted_text: str
     extracted_text_sha256: str
     headings: list[Heading]
     paragraphs: list[Paragraph]
+
+    # PDF-only side table: list of (char_start, char_end, page_number) tuples
+    # mapping spans of extracted_text to their source page (1-indexed).
+    # Empty for non-PDF formats.
+    page_boundaries: list[tuple[int, int, int]] = field(default_factory=list)
 
     # Lazy-computed
     _spacy_doc: Any = None
@@ -132,6 +137,16 @@ class Document:
         # Fall back to last paragraph
         return self.paragraphs[-1].index if self.paragraphs else 0
 
+    def page_number_for_offset(self, char_offset: int) -> int | None:
+        """Return the 1-indexed page number for a char offset, or None for
+        non-PDF documents (or if the offset falls outside any page range)."""
+        for s, e, page in self.page_boundaries:
+            if s <= char_offset < e:
+                return page
+        if self.page_boundaries and char_offset >= self.page_boundaries[-1][1]:
+            return self.page_boundaries[-1][2]
+        return None
+
     def section_path_for_offset(self, char_offset: int) -> list[str]:
         """Build the heading hierarchy in effect at a given char offset."""
         path: list[str] = []
@@ -172,6 +187,7 @@ def load_document(
     source_sha = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
     suffix = path.suffix.lower()
 
+    page_boundaries: list[tuple[int, int, int]] = []
     if suffix in (".md", ".markdown"):
         text, headings = _parse_markdown(raw_bytes)
         source_format = "markdown"
@@ -181,6 +197,9 @@ def load_document(
     elif suffix == ".docx":
         text, headings = _parse_docx(path)
         source_format = "docx"
+    elif suffix == ".pdf":
+        text, headings, page_boundaries = _parse_pdf(path)
+        source_format = "pdf"
     else:
         raise ValueError(f"Unsupported file extension: {suffix!r}")
 
@@ -196,6 +215,7 @@ def load_document(
         extracted_text_sha256=extracted_sha,
         headings=headings,
         paragraphs=paragraphs,
+        page_boundaries=page_boundaries,
         _spacy_model_name=spacy_model_name,
     )
 
@@ -279,6 +299,55 @@ def _parse_docx(path: Path) -> tuple[str, list[Heading]]:
 
     text = "\n\n".join(text_parts)
     return text, headings
+
+
+def _parse_pdf(path: Path) -> tuple[str, list[Heading], list[tuple[int, int, int]]]:
+    """Extract text from a PDF using pypdf.
+
+    Returns (extracted_text, headings, page_boundaries) where:
+      - headings is always [] (we don't attempt heading detection from PDF
+        layout; see docs/decisions.md)
+      - page_boundaries is a list of (char_start, char_end, page_number)
+        tuples mapping spans of the extracted_text back to their source
+        page (page_number is 1-indexed)
+
+    Pages are joined with two newlines so paragraph segmentation behaves
+    sensibly across page breaks. Within a page we keep pypdf's extracted
+    layout as-is.
+
+    Raises ValueError if the PDF contains no extractable text (e.g., a
+    scanned/image-only PDF). OCR is not supported.
+    """
+    from pypdf import PdfReader  # type: ignore # ty:ignore[unresolved-import]
+
+    reader = PdfReader(str(path))
+    page_texts: list[str] = []
+    page_boundaries: list[tuple[int, int, int]] = []
+
+    char_offset = 0
+    page_separator = "\n\n"
+    for page_idx, page in enumerate(reader.pages, start=1):
+        page_text = page.extract_text() or ""
+        # Normalize line endings; pypdf occasionally emits \r line terminators.
+        page_text = page_text.replace("\r\n", "\n").replace("\r", "\n")
+        page_start = char_offset
+        page_end = page_start + len(page_text)
+        page_boundaries.append((page_start, page_end, page_idx))
+        page_texts.append(page_text)
+        # Advance offset by page text + separator (separator only between pages)
+        char_offset = page_end
+        if page_idx < len(reader.pages):
+            char_offset += len(page_separator)
+
+    text = page_separator.join(page_texts)
+
+    if not any(c.isalpha() for c in text):
+        raise ValueError(
+            f"PDF contains no extractable text: {path!s}. "
+            "Image-only / scanned PDFs require OCR, which is not supported."
+        )
+
+    return text, [], page_boundaries
 
 
 def _segment_paragraphs(text: str) -> list[Paragraph]:
