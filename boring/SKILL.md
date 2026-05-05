@@ -56,39 +56,87 @@ this `SKILL.md` (e.g., `~/.claude/skills/boring/`,
 below resolve from that directory, not from the user's current working
 directory.
 
-#### One-time setup (idempotent)
+#### One-time setup
 
 The analyzer needs a Python virtual environment with `spacy`,
-`proselint`, `textstat`, `python-docx`, and `pypdf`, plus the
-`en_core_web_sm` spaCy model.
+`proselint`, `textstat`, `python-docx`, `pypdf`, and the
+`en_core_web_sm` spaCy model. All dependencies are declared in
+`pyproject.toml`, so a single `uv sync` from `<SKILL_DIR>` builds the
+environment and installs everything; subsequent runs are a no-op.
 
-**Prerequisites the user must have installed:** `uv` (see
-<https://docs.astral.sh/uv/>). If `uv --version` fails, ask the user
-to install it before continuing — don't try to work around it.
+#### Setup decision tree
 
-**Idempotent setup recipe** — safe to run on every invocation; it
-becomes a no-op once the venv is built:
+Run these checks in order on every invocation. Each one tells you
+exactly what to do at the relevant fork.
+
+**Check 1 — Is `uv` installed?**
+
+```sh
+uv --version
+```
+
+- **Exit 0** → `uv` is installed; continue to Check 2.
+- **`command not found`** → STOP. `uv` is a hard prerequisite and the
+  skill cannot install it for the user (it's a system-level tool).
+  Tell the user: *"This skill needs `uv` to manage its Python
+  environment, but `uv` doesn't appear to be installed on this system.
+  Please install it from <https://docs.astral.sh/uv/getting-started/installation/>
+  (one-line installer for macOS/Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`),
+  then re-run the skill."* Do not proceed.
+
+**Check 2 — Is the venv built and current?**
 
 ```sh
 cd <SKILL_DIR>
 uv sync
 ```
 
-That's it. The spaCy model (`en_core_web_sm`) is declared as a
-dependency in `pyproject.toml` and installed by `uv sync` like every
-other package. Subsequent invocations are a no-op once the lockfile
-is satisfied.
+- **Exit 0** → venv is built or refreshed; continue to Check 3.
+- **Network error** (PyPI or `github.com` unreachable, "Connection
+  reset", "Failed to fetch") → STOP. Tell the user: *"Setup needs to
+  download Python packages from PyPI and the spaCy model from GitHub,
+  but the network request failed: [paste the error]. Please check
+  your internet connection (or proxy / firewall settings) and re-run
+  the skill."* Do not retry blindly.
+- **`uv` version too old** ("unrecognized option", "unknown command")
+  → STOP. Tell the user: *"This skill requires a recent version of
+  `uv`. Please update with `uv self update` and re-run."*
+- **Other error** → STOP. Capture the full error and tell the user:
+  *"Setup failed with an error I don't recognize: [paste]. Please
+  share this with whoever maintains the skill, or try removing the
+  venv (`rm -rf <SKILL_DIR>/.venv`) and re-running."*
 
-If `uv sync` fails with a network error (PyPI / GitHub unreachable),
-tell the user — don't retry blindly.
-
-**Quick verification** — confirms the venv is usable and the spaCy
-model loads:
+**Check 3 — Verify the venv actually works.**
 
 ```sh
 cd <SKILL_DIR>
 uv run python -c "from analyzer.pipeline import run_analysis; import en_core_web_sm; print('analyzer + spaCy model: ok')"
 ```
+
+- **Prints `analyzer + spaCy model: ok`** → setup is good. Proceed to
+  the analysis step.
+- **`ModuleNotFoundError: No module named 'analyzer'`** → the editable
+  install of the local package didn't take. Recover with:
+  `cd <SKILL_DIR> && rm -rf .venv && uv sync` and re-run the
+  verification. If it still fails after a clean rebuild, tell the
+  user the same way you'd report an unknown error in Check 2.
+- **`OSError: [E050] Can't find model 'en_core_web_sm'`** → rare,
+  because `uv run` re-installs missing declared dependencies on the
+  fly. If you do see it, the model URL in `pyproject.toml` may be
+  stale relative to the spaCy version actually installed (e.g., a
+  manual `pip install spacy` upgraded spaCy past what the model
+  supports). Recovery: clean rebuild (`rm -rf .venv && uv sync`).
+  If that still fails, tell the user the model pin needs a refresh
+  and stop.
+- **Any other import error** → capture the full traceback and tell
+  the user the venv is broken in a way you don't recognize, and
+  suggest the clean-rebuild recipe as a first step.
+
+**Once Check 3 passes**, the environment is good for the rest of the
+session. Don't re-run the checks for follow-up document analyses
+within the same session — `uv sync` is fast (~10 ms when current)
+but the verification call spins up Python, which is unnecessary
+overhead.
 
 #### Run on the target document
 
