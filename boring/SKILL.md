@@ -48,20 +48,65 @@ rich JSON for 15 sub-dimensions plus document metadata (readability,
 structure, paragraph/sentence stats). It also lists the 5 sub-
 dimensions deferred to you (Phase 2).
 
-**One-time setup** (skip if `boring/.venv/` already exists):
+#### Where is the skill installed?
+
+Throughout this section, `<SKILL_DIR>` means the directory containing
+this `SKILL.md` (e.g., `~/.claude/skills/boring/`,
+`/path/to/cloned/repo/boring/`, etc.). All paths in the commands
+below resolve from that directory, not from the user's current working
+directory.
+
+#### One-time setup (idempotent)
+
+The analyzer needs a Python virtual environment with `spacy`,
+`proselint`, `textstat`, `python-docx`, and `pypdf`, plus the
+`en_core_web_sm` spaCy model.
+
+**Prerequisites the user must have installed:** `uv` (see
+<https://docs.astral.sh/uv/>). If `uv --version` fails, ask the user
+to install it before continuing — don't try to work around it.
+
+**Idempotent setup recipe** — safe to run on every invocation; it
+becomes a no-op once the venv is built:
 
 ```sh
-cd boring/
+cd <SKILL_DIR>
 uv sync
-uv pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 ```
 
-**Run on the target document:**
+That's it. The spaCy model (`en_core_web_sm`) is declared as a
+dependency in `pyproject.toml` and installed by `uv sync` like every
+other package. Subsequent invocations are a no-op once the lockfile
+is satisfied.
+
+If `uv sync` fails with a network error (PyPI / GitHub unreachable),
+tell the user — don't retry blindly.
+
+**Quick verification** — confirms the venv is usable and the spaCy
+model loads:
 
 ```sh
-cd boring/
-uv run python -m analyzer <path-to-document> --genre <genre> --output <path-to-output.json>
+cd <SKILL_DIR>
+uv run python -c "from analyzer.pipeline import run_analysis; import en_core_web_sm; print('analyzer + spaCy model: ok')"
 ```
+
+#### Run on the target document
+
+```sh
+cd <SKILL_DIR>
+uv run python -m analyzer <absolute-path-to-document> \
+    --genre <genre> \
+    --output <absolute-path-to-output.json>
+```
+
+**Always use absolute paths** for the document and output — `cd
+<SKILL_DIR>` changes your working directory, so document paths
+relative to where the user invoked you will resolve incorrectly.
+
+**Always use `uv run`** — running `python -m analyzer` directly will
+fail to find the package because the analyzer lives under
+`scripts/analyzer/` and is only on `sys.path` via the editable
+install that `uv run` activates.
 
 Genres recognized: `executive_brief`, `architecture_doc`,
 `technical_report`, `finding_writeup`, `proposal`, `rfc`,
