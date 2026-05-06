@@ -63,6 +63,17 @@ defaults, not yet tuned against a labeled corpus of business writing —
 see `docs/calibration-findings-2026-05-04.md` for the first
 calibration attempt and why it punted on threshold updates.
 
+**Next steps** The skill is undergoing calibration against a hand-labeled
+corpus of business writing, which will cause an update in the values
+in configuration.toml that optimize against writing style at the author's
+employer.  The skill runs fine and produces useful output now with
+intuitive weights, or you can assemble your own internal corpous
+of "boring" and "not-boring" documents for your organization and perform
+your own calibration vs. that corpus.  Note that "not-boring" does
+not mean the same thing as "interesting"; the latter concept is
+heavily weighted in the subject's perceived interest in the subject
+matter vs. the writing style.
+
 ## Repository layout
 
 This directory is split into the shipped skill and the dev-side
@@ -110,6 +121,8 @@ boring/
 │   ├── run_one.py              ← re-runs a single doc, patches results.csv
 │   └── analyze_results.py      ← per-check separability + threshold recs
 ├── calibration/                ← gitignored corpus + per-run outputs
+│   ├── boring                  ← corpus of curated documents that are hand-labeled as "boring"
+│   ├── not-boring              ← corpus of curated documents that are hand-labeled as "not-boring"
 └── dist/                       ← gitignored build output (copy of src/)
 ```
 
