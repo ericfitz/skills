@@ -7,8 +7,11 @@ taxonomy on four axes: **Direction**, **Density**, **Texture**, and
 **Surprise**. Grounded in the MAC model of boredom (Westgate & Wilson,
 2018) plus the craft tradition (Gopen-Swan, Williams, Provost, Minto).
 
-**Skill entry point**: `src/SKILL.md`. Invoke from a Claude Code or
-Anthropic-Console session.
+**Skill entry point**: `src/SKILL.md`. Invoke from a Codex or Claude Code
+session.
+
+## Download
+Clone the repository or download the skill as a zip file from [`releases`](https://github.com/ericfitz/skills/releases).
 
 ## Install
 
