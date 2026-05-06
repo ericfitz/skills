@@ -34,7 +34,21 @@ cd ~/.claude/skills && unzip boring-<version>.zip && rm boring-<version>.zip
 cd boring && uv sync
 ```
 
-Step 3 is technically optional — SKILL.md's setup decision tree runs
+To install into a Codex skills directory:
+
+```sh
+# 1. Copy the zip into your skills dir (user-global shown; project-
+#    local would be <repo>/.codex/skills/ instead).
+cp boring/dist/boring-<version>.zip ~/.codex/skills/
+
+# 2. Unzip — produces ~/.codex/skills/boring/
+cd ~/.codex/skills && unzip boring-<version>.zip && rm boring-<version>.zip
+
+# 3. Build the analyzer's Python venv. Requires `uv`
+#    (https://docs.astral.sh/uv/). Takes ~30s the first time.
+cd boring && uv sync
+```
+In either case, step 3 is technically optional — SKILL.md's setup decision tree runs
 `uv sync` on first invocation if the venv is missing — but doing it
 eagerly fails fast if `uv` isn't installed or the network is down,
 instead of discovering that mid-conversation.
