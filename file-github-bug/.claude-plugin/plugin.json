@@ -1,0 +1,6 @@
+{
+  "name": "file-github-bug",
+  "version": "1.0.0",
+  "description": "Use when filing a detailed bug report against a GitHub repo with evidence, optionally adding it to a GitHub Project (v2), setting milestone from current branch, and marking initial status. Reads repo/project metadata from .local-projects.json so the skill is repo-agnostic.",
+  "author": { "name": "efitz" }
+}
