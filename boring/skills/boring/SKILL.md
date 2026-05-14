@@ -17,7 +17,7 @@ technical reports — across a 20-sub-dimension taxonomy on four axes:
 The taxonomy is grounded in the MAC model of boredom (Westgate &
 Wilson, 2018) plus the craft tradition (Gopen-Swan, Williams, Provost,
 Minto). Full theoretical grounding lives in the development repo
-(`boring/docs/research-report.md`) and is not shipped with the skill.
+(`boring/skills/boring/top-docs/research-report.md`) and is not shipped with the skill.
 
 ## When to invoke
 
@@ -276,7 +276,7 @@ should make deliberately.
 ## Files in this skill
 
 ```
-boring/                         ← (this file lives in src/; tree shows shipped layout)
+boring/
 ├── SKILL.md                    ← this file
 ├── calibration.toml            ← thresholds (uncalibrated as of v0.1)
 ├── docs/
@@ -294,9 +294,3 @@ boring/                         ← (this file lives in src/; tree shows shipped
 ├── pyproject.toml              ← Python deps (spacy, proselint, textstat, ...)
 └── uv.lock
 ```
-
-In the development repo this skill is built from `boring/src/`. The
-parent `boring/` directory also contains `docs/` (full design notes
-and research grounding), `samples/` (smoke-test fixtures), `tools/`
-(calibration scripts), and `calibration/` (gitignored corpus) — none
-of which ship with the skill.
