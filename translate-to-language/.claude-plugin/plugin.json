@@ -1,0 +1,6 @@
+{
+  "name": "translate-to-language",
+  "version": "1.0.0",
+  "description": "Use when translating UI strings, i18n values, or short localized content into a specific target language while preserving placeholders, formatting, capitalization, and tone.",
+  "author": { "name": "efitz" }
+}
