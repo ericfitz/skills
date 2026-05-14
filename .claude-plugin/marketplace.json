@@ -1,0 +1,7 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "efitz-skills",
+  "description": "efitz's personal Claude Code skills, commands, and tools",
+  "owner": { "name": "efitz" },
+  "plugins": []
+}
