@@ -5,6 +5,7 @@
   "owner": { "name": "efitz" },
   "plugins": [
     { "name": "plugin-vetter", "description": "Security-first plugin vetting for AI agents. Use before installing any plugin (skill, plugin, command, etc.) from any Marketplace, GitHub, or other sources. Checks for red flags, permission scope, and suspicious patterns.", "source": "./plugin-vetter", "category": "security" },
-    { "name": "race-condition-audit", "description": "Systematic identification of race conditions, concurrency bugs, and thread-safety issues across codebases. Use when asked to find race conditions, audit concurrent code, debug non-deterministic behavior, review thread safety, find data races, or analyze async/parallel code. Supports TypeScript, JavaScript, Python, Go, Rust, C++, Java, and Kotlin.", "source": "./race-condition-audit", "category": "security" }
+    { "name": "race-condition-audit", "description": "Systematic identification of race conditions, concurrency bugs, and thread-safety issues across codebases. Use when asked to find race conditions, audit concurrent code, debug non-deterministic behavior, review thread safety, find data races, or analyze async/parallel code. Supports TypeScript, JavaScript, Python, Go, Rust, C++, Java, and Kotlin.", "source": "./race-condition-audit", "category": "security" },
+    { "name": "analyze-localization-files", "description": "Use when building a translation task manifest for an i18n project — produces per-language lists of missing keys with their source values by running the bundled check-i18n.py script.", "source": "./analyze-localization-files", "category": "localization" }
   ]
 }
