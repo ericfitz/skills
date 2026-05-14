@@ -4,6 +4,7 @@
   "description": "efitz's personal Claude Code skills, commands, and tools",
   "owner": { "name": "efitz" },
   "plugins": [
-    { "name": "plugin-vetter", "description": "Security-first plugin vetting for AI agents. Use before installing any plugin (skill, plugin, command, etc.) from any Marketplace, GitHub, or other sources. Checks for red flags, permission scope, and suspicious patterns.", "source": "./plugin-vetter", "category": "security" }
+    { "name": "plugin-vetter", "description": "Security-first plugin vetting for AI agents. Use before installing any plugin (skill, plugin, command, etc.) from any Marketplace, GitHub, or other sources. Checks for red flags, permission scope, and suspicious patterns.", "source": "./plugin-vetter", "category": "security" },
+    { "name": "race-condition-audit", "description": "Systematic identification of race conditions, concurrency bugs, and thread-safety issues across codebases. Use when asked to find race conditions, audit concurrent code, debug non-deterministic behavior, review thread safety, find data races, or analyze async/parallel code. Supports TypeScript, JavaScript, Python, Go, Rust, C++, Java, and Kotlin.", "source": "./race-condition-audit", "category": "security" }
   ]
 }

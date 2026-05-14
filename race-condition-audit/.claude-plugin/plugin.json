@@ -1,0 +1,6 @@
+{
+  "name": "race-condition-audit",
+  "version": "1.0.0",
+  "description": "Systematic identification of race conditions, concurrency bugs, and thread-safety issues across codebases. Use when asked to find race conditions, audit concurrent code, debug non-deterministic behavior, review thread safety, find data races, or analyze async/parallel code. Supports TypeScript, JavaScript, Python, Go, Rust, C++, Java, and Kotlin.",
+  "author": { "name": "efitz" }
+}
