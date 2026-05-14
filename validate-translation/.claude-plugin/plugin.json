@@ -1,0 +1,6 @@
+{
+  "name": "validate-translation",
+  "version": "1.0.0",
+  "description": "Use when reviewing a translated string or validating an i18n file update, to verify placeholder preservation, length, encoding, and common translation errors.",
+  "author": { "name": "efitz" }
+}
