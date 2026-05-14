@@ -1,0 +1,6 @@
+{
+  "name": "verify-migrate-doc",
+  "version": "1.0.0",
+  "description": "Use when asked to verify a documentation file's accuracy against source code and external references, then migrate it into a project wiki. Reads target repo and wiki path from .local-projects.json.",
+  "author": { "name": "efitz" }
+}
