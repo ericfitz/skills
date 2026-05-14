@@ -3,5 +3,7 @@
   "name": "efitz-skills",
   "description": "efitz's personal Claude Code skills, commands, and tools",
   "owner": { "name": "efitz" },
-  "plugins": []
+  "plugins": [
+    { "name": "plugin-vetter", "description": "Security-first plugin vetting for AI agents. Use before installing any plugin (skill, plugin, command, etc.) from any Marketplace, GitHub, or other sources. Checks for red flags, permission scope, and suspicious patterns.", "source": "./plugin-vetter", "category": "security" }
+  ]
 }
