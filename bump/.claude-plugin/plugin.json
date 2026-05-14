@@ -1,0 +1,6 @@
+{
+  "name": "bump",
+  "version": "1.0.0",
+  "description": "Update dependencies safely across Go/Python/Node ecosystems. Use when the user asks to bump deps, update packages, fix Dependabot alerts, or run a dependency upgrade. Detects ecosystems, applies safe updates with build/test/lint validation, and surfaces a plan for packages that need manual review.",
+  "author": { "name": "efitz" }
+}
