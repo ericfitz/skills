@@ -9,6 +9,8 @@ Analyze the differences between the master i18n file and target-language files, 
 
 This skill bundles its own analyzer (`scripts/check-i18n.py`) so it is tool-agnostic — it does not rely on `pnpm`, `npm`, or any other project-specific wrapper.
 
+When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/efitz-skills/analyze-localization-files/<version>/`. The skill's files live under `${CLAUDE_PLUGIN_ROOT}/skills/analyze-localization-files/`, so the analyzer is at `${CLAUDE_PLUGIN_ROOT}/skills/analyze-localization-files/scripts/check-i18n.py`. If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md (that path *is* the `${CLAUDE_PLUGIN_ROOT}/skills/analyze-localization-files/` portion), and use the absolute path to the script. Do **NOT** fall back to the legacy `$SKILL_DIR` form.
+
 ## Bundled tool
 
 `scripts/check-i18n.py` is a self-contained Python 3.8+ script with PEP 723 inline metadata. Invoke it with `uv run` (recommended — no setup) or `python3` directly. It:

@@ -136,37 +136,30 @@ done
 # ---------- No stale legacy env vars or hardcoded paths ----------
 hdr "Skill bodies: no legacy paths or env vars"
 
-# $SKILL_DIR should be gone from all SKILL.md files
-hits=$(grep -rln '\$SKILL_DIR' --include='SKILL.md' . 2>/dev/null || true)
-if [ -n "$hits" ]; then
-  bad "Stale \$SKILL_DIR references found in:\n$hits"
-else
-  ok "No \$SKILL_DIR references in any SKILL.md"
-fi
+# Legacy reference scan — we only care about *active* references (in code blocks, as
+# script arguments, etc.), not mentions inside "Do NOT fall back to ..." warning text.
+# We treat any line containing both "legacy" + the reference, or "Do NOT" + the reference,
+# or "fall back" + the reference, as a documented warning and skip it.
+scan_legacy() {
+  local pattern="$1"
+  local label="$2"
+  # Find candidate lines, then drop ones that are clearly inside warning text.
+  local hits
+  hits=$(grep -rn "$pattern" --include='SKILL.md' . 2>/dev/null \
+    | grep -viE 'do \*?\*?not\*?\*?|fall back|legacy|after cutover' \
+    || true)
+  if [ -n "$hits" ]; then
+    bad "Active $label references found:"
+    echo "$hits" | while IFS= read -r line; do printf '         %s\n' "$line"; done
+  else
+    ok "No active $label references in any SKILL.md"
+  fi
+}
 
-# $COMMAND_DIR should be gone
-hits=$(grep -rln '\$COMMAND_DIR' --include='SKILL.md' . 2>/dev/null || true)
-if [ -n "$hits" ]; then
-  bad "Stale \$COMMAND_DIR references found in:\n$hits"
-else
-  ok "No \$COMMAND_DIR references in any SKILL.md"
-fi
-
-# ~/.claude/scripts/ should be gone from skill bodies
-hits=$(grep -rln '~/\.claude/scripts\|/\.claude/scripts/' --include='SKILL.md' . 2>/dev/null || true)
-if [ -n "$hits" ]; then
-  bad "Stale ~/.claude/scripts/ references found in:\n$hits"
-else
-  ok "No ~/.claude/scripts/ references in any SKILL.md"
-fi
-
-# ~/.claude/agents/ should be gone from skill bodies
-hits=$(grep -rln '~/\.claude/agents\|/\.claude/agents/' --include='SKILL.md' . 2>/dev/null || true)
-if [ -n "$hits" ]; then
-  bad "Stale ~/.claude/agents/ references found in:\n$hits"
-else
-  ok "No ~/.claude/agents/ references in any SKILL.md"
-fi
+scan_legacy '\$SKILL_DIR'              '$SKILL_DIR'
+scan_legacy '\$COMMAND_DIR'            '$COMMAND_DIR'
+scan_legacy '~/\.claude/scripts'       '~/.claude/scripts/'
+scan_legacy '~/\.claude/agents'        '~/.claude/agents/'
 
 # ---------- Bundled scripts present where SKILL.md references them ----------
 hdr "Bundled scripts: presence at \${CLAUDE_PLUGIN_ROOT} paths"

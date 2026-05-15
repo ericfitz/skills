@@ -8,6 +8,10 @@ description: Find and analyze duplicate or overlapping functionality across a co
 
 Find and analyze duplicate or overlapping functionality across the codebase.
 
+## Bundled Files Location
+
+This plugin bundles a report generator at `scripts/dedupe-report.py` and three worker agent prompts at `agents/dedupe-{analyzer,grouper,deduplicator}.md`. When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/efitz-skills/dedupe/<version>/`. If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md, walk up to the plugin root, and use that absolute path. Do **NOT** fall back to `~/.claude/scripts/` or `~/.claude/agents/` — those legacy paths may not exist after cutover.
+
 ## Overview
 
 This command performs a multi-phase analysis of code duplication:
