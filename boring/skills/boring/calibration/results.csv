@@ -1,0 +1,451 @@
+filename,label,genre,word_count,sentence_count,code,name,axis,checked,score,metric_name,metric_value,threshold_warn,threshold_severe,flag_count
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0134,0.2,0.4,1
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0556,0.1,0.2,30
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,2.57,4.0,8.0,21
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,0.793,1.5,2.5,32
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1437,0.4,0.55,75
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1284,0.15,0.3,47
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,4.41,50,80,2
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.12,2.0,5.0,1
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.8673,0.35,0.2,0
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,5,3,5,5
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.2851,0.4,0.25,18
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.7007,0.55,0.45,10
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/01_oaep_bellare_rogaway_1994.pdf,boring,technical_report,8185,522,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,6.84,6.0,12.0,56
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0115,0.2,0.4,1
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0579,0.1,0.2,61
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.25,4.0,8.0,18
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,0.725,1.5,2.5,29
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1354,0.4,0.55,138
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.0905,0.15,0.3,64
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,5.99,50,80,4
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.8662,0.35,0.2,0
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,4,3,5,5
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.2672,0.4,0.25,37
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.6614,0.55,0.45,10
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/02_cbc_security_bellare_kilian_rogaway_1994.pdf,boring,technical_report,14386,1019,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,12.51,6.0,12.0,180
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0059,0.2,0.4,1
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.058,0.1,0.2,78
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.53,4.0,8.0,33
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,1.635,1.5,2.5,84
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.2729,0.4,0.55,301
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1168,0.15,0.3,103
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,7.25,50,80,6
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.09,2.0,5.0,2
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.5832,0.35,0.2,1
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,6,3,5,5
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,1.3318,0.4,0.25,44
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.7226,0.55,0.45,10
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,2,3,6,0
+boring/04_nist_sp_800-207_zero_trust_2020.pdf,boring,technical_report,21562,1103,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,10.44,6.0,12.0,225
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0019,0.2,0.4,1
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0512,0.1,0.2,87
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.5,4.0,8.0,45
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,2.373,1.5,2.5,95
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.386,0.4,0.55,513
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.2045,0.15,0.3,201
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,4.89,50,80,3
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.1,2.0,5.0,3
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,1.0031,0.35,0.2,0
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,10,3,5,5
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.6305,0.4,0.25,77
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.61,0.55,0.45,10
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/05_common_criteria_part1_v3-1r5.pdf,boring,technical_report,29973,1329,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,9.24,6.0,12.0,277
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0156,0.2,0.4,1
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0362,0.1,0.2,31
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D2.1,Padding / wordiness,density,True,warn,wordy_phrases_per_1000_words,6.39,4.0,8.0,89
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,0.882,1.5,2.5,19
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.2826,0.4,0.55,234
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1092,0.15,0.3,62
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,4.59,50,80,1
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.6499,0.35,0.2,0
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,7,3,5,5
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.1347,0.4,0.25,18
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.682,0.55,0.45,10
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/06_meltdown_lipp_2018.pdf,boring,technical_report,13933,828,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,8.25,6.0,12.0,115
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0051,0.2,0.4,1
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0586,0.1,0.2,116
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,0.9,4.0,8.0,28
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,1.194,1.5,2.5,111
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.2472,0.4,0.55,447
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.1724,0.15,0.3,205
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,9.24,50,80,15
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.03,2.0,5.0,1
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.7576,0.35,0.2,2
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,6,3,5,5
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.6705,0.4,0.25,48
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.7004,0.55,0.45,10
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/07_saltzer_schroeder_protection_1975.pdf,boring,technical_report,31132,1808,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,13.3,6.0,12.0,414
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0115,0.2,0.4,1
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0272,0.1,0.2,596
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,0.75,4.0,8.0,83
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,1.564,1.5,2.5,285
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.3695,0.4,0.55,2272
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.2078,0.15,0.3,886
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,4.03,50,80,13
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.03,2.0,5.0,3
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.7261,0.35,0.2,0
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,4,3,5,5
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.9533,0.4,0.25,268
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.6543,0.55,0.45,10
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/08_pci_dss_v4-0-1.pdf,boring,technical_report,110082,6149,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,8.32,6.0,12.0,916
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0511,0.2,0.4,1
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0149,0.1,0.2,7
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,3.39,4.0,8.0,8
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,2.194,1.5,2.5,7
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.2687,0.4,0.55,36
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.2529,0.15,0.3,22
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,0.75,50,80,0
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.7857,0.35,0.2,0
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,4,3,5,3
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,1.6429,0.4,0.25,4
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D3.5,Vocabulary flatness,texture,True,pass,mattr,0.6311,0.55,0.45,10
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,2,3,6,0
+boring/09_fips_140-3_2019.pdf,boring,technical_report,2357,134,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,8.91,6.0,12.0,21
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0102,0.2,0.4,1
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0386,0.1,0.2,47
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,2.57,4.0,8.0,36
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,1.348,1.5,2.5,35
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1699,0.4,0.55,141
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1229,0.15,0.3,59
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,5.9,50,80,2
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.21,2.0,5.0,3
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.916,0.35,0.2,1
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,3,3,5,3
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.8348,0.4,0.25,36
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.8111,0.55,0.45,10
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D4.1,No concrete examples,surprise,True,warn,longest_abstract_paragraph_run,3,3,6,1
+boring/10_nato_ist-152_autonomous_agents_2018.pdf,boring,technical_report,14012,830,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,10.78,6.0,12.0,151
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0126,0.2,0.4,1
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0597,0.1,0.2,25
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D2.1,Padding / wordiness,density,True,warn,wordy_phrases_per_1000_words,6.14,4.0,8.0,28
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,0.381,1.5,2.5,4
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.0572,0.4,0.55,23
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1152,0.15,0.3,25
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,1.24,50,80,1
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.9339,0.35,0.2,0
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,2,3,5,0
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.184,0.4,0.25,11
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.5565,0.55,0.45,10
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D4.1,No concrete examples,surprise,True,warn,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/0404220v3.pdf,boring,technical_report,4559,402,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,6.36,6.0,12.0,29
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0804,0.2,0.4,1
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0349,0.1,0.2,9
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D2.1,Padding / wordiness,density,True,warn,wordy_phrases_per_1000_words,6.07,4.0,8.0,13
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,1.163,1.5,2.5,5
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1047,0.4,0.55,18
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1136,0.15,0.3,10
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,5.81,50,80,3
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.8434,0.35,0.2,0
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D3.3,Opener monotony,texture,True,pass,longest_same_first_token_run,2,3,5,0
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.7847,0.4,0.25,4
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D3.5,Vocabulary flatness,texture,True,pass,mattr,0.7493,0.55,0.45,10
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D4.1,No concrete examples,surprise,True,warn,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/1-s2.0-S1877042813028322-main.pdf,boring,technical_report,2140,172,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,13.55,6.0,12.0,29
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0093,0.2,0.4,1
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D1.4,No signposting,direction,True,pass,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,0
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0461,0.1,0.2,184
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D2.1,Padding / wordiness,density,True,warn,wordy_phrases_per_1000_words,5.87,4.0,8.0,378
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,0.911,1.5,2.5,54
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1176,0.4,0.55,434
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.2096,0.15,0.3,428
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,4.61,50,80,15
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.12,2.0,5.0,8
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,1.008,0.35,0.2,1
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,6,3,5,5
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.2575,0.4,0.25,175
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.6941,0.55,0.45,10
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/Inter-universal Teichmuller Theory I.pdf,boring,technical_report,64450,3691,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,6.39,6.0,12.0,412
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0097,0.2,0.4,1
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0218,0.1,0.2,27
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.12,4.0,8.0,10
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,2.422,1.5,2.5,32
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.3325,0.4,0.55,137
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.1772,0.15,0.3,56
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,6.8,50,80,3
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.22,2.0,5.0,2
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.8663,0.35,0.2,1
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,7,3,5,5
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.9479,0.4,0.25,18
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.6643,0.55,0.45,10
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/NIST.CSWP.29.pdf,boring,technical_report,8968,412,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,8.7,6.0,12.0,78
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0013,0.2,0.4,1
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0218,0.1,0.2,33
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D2.1,Padding / wordiness,density,True,warn,wordy_phrases_per_1000_words,4.84,4.0,8.0,82
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,0.886,1.5,2.5,38
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1453,0.4,0.55,187
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1187,0.15,0.3,76
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,4.27,50,80,2
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.06,2.0,5.0,1
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.8744,0.35,0.2,2
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,5,3,5,4
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.3663,0.4,0.25,20
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.8071,0.55,0.45,10
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/Notice_of_Retraction_AI_Techniques_for_COVID-19.pdf,boring,technical_report,16954,1287,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,11.91,6.0,12.0,202
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0,0.2,0.4,1
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.006,0.1,0.2,16
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D2.1,Padding / wordiness,density,True,severe,wordy_phrases_per_1000_words,21.96,4.0,8.0,298
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,0.788,1.5,2.5,28
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.0766,0.4,0.55,76
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1353,0.15,0.3,72
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,4.03,50,80,2
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.7434,0.35,0.2,0
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,2,3,5,0
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.272,0.4,0.25,19
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.7703,0.55,0.45,10
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/SP26_GuardRailSoK.pdf,boring,technical_report,13571,992,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,15.03,6.0,12.0,204
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0207,0.2,0.4,1
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.024,0.1,0.2,16
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,0.81,4.0,8.0,5
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,2.0,1.5,2.5,11
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.184,0.4,0.55,46
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.1608,0.15,0.3,32
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,10.0,50,80,1
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.64,2.0,5.0,4
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,1.1611,0.35,0.2,0
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,2,3,5,0
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,1.0361,0.4,0.25,13
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D3.5,Vocabulary flatness,texture,True,pass,mattr,0.7961,0.55,0.45,10
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/The-Promise-and-Peril-of-AI-0326.pdf,boring,technical_report,6203,250,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,9.83,6.0,12.0,61
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0028,0.2,0.4,1
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0525,0.1,0.2,47
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.82,4.0,8.0,26
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,0.826,1.5,2.5,37
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1888,0.4,0.55,151
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1302,0.15,0.3,69
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,6.75,50,80,5
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.7471,0.35,0.2,0
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,3,3,5,1
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.416,0.4,0.25,23
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.712,0.55,0.45,10
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/nihms192342.pdf,boring,technical_report,14256,800,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,8.84,6.0,12.0,126
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0,0.2,0.4,1
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0062,0.1,0.2,21
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,2.26,4.0,8.0,37
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,0.81,1.5,2.5,40
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1316,0.4,0.55,192
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1078,0.15,0.3,54
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,1.37,50,80,1
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.12,2.0,5.0,2
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,1.0735,0.35,0.2,1
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,4,3,5,5
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.2171,0.4,0.25,31
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.759,0.55,0.45,10
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/physically-unclonable-functions.pdf,boring,technical_report,16356,1459,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,12.04,6.0,12.0,197
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0439,0.2,0.4,1
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0292,0.1,0.2,22
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,2.36,4.0,8.0,16
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,2.278,1.5,2.5,13
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1462,0.4,0.55,50
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.1588,0.15,0.3,44
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,7.31,50,80,0
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,1.1288,0.35,0.2,1
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D3.3,Opener monotony,texture,True,pass,longest_same_first_token_run,2,3,5,0
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,1.0023,0.4,0.25,17
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D3.5,Vocabulary flatness,texture,True,pass,mattr,0.7886,0.55,0.45,10
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+boring/additional/security_debt_0326.pdf,boring,technical_report,6771,342,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,8.86,6.0,12.0,60
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D1.1,Buried thesis,direction,True,warn,position_of_first_claim_pct,0.3269,0.2,0.4,1
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D1.6,Topic-position drift,direction,True,warn,expletive_subject_ratio,0.1026,0.1,0.2,4
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.92,4.0,8.0,1
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,0.821,1.5,2.5,0
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.0256,0.4,0.55,1
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1364,0.15,0.3,3
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,23.08,50,80,2
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.5867,0.35,0.2,0
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,3,3,5,1
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D3.4,Paragraph monotony,texture,True,pass,paragraph_length_coefficient_of_variation,0.426,0.4,0.25,0
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D3.5,Vocabulary flatness,texture,True,pass,mattr,0.7981,0.55,0.45,10
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D4.1,No concrete examples,surprise,True,warn,longest_abstract_paragraph_run,0,3,6,0
+not-boring/01_trusting_trust_thompson_1984.pdf,not-boring,technical_report,520,39,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,9.62,6.0,12.0,5
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0164,0.2,0.4,1
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0418,0.1,0.2,19
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.38,4.0,8.0,10
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,0.313,1.5,2.5,3
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.0966,0.4,0.55,37
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.2148,0.15,0.3,58
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,1.31,50,80,0
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.8366,0.35,0.2,0
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,4,3,5,2
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.5822,0.4,0.25,18
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.6696,0.55,0.45,10
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D4.1,No concrete examples,surprise,True,severe,longest_abstract_paragraph_run,0,3,6,0
+not-boring/02_smashing_stack_aleph_one_1996.pdf,not-boring,technical_report,7226,383,D4.4,No specificity,surprise,True,pass,vague_terms_per_1000_words,4.98,6.0,12.0,36
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0234,0.2,0.4,1
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0426,0.1,0.2,34
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,0.6,4.0,8.0,6
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,0.628,1.5,2.5,19
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1236,0.4,0.55,90
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.0766,0.15,0.3,38
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,11.68,50,80,8
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.6951,0.35,0.2,2
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,4,3,5,2
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.575,0.4,0.25,15
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D3.5,Vocabulary flatness,texture,True,pass,mattr,0.8169,0.55,0.45,10
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D4.1,No concrete examples,surprise,True,warn,longest_abstract_paragraph_run,0,3,6,0
+not-boring/03_stalking_wily_hacker_stoll_1988.pdf,not-boring,technical_report,10039,728,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,14.44,6.0,12.0,145
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0067,0.2,0.4,1
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0519,0.1,0.2,54
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,2.77,4.0,8.0,55
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,1.081,1.5,2.5,48
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1759,0.4,0.55,156
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.1682,0.15,0.3,132
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,17.81,50,80,13
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.05,2.0,5.0,1
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.802,0.35,0.2,2
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,3,3,5,4
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.576,0.4,0.25,52
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.7342,0.55,0.45,10
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+not-boring/04_mandiant_APT1_report_2013.pdf,not-boring,technical_report,19887,887,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,11.46,6.0,12.0,228
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D1.1,Buried thesis,direction,True,severe,position_of_first_claim_pct,0.4292,0.2,0.4,1
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0,0.1,0.2,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,0.0,4.0,8.0,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,1.222,1.5,2.5,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.3333,0.4,0.55,3
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.0,0.15,0.3,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,0.0,50,80,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.689,0.35,0.2,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,0,3,5,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D3.4,Paragraph monotony,texture,True,warn,paragraph_length_coefficient_of_variation,0.3586,0.4,0.25,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D3.5,Vocabulary flatness,texture,True,pass,mattr,0.88,0.55,0.45,10
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D4.1,No concrete examples,surprise,True,severe,longest_abstract_paragraph_run,0,3,6,0
+not-boring/05_qmail_security_bernstein_2007.txt,not-boring,technical_report,157,9,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,12.74,6.0,12.0,2
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0377,0.2,0.4,1
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0231,0.1,0.2,18
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,2.9,4.0,8.0,29
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,0.965,1.5,2.5,23
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.2659,0.4,0.55,138
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1223,0.15,0.3,46
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,7.71,50,80,2
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.3,2.0,5.0,3
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.6587,0.35,0.2,1
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,3,3,5,4
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.3764,0.4,0.25,15
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.7418,0.55,0.45,10
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+not-boring/06_spectre_attacks_kocher_2018.pdf,not-boring,technical_report,10002,519,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,7.5,6.0,12.0,75
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0018,0.2,0.4,1
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0799,0.1,0.2,162
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,3.34,4.0,8.0,132
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D2.2,Nominalization fog,density,True,warn,nominalizations_per_sentence,1.251,1.5,2.5,100
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1395,0.4,0.55,269
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1329,0.15,0.3,205
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,18.57,50,80,38
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.2,2.0,5.0,8
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.6492,0.35,0.2,2
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,4,3,5,5
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.6071,0.4,0.25,86
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.8036,0.55,0.45,10
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+not-boring/07_verizon_dbir_2025.pdf,not-boring,technical_report,39472,1928,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,13.2,6.0,12.0,521
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0126,0.2,0.4,1
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0195,0.1,0.2,35
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D2.1,Padding / wordiness,density,True,severe,wordy_phrases_per_1000_words,8.52,4.0,8.0,168
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,1.095,1.5,2.5,30
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.373,0.4,0.55,401
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1063,0.15,0.3,94
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,7.07,50,80,6
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.2,2.0,5.0,4
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.7393,0.35,0.2,1
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,8,3,5,5
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.5461,0.4,0.25,48
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.643,0.55,0.45,10
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+not-boring/08_stuxnet_dossier_symantec_2011.pdf,not-boring,technical_report,19717,1075,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,8.88,6.0,12.0,175
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0232,0.2,0.4,1
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0239,0.1,0.2,20
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,2.18,4.0,8.0,25
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,0.572,1.5,2.5,14
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1208,0.4,0.55,91
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1017,0.15,0.3,47
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,8.23,50,80,3
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.7941,0.35,0.2,0
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D3.3,Opener monotony,texture,True,warn,longest_same_first_token_run,3,3,5,3
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.1948,0.4,0.25,13
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D3.5,Vocabulary flatness,texture,True,warn,mattr,0.7616,0.55,0.45,10
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+not-boring/09_imperfect_forward_secrecy_logjam_2015.pdf,not-boring,technical_report,11447,753,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,16.34,6.0,12.0,187
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0043,0.2,0.4,1
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0263,0.1,0.2,46
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,3.36,4.0,8.0,65
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D2.2,Nominalization fog,density,True,pass,nominalizations_per_sentence,1.096,1.5,2.5,38
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.2237,0.4,0.55,247
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D2.4,Subject-verb separation,density,True,pass,pct_sentences_over_warn_threshold,0.1342,0.15,0.3,100
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,8.06,50,80,8
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.16,2.0,5.0,3
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D3.1,Sentence-length monotony,texture,True,pass,coefficient_of_variation,0.7129,0.35,0.2,0
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,5,3,5,5
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,0.5748,0.4,0.25,41
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.7215,0.55,0.45,10
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D4.1,No concrete examples,surprise,True,pass,longest_abstract_paragraph_run,0,3,6,0
+not-boring/10_acoustic_cryptanalysis_genkin_2014.pdf,not-boring,technical_report,19348,1104,D4.4,No specificity,surprise,True,severe,vague_terms_per_1000_words,15.45,6.0,12.0,299
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D1.1,Buried thesis,direction,True,pass,position_of_first_claim_pct,0.0008,0.2,0.4,1
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D1.4,No signposting,direction,True,warn,transition_marker_ratio_at_section_boundaries,1.0,0.4,0.2,1
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D1.6,Topic-position drift,direction,True,pass,expletive_subject_ratio,0.0158,0.1,0.2,609
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D2.1,Padding / wordiness,density,True,pass,wordy_phrases_per_1000_words,1.73,4.0,8.0,323
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D2.2,Nominalization fog,density,True,severe,nominalizations_per_sentence,2.528,1.5,2.5,684
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D2.3,Passive overhang,density,True,pass,passive_sentence_ratio,0.1693,0.4,0.55,1787
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D2.4,Subject-verb separation,density,True,warn,pct_sentences_over_warn_threshold,0.2062,0.15,0.3,1195
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D2.7,Hedging clutter,density,True,pass,hedges_per_100_sentences,2.8,50,80,17
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D2.8,Throat-clearing,density,True,pass,throat_clearing_phrases_per_1000_words,0.0,2.0,5.0,0
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D3.1,Sentence-length monotony,texture,True,warn,coefficient_of_variation,0.8437,0.35,0.2,3
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D3.3,Opener monotony,texture,True,severe,longest_same_first_token_run,5,3,5,5
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D3.4,Paragraph monotony,texture,True,severe,paragraph_length_coefficient_of_variation,1.0021,0.4,0.25,435
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D3.5,Vocabulary flatness,texture,True,severe,mattr,0.6323,0.55,0.45,10
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D4.1,No concrete examples,surprise,True,warn,longest_abstract_paragraph_run,3,3,6,1
+boring/03_nist_sp_800-53_rev5_2020.pdf,boring,technical_report,186961,10554,D4.4,No specificity,surprise,True,warn,vague_terms_per_1000_words,7.26,6.0,12.0,1357

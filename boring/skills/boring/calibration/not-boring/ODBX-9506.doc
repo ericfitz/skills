@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>[#ODBX-9506] Admin interface uses weak authentication model - tcp (or port based) which increases the risk of unauthorized access.</title>
+    <meta http-equiv="Content-Type" Content="application/vnd.ms-word; charset=UTF-8">
+        <style type="text/css">
+
+.tableBorder, .grid
+{
+    background-color: #fff;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tableBorder td, .grid td
+{
+    vertical-align: top;
+    padding: 2px;
+    border: 1px solid #ccc;
+}
+
+.noPadding
+{
+    padding: 0 !important;
+}
+
+h3 .subText
+{
+    font-size: 60%;
+    font-weight: normal;
+}
+
+.tabLabel
+{
+    font-weight: bold;
+    border: 1px solid #ccc;
+    border-bottom:none;
+    padding: 2px;
+    display: inline;
+}
+
+td.blank
+{
+    padding: 0;
+    margin: 0;
+}
+
+.blank td
+{
+    border: none;
+}
+
+#descriptionArea
+{
+    margin: 0;
+    padding: 2px;
+    border: 1px solid #ccc;
+}
+
+hr
+{
+    border-top:1px solid #aaa;
+}
+
+hr.fullcontent
+{
+  height: 15px;
+  padding: 10px 0;
+  background: #fff url('https://jira.oci.oraclecorp.com/images/icons/hr.gif') no-repeat scroll center;
+}
+
+</style>
+
+</head>
+<body>
+
+<table class="tableBorder" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td bgcolor="#f0f0f0" width="100%" colspan="2" valign="top">
+                            <h3 class="formtitle">
+                        [ODBX-9506]&nbsp;<a href="https://jira.oci.oraclecorp.com/browse/ODBX-9506">Admin interface uses weak authentication model - tcp (or port based) which increases the risk of unauthorized access.</a>
+            <span class="subText">
+               Created: 17/Jun/25                   &nbsp;Updated: 17/Feb/26
+
+                                    &nbsp;Due: 30/Dec/25
+                                                    &nbsp;Resolved: 17/Feb/26
+                            </span>
+            </h3>
+        </td>
+    </tr>
+    <tr>
+        <td width="20%"><b>Status:</b></td>
+        <td width="80%">Done</td>
+    </tr>
+    <tr>
+        <td width="20%"><b>Project:</b></td>
+        <td width="80%"><a href="https://jira.oci.oraclecorp.com/secure/BrowseProject.jspa?id=33906">ODBG</a></td>
+    </tr>
+
+        <tr>
+            <td><b>Component/s:</b></td>
+            <td>
+                                        <a title="ODBG CP"
+                href="https://jira.oci.oraclecorp.com/issues/?jql=project%3D33906%20AND%20%22component%22%3D77433%20ORDER%20BY%20priority%20ASC"
+            >ODBG CP</a>                        </td>
+    </tr>
+    
+
+        <tr>
+            <td><b>Affects Version/s:</b></td>
+            <td>
+                            None
+                </td>
+    </tr>
+    
+
+        <tr>
+            <td><b>Fix Version/s:</b></td>
+            <td>
+                                        <a title="Long-Term"
+                href="https://jira.oci.oraclecorp.com/issues/?jql=project%3D33906%20AND%20%22fixVersion%22%3D43402%20ORDER%20BY%20priority%20ASC"
+            >Long-Term</a>                        </td>
+    </tr>
+    
+    </table>
+
+<br />
+<table class="grid" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td bgcolor="#f0f0f0" valign="top" width="20%">
+            <b>Type:</b>
+        </td>
+        <td bgcolor="#ffffff" valign="top"  width="30%" >
+            Task
+        </td>
+
+                    <td bgcolor="#f0f0f0">
+                <b>Priority:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" nowrap>
+                Highest
+            </td>
+            </tr>
+    <tr>
+                        <td bgcolor="#f0f0f0" valign="top" width="20%">
+                <b>Reporter:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top"  width="30%" >
+                                            <a class="user-hover" rel="arsadasi" id="word_reporter_arsadasi" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=arsadasi">Arunkumar Sadasivan</a>
+                            </td>
+        
+                    <td bgcolor="#f0f0f0" width="20%">
+                <b>Assignee:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" nowrap  width="30%" >
+                                            <a class="user-hover" rel="alexamun" id="word_assignee_alexamun" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=alexamun">Alexandru Munteanu</a>
+                            </td>
+            </tr>
+    	<tr>
+		<td bgcolor="#f0f0f0" width="20%">
+			<b>Resolution:</b>
+		</td>
+		<td bgcolor="#ffffff" valign="top" width="30%" nowrap>
+                            Done
+                    </td>
+                    <td bgcolor="#f0f0f0" width="20%">
+                <b>Votes:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" width="30%" nowrap>
+                0
+            </td>
+        
+    </tr>
+    
+        <tr>
+        <td bgcolor="#f0f0f0" width="20%">
+            <b>Labels:</b>
+        </td>
+        <td id="labels-7467977-value" class="value" bgcolor="#ffffff" valign="top" colspan="3" nowrap>
+                            SecurityCentralJiraSync, phonebookid:odbx, secarch-risk-critical                    </td>
+    </tr>
+    
+    	<tr>
+        		<td bgcolor="#f0f0f0" width="20%"><b>Remaining Estimate:</b></td>
+        <td bgcolor="#ffffff" valign="top" nowrap width="80%" colspan="3">
+                            Not Specified
+            		</td>
+    </tr>
+    <tr>
+                <td bgcolor="#f0f0f0" width="20%"><b>Time Spent:</b></td>
+		<td bgcolor="#ffffff" valign="top" nowrap width="80%" colspan="3">
+                            Not Specified
+            		</td>
+	</tr>
+    <tr>
+                <td bgcolor="#f0f0f0" width="20%"><b>Original Estimate:</b></td>
+		<td bgcolor="#ffffff" valign="top" nowrap width="80%" colspan="3">
+                            Not Specified
+            		</td>
+    </tr>
+    
+    </table>
+
+
+
+    <br />
+
+    	<table class="grid" cellpadding="0" cellspacing="0" border="0" width="100%">
+            
+
+        
+            <tr>
+            <td bgcolor="#f0f0f0" width="20%" valign="top">
+                <b>Issue Links:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" class="noPadding">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%" class="blank">
+                                            <tr>
+                            <td colspan="4" bgcolor="#f0f0f0">
+                                <b>Action Item</b><br/>
+                            </td>
+                        </tr>
+                                                                <tr>
+            <td>
+                is action item of
+            </td>
+            <td>
+                <a href="https://jira.oci.oraclecorp.com/browse/SECARCH-13274">
+                     <strike>SECARCH-13274</strike>                 </a>
+            </td>
+            <td>
+                SecArch - Oasis Base Database Cloud S...
+            </td>
+            <td>
+                Completed
+            </td>
+        </tr>
+                                                <tr>
+                            <td colspan="4" bgcolor="#f0f0f0">
+                                <b>Blocks</b><br/>
+                            </td>
+                        </tr>
+                                    <tr>
+            <td>
+                blocks
+            </td>
+            <td>
+                <a href="https://jira.oci.oraclecorp.com/browse/SECAPPROVE-5148">
+                     <strike>SECAPPROVE-5148</strike>                 </a>
+            </td>
+            <td>
+                Oasis Base Database Cloud Service (Ba...
+            </td>
+            <td>
+                Exception Approved
+            </td>
+        </tr>
+                                                                            <tr>
+                            <td colspan="4" bgcolor="#f0f0f0">
+                                <b>Related</b><br/>
+                            </td>
+                        </tr>
+                                                                <tr>
+            <td>
+                is related to
+            </td>
+            <td>
+                <a href="https://jira.oci.oraclecorp.com/browse/HAZARDLOG-66">
+                     HAZARDLOG-66                 </a>
+            </td>
+            <td>
+                Weak TCP auth model allows unauthoriz...
+            </td>
+            <td>
+                Resolved
+            </td>
+        </tr>
+                                        </table>
+            </td>
+        </tr>
+    
+
+
+
+                                                                                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Activity:</b></td>
+                <td id="customfield_15814-7467977-value" class="value" bgcolor="#ffffff" width="80%">    SecArch
+</td>
+            </tr>
+                                                </table>
+
+    <br/>
+
+    <table cellpadding="2" cellspacing="0" border="0" width="100%" align="center">
+    <tr>
+        <td bgcolor="#bbbbbb" width="1%" nowrap align="center">
+            &nbsp;<font color="#ffffff"><b>Description</b></font>&nbsp;
+        </td>
+        <td>&nbsp;</td>
+    </tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td id="descriptionArea">
+            <p><b>Description:</b> </p>
+
+<p>ODGB CP uses the boiler code provided by Pegasus, which uses Dropwizard internally. Dropwizards has two connectors - applicationConnectors and adminConnectors. Application requests are handled by applicationConnectors. Admin requests are handled by adminConnectors. Dropwizard separates connectors in config.yml. It uses the application for public access and the admin for internal (localhost-only) access. APIs defined using Application connectors have a filter called SPLAT mTLS filter that ensures the call is coming from SPLAT. If the user makes the call, then the user is authenticated with SPLAT, and SPLAT authenticates with the service. In case of admin-related tasks or APIs, the authentication to the admin interface is using TCP-based (port-based), which is weak.</p>
+
+<p><b>Reasoning:</b></p>
+
+<p>The implementation of the admin interface using TCP-based authentication is typically considered weak, as access control relies entirely on access to the port. Every process on the machine that has access to the port will be able to call the Admin API. This makes it hard to implement granular access control. An SSRF vulnerability could allow access to the privileged admin port from localhost, bypassing any network firewall or external restrictions and enabling the attacker to execute internal-only endpoints via the service. A misconfigured local app or service could access those ports and perform malicious actions. A Malicious operator with limited shell access might be able to connect to the API, violating the principle of least privilege. </p>
+
+<p><b>Impact:</b></p>
+
+<p>Unauthorized access can lead to the leakage of sensitive data, data manipulation, and service disruptions.</p>
+
+<p><b>Note:</b></p>
+<ul>
+	<li>This issue occurs on all OCI services that use the code provided by Pegasus - Dropwizard.</li>
+	<li>Severity depends on the admin tasks provided by each service.</li>
+	<li>New services use Micronaut, which is an in-house application developed by OCI that replaces Dropwizard. Not sure if the issue exists on Micronaut.</li>
+</ul>
+
+
+<p><b>Mitigation:</b></p>
+
+<p>Use project Forge to perform admin tasks</p>
+
+<p><b>Instructions for Service Team:</b></p>
+<ul>
+	<li>Security Risk is marked by labels that <b>only SecArch should modify</b> - secarch-risk-level.</li>
+	<li>This Security Risk finding will also appear in Security Central aligned with your supplied Phonebook entry.</li>
+	<li>Prioritize remediation of this Security Risk in your SDLC in accordance with the <a href="https://confluence.oci.oraclecorp.com/x/2jBLAg" class="external-link" target="_blank" rel="nofollow noopener">OCI SLA for Vulnerability Mitigations</a></li>
+</ul>
+
+            <br/>
+        </td>
+    </tr>
+    </table>
+
+    <br/>
+
+    <table cellpadding="2" cellspacing="0" border="0" width="100%" align="center">
+    <tr>
+        <td bgcolor="#bbbbbb" width="1%" nowrap align="center">
+            &nbsp;<font color="#ffffff"><b>Comments</b></font>&nbsp;
+        </td>
+        <td>&nbsp;</td>
+    </tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" class="grid" style="margin: 0;">
+                <tr id="comment-header-16672400"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="chengych" id="word_commented_chengych" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=chengych">Chelsea Chen</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">24/Jul/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16672400"><td bgcolor="#ffffff">
+            <p>Updated the due date to 12/30/2025 per SDR extension deadline. <a href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=arsadasi" class="user-hover" rel="arsadasi">Arunkumar Sadasivan</a> we will keep this AI open until resolve.</p>
+        </td></tr>
+                <tr id="comment-header-16642108"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="arsadasi" id="word_commented_arsadasi" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=arsadasi">Arunkumar Sadasivan</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">22/Jul/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16642108"><td bgcolor="#ffffff">
+            <p><a href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=chengych" class="user-hover" rel="chengych">Chelsea Chen</a> <a href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=apnatar" class="user-hover" rel="apnatar">Aparna Natarajan</a> SDR is an exception to release with a security finding. Please close the ticket only when the issue is fixed.</p>
+
+<p>Reopening the ticket since not fixed. </p>
+        </td></tr>
+                <tr id="comment-header-16556008"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="chengych" id="word_commented_chengych" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=chengych">Chelsea Chen</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">11/Jul/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16556008"><td bgcolor="#ffffff">
+            <p> <a href="https://jira-sd.mc1.oracleiaas.com/browse/SDR-31649" class="external-link" target="_blank" rel="nofollow noopener">https://jira-sd.mc1.oracleiaas.com/browse/SDR-31649</a> has been approved. <a href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=alexamun" class="user-hover" rel="alexamun">Alexandru Munteanu</a> can you close this ticket?</p>
+        </td></tr>
+                <tr id="comment-header-16511924"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="etyuan" id="word_commented_etyuan" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=etyuan">Ethan Yuan</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">07/Jul/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16511924"><td bgcolor="#ffffff">
+            <p>Created an SDR ticket - <a href="https://jira-sd.mc1.oracleiaas.com/browse/SDR-31649" class="external-link" target="_blank" rel="nofollow noopener">https://jira-sd.mc1.oracleiaas.com/browse/SDR-31649</a> </p>
+        </td></tr>
+                <tr id="comment-header-16468788"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="alexamun" id="word_commented_alexamun" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=alexamun">Alexandru Munteanu</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">01/Jul/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16468788"><td bgcolor="#ffffff">
+            <p>We discussed on a dedicated meeting:</p>
+<ul>
+	<li>Today, the admin task is actually more secure from an employee perspective =&gt; Since while the API itself doesn't have any authentication, getting to a point where the engineer can execute the admin task requires multiple levels of access =&gt; Needs cluster access permission  + hostclass entitlement permission  (which today we handle through a dedicated role <a href="https://permissions.oci.oraclecorp.com/service/odbgcp?tab=prod-cluster-login" class="external-link" target="_blank" rel="nofollow noopener">https://permissions.oci.oraclecorp.com/service/odbgcp?tab=prod-cluster-login</a> ) ; Also executing the admin task requires following up a dedicated runbook</li>
+	<li>The concern with moving admin tasks to APIs is setting up the proper authorization model. Most teams in OCI use blanket boat groups that grant "manage all-resources") access, and that is harder to contain than it sounds.. ALso adds the risk of new employees adding a blanket policy that grants too much access to the new APIs. Especially since these APIs will have dedicated permission strings, security central can't auto-detect that a non-JIT group might have access to dangerous APIs</li>
+	<li>Long term we will try to move to away from admin tasks, but I think that can be more dangerous unless done right; Other teams that are asked directly to move away, may unknowingly make it less secure unless they understand the implications of virtual resourcing model</li>
+	<li>Currently, our Admin tasks are all about checking or updating very specific fields in kiev. They are ONLY used in rare events to fix the state of a specific resource. 
+	<ul>
+		<li>Gaining access to these APIs by a malicious user can affect ControlPlane operations with the resources, but cannot gain access to the resources themselves (dataplane). </li>
+		<li>Using Kiev transactions we could potentially revert any wrong-doing should an attack happen</li>
+		<li>In worst case, customers will just stop seeing their resources in the Cloud Provider console, but will keep seeing them in OCI console</li>
+	</ul>
+	</li>
+	<li>Access to these tasks can only happen inside our VCN; there is NO direct access available to these admin tasks from outside the network. Hence an attacker would have first to run their code inside the VCN, in order to even access the admin tasks.</li>
+	<li>Given all of the above, I do think the risk for the current admin tasks is minimal from an attacker perspective, and it's potential riskier to move away from them from an employee access perspective, without proper guidelines.</li>
+</ul>
+
+
+<p> </p>
+        </td></tr>
+                <tr id="comment-header-16353889"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="gear-securitycentral" id="word_commented_gear-securitycentral" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=gear-securitycentral">gear-securitycentral</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">17/Jun/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16353889"><td bgcolor="#ffffff">
+            <p>This ticket was not created by Security Central. This ticket has been synced into Security Central, so you can view them in a single place. However, if you have any questions related the content of the ticket, its due date and ownership assignment, please reach out to the reporter directly</p>
+        </td></tr>
+            </table>
+Generated at Tue May 05 00:37:12 UTC 2026 by Aaron Bryson using Jira 9.12.26#9120026-sha1:0a9486941371436bd1a592f478f3315c53c428b1.
+
+</body>
+</html>

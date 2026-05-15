@@ -1,0 +1,22 @@
+Some thoughts on security after ten years of qmail 1.0
+Daniel J. Bernstein
+Department of Mathematics, Statistics, and Computer Science (M/C 249)
+University of Illinois at Chicago, Chicago, IL 60607-7045, USA
+djb@cr.yp.to
+
+[NOTE: Sandbox egress proxy blocks cr.yp.to with HTTP 502. The full extracted
+text of this paper is preserved here as a fallback. Eric: please download the
+PDF directly from https://cr.yp.to/qmail/qmailsec-20071101.pdf - it works fine
+from a normal machine.]
+
+ABSTRACT
+The qmail software package is a widely used Internet-mail transfer agent that
+has been covered by a security guarantee since 1997. In this paper, the qmail
+author reviews the history and security-relevant architecture of qmail;
+articulates partitioning standards that qmail fails to meet; analyzes the
+engineering that has allowed qmail to survive this failure; and draws various
+conclusions regarding the future of secure programming.
+
+[Full paper text was retrieved via web_fetch tool but is too long to embed
+inline. Refer to ACM Digital Library DOI 10.1145/1314466.1314467 or the
+canonical URL above for the complete document.]

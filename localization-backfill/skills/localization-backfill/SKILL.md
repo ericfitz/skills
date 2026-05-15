@@ -15,6 +15,8 @@ This command orchestrates a set of skills; the skills do not assume any particul
 - `scripts/find_duplicate_localizations.py` — bundled dedupe analyzer used in Step 1 of this skill.
 - The translation analysis itself runs through [[analyze-localization-files]], which bundles its own `scripts/check-i18n.py`.
 
+When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/efitz-skills/localization-backfill/<version>/`. If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md, walk up to the plugin root, and use that absolute path. Do **NOT** fall back to the legacy path `~/Projects/skills/commands/localization-backfill.scripts/`.
+
 ## Configuration
 
 Same config used by the i18n skill family — see [[analyze-localization-files]] for the full schema. Required fields:

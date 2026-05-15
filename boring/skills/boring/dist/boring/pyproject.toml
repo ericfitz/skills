@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "boring-analyzer"
+version = "0.1.0"
+description = "Mechanical-analysis runtime for the boring-writing skill"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Eric Fitz" }]
+dependencies = [
+    "spacy>=3.8,<4",
+    "textstat>=0.7",
+    "proselint>=0.14",
+    "python-docx>=1.0",
+    "pypdf>=6.10.2",
+    # spaCy model — pinned to a version compatible with spacy >=3.8,<4.
+    # Bundled as a direct URL so `uv sync` installs and preserves it.
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+]
+
+[project.scripts]
+boring-analyze = "analyzer.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["scripts"]
+
+[tool.setuptools.package-data]
+# Calibration lives at the skill root; pass --calibration explicitly or
+# rely on the analyzer's default-path resolution.
+
+# ---------------------------------------------------------------------------
+# Tooling — point linters and type-checkers at the project's .venv so they
+# resolve our deps (spacy, proselint, textstat, python-docx, pypdf).
+# uv creates the venv at ./.venv; override these if you use a different path.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+src = ["scripts"]
+target-version = "py311"
+# Many long lines are curated word lists, threshold-rationale comments,
+# or rubric prose where breaking lines hurts readability more than it helps.
+line-length = 110
+
+[tool.ruff.lint]
+# Match the IDE's Ruff integration: default rules (E, F, I) plus blind-except.
+select = ["E", "F", "I", "BLE"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["analyzer"]
+
+[tool.ty.environment]
+# ty (Astral's type-checker) — point at the project's .venv.
+python = ".venv"
+
+[tool.pyright]
+# Pylance / Pyright — same purpose as [tool.ty].
+venvPath = "."
+venv = ".venv"
+include = ["scripts"]
+extraPaths = ["scripts"]

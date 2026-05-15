@@ -11,6 +11,8 @@ Generate a coverage report for all locales by running the bundled `scripts/check
 
 `scripts/check-i18n.py` — the same self-contained Python 3.8+ analyzer used by [[analyze-localization-files]]. See that skill for the full description.
 
+When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/efitz-skills/validate-localization-coverage/<version>/`. The skill's files live under `${CLAUDE_PLUGIN_ROOT}/skills/validate-localization-coverage/`, so the analyzer is at `${CLAUDE_PLUGIN_ROOT}/skills/validate-localization-coverage/scripts/check-i18n.py`. If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md (that path *is* the `${CLAUDE_PLUGIN_ROOT}/skills/validate-localization-coverage/` portion), and use the absolute path to the script. Do **NOT** fall back to the legacy `$SKILL_DIR` form.
+
 ## Configuration
 
 Reads `.claude/i18n.config.json` (walked up from `pwd`). Required fields: `locales_dir`, `master_locale`, `file_extension`.

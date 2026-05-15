@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>[#HAZARDLOG-66] Weak TCP auth model allows unauthorized access to admin interface.</title>
+    <meta http-equiv="Content-Type" Content="application/vnd.ms-word; charset=UTF-8">
+        <style type="text/css">
+
+.tableBorder, .grid
+{
+    background-color: #fff;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tableBorder td, .grid td
+{
+    vertical-align: top;
+    padding: 2px;
+    border: 1px solid #ccc;
+}
+
+.noPadding
+{
+    padding: 0 !important;
+}
+
+h3 .subText
+{
+    font-size: 60%;
+    font-weight: normal;
+}
+
+.tabLabel
+{
+    font-weight: bold;
+    border: 1px solid #ccc;
+    border-bottom:none;
+    padding: 2px;
+    display: inline;
+}
+
+td.blank
+{
+    padding: 0;
+    margin: 0;
+}
+
+.blank td
+{
+    border: none;
+}
+
+#descriptionArea
+{
+    margin: 0;
+    padding: 2px;
+    border: 1px solid #ccc;
+}
+
+hr
+{
+    border-top:1px solid #aaa;
+}
+
+hr.fullcontent
+{
+  height: 15px;
+  padding: 10px 0;
+  background: #fff url('https://jira.oci.oraclecorp.com/images/icons/hr.gif') no-repeat scroll center;
+}
+
+</style>
+
+</head>
+<body>
+
+<table class="tableBorder" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td bgcolor="#f0f0f0" width="100%" colspan="2" valign="top">
+                            <h3 class="formtitle">
+                        [HAZARDLOG-66]&nbsp;<a href="https://jira.oci.oraclecorp.com/browse/HAZARDLOG-66">Weak TCP auth model allows unauthorized access to admin interface.</a>
+            <span class="subText">
+               Created: 30/Jul/25                   &nbsp;Updated: 20/Mar/26
+
+                                            </span>
+            </h3>
+        </td>
+    </tr>
+    <tr>
+        <td width="20%"><b>Status:</b></td>
+        <td width="80%">Resolved</td>
+    </tr>
+    <tr>
+        <td width="20%"><b>Project:</b></td>
+        <td width="80%"><a href="https://jira.oci.oraclecorp.com/secure/BrowseProject.jspa?id=45600">Safety Hazard</a></td>
+    </tr>
+
+        <tr>
+            <td><b>Component/s:</b></td>
+            <td>
+                            None
+                </td>
+    </tr>
+    
+
+        <tr>
+            <td><b>Affects Version/s:</b></td>
+            <td>
+                            None
+                </td>
+    </tr>
+    
+
+        <tr>
+            <td><b>Fix Version/s:</b></td>
+            <td>
+                            None
+                </td>
+    </tr>
+    
+            <tr>
+            <td><b>Security Level:</b></td>
+            <td>
+                Private
+                                    <font size=1> (Private Security Level)</font>
+                            </td>
+       </tr>
+    </table>
+
+<br />
+<table class="grid" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td bgcolor="#f0f0f0" valign="top" width="20%">
+            <b>Type:</b>
+        </td>
+        <td bgcolor="#ffffff" valign="top"  width="30%" >
+            Story
+        </td>
+
+                    <td bgcolor="#f0f0f0">
+                <b>Priority:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" nowrap>
+                High
+            </td>
+            </tr>
+    <tr>
+                        <td bgcolor="#f0f0f0" valign="top" width="20%">
+                <b>Reporter:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top"  width="30%" >
+                                            <a class="user-hover" rel="arsadasi" id="word_reporter_arsadasi" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=arsadasi">Arunkumar Sadasivan</a>
+                            </td>
+        
+                    <td bgcolor="#f0f0f0" width="20%">
+                <b>Assignee:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" nowrap  width="30%" >
+                                            <a class="user-hover" rel="veganap" id="word_assignee_veganap" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=veganap">Venkat Ganapathy</a>
+                            </td>
+            </tr>
+    	<tr>
+		<td bgcolor="#f0f0f0" width="20%">
+			<b>Resolution:</b>
+		</td>
+		<td bgcolor="#ffffff" valign="top" width="30%" nowrap>
+            				Unresolved
+                    </td>
+                    <td bgcolor="#f0f0f0" width="20%">
+                <b>Votes:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" width="30%" nowrap>
+                0
+            </td>
+        
+    </tr>
+    
+        <tr>
+        <td bgcolor="#f0f0f0" width="20%">
+            <b>Labels:</b>
+        </td>
+        <td id="labels-7672738-value" class="value" bgcolor="#ffffff" valign="top" colspan="3" nowrap>
+                            Cat:Operator_Privileges, safety-src-hazardlog, systemic-issue                    </td>
+    </tr>
+    
+    	<tr>
+                <td bgcolor="#f0f0f0" width="20%"><b>Σ Remaining Estimate:</b></td>
+        <td bgcolor="#ffffff" valign="top" nowrap>
+                            Not Specified
+                    </td>
+        		<td bgcolor="#f0f0f0" width="20%"><b>Remaining Estimate:</b></td>
+        <td bgcolor="#ffffff" valign="top" nowrap>
+                            Not Specified
+            		</td>
+    </tr>
+    <tr>
+                <td bgcolor="#f0f0f0" width="20%"><b>Σ Time Spent:</b></td>
+        <td bgcolor="#ffffff" valign="top" nowrap>
+                            Not Specified
+                    </td>
+                <td bgcolor="#f0f0f0" width="20%"><b>Time Spent:</b></td>
+		<td bgcolor="#ffffff" valign="top" nowrap>
+                            Not Specified
+            		</td>
+	</tr>
+    <tr>
+                <td bgcolor="#f0f0f0" width="20%"><b>Σ Original Estimate:</b></td>
+        <td bgcolor="#ffffff" valign="top" nowrap>
+                            Not Specified
+                    </td>
+                <td bgcolor="#f0f0f0" width="20%"><b>Original Estimate:</b></td>
+		<td bgcolor="#ffffff" valign="top" nowrap>
+                            Not Specified
+            		</td>
+    </tr>
+    
+    </table>
+
+
+
+    <br />
+
+    	<table class="grid" cellpadding="0" cellspacing="0" border="0" width="100%">
+            
+
+        
+            <tr>
+            <td bgcolor="#f0f0f0" width="20%" valign="top">
+                <b>Issue Links:</b>
+            </td>
+            <td bgcolor="#ffffff" valign="top" class="noPadding">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%" class="blank">
+                                            <tr>
+                            <td colspan="4" bgcolor="#f0f0f0">
+                                <b>Action Item</b><br/>
+                            </td>
+                        </tr>
+                                    <tr>
+            <td>
+                actioned by
+            </td>
+            <td>
+                <a href="https://jira.oci.oraclecorp.com/browse/HAZARDLOG-65">
+                     HAZARDLOG-65                 </a>
+            </td>
+            <td>
+                HTTP admin API exposes sensitive data...
+            </td>
+            <td>
+                Resolved
+            </td>
+        </tr>
+                                                                            <tr>
+                            <td colspan="4" bgcolor="#f0f0f0">
+                                <b>Related</b><br/>
+                            </td>
+                        </tr>
+                                    <tr>
+            <td>
+                relates to
+            </td>
+            <td>
+                <a href="https://jira.oci.oraclecorp.com/browse/ODBX-9506">
+                     <strike>ODBX-9506</strike>                 </a>
+            </td>
+            <td>
+                Admin interface uses weak authenticat...
+            </td>
+            <td>
+                Done
+            </td>
+        </tr>
+                                                                    </table>
+            </td>
+        </tr>
+    
+
+
+<tr><td bgcolor="#f0f0f0" width="20%" valign="top"><b>Sub-Tasks:</b></td>
+    <td bgcolor="#ffffff" valign="top">
+        <table class="grid" cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr bgcolor="#f0f0f0">
+                <td>
+                    <b>Key</b><br/>
+                </td>
+                <td>
+                    <b>Summary</b><br/>
+                </td>
+                <td>
+                    <b>Type</b><br/>
+                </td>
+                <td>
+                    <b>Status</b><br/>
+                </td>
+                <td>
+                    <b>Assignee</b><br/>
+                </td>
+            </tr>
+                                            <tr>
+                    <td>
+                        <a href="https://jira.oci.oraclecorp.com/browse/HAZARDLOG-65">HAZARDLOG-65</a>
+                    </td>
+                    <td valign="top" width="25%">
+                        <a href="https://jira.oci.oraclecorp.com/browse/HAZARDLOG-65">HTTP admin API exposes sensitive data...</a>
+                    </td>
+                    <td>
+                        Sub-task
+                    </td>
+                    <td>
+                        Resolved
+                    </td>
+                    <td>
+                                                     Venkat Ganapathy  &nbsp;
+                                            </td>
+                </tr>
+                                                            <tr>
+                    <td>
+                        <a href="https://jira.oci.oraclecorp.com/browse/HAZARDLOG-64">HAZARDLOG-64</a>
+                    </td>
+                    <td valign="top" width="25%">
+                        <a href="https://jira.oci.oraclecorp.com/browse/HAZARDLOG-64">Admin API exposed on health check por...</a>
+                    </td>
+                    <td>
+                        Sub-task
+                    </td>
+                    <td>
+                        Resolved
+                    </td>
+                    <td>
+                                                     Venkat Ganapathy  &nbsp;
+                                            </td>
+                </tr>
+                                    </table>
+    </td>
+</tr>
+
+                                    <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Status Update:</b></td>
+                <td id="customfield_10712-7672738-value" class="value" bgcolor="#ffffff" width="80%">      <p> </p>
+
+<p><b>COMPLETE</b><br/>
+<font color="#172b4d">Hazard confirmed resolved on 10/14</font></p>
+
+<p> </p>
+  </td>
+            </tr>
+                                            <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Impact:</b></td>
+                <td id="customfield_10304-7672738-value" class="value" bgcolor="#ffffff" width="80%">    High
+</td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Affected Realm:</b></td>
+                <td id="customfield_18200-7672738-value" class="value" bgcolor="#ffffff" width="80%">
+
+
+    <div class="shorten" id="customfield_18200-field">
+        							<span>N/A</span>			            </div>
+</td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Severity:</b></td>
+                <td id="customfield_10409-7672738-value" class="value" bgcolor="#ffffff" width="80%">    2
+</td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Customer Impact:</b></td>
+                <td id="customfield_10952-7672738-value" class="value" bgcolor="#ffffff" width="80%">    Yes
+</td>
+            </tr>
+                                            <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>TPM Contact:</b></td>
+                <td id="customfield_12513-7672738-value" class="value" bgcolor="#ffffff" width="80%">            <span class="aui-avatar aui-avatar-small"><span class="aui-avatar-inner"><img src="https://jira.oci.oraclecorp.com/secure/useravatar?avatarId=10335" alt="Valerie DiPietro" /></span></span>
+        <span class="tinylink">        <span class="user-hover" rel="vadipie" id="user_cf_vadipie">Valerie DiPietro</span></span>
+    </td>
+            </tr>
+                                                        <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Recommendation:</b></td>
+                <td id="customfield_18605-7672738-value" class="value" bgcolor="#ffffff" width="80%">      This hazard is reported by SecArch and the related service ticket is <a href="https://jira.oci.oraclecorp.com/browse/ODBX-9506" title="Admin interface uses weak authentication model - tcp (or port based) which increases the risk of unauthorized access." class="issue-link" data-issue-key="ODBX-9506"><strike>ODBX-9506</strike></a> (also reported by SecArch), due date is 12/30/2025 and a security exception has also been filed, approved and expires 30/Jan/2026 (SDR-31649).<br/>
+<br/>
+Service: SecArch<br/>
+Contact(s): <a href='mailto:shawn.jackson@oracle.com'>shawn.jackson@oracle.com</a><br/>
+Recommendation (Proposed): Use Project Forge to perform admin tasks.
+  </td>
+            </tr>
+                                                        <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Risk probability:</b></td>
+                <td id="customfield_10939-7672738-value" class="value" bgcolor="#ffffff" width="80%">    High
+</td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Compliance Impact:</b></td>
+                <td id="customfield_19302-7672738-value" class="value" bgcolor="#ffffff" width="80%">    High
+</td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Risk consequence:</b></td>
+                <td id="customfield_10938-7672738-value" class="value" bgcolor="#ffffff" width="80%">    High
+</td>
+            </tr>
+                                                        <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Area Leader (VP+):</b></td>
+                <td id="customfield_16600-7672738-value" class="value" bgcolor="#ffffff" width="80%">
+
+
+    <div class="shorten" id="customfield_16600-field">
+        							<span>Jeppe Larsen</span>			            </div>
+</td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Phonebook Service Entry:</b></td>
+                <td id="customfield_16827-7672738-value" class="value" bgcolor="#ffffff" width="80%">      &nbsp;<a href="https://devops.oci.oraclecorp.com/phonebook/odbx">https://devops.oci.oraclecorp.com/phonebook/odbx</a>
+  </td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Service Name:</b></td>
+                <td id="customfield_10957-7672738-value" class="value" bgcolor="#ffffff" width="80%">      ODBG
+  </td>
+            </tr>
+                                <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>High Dependency:</b></td>
+                <td id="customfield_16842-7672738-value" class="value" bgcolor="#ffffff" width="80%">
+
+
+    <div class="shorten" id="customfield_16842-field">
+        							<span>This service has high dependency and it potentially blocking other services to onboard compliance</span>			            </div>
+</td>
+            </tr>
+                                            <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Target GA date:</b></td>
+                <td id="customfield_14407-7672738-value" class="value" bgcolor="#ffffff" width="80%">          <span title="30/Dec/25"><time datetime="2025-12-30">30/Dec/25</time></span>
+    </td>
+            </tr>
+                                            <tr>
+                <td bgcolor="#f0f0f0" width="20%" valign="top"><b>Affected Service:</b></td>
+                <td id="customfield_12209-7672738-value" class="value" bgcolor="#ffffff" width="80%">    Security Architecture
+</td>
+            </tr>
+            </table>
+
+    <br/>
+
+    <table cellpadding="2" cellspacing="0" border="0" width="100%" align="center">
+    <tr>
+        <td bgcolor="#bbbbbb" width="1%" nowrap align="center">
+            &nbsp;<font color="#ffffff"><b>Description</b></font>&nbsp;
+        </td>
+        <td>&nbsp;</td>
+    </tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td id="descriptionArea">
+            <p>Admin interface uses weak authentication model - TCP (or port-based), which increases the risk of unauthorized access - Critical Description: The service currently uses Dropwizard to provide administrative functionalities. The admin related tasks or APIs use TCP-based (port-based) authentication. Using TCP-based authentication is generally considered weak, as access control relies entirely on access to the port. Every process on the machine that has access to the port will be able to call the Admin API. This makes it hard to implement granular access control. An SSRF vulnerability could allow access to the privileged admin port from localhost, bypassing any network firewall or external restrictions and enabling the attacker to execute internal-only endpoints via the service. A misconfigured local app or service could access those ports and perform malicious actions. A Malicious operator with limited shell access might be able to connect to the API, violating the principle of least privilege. Impact: Unauthorized access can lead to the leakage of sensitive data, data manipulation, and service disruptions.</p>
+            <br/>
+        </td>
+    </tr>
+    </table>
+
+    <br/>
+
+    <table cellpadding="2" cellspacing="0" border="0" width="100%" align="center">
+    <tr>
+        <td bgcolor="#bbbbbb" width="1%" nowrap align="center">
+            &nbsp;<font color="#ffffff"><b>Comments</b></font>&nbsp;
+        </td>
+        <td>&nbsp;</td>
+    </tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" class="grid" style="margin: 0;">
+                <tr id="comment-header-17264094"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="veganap" id="word_commented_veganap" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=veganap">Venkat Ganapathy</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">02/Oct/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-17264094"><td bgcolor="#ffffff">
+            <p>A security exception has been filed, approved and expires 30/Jan/2026 (<a href="https://jira-sd.mc1.oracleiaas.com/browse/SDR-31649" class="external-link" target="_blank" rel="nofollow noopener">SDR-31649)</a></p>
+        </td></tr>
+                <tr id="comment-header-16908114"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="veganap" id="word_commented_veganap" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=veganap">Venkat Ganapathy</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">21/Aug/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16908114"><td bgcolor="#ffffff">
+            <p>Related service tickets:<br/>
+<a href="https://jira.oci.oraclecorp.com/browse/ODBX-9506" class="external-link" rel="nofollow">https://jira.oci.oraclecorp.com/browse/ODBX-9506</a><br/>
+<a href="https://jira.oci.oraclecorp.com/browse/INDIGO-20739" class="external-link" rel="nofollow">https://jira.oci.oraclecorp.com/browse/INDIGO-20739</a><br/>
+<a href="https://jira.oci.oraclecorp.com/browse/ODBX-9507" class="external-link" rel="nofollow">https://jira.oci.oraclecorp.com/browse/ODBX-9507</a><br/>
+<a href="https://jira.oci.oraclecorp.com/browse/ODBX-9563" class="external-link" rel="nofollow">https://jira.oci.oraclecorp.com/browse/ODBX-9563</a><br/>
+ </p>
+        </td></tr>
+                <tr id="comment-header-16884980"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="veganap" id="word_commented_veganap" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=veganap">Venkat Ganapathy</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">19/Aug/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16884980"><td bgcolor="#ffffff">
+            <p>Reached out to the SecArch team member who initially reported these hazards. Two service teams ORP and DeepHealthCheck determined that they are not impacted by this hazard and resolved the corresponding ticket. </p>
+
+<p>It seems this safety issue could be wide spread which could affect multiple services.</p>
+
+<p>Next steps:</p>
+<ul>
+	<li>Figure out how we can communicate to other service teams that they need to verify if they are impacted by this hazard or not</li>
+	<li>How to track and have tickets created in respective service team so they can document the impact findings and proceed with the remediation plan if impacted.</li>
+</ul>
+
+        </td></tr>
+                <tr id="comment-header-16807803"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="veganap" id="word_commented_veganap" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=veganap">Venkat Ganapathy</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">09/Aug/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16807803"><td bgcolor="#ffffff">
+            <ul>
+	<li>Meeting notes on my conversation with <a href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=arsadasi" class="external-link" rel="nofollow">Arunkumar Sadasivan</a> from the Security Architecture team:</li>
+	<li>Admin operations are allowed only via TCP and without AuthN/AuthZ</li>
+	<li>Impact
+	<ul>
+		<li>Any service team who use “drop wizard” will be impacted by this hazard</li>
+	</ul>
+	</li>
+	<li>Next steps:
+	<ul>
+		<li>Security Architecture team can only suggest remediation on the service they review and don’t have a way to enforce remediation across all the impacted services</li>
+	</ul>
+	</li>
+</ul>
+
+        </td></tr>
+                <tr id="comment-header-16797733"><td bgcolor="#f0f0f0">
+            Comment by  
+                                                        <a class="user-hover" rel="veganap" id="word_commented_veganap" href="https://jira.oci.oraclecorp.com/secure/ViewProfile.jspa?name=veganap">Venkat Ganapathy</a>
+                                        <font size="-2">
+            [
+                <font color="#336699">07/Aug/25</font>
+
+                            ]
+            </font>
+
+        </td></tr>
+        <tr id="comment-body-16797733"><td bgcolor="#ffffff">
+            <p>I have reached out to the reporter to ask for some clarifications.</p>
+        </td></tr>
+            </table>
+Generated at Tue May 05 00:36:58 UTC 2026 by Aaron Bryson using Jira 9.12.26#9120026-sha1:0a9486941371436bd1a592f478f3315c53c428b1.
+
+</body>
+</html>
