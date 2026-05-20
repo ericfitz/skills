@@ -7,8 +7,11 @@ taxonomy on four axes: **Direction**, **Density**, **Texture**, and
 **Surprise**. Grounded in the MAC model of boredom (Westgate & Wilson,
 2018) plus the craft tradition (Gopen-Swan, Williams, Provost, Minto).
 
-**Skill entry point**: `src/SKILL.md`. Invoke from a Claude Code or
-Anthropic-Console session.
+**Skill entry point**: `src/SKILL.md`. Invoke from a Codex or Claude Code
+session.
+
+## Download
+Clone the repository or download the skill as a zip file from [`releases`](https://github.com/ericfitz/skills/releases).
 
 ## Install
 
@@ -34,7 +37,21 @@ cd ~/.claude/skills && unzip boring-<version>.zip && rm boring-<version>.zip
 cd boring && uv sync
 ```
 
-Step 3 is technically optional — SKILL.md's setup decision tree runs
+To install into a Codex skills directory:
+
+```sh
+# 1. Copy the zip into your skills dir (user-global shown; project-
+#    local would be <repo>/.codex/skills/ instead).
+cp boring/dist/boring-<version>.zip ~/.codex/skills/
+
+# 2. Unzip — produces ~/.codex/skills/boring/
+cd ~/.codex/skills && unzip boring-<version>.zip && rm boring-<version>.zip
+
+# 3. Build the analyzer's Python venv. Requires `uv`
+#    (https://docs.astral.sh/uv/). Takes ~30s the first time.
+cd boring && uv sync
+```
+In either case, step 3 is technically optional — SKILL.md's setup decision tree runs
 `uv sync` on first invocation if the venv is missing — but doing it
 eagerly fails fast if `uv` isn't installed or the network is down,
 instead of discovering that mid-conversation.
@@ -48,6 +65,17 @@ rubrics in `src/rubrics/`. Calibration thresholds are intuitive
 defaults, not yet tuned against a labeled corpus of business writing —
 see `docs/calibration-findings-2026-05-04.md` for the first
 calibration attempt and why it punted on threshold updates.
+
+**Next steps** The skill is undergoing calibration against a hand-labeled
+corpus of business writing, which will cause an update in the values
+in configuration.toml that optimize against writing style at the author's
+employer.  The skill runs fine and produces useful output now with
+intuitive weights, or you can assemble your own internal corpous
+of "boring" and "not-boring" documents for your organization and perform
+your own calibration vs. that corpus.  Note that "not-boring" does
+not mean the same thing as "interesting"; the latter concept is
+heavily weighted in the subject's perceived interest in the subject
+matter vs. the writing style.
 
 ## Repository layout
 
@@ -96,6 +124,8 @@ boring/
 │   ├── run_one.py              ← re-runs a single doc, patches results.csv
 │   └── analyze_results.py      ← per-check separability + threshold recs
 ├── calibration/                ← gitignored corpus + per-run outputs
+│   ├── boring                  ← corpus of curated documents that are hand-labeled as "boring"
+│   ├── not-boring              ← corpus of curated documents that are hand-labeled as "not-boring"
 └── dist/                       ← gitignored build output (copy of src/)
 ```
 
