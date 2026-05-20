@@ -1,0 +1,4 @@
+interface:
+  display_name: "Writing Style"
+  short_description: "Review technical writing for clarity and impact"
+  default_prompt: "Use $writing-style in standard mode to review this technical document for audience fit, thesis clarity, decision framing, structure, and sentence-level impact."
