@@ -13,9 +13,9 @@ __pycache__/
 # data directory and per-run output files are ignored.
 writing/skills/boring/calibration/
 
-# Built skill output — produced by copying writing/src/ into a
+# Built skill output — produced by copying the skill src into a
 # distributable tree. Regenerated; not tracked.
-writing/dist/
+writing/skills/boring/dist/
 
 # IDE local state
 .vscode/
