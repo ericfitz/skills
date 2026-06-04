@@ -28,50 +28,36 @@ fi
 ok ".claude-plugin/marketplace.json parses as JSON"
 
 PLUGIN_COUNT=$(python3 -c "import json; print(len(json.load(open('.claude-plugin/marketplace.json'))['plugins']))")
-if [ "$PLUGIN_COUNT" -eq 16 ]; then
-  ok "marketplace.json has 16 plugin entries"
+if [ "$PLUGIN_COUNT" -eq 8 ]; then
+  ok "marketplace.json has 8 plugin entries"
 else
-  bad "marketplace.json has $PLUGIN_COUNT plugin entries (expected 16)"
+  bad "marketplace.json has $PLUGIN_COUNT plugin entries (expected 8)"
 fi
 
 # ---------- Per-plugin structural checks ----------
-hdr "Per-plugin structure"
+hdr "Per-plugin structure (multi-skill)"
 
-# (name, category) tuples expected in marketplace.json
+# "plugin:category:skill1,skill2,..."  — skills are the dir names under <plugin>/skills/
 declare -a PLUGINS=(
-  "plugin-vetter:security"
-  "race-condition-audit:security"
-  "analyze-localization-files:localization"
-  "validate-localization-coverage:localization"
-  "detect-non-localizable:localization"
-  "translate-to-language:localization"
-  "update-json-localization-file:localization"
-  "validate-translation:localization"
-  "file-github-bug:misc"
-  "verify-migrate-doc:misc"
-  "visual-regression-triage:misc"
+  "loc:localization:analyze,coverage,detect-nonloc,translate-to,update-json,validate-translation,backfill"
+  "security:security:vet-plugin,race-cond"
+  "github:development:backlog,file-bug"
+  "ui:development:vrt"
+  "wiki:documentation:verify-doc"
+  "dev:development:dedupe"
   "writing:writing:boring"
   "deps:development:bump"
-  "backlog-next:development"
-  "dedupe:development"
-  "localization-backfill:localization"
 )
 
 for entry in "${PLUGINS[@]}"; do
-  # entry is "name:category" or "name:category:skilldir". The skill dir
-  # defaults to the plugin name, but differs after a plugin rename that
-  # keeps the original skill name (e.g. writing→boring, deps→bump).
-  IFS=: read -r name expected_cat skill <<< "$entry"
-  [ -z "$skill" ] && skill="$name"
+  IFS=: read -r name expected_cat skills_csv <<< "$entry"
 
   # plugin.json exists and parses
   if [ ! -f "$name/.claude-plugin/plugin.json" ]; then
-    bad "$name: .claude-plugin/plugin.json missing"
-    continue
+    bad "$name: .claude-plugin/plugin.json missing"; continue
   fi
   if ! python3 -c "import json; json.load(open('$name/.claude-plugin/plugin.json'))" 2>/dev/null; then
-    bad "$name: .claude-plugin/plugin.json invalid JSON"
-    continue
+    bad "$name: .claude-plugin/plugin.json invalid JSON"; continue
   fi
 
   # plugin.json fields
@@ -79,26 +65,6 @@ for entry in "${PLUGINS[@]}"; do
   pv=$(python3 -c "import json; print(json.load(open('$name/.claude-plugin/plugin.json')).get('version',''))")
   if [ "$pn" != "$name" ]; then bad "$name: plugin.json name=$pn (expected $name)"; continue; fi
   if [ "$pv" != "1.0.0" ]; then bad "$name: plugin.json version=$pv (expected 1.0.0)"; continue; fi
-
-  # SKILL.md exists at the expected nested path (skill dir may differ
-  # from plugin name after a rename — see the skilldir field above).
-  if [ ! -f "$name/skills/$skill/SKILL.md" ]; then
-    bad "$name: skills/$skill/SKILL.md missing"
-    continue
-  fi
-
-  # SKILL.md has frontmatter with name matching the skill dir
-  fm_name=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$name/skills/$skill/SKILL.md")
-  if [ "$fm_name" != "$skill" ]; then
-    bad "$name: SKILL.md frontmatter name='$fm_name' (expected $skill)"
-    continue
-  fi
-
-  # No stale SKILL.md at the old flat location
-  if [ -f "$name/SKILL.md" ]; then
-    bad "$name: stale $name/SKILL.md still exists at flat location"
-    continue
-  fi
 
   # Marketplace entry exists with correct category
   cat=$(python3 -c "
@@ -108,51 +74,74 @@ e = next((p for p in d['plugins'] if p.get('name')=='$name'), None)
 print(e['category'] if e else '')
 ")
   if [ "$cat" != "$expected_cat" ]; then
-    bad "$name: marketplace category='$cat' (expected $expected_cat)"
-    continue
+    bad "$name: marketplace category='$cat' (expected $expected_cat)"; continue
   fi
 
-  ok "$name (category=$expected_cat)"
+  # No stale SKILL.md at the plugin's flat location
+  if [ -f "$name/SKILL.md" ]; then
+    bad "$name: stale $name/SKILL.md at plugin root"; continue
+  fi
+
+  # Each declared skill: SKILL.md exists with frontmatter name == skill dir
+  plugin_ok=1
+  IFS=, read -ra skills <<< "$skills_csv"
+  for skill in "${skills[@]}"; do
+    sm="$name/skills/$skill/SKILL.md"
+    if [ ! -f "$sm" ]; then
+      bad "$name: skills/$skill/SKILL.md missing"; plugin_ok=0; continue
+    fi
+    fm_name=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$sm")
+    if [ "$fm_name" != "$skill" ]; then
+      bad "$name/$skill: SKILL.md frontmatter name='$fm_name' (expected $skill)"; plugin_ok=0
+    fi
+  done
+  [ "$plugin_ok" -eq 1 ] && ok "$name (category=$expected_cat, skills: $skills_csv)"
 done
 
-# ---------- Command-wrapper plugins ----------
-# The deps plugin (formerly bump) intentionally ships no in-repo command
-# wrapper: plugin namespacing made the bare `/bump` collide with the skill,
-# so it was dropped and `/bump` is provided by a personal ~/.claude/commands
-# wrapper instead. Canonical invocation is `/deps:bump`.
-hdr "Command wrappers (backlog-next, dedupe, localization-backfill)"
+# ---------- Bundled scripts present at expected paths ----------
+hdr "Bundled scripts: presence at plugin-root scripts/"
 
-for plugin in backlog-next dedupe localization-backfill; do
-  wrapper="$plugin/commands/$plugin.md"
-  if [ ! -f "$wrapper" ]; then
-    bad "$plugin: command wrapper $wrapper missing"
-    continue
-  fi
-  # Must reference the plugin:skill Skill tool invocation
-  if ! grep -q "\`$plugin:$plugin\`" "$wrapper"; then
-    bad "$plugin: wrapper does not reference \`$plugin:$plugin\` skill name"
-    continue
-  fi
-  # Must pass through \$ARGUMENTS
-  if ! grep -q '\$ARGUMENTS' "$wrapper"; then
-    bad "$plugin: wrapper does not pass through \$ARGUMENTS"
-    continue
-  fi
-  ok "$plugin: command wrapper OK"
+declare -a SCRIPTS=(
+  "loc/scripts/check-i18n.py"
+  "loc/scripts/find_duplicate_localizations.py"
+  "github/scripts/gh-issues.py"
+  "dev/scripts/dedupe-report.py"
+)
+for s in "${SCRIPTS[@]}"; do
+  if [ -f "$s" ]; then ok "$s exists"; else bad "$s missing"; fi
 done
 
-# ---------- No stale legacy env vars or hardcoded paths ----------
+# Shared check-i18n.py must NOT be duplicated back under the loc skill dirs
+if ls loc/skills/analyze/scripts/check-i18n.py loc/skills/coverage/scripts/check-i18n.py >/dev/null 2>&1; then
+  bad "loc: check-i18n.py still duplicated under a skill dir (should be only loc/scripts/check-i18n.py)"
+else
+  ok "loc: check-i18n.py is a single shared copy at loc/scripts/"
+fi
+
+# ---------- dev worker agents ----------
+hdr "dev worker agents (dedupe)"
+
+for agent in dedupe-analyzer dedupe-grouper dedupe-deduplicator; do
+  af="dev/agents/$agent.md"
+  if [ ! -f "$af" ]; then bad "dev/agents/$agent.md missing"; continue; fi
+  n=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$af")
+  if [ -z "$n" ]; then bad "dev/agents/$agent.md missing name: in frontmatter"; continue; fi
+  ok "dev/agents/$agent.md (name='$n')"
+done
+
+for agent in dedupe-analyzer dedupe-grouper dedupe-deduplicator; do
+  if grep -q "\${CLAUDE_PLUGIN_ROOT}/agents/$agent.md" dev/skills/dedupe/SKILL.md; then
+    ok "dev SKILL.md references $agent via \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
+  else
+    bad "dev SKILL.md does not reference \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
+  fi
+done
+
+# ---------- Skill bodies: no legacy paths or env vars ----------
 hdr "Skill bodies: no legacy paths or env vars"
 
-# Legacy reference scan — we only care about *active* references (in code blocks, as
-# script arguments, etc.), not mentions inside "Do NOT fall back to ..." warning text.
-# We treat any line containing both "legacy" + the reference, or "Do NOT" + the reference,
-# or "fall back" + the reference, as a documented warning and skip it.
 scan_legacy() {
-  local pattern="$1"
-  local label="$2"
-  # Find candidate lines, then drop ones that are clearly inside warning text.
-  local hits
+  local pattern="$1"; local label="$2"; local hits
   hits=$(grep -rn "$pattern" --include='SKILL.md' . 2>/dev/null \
     | grep -viE 'do \*?\*?not\*?\*?|fall back|legacy|after cutover' \
     || true)
@@ -169,66 +158,28 @@ scan_legacy '\$COMMAND_DIR'            '$COMMAND_DIR'
 scan_legacy '~/\.claude/scripts'       '~/.claude/scripts/'
 scan_legacy '~/\.claude/agents'        '~/.claude/agents/'
 
-# ---------- Bundled scripts present where SKILL.md references them ----------
-hdr "Bundled scripts: presence at \${CLAUDE_PLUGIN_ROOT} paths"
+# ---------- No stale old-plugin example paths in SKILL bodies ----------
+hdr "No stale old-plugin example paths"
 
-# (plugin, relative-path-from-plugin-root)
-declare -a SCRIPTS=(
-  "bump:none"
-  "backlog-next:scripts/gh-issues.py"
-  "dedupe:scripts/dedupe-report.py"
-  "localization-backfill:scripts/find_duplicate_localizations.py"
-  "analyze-localization-files:skills/analyze-localization-files/scripts/check-i18n.py"
-  "validate-localization-coverage:skills/validate-localization-coverage/scripts/check-i18n.py"
-)
+OLD_NAMES='analyze-localization-files|validate-localization-coverage|detect-non-localizable|translate-to-language|update-json-localization-file|localization-backfill|plugin-vetter|race-condition-audit|backlog-next|file-github-bug|verify-migrate-doc|visual-regression-triage'
+stale=$(grep -rnE "efitz-skills/($OLD_NAMES)/" --include='SKILL.md' . 2>/dev/null || true)
+if [ -n "$stale" ]; then
+  bad "Stale efitz-skills/<old-plugin>/ example paths in SKILL.md:"
+  echo "$stale" | while IFS= read -r line; do printf '         %s\n' "$line"; done
+else
+  ok "No stale efitz-skills/<old-plugin>/ example paths"
+fi
 
-for entry in "${SCRIPTS[@]}"; do
-  plugin="${entry%%:*}"
-  rel="${entry#*:}"
-  if [ "$rel" = "none" ]; then
-    continue
-  fi
-  if [ -f "$plugin/$rel" ]; then
-    ok "$plugin/$rel exists"
-  else
-    bad "$plugin/$rel missing"
-  fi
-done
-
-# ---------- dedupe-specific: 3 worker agents present ----------
-hdr "Dedupe worker agents"
-
-for agent in dedupe-analyzer dedupe-grouper dedupe-deduplicator; do
-  af="dedupe/agents/$agent.md"
-  if [ ! -f "$af" ]; then
-    bad "dedupe/agents/$agent.md missing"
-    continue
-  fi
-  # has a name: field in frontmatter
-  n=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$af")
-  if [ -z "$n" ]; then
-    bad "dedupe/agents/$agent.md missing name: in frontmatter"
-    continue
-  fi
-  ok "dedupe/agents/$agent.md (name='$n')"
-done
-
-# Confirm SKILL.md references each agent file via \${CLAUDE_PLUGIN_ROOT}/agents/
-for agent in dedupe-analyzer dedupe-grouper dedupe-deduplicator; do
-  if grep -q "\${CLAUDE_PLUGIN_ROOT}/agents/$agent.md" dedupe/skills/dedupe/SKILL.md; then
-    ok "dedupe SKILL.md references $agent via \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
-  else
-    bad "dedupe SKILL.md does not reference \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
-  fi
-done
-
-# ---------- repo-root commands/ dir is gone ----------
+# ---------- Repo cleanup ----------
 hdr "Repo cleanup"
 
-if [ ! -d "commands" ]; then
-  ok "repo-root commands/ removed"
+if [ ! -d "commands" ]; then ok "repo-root commands/ removed"; else bad "repo-root commands/ still exists"; fi
+
+cmd_dirs=$(find . -path ./.git -prune -o -type d -name commands -print 2>/dev/null | grep -v node_modules || true)
+if [ -z "$cmd_dirs" ]; then
+  ok "no per-plugin commands/ dirs (all command wrappers dropped)"
 else
-  bad "repo-root commands/ still exists (should have been removed by Task 18)"
+  bad "stray commands/ dirs found:"; echo "$cmd_dirs" | while IFS= read -r d; do printf '         %s\n' "$d"; done
 fi
 
 # ---------- summary ----------
@@ -238,9 +189,7 @@ printf 'PASS: %d\nFAIL: %d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -ne 0 ]; then
   echo
   echo "Failures:"
-  for f in "${FAILURES[@]}"; do
-    printf '  - %s\n' "$f"
-  done
+  for f in "${FAILURES[@]}"; do printf '  - %s\n' "$f"; done
   exit 1
 fi
 

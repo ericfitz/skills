@@ -1,0 +1,6 @@
+{
+  "name": "dev",
+  "version": "1.0.0",
+  "description": "Developer toolkit: find and analyze duplicate or overlapping functionality across a codebase (dedupe). Supports Go, Python, and TypeScript; orchestrates per-file analysis, grouping, and deep comparison via worker agents.",
+  "author": { "name": "efitz" }
+}

@@ -1,6 +1,0 @@
-{
-  "name": "dedupe",
-  "version": "1.0.0",
-  "description": "Find and analyze duplicate or overlapping functionality across a codebase. Use when the user asks to dedupe, find duplicate code, look for redundant functions, or audit for code duplication. Supports Go, Python, and TypeScript. Orchestrates per-file analysis, candidate grouping, and deep comparison through a shared SQLite database.",
-  "author": { "name": "efitz" }
-}

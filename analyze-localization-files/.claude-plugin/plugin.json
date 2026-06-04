@@ -1,6 +1,0 @@
-{
-  "name": "analyze-localization-files",
-  "version": "1.0.0",
-  "description": "Use when building a translation task manifest for an i18n project — produces per-language lists of missing keys with their source values by running the bundled check-i18n.py script.",
-  "author": { "name": "efitz" }
-}

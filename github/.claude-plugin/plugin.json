@@ -1,0 +1,6 @@
+{
+  "name": "github",
+  "version": "1.0.0",
+  "description": "GitHub workflow toolkit: pick the next issue to work on from a milestone/backlog (backlog) and file detailed bug reports into a repo/Project (file-bug). Use for issue triage and bug filing.",
+  "author": { "name": "efitz" }
+}

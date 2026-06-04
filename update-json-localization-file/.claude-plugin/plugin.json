@@ -1,6 +1,0 @@
-{
-  "name": "update-json-localization-file",
-  "version": "1.0.0",
-  "description": "Use when modifying a JSON i18n file with additions, updates, or deletions while preserving formatting and writing atomically.",
-  "author": { "name": "efitz" }
-}

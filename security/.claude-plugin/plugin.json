@@ -1,0 +1,6 @@
+{
+  "name": "security",
+  "version": "1.0.0",
+  "description": "Security toolkit: vet plugins/skills before install (vet-plugin) and audit code for race conditions and concurrency bugs (race-cond). Use before installing third-party agent extensions or when reviewing concurrent code.",
+  "author": { "name": "efitz" }
+}

@@ -1,6 +1,0 @@
-{
-  "name": "visual-regression-triage",
-  "version": "1.0.0",
-  "description": "Use when a Playwright visual regression test fails (screenshot mismatch) or a user mentions a screenshot test failure. Presents baseline, actual, and diff images framed against the current task context, then helps the user decide bug vs. expected change.",
-  "author": { "name": "efitz" }
-}

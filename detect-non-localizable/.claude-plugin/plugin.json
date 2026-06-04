@@ -1,6 +1,0 @@
-{
-  "name": "detect-non-localizable",
-  "version": "1.0.0",
-  "description": "Use when filtering localization keys, validating translation files, or deciding whether a string value should be translated or left as-is. Returns a boolean and the matched pattern.",
-  "author": { "name": "efitz" }
-}

@@ -1,6 +1,0 @@
-{
-  "name": "validate-localization-coverage",
-  "version": "1.0.0",
-  "description": "Use when auditing i18n translation completeness across all target locales or identifying locales below a coverage threshold. Produces a per-locale and summary coverage report.",
-  "author": { "name": "efitz" }
-}
