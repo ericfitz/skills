@@ -17,7 +17,7 @@ technical reports — across a 20-sub-dimension taxonomy on four axes:
 The taxonomy is grounded in the MAC model of boredom (Westgate &
 Wilson, 2018) plus the craft tradition (Gopen-Swan, Williams, Provost,
 Minto). Full theoretical grounding lives in the development repo
-(`boring/skills/boring/top-docs/research-report.md`) and is not shipped with the skill.
+(`writing/skills/boring/top-docs/research-report.md`) and is not shipped with the skill.
 
 ## When to invoke
 

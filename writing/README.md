@@ -18,8 +18,8 @@ Clone the repository or download the skill as a zip file from [`releases`](https
 The shipped artifact is a versioned zip in `dist/`. Build it with:
 
 ```sh
-boring/tools/build.sh
-# → boring/dist/boring-<version>.zip
+writing/tools/build.sh
+# → writing/dist/boring-<version>.zip
 ```
 
 To install into a Claude Code skills directory:
@@ -27,7 +27,7 @@ To install into a Claude Code skills directory:
 ```sh
 # 1. Copy the zip into your skills dir (user-global shown; project-
 #    local would be <repo>/.claude/skills/ instead).
-cp boring/dist/boring-<version>.zip ~/.claude/skills/
+cp writing/dist/boring-<version>.zip ~/.claude/skills/
 
 # 2. Unzip — produces ~/.claude/skills/boring/
 cd ~/.claude/skills && unzip boring-<version>.zip && rm boring-<version>.zip
@@ -42,7 +42,7 @@ To install into a Codex skills directory:
 ```sh
 # 1. Copy the zip into your skills dir (user-global shown; project-
 #    local would be <repo>/.codex/skills/ instead).
-cp boring/dist/boring-<version>.zip ~/.codex/skills/
+cp writing/dist/boring-<version>.zip ~/.codex/skills/
 
 # 2. Unzip — produces ~/.codex/skills/boring/
 cd ~/.codex/skills && unzip boring-<version>.zip && rm boring-<version>.zip
@@ -83,7 +83,7 @@ This directory is split into the shipped skill and the dev-side
 tooling around it:
 
 ```
-boring/
+writing/
 ├── README.md                   ← this file
 ├── src/                        ← the skill (everything that ships)
 │   ├── SKILL.md                ← entry point: invocation, workflow, rubrics index
@@ -135,7 +135,7 @@ Everything outside `src/` is dev-side and intentionally not shipped.
 ## Quickstart
 
 ```sh
-# from boring/src/ — uv handles the venv + deps (model is bundled
+# from writing/src/ — uv handles the venv + deps (model is bundled
 # via pyproject.toml, no separate spaCy install needed)
 cd src
 uv sync
@@ -146,7 +146,7 @@ uv run python -m analyzer ../samples/input.md --genre executive_brief --output /
 
 If your IDE (VS Code, ty, Pylance) reports spurious "unresolved import"
 errors for `spacy`, `proselint`, `textstat`, `docx`, or `pypdf`, point
-the IDE's Python interpreter at `boring/src/.venv/bin/python`. The
+the IDE's Python interpreter at `writing/src/.venv/bin/python`. The
 `pyproject.toml` already configures `tool.ty.environment`,
 `tool.pyright`, and `tool.ruff` for that path; some IDEs also need an
 explicit interpreter selection.

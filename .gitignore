@@ -9,13 +9,13 @@ __pycache__/
 # Calibration corpus and per-run outputs — mostly third-party /
 # copyrighted source documents and large CSV artifacts we use locally
 # to tune thresholds. Not for the public repo. The tooling
-# (boring/tools/*.py) IS tracked — only the data directories and
+# (writing/tools/*.py) IS tracked — only the data directories and
 # per-run output files are ignored.
-boring/calibration/
+writing/calibration/
 
-# Built skill output — produced by copying boring/src/ into a
+# Built skill output — produced by copying writing/src/ into a
 # distributable tree. Regenerated; not tracked.
-boring/dist/
+writing/dist/
 
 # IDE local state
 .vscode/

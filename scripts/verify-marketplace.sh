@@ -50,16 +50,19 @@ declare -a PLUGINS=(
   "file-github-bug:misc"
   "verify-migrate-doc:misc"
   "visual-regression-triage:misc"
-  "boring:writing"
-  "bump:development"
+  "writing:writing:boring"
+  "deps:development:bump"
   "backlog-next:development"
   "dedupe:development"
   "localization-backfill:localization"
 )
 
 for entry in "${PLUGINS[@]}"; do
-  name="${entry%:*}"
-  expected_cat="${entry#*:}"
+  # entry is "name:category" or "name:category:skilldir". The skill dir
+  # defaults to the plugin name, but differs after a plugin rename that
+  # keeps the original skill name (e.g. writing→boring, deps→bump).
+  IFS=: read -r name expected_cat skill <<< "$entry"
+  [ -z "$skill" ] && skill="$name"
 
   # plugin.json exists and parses
   if [ ! -f "$name/.claude-plugin/plugin.json" ]; then
@@ -77,16 +80,17 @@ for entry in "${PLUGINS[@]}"; do
   if [ "$pn" != "$name" ]; then bad "$name: plugin.json name=$pn (expected $name)"; continue; fi
   if [ "$pv" != "1.0.0" ]; then bad "$name: plugin.json version=$pv (expected 1.0.0)"; continue; fi
 
-  # SKILL.md exists at the expected nested path
-  if [ ! -f "$name/skills/$name/SKILL.md" ]; then
-    bad "$name: skills/$name/SKILL.md missing"
+  # SKILL.md exists at the expected nested path (skill dir may differ
+  # from plugin name after a rename — see the skilldir field above).
+  if [ ! -f "$name/skills/$skill/SKILL.md" ]; then
+    bad "$name: skills/$skill/SKILL.md missing"
     continue
   fi
 
-  # SKILL.md has frontmatter with name matching plugin name
-  fm_name=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$name/skills/$name/SKILL.md")
-  if [ "$fm_name" != "$name" ]; then
-    bad "$name: SKILL.md frontmatter name='$fm_name' (expected $name)"
+  # SKILL.md has frontmatter with name matching the skill dir
+  fm_name=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$name/skills/$skill/SKILL.md")
+  if [ "$fm_name" != "$skill" ]; then
+    bad "$name: SKILL.md frontmatter name='$fm_name' (expected $skill)"
     continue
   fi
 
@@ -111,10 +115,14 @@ print(e['category'] if e else '')
   ok "$name (category=$expected_cat)"
 done
 
-# ---------- Command-wrapper plugins (4) ----------
-hdr "Command wrappers (bump, backlog-next, dedupe, localization-backfill)"
+# ---------- Command-wrapper plugins ----------
+# The deps plugin (formerly bump) intentionally ships no in-repo command
+# wrapper: plugin namespacing made the bare `/bump` collide with the skill,
+# so it was dropped and `/bump` is provided by a personal ~/.claude/commands
+# wrapper instead. Canonical invocation is `/deps:bump`.
+hdr "Command wrappers (backlog-next, dedupe, localization-backfill)"
 
-for plugin in bump backlog-next dedupe localization-backfill; do
+for plugin in backlog-next dedupe localization-backfill; do
   wrapper="$plugin/commands/$plugin.md"
   if [ ! -f "$wrapper" ]; then
     bad "$plugin: command wrapper $wrapper missing"
