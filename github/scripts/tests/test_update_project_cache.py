@@ -15,6 +15,37 @@ class TestScaffold(unittest.TestCase):
         self.assertEqual(upc.LEGACY_CONFIG_FILENAME, ".local-projects.json")
 
 
+class TestParseRepoMetadata(unittest.TestCase):
+    def test_milestones(self):
+        data = [
+            {"title": "release/1.3.0", "number": 5, "node_id": "MI_a"},
+            {"title": "release/1.4.0", "number": 6, "node_id": "MI_b"},
+            {"number": 7, "node_id": "MI_c"},  # no title -> dropped
+        ]
+        self.assertEqual(upc.parse_milestones(data), [
+            {"title": "release/1.3.0", "number": 5, "id": "MI_a"},
+            {"title": "release/1.4.0", "number": 6, "id": "MI_b"},
+        ])
+
+    def test_milestones_empty(self):
+        self.assertEqual(upc.parse_milestones([]), [])
+
+    def test_labels(self):
+        data = [{"name": "bug"}, {"name": "api"}, {"color": "fff"}]
+        self.assertEqual(upc.parse_labels(data), ["bug", "api"])
+
+    def test_issue_types_list_of_objects(self):
+        self.assertEqual(upc.parse_issue_types([{"name": "Bug"}, {"name": "Feature"}]),
+                         ["Bug", "Feature"])
+
+    def test_issue_types_wrapped(self):
+        self.assertEqual(upc.parse_issue_types({"issue_types": [{"name": "Task"}]}),
+                         ["Task"])
+
+    def test_issue_types_empty(self):
+        self.assertEqual(upc.parse_issue_types(None), [])
+
+
 class TestParseFields(unittest.TestCase):
     SAMPLE = {
         "fields": [

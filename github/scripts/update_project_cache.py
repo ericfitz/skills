@@ -27,6 +27,25 @@ CACHE_FILENAME = "project-cache.json"
 LEGACY_CONFIG_FILENAME = ".local-projects.json"
 
 
+def parse_milestones(data):
+    """Map `gh api repos/{o}/{r}/milestones` output to ordered {title, number, id}."""
+    return [{"title": m.get("title"), "number": m.get("number"), "id": m.get("node_id")}
+            for m in (data or []) if m.get("title")]
+
+
+def parse_labels(data):
+    """Map `gh api repos/{o}/{r}/labels` output to a list of label names."""
+    return [l.get("name") for l in (data or []) if l.get("name")]
+
+
+def parse_issue_types(data):
+    """Best-effort: accept a list of {name} or a {issue_types|data: [...]} wrapper."""
+    if isinstance(data, dict):
+        data = data.get("issue_types") or data.get("data") or []
+    return [t.get("name") for t in (data or [])
+            if isinstance(t, dict) and t.get("name")]
+
+
 FIELD_TYPE_MAP = {
     "ProjectV2SingleSelectField": "single_select",
     "ProjectV2IterationField": "iteration",
