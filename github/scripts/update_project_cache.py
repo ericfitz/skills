@@ -357,3 +357,68 @@ def process_entry(entry, selection, now_iso, config, config_path, cache_path, gi
     write_json(config_path, config)
     ensure_gitignore_file(gitignore_path)
     return {"name": name, "status": "resolved", "title": project["title"]}
+
+
+def _load_or_init_config(start_dir):
+    """Return (config_dict, config_path). Migrate a legacy file if found.
+
+    If no config exists, initialize one under <start_dir>/.local/projects.json with a
+    single entry named after the repo (from git remote, else the directory name).
+    """
+    start_dir = Path(start_dir).absolute()
+    path, is_legacy = find_config(start_dir)
+    if path is None:
+        owner, repo = parse_git_remote(git_remote_url())
+        name = repo or start_dir.name
+        config = {"projects": [{"name": name, "github": {}}]}
+        if owner and repo:
+            config["projects"][0]["github"] = {"owner": owner, "repo": repo}
+        new_path = start_dir / LOCAL_DIR / CONFIG_FILENAME
+        return config, new_path
+    config = json.loads(path.read_text())
+    config["projects"] = [migrate_entry(e) for e in config.get("projects", [])]
+    if is_legacy:
+        # Move into .local/projects.json beside the legacy file's directory.
+        new_path = path.parent / LOCAL_DIR / CONFIG_FILENAME
+        return config, new_path
+    return config, path
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Resolve a repo's GitHub Project and cache its metadata.")
+    parser.add_argument("command", choices=["update"])
+    parser.add_argument("--name", help="Only process the entry with this name.")
+    parser.add_argument("--dir", default=".", help="Directory to resolve config from.")
+    parser.add_argument("--select-title", help="Force-select a project by title.")
+    parser.add_argument("--select-number", type=int, help="Force-select a project by number.")
+    args = parser.parse_args(argv)
+
+    config, config_path = _load_or_init_config(args.dir)
+    cache_path = config_path.parent / CACHE_FILENAME
+    gitignore_path = config_path.parent.parent / ".gitignore"
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    selection = {}
+    if args.select_title:
+        selection["title"] = args.select_title
+    if args.select_number is not None:
+        selection["number"] = args.select_number
+
+    entries = config.get("projects", [])
+    if args.name:
+        entries = [e for e in entries if e.get("name") == args.name]
+        if not entries:
+            print(json.dumps({"results": [
+                {"name": args.name, "status": "error", "message": "entry not found"}]}))
+            return 1
+
+    results = [process_entry(e, selection, now_iso, config, config_path,
+                             cache_path, gitignore_path)
+               for e in entries]
+    print(json.dumps({"results": results}, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

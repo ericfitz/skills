@@ -459,5 +459,45 @@ class TestProcessEntry(unittest.TestCase):
             self.assertEqual(result["status"], "error")
 
 
+import io
+import contextlib
+
+
+class TestMain(unittest.TestCase):
+    def test_main_resolves_single_named_entry(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local").mkdir()
+            (root / ".local" / "projects.json").write_text(json.dumps(
+                {"projects": [{"name": "tmi",
+                               "github": {"owner": "ericfitz", "repo": "tmi"}}]}))
+            linked = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"}]
+            buf = io.StringIO()
+            with mock.patch.object(upc, "discover_linked_projects", return_value=linked), \
+                 mock.patch.object(upc, "enumerate_project",
+                                   return_value={"cached_at": "t", "project": linked[0]}), \
+                 contextlib.redirect_stdout(buf):
+                rc = upc.main(["update", "--name", "tmi", "--dir", str(root)])
+            self.assertEqual(rc, 0)
+            out = json.loads(buf.getvalue())
+            self.assertEqual(out["results"][0]["status"], "resolved")
+
+    def test_main_migrates_legacy_root_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local-projects.json").write_text(json.dumps(
+                {"projects": [{"name": "tmi", "github": {
+                    "owner": "ericfitz", "repo": "tmi",
+                    "issues_project": {"id": "PVT_x", "number": 2}}}]}))
+            with mock.patch.object(upc, "discover_linked_projects", return_value=[]):
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    rc = upc.main(["update", "--dir", str(root)])
+            # New config created under .local/, legacy IDs dropped.
+            self.assertTrue((root / ".local" / "projects.json").exists())
+            migrated = json.loads((root / ".local" / "projects.json").read_text())
+            self.assertNotIn("issues_project", migrated["projects"][0]["github"])
+
+
 if __name__ == "__main__":
     unittest.main()
