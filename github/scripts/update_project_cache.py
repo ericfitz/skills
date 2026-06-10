@@ -157,6 +157,7 @@ def parse_git_remote(url):
 
 
 def get_entry(config, name):
+    """Return the first entry in config["projects"] with the given name, or None."""
     for e in (config or {}).get("projects", []):
         if e.get("name") == name:
             return e

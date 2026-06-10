@@ -236,6 +236,11 @@ class TestConfigHelpers(unittest.TestCase):
         self.assertEqual(cfg["projects"][0],
                          {"name": "newrepo", "github": {"project": ""}})
 
+    def test_set_title_existing_entry_without_github_key(self):
+        cfg = {"projects": [{"name": "tmi"}]}
+        upc.set_project_title(cfg, "tmi", "Roadmap")
+        self.assertEqual(cfg["projects"][0]["github"]["project"], "Roadmap")
+
     def test_migrate_drops_legacy_ids_keeps_title(self):
         entry = {"name": "tmi", "github": {
             "owner": "ericfitz", "repo": "tmi", "project": "Roadmap",
@@ -274,6 +279,7 @@ class TestLocationAndIO(unittest.TestCase):
             p = Path(d) / "sub" / "out.json"
             upc.write_json(p, {"a": 1})
             self.assertEqual(json.loads(p.read_text()), {"a": 1})
+            self.assertFalse((p.parent / "out.json.tmp").exists())
 
     def test_find_config_prefers_new_location(self):
         with tempfile.TemporaryDirectory() as d:
