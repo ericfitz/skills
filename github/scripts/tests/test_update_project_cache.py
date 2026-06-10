@@ -15,6 +15,36 @@ class TestScaffold(unittest.TestCase):
         self.assertEqual(upc.LEGACY_CONFIG_FILENAME, ".local-projects.json")
 
 
+class TestParseLinkedProjects(unittest.TestCase):
+    SAMPLE = {
+        "data": {
+            "repository": {
+                "projectsV2": {
+                    "nodes": [
+                        {"number": 2, "id": "PVT_a", "title": "TMI Roadmap",
+                         "owner": {"login": "ericfitz"}},
+                        {"number": 5, "id": "PVT_b", "title": "Security",
+                         "owner": {"login": "ericfitz"}},
+                    ]
+                }
+            }
+        }
+    }
+
+    def test_parses_nodes(self):
+        out = upc.parse_linked_projects(self.SAMPLE)
+        self.assertEqual(out, [
+            {"number": 2, "id": "PVT_a", "title": "TMI Roadmap", "owner": "ericfitz"},
+            {"number": 5, "id": "PVT_b", "title": "Security", "owner": "ericfitz"},
+        ])
+
+    def test_empty_repo(self):
+        self.assertEqual(upc.parse_linked_projects({"data": {"repository": None}}), [])
+
+    def test_missing_keys(self):
+        self.assertEqual(upc.parse_linked_projects({}), [])
+
+
 class TestParseGitRemote(unittest.TestCase):
     def test_https_with_git_suffix(self):
         self.assertEqual(upc.parse_git_remote("https://github.com/ericfitz/tmi.git"),

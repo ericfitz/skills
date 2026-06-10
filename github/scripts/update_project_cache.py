@@ -27,6 +27,23 @@ CACHE_FILENAME = "project-cache.json"
 LEGACY_CONFIG_FILENAME = ".local-projects.json"
 
 
+def parse_linked_projects(data):
+    """Extract a list of {number, id, title, owner} from a repository.projectsV2 query."""
+    repo = (data or {}).get("data", {}).get("repository") or {}
+    nodes = (repo.get("projectsV2") or {}).get("nodes") or []
+    out = []
+    for n in nodes:
+        if not n:
+            continue
+        out.append({
+            "number": n.get("number"),
+            "id": n.get("id"),
+            "title": n.get("title"),
+            "owner": (n.get("owner") or {}).get("login"),
+        })
+    return out
+
+
 def parse_git_remote(url):
     """Parse a git remote URL into (owner, repo); (None, None) if unparseable."""
     if not url:
