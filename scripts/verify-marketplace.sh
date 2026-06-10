@@ -64,7 +64,7 @@ for entry in "${PLUGINS[@]}"; do
   pn=$(python3 -c "import json; print(json.load(open('$name/.claude-plugin/plugin.json')).get('name',''))")
   pv=$(python3 -c "import json; print(json.load(open('$name/.claude-plugin/plugin.json')).get('version',''))")
   if [ "$pn" != "$name" ]; then bad "$name: plugin.json name=$pn (expected $name)"; continue; fi
-  if [ "$pv" != "1.0.0" ]; then bad "$name: plugin.json version=$pv (expected 1.0.0)"; continue; fi
+  if ! printf '%s' "$pv" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then bad "$name: plugin.json version='$pv' (expected semver X.Y.Z)"; continue; fi
 
   # Marketplace entry exists with correct category
   cat=$(python3 -c "

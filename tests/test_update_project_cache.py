@@ -4,7 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Don't write __pycache__ into the plugin's scripts dir — it would otherwise be
+# distributed (the plugin installer copies the working tree, not git-tracked files).
+sys.dont_write_bytecode = True
+
+# Tests live at repo root (outside the github/ plugin dir so they are not shipped).
+# Add the plugin's scripts dir to the path to import the module under test.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "github" / "scripts"))
 
 import update_project_cache as upc
 
