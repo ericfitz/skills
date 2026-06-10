@@ -333,5 +333,61 @@ class TestUpdateCache(unittest.TestCase):
             self.assertEqual(data["tmi"]["cached_at"], "t2")
 
 
+from unittest import mock
+
+
+class TestEnumeration(unittest.TestCase):
+    def test_discover_linked_projects(self):
+        sample = {"data": {"repository": {"projectsV2": {"nodes": [
+            {"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": {"login": "ericfitz"}},
+        ]}}}}
+        with mock.patch.object(upc, "run_gh_graphql", return_value=sample):
+            out = upc.discover_linked_projects("ericfitz", "tmi")
+        self.assertEqual(out[0]["title"], "Roadmap")
+
+    def test_enumerate_project_composes_parsers(self):
+        project = {"number": 2, "owner": "ericfitz", "id": "PVT_a", "title": "Roadmap"}
+
+        def fake_run_gh_json(args):
+            if args[:2] == ["project", "field-list"]:
+                return {"fields": [{"id": "PVTSSF_s", "name": "Status",
+                                    "type": "ProjectV2SingleSelectField",
+                                    "options": [{"id": "o1", "name": "Backlog"}]}]}
+            if "milestones" in args[1]:
+                return [{"title": "release/1.3.0", "number": 5, "node_id": "MI_a"}]
+            if "/labels" in args[1]:
+                return [{"name": "bug"}]
+            if "issue-types" in args[1]:
+                return [{"name": "Bug"}]
+            raise AssertionError(f"unexpected args: {args}")
+
+        with mock.patch.object(upc, "run_gh_json", side_effect=fake_run_gh_json):
+            entry = upc.enumerate_project("ericfitz", "tmi", project, "2026-06-10T00:00:00+00:00")
+
+        self.assertEqual(entry["project"]["title"], "Roadmap")
+        self.assertIn("Status", entry["fields"])
+        self.assertEqual(entry["milestones"][0]["number"], 5)
+        self.assertEqual(entry["labels"], ["bug"])
+        self.assertEqual(entry["issue_types"], ["Bug"])
+
+    def test_enumerate_tolerates_issue_types_failure(self):
+        project = {"number": 2, "owner": "ericfitz", "id": "PVT_a", "title": "Roadmap"}
+
+        def fake_run_gh_json(args):
+            if args[:2] == ["project", "field-list"]:
+                return {"fields": []}
+            if "milestones" in args[1]:
+                return []
+            if "/labels" in args[1]:
+                return []
+            if "issue-types" in args[1]:
+                raise upc.GhError("404")
+            raise AssertionError(f"unexpected args: {args}")
+
+        with mock.patch.object(upc, "run_gh_json", side_effect=fake_run_gh_json):
+            entry = upc.enumerate_project("ericfitz", "tmi", project, "t")
+        self.assertEqual(entry["issue_types"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

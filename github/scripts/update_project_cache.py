@@ -225,3 +225,87 @@ def update_cache(cache_path, name, entry):
     cache[name] = entry
     write_json(cache_path, cache)
     return cache
+
+
+class GhError(RuntimeError):
+    """Raised when a gh CLI call fails."""
+
+
+PROJECTS_QUERY = """
+query($owner:String!, $repo:String!) {
+  repository(owner:$owner, name:$repo) {
+    projectsV2(first:50) {
+      nodes {
+        number title id
+        owner { ... on User { login } ... on Organization { login } }
+      }
+    }
+  }
+}
+"""
+
+
+def run_gh(args):
+    """Run a gh command; return stdout. Raise GhError on failure."""
+    try:
+        result = subprocess.run(["gh"] + args, capture_output=True, text=True, check=True)
+        return result.stdout
+    except FileNotFoundError:
+        print("Error: 'gh' CLI not found. Install it from https://cli.github.com/",
+              file=sys.stderr)
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        raise GhError(e.stderr.strip()) from e
+
+
+def run_gh_json(args):
+    """Run a gh command and parse stdout as JSON."""
+    return json.loads(run_gh(args))
+
+
+def run_gh_graphql(query, variables):
+    """Run a GraphQL query via `gh api graphql` with -F field=value variables."""
+    args = ["api", "graphql", "-f", f"query={query}"]
+    for k, v in variables.items():
+        args += ["-F", f"{k}={v}"]
+    return run_gh_json(args)
+
+
+def git_remote_url():
+    """Return the origin remote URL, or '' if unavailable."""
+    try:
+        result = subprocess.run(["git", "remote", "get-url", "origin"],
+                                capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return ""
+
+
+def discover_linked_projects(owner, repo):
+    """Return linked Projects v2 for a repo as a list of {number,id,title,owner}."""
+    data = run_gh_graphql(PROJECTS_QUERY, {"owner": owner, "repo": repo})
+    return parse_linked_projects(data)
+
+
+def enumerate_project(owner, repo, project, now_iso):
+    """Gather all metadata for the chosen project and assemble a cache entry."""
+    field_data = run_gh_json([
+        "project", "field-list", str(project["number"]),
+        "--owner", project["owner"], "--format", "json",
+    ])
+    fields = parse_fields(field_data)
+
+    milestones = parse_milestones(run_gh_json([
+        "api", f"repos/{owner}/{repo}/milestones?state=all&per_page=100",
+    ]))
+    labels = parse_labels(run_gh_json([
+        "api", f"repos/{owner}/{repo}/labels?per_page=100",
+    ]))
+    try:
+        issue_types = parse_issue_types(run_gh_json([
+            "api", f"repos/{owner}/{repo}/issue-types",
+        ]))
+    except GhError:
+        issue_types = []  # issue types not enabled / endpoint unavailable
+
+    return build_cache_entry(project, fields, milestones, labels, issue_types, now_iso)
