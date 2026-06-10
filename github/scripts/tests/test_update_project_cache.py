@@ -429,6 +429,8 @@ class TestProcessEntry(unittest.TestCase):
             self.assertEqual(json.loads(paths["config_path"].read_text())
                              ["projects"][0]["github"]["project"], "")
             self.assertFalse(paths["cache_path"].exists())
+            # .local/ is created on the none path too, so it must be gitignored.
+            self.assertIn(".local/", paths["gitignore_path"].read_text())
 
     def test_needs_selection_writes_nothing(self):
         with tempfile.TemporaryDirectory() as d:

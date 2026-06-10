@@ -348,6 +348,7 @@ def process_entry(entry, selection, now_iso, config, config_path, cache_path, gi
     if status == "none":
         set_project_title(config, name, "")
         write_json(config_path, config)
+        ensure_gitignore_file(gitignore_path)
         return {"name": name, "status": "none"}
 
     project = payload

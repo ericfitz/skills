@@ -41,7 +41,7 @@ hdr "Per-plugin structure (multi-skill)"
 declare -a PLUGINS=(
   "loc:localization:analyze,coverage,detect-nonloc,translate-to,update-json,validate-translation,backfill"
   "security:security:vet-plugin,race-cond"
-  "github:development:backlog,file-bug"
+  "github:development:backlog,update-project-cache,create-issue"
   "ui:development:vrt"
   "wiki:documentation:verify-doc"
   "dev:development:dedupe"
@@ -105,6 +105,7 @@ declare -a SCRIPTS=(
   "loc/scripts/check-i18n.py"
   "loc/scripts/find_duplicate_localizations.py"
   "github/scripts/gh-issues.py"
+  "github/scripts/update_project_cache.py"
   "dev/scripts/dedupe-report.py"
 )
 for s in "${SCRIPTS[@]}"; do

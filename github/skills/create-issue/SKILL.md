@@ -187,8 +187,9 @@ Created: <issue_url>
 ## Implementation Notes
 
 1. **Cache is the source of ids.** This skill never enumerates project metadata; it delegates that
-   to `update-project-cache`, and triggers it at most twice per run (once for an unresolved
-   project, once for a single missing value).
+   to `update-project-cache`, and triggers it at most once per unresolved state (an unresolved
+   project, a missing label, a missing milestone) — each fires at most once, then proceeds
+   regardless, so it never loops.
 2. **Evidence quality matters** for bugs: include actual payloads and field values.
 3. **Conventional-Commit prefixes** by type as in the table above.
 4. **Branch → milestone**: exact title match; no fuzzy matching.
