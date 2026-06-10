@@ -25,3 +25,16 @@ LOCAL_DIR = ".local"
 CONFIG_FILENAME = "projects.json"
 CACHE_FILENAME = "project-cache.json"
 LEGACY_CONFIG_FILENAME = ".local-projects.json"
+
+
+def parse_git_remote(url):
+    """Parse a git remote URL into (owner, repo); (None, None) if unparseable."""
+    if not url:
+        return (None, None)
+    url = url.strip()
+    if url.endswith(".git"):
+        url = url[:-4]
+    m = re.search(r"[:/]([^/:]+)/([^/:]+)$", url)
+    if not m:
+        return (None, None)
+    return (m.group(1), m.group(2))
