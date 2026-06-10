@@ -15,6 +15,25 @@ class TestScaffold(unittest.TestCase):
         self.assertEqual(upc.LEGACY_CONFIG_FILENAME, ".local-projects.json")
 
 
+class TestBuildCacheEntry(unittest.TestCase):
+    def test_assembles_full_entry(self):
+        project = {"number": 2, "owner": "ericfitz", "id": "PVT_a", "title": "Roadmap"}
+        entry = upc.build_cache_entry(
+            project,
+            fields={"Status": {"id": "PVTSSF_s", "type": "single_select", "options": []}},
+            milestones=[{"title": "release/1.3.0", "number": 5, "id": "MI_a"}],
+            labels=["bug"],
+            issue_types=["Bug"],
+            now_iso="2026-06-10T12:00:00+00:00",
+        )
+        self.assertEqual(entry["cached_at"], "2026-06-10T12:00:00+00:00")
+        self.assertEqual(entry["project"], project)
+        self.assertEqual(entry["labels"], ["bug"])
+        self.assertEqual(entry["issue_types"], ["Bug"])
+        self.assertIn("Status", entry["fields"])
+        self.assertEqual(entry["milestones"][0]["number"], 5)
+
+
 class TestParseRepoMetadata(unittest.TestCase):
     def test_milestones(self):
         data = [

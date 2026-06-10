@@ -27,6 +27,23 @@ CACHE_FILENAME = "project-cache.json"
 LEGACY_CONFIG_FILENAME = ".local-projects.json"
 
 
+def build_cache_entry(project, fields, milestones, labels, issue_types, now_iso):
+    """Assemble one project's cache entry."""
+    return {
+        "cached_at": now_iso,
+        "project": {
+            "number": project.get("number"),
+            "owner": project.get("owner"),
+            "id": project.get("id"),
+            "title": project.get("title"),
+        },
+        "fields": fields,
+        "milestones": milestones,
+        "labels": labels,
+        "issue_types": issue_types,
+    }
+
+
 def parse_milestones(data):
     """Map `gh api repos/{o}/{r}/milestones` output to ordered {title, number, id}."""
     return [{"title": m.get("title"), "number": m.get("number"), "id": m.get("node_id")}
