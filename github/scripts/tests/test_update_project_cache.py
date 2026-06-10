@@ -1,4 +1,6 @@
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -251,6 +253,59 @@ class TestConfigHelpers(unittest.TestCase):
         out = upc.migrate_entry(entry)
         self.assertNotIn("project", out["github"])
         self.assertNotIn("issues_project", out["github"])
+
+
+class TestLocationAndIO(unittest.TestCase):
+    def test_ensure_gitignore_adds_when_missing(self):
+        self.assertEqual(upc.ensure_gitignore_text(""), ".local/\n")
+        self.assertEqual(upc.ensure_gitignore_text("node_modules\n"),
+                         "node_modules\n.local/\n")
+
+    def test_ensure_gitignore_idempotent(self):
+        self.assertEqual(upc.ensure_gitignore_text(".local/\n"), ".local/\n")
+        self.assertEqual(upc.ensure_gitignore_text("foo\n.local\nbar\n"),
+                         "foo\n.local\nbar\n")
+
+    def test_ensure_gitignore_adds_trailing_newline(self):
+        self.assertEqual(upc.ensure_gitignore_text("foo"), "foo\n.local/\n")
+
+    def test_write_and_read_json_roundtrip(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sub" / "out.json"
+            upc.write_json(p, {"a": 1})
+            self.assertEqual(json.loads(p.read_text()), {"a": 1})
+
+    def test_find_config_prefers_new_location(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local").mkdir()
+            (root / ".local" / "projects.json").write_text("{}")
+            (root / ".local-projects.json").write_text("{}")
+            path, legacy = upc.find_config(root)
+            self.assertEqual(path, root / ".local" / "projects.json")
+            self.assertFalse(legacy)
+
+    def test_find_config_falls_back_to_legacy(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local-projects.json").write_text("{}")
+            path, legacy = upc.find_config(root)
+            self.assertEqual(path, root / ".local-projects.json")
+            self.assertTrue(legacy)
+
+    def test_find_config_walks_up(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local").mkdir()
+            (root / ".local" / "projects.json").write_text("{}")
+            nested = root / "a" / "b"
+            nested.mkdir(parents=True)
+            path, legacy = upc.find_config(nested)
+            self.assertEqual(path, root / ".local" / "projects.json")
+
+    def test_find_config_none(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(upc.find_config(Path(d)), (None, False))
 
 
 if __name__ == "__main__":

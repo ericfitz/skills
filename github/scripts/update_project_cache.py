@@ -180,3 +180,36 @@ def migrate_entry(entry):
     out = dict(entry)
     out["github"] = gh
     return out
+
+
+def ensure_gitignore_text(text, entry=".local/"):
+    """Return gitignore text with `entry` present (idempotent)."""
+    target = entry.rstrip("/")
+    for line in text.splitlines():
+        if line.strip().rstrip("/") == target:
+            return text
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text + entry + "\n"
+
+
+def write_json(path, data):
+    """Write JSON atomically, creating parent dirs."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n")
+    tmp.replace(path)
+
+
+def find_config(start_dir):
+    """Walk up from start_dir. Return (Path, is_legacy) or (None, False)."""
+    d = Path(start_dir).absolute()
+    for parent in [d, *d.parents]:
+        new = parent / LOCAL_DIR / CONFIG_FILENAME
+        if new.exists():
+            return (new, False)
+        legacy = parent / LEGACY_CONFIG_FILENAME
+        if legacy.exists():
+            return (legacy, True)
+    return (None, False)
