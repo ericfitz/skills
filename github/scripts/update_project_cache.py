@@ -396,6 +396,7 @@ def main(argv=None):
 
     config, config_path = _load_or_init_config(args.dir)
     cache_path = config_path.parent / CACHE_FILENAME
+    # config_path is <repo-root>/.local/projects.json, so .parent.parent is repo root.
     gitignore_path = config_path.parent.parent / ".gitignore"
     now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -413,9 +414,14 @@ def main(argv=None):
                 {"name": args.name, "status": "error", "message": "entry not found"}]}))
             return 1
 
-    results = [process_entry(e, selection, now_iso, config, config_path,
-                             cache_path, gitignore_path)
-               for e in entries]
+    results = []
+    for e in entries:
+        try:
+            results.append(process_entry(e, selection, now_iso, config,
+                                         config_path, cache_path, gitignore_path))
+        except GhError as exc:
+            results.append({"name": e.get("name"), "status": "error",
+                            "message": str(exc)})
     print(json.dumps({"results": results}, indent=2))
     return 0
 

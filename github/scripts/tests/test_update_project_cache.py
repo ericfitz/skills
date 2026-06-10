@@ -481,6 +481,25 @@ class TestMain(unittest.TestCase):
             self.assertEqual(rc, 0)
             out = json.loads(buf.getvalue())
             self.assertEqual(out["results"][0]["status"], "resolved")
+            # .gitignore lands at repo root (config_path.parent.parent) with .local/.
+            self.assertIn(".local/", (root / ".gitignore").read_text())
+
+    def test_main_reports_gh_error_as_structured_result(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local").mkdir()
+            (root / ".local" / "projects.json").write_text(json.dumps(
+                {"projects": [{"name": "tmi",
+                               "github": {"owner": "ericfitz", "repo": "tmi"}}]}))
+            buf = io.StringIO()
+            with mock.patch.object(upc, "discover_linked_projects",
+                                   side_effect=upc.GhError("boom")), \
+                 contextlib.redirect_stdout(buf):
+                rc = upc.main(["update", "--name", "tmi", "--dir", str(root)])
+            self.assertEqual(rc, 0)
+            out = json.loads(buf.getvalue())
+            self.assertEqual(out["results"][0]["status"], "error")
+            self.assertIn("boom", out["results"][0]["message"])
 
     def test_main_migrates_legacy_root_file(self):
         with tempfile.TemporaryDirectory() as d:
