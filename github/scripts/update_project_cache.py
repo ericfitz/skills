@@ -154,3 +154,29 @@ def parse_git_remote(url):
     if not m:
         return (None, None)
     return (m.group(1), m.group(2))
+
+
+def get_entry(config, name):
+    for e in (config or {}).get("projects", []):
+        if e.get("name") == name:
+            return e
+    return None
+
+
+def set_project_title(config, name, title):
+    """Set github.project for `name`, creating the entry if needed. Returns config."""
+    e = get_entry(config, name)
+    if e is None:
+        e = {"name": name, "github": {}}
+        config.setdefault("projects", []).append(e)
+    e.setdefault("github", {})["project"] = title
+    return config
+
+
+def migrate_entry(entry):
+    """Drop a legacy issues_project ID block; keep owner/repo/project title."""
+    gh = dict(entry.get("github", {}))
+    gh.pop("issues_project", None)
+    out = dict(entry)
+    out["github"] = gh
+    return out

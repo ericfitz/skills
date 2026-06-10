@@ -214,5 +214,44 @@ class TestParseGitRemote(unittest.TestCase):
         self.assertEqual(upc.parse_git_remote("not-a-url"), (None, None))
 
 
+class TestConfigHelpers(unittest.TestCase):
+    def test_get_entry_found(self):
+        cfg = {"projects": [{"name": "tmi", "github": {}}]}
+        self.assertEqual(upc.get_entry(cfg, "tmi")["name"], "tmi")
+
+    def test_get_entry_missing(self):
+        self.assertIsNone(upc.get_entry({"projects": []}, "nope"))
+
+    def test_set_title_existing(self):
+        cfg = {"projects": [{"name": "tmi", "github": {"owner": "ericfitz"}}]}
+        upc.set_project_title(cfg, "tmi", "Roadmap")
+        self.assertEqual(cfg["projects"][0]["github"]["project"], "Roadmap")
+        self.assertEqual(cfg["projects"][0]["github"]["owner"], "ericfitz")
+
+    def test_set_title_creates_entry(self):
+        cfg = {}
+        upc.set_project_title(cfg, "newrepo", "")
+        self.assertEqual(cfg["projects"][0],
+                         {"name": "newrepo", "github": {"project": ""}})
+
+    def test_migrate_drops_legacy_ids_keeps_title(self):
+        entry = {"name": "tmi", "github": {
+            "owner": "ericfitz", "repo": "tmi", "project": "Roadmap",
+            "issues_project": {"id": "PVT_x", "number": 2, "fields": {"status": {}}},
+        }}
+        out = upc.migrate_entry(entry)
+        self.assertEqual(out["github"],
+                         {"owner": "ericfitz", "repo": "tmi", "project": "Roadmap"})
+
+    def test_migrate_legacy_without_title_leaves_project_unset(self):
+        entry = {"name": "tmi", "github": {
+            "owner": "ericfitz", "repo": "tmi",
+            "issues_project": {"id": "PVT_x", "number": 2},
+        }}
+        out = upc.migrate_entry(entry)
+        self.assertNotIn("project", out["github"])
+        self.assertNotIn("issues_project", out["github"])
+
+
 if __name__ == "__main__":
     unittest.main()
