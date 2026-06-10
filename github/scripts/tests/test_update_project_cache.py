@@ -308,5 +308,24 @@ class TestLocationAndIO(unittest.TestCase):
             self.assertEqual(upc.find_config(Path(d)), (None, False))
 
 
+class TestUpdateCache(unittest.TestCase):
+    def test_creates_and_preserves_other_keys(self):
+        with tempfile.TemporaryDirectory() as d:
+            cache_path = Path(d) / ".local" / "project-cache.json"
+            upc.update_cache(cache_path, "tmi", {"cached_at": "t1"})
+            upc.update_cache(cache_path, "other", {"cached_at": "t2"})
+            data = json.loads(cache_path.read_text())
+            self.assertEqual(set(data), {"tmi", "other"})
+            self.assertEqual(data["tmi"]["cached_at"], "t1")
+
+    def test_overwrites_same_key(self):
+        with tempfile.TemporaryDirectory() as d:
+            cache_path = Path(d) / "project-cache.json"
+            upc.update_cache(cache_path, "tmi", {"cached_at": "t1"})
+            upc.update_cache(cache_path, "tmi", {"cached_at": "t2"})
+            data = json.loads(cache_path.read_text())
+            self.assertEqual(data["tmi"]["cached_at"], "t2")
+
+
 if __name__ == "__main__":
     unittest.main()

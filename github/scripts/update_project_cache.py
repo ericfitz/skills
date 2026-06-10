@@ -213,3 +213,14 @@ def find_config(start_dir):
         if legacy.exists():
             return (legacy, True)
     return (None, False)
+
+
+def update_cache(cache_path, name, entry):
+    """Merge one project's entry into the cache file, preserving other keys."""
+    cache_path = Path(cache_path)
+    cache = {}
+    if cache_path.exists():
+        cache = json.loads(cache_path.read_text())
+    cache[name] = entry
+    write_json(cache_path, cache)
+    return cache
