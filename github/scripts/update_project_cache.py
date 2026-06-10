@@ -309,3 +309,51 @@ def enumerate_project(owner, repo, project, now_iso):
         issue_types = []  # issue types not enabled / endpoint unavailable
 
     return build_cache_entry(project, fields, milestones, labels, issue_types, now_iso)
+
+
+def ensure_gitignore_file(gitignore_path):
+    """Ensure `.local/` is ignored in the given .gitignore file."""
+    path = Path(gitignore_path)
+    text = path.read_text() if path.exists() else ""
+    new_text = ensure_gitignore_text(text)
+    if new_text != text:
+        path.write_text(new_text)
+
+
+def process_entry(entry, selection, now_iso, config, config_path, cache_path, gitignore_path):
+    """Resolve one entry's project and update cache/config. Returns a result dict."""
+    name = entry.get("name")
+    gh = entry.get("github", {})
+    owner, repo = gh.get("owner"), gh.get("repo")
+    if not owner or not repo:
+        o2, r2 = parse_git_remote(git_remote_url())
+        owner = owner or o2
+        repo = repo or r2
+    if not owner or not repo:
+        return {"name": name, "status": "error",
+                "message": "no owner/repo in config and none derivable from git remote"}
+
+    linked = discover_linked_projects(owner, repo)
+    status, payload = select_project(
+        linked,
+        named_title=gh.get("project"),
+        selected_title=selection.get("title"),
+        selected_number=selection.get("number"),
+    )
+
+    if status == "needs_selection":
+        return {"name": name, "status": "needs_selection",
+                "candidates": [{"number": p["number"], "title": p["title"]}
+                               for p in payload]}
+    if status == "none":
+        set_project_title(config, name, "")
+        write_json(config_path, config)
+        return {"name": name, "status": "none"}
+
+    project = payload
+    cache_entry = enumerate_project(owner, repo, project, now_iso)
+    update_cache(cache_path, name, cache_entry)
+    set_project_title(config, name, project["title"])
+    write_json(config_path, config)
+    ensure_gitignore_file(gitignore_path)
+    return {"name": name, "status": "resolved", "title": project["title"]}

@@ -389,5 +389,75 @@ class TestEnumeration(unittest.TestCase):
         self.assertEqual(entry["issue_types"], [])
 
 
+class TestProcessEntry(unittest.TestCase):
+    def _paths(self, d):
+        return {
+            "cache_path": Path(d) / ".local" / "project-cache.json",
+            "config_path": Path(d) / ".local" / "projects.json",
+            "gitignore_path": Path(d) / ".gitignore",
+        }
+
+    def test_resolved_writes_cache_config_and_gitignore(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths = self._paths(d)
+            config = {"projects": [{"name": "tmi",
+                                    "github": {"owner": "ericfitz", "repo": "tmi"}}]}
+            entry = config["projects"][0]
+            linked = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"}]
+            with mock.patch.object(upc, "discover_linked_projects", return_value=linked), \
+                 mock.patch.object(upc, "enumerate_project",
+                                   return_value={"cached_at": "t", "project": linked[0]}):
+                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
+                                           paths["cache_path"], paths["gitignore_path"])
+            self.assertEqual(result["status"], "resolved")
+            self.assertEqual(result["title"], "Roadmap")
+            self.assertEqual(json.loads(paths["config_path"].read_text())
+                             ["projects"][0]["github"]["project"], "Roadmap")
+            self.assertIn("tmi", json.loads(paths["cache_path"].read_text()))
+            self.assertIn(".local/", paths["gitignore_path"].read_text())
+
+    def test_none_writes_empty_marker_no_cache(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths = self._paths(d)
+            config = {"projects": [{"name": "tmi",
+                                    "github": {"owner": "ericfitz", "repo": "tmi"}}]}
+            entry = config["projects"][0]
+            with mock.patch.object(upc, "discover_linked_projects", return_value=[]):
+                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
+                                           paths["cache_path"], paths["gitignore_path"])
+            self.assertEqual(result["status"], "none")
+            self.assertEqual(json.loads(paths["config_path"].read_text())
+                             ["projects"][0]["github"]["project"], "")
+            self.assertFalse(paths["cache_path"].exists())
+
+    def test_needs_selection_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths = self._paths(d)
+            config = {"projects": [{"name": "tmi",
+                                    "github": {"owner": "ericfitz", "repo": "tmi"}}]}
+            entry = config["projects"][0]
+            linked = [
+                {"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"},
+                {"number": 5, "id": "PVT_b", "title": "Security", "owner": "ericfitz"},
+            ]
+            with mock.patch.object(upc, "discover_linked_projects", return_value=linked):
+                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
+                                           paths["cache_path"], paths["gitignore_path"])
+            self.assertEqual(result["status"], "needs_selection")
+            self.assertEqual(len(result["candidates"]), 2)
+            self.assertFalse(paths["config_path"].exists())
+            self.assertFalse(paths["cache_path"].exists())
+
+    def test_error_when_no_owner_repo(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths = self._paths(d)
+            config = {"projects": [{"name": "tmi", "github": {}}]}
+            entry = config["projects"][0]
+            with mock.patch.object(upc, "git_remote_url", return_value=""):
+                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
+                                           paths["cache_path"], paths["gitignore_path"])
+            self.assertEqual(result["status"], "error")
+
+
 if __name__ == "__main__":
     unittest.main()
