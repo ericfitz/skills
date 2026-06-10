@@ -15,6 +15,47 @@ class TestScaffold(unittest.TestCase):
         self.assertEqual(upc.LEGACY_CONFIG_FILENAME, ".local-projects.json")
 
 
+class TestSelectProject(unittest.TestCase):
+    ONE = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"}]
+    TWO = ONE + [{"number": 5, "id": "PVT_b", "title": "Security", "owner": "ericfitz"}]
+
+    def test_explicit_number_match(self):
+        status, payload = upc.select_project(self.TWO, selected_number=5)
+        self.assertEqual(status, "resolved")
+        self.assertEqual(payload["title"], "Security")
+
+    def test_explicit_number_no_match(self):
+        self.assertEqual(upc.select_project(self.TWO, selected_number=99), ("none", None))
+
+    def test_explicit_title_case_insensitive(self):
+        status, payload = upc.select_project(self.TWO, selected_title="security")
+        self.assertEqual((status, payload["number"]), ("resolved", 5))
+
+    def test_named_title_still_linked(self):
+        status, payload = upc.select_project(self.TWO, named_title="Roadmap")
+        self.assertEqual((status, payload["number"]), ("resolved", 2))
+
+    def test_named_title_no_longer_linked_falls_through_to_one(self):
+        status, payload = upc.select_project(self.ONE, named_title="Gone")
+        self.assertEqual((status, payload["number"]), ("resolved", 2))
+
+    def test_empty_marker_named_title_discovers(self):
+        status, payload = upc.select_project(self.TWO, named_title="")
+        self.assertEqual(status, "needs_selection")
+
+    def test_discovery_single(self):
+        status, payload = upc.select_project(self.ONE)
+        self.assertEqual((status, payload["number"]), ("resolved", 2))
+
+    def test_discovery_multiple(self):
+        status, payload = upc.select_project(self.TWO)
+        self.assertEqual(status, "needs_selection")
+        self.assertEqual(len(payload), 2)
+
+    def test_discovery_none(self):
+        self.assertEqual(upc.select_project([]), ("none", None))
+
+
 class TestParseLinkedProjects(unittest.TestCase):
     SAMPLE = {
         "data": {

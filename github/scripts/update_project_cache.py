@@ -27,6 +27,41 @@ CACHE_FILENAME = "project-cache.json"
 LEGACY_CONFIG_FILENAME = ".local-projects.json"
 
 
+def _find_by_title(linked, title):
+    for p in linked:
+        if (p.get("title") or "").lower() == title.lower():
+            return p
+    return None
+
+
+def select_project(linked, named_title=None, selected_title=None, selected_number=None):
+    """Decide which project to use.
+
+    Returns (status, payload):
+      ("resolved", project_dict)
+      ("needs_selection", [candidate_dicts])
+      ("none", None)
+    """
+    if selected_number is not None:
+        for p in linked:
+            if p.get("number") == selected_number:
+                return ("resolved", p)
+        return ("none", None)
+    if selected_title:
+        p = _find_by_title(linked, selected_title)
+        return ("resolved", p) if p else ("none", None)
+    if named_title:  # "" marker is falsy -> skipped -> discovery
+        p = _find_by_title(linked, named_title)
+        if p:
+            return ("resolved", p)
+        # named project no longer linked: fall through to discovery
+    if len(linked) == 1:
+        return ("resolved", linked[0])
+    if len(linked) > 1:
+        return ("needs_selection", linked)
+    return ("none", None)
+
+
 def parse_linked_projects(data):
     """Extract a list of {number, id, title, owner} from a repository.projectsV2 query."""
     repo = (data or {}).get("data", {}).get("repository") or {}
