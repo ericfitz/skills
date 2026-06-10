@@ -1,6 +1,6 @@
 {
   "name": "github",
   "version": "1.0.0",
-  "description": "GitHub workflow toolkit: pick the next issue to work on from a milestone/backlog (backlog) and file detailed bug reports into a repo/Project (file-bug). Use for issue triage and bug filing.",
+  "description": "GitHub workflow toolkit: pick the next issue to work on from a milestone/backlog (backlog), cache a repo's GitHub Project (v2) metadata locally (update-project-cache), and file detailed issues into a repo/Project using that cache (create-issue). Use for issue triage, project metadata caching, and issue filing.",
   "author": { "name": "efitz" }
 }
