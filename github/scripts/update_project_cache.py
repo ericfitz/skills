@@ -52,7 +52,7 @@ def parse_milestones(data):
 
 def parse_labels(data):
     """Map `gh api repos/{o}/{r}/labels` output to a list of label names."""
-    return [l.get("name") for l in (data or []) if l.get("name")]
+    return [lbl.get("name") for lbl in (data or []) if lbl.get("name")]
 
 
 def parse_issue_types(data):

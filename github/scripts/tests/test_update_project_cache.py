@@ -27,7 +27,11 @@ class TestBuildCacheEntry(unittest.TestCase):
             now_iso="2026-06-10T12:00:00+00:00",
         )
         self.assertEqual(entry["cached_at"], "2026-06-10T12:00:00+00:00")
-        self.assertEqual(entry["project"], project)
+        self.assertEqual(set(entry["project"]), {"number", "owner", "id", "title"})
+        self.assertEqual(entry["project"]["number"], 2)
+        self.assertEqual(entry["project"]["owner"], "ericfitz")
+        self.assertEqual(entry["project"]["id"], "PVT_a")
+        self.assertEqual(entry["project"]["title"], "Roadmap")
         self.assertEqual(entry["labels"], ["bug"])
         self.assertEqual(entry["issue_types"], ["Bug"])
         self.assertIn("Status", entry["fields"])
@@ -112,6 +116,11 @@ class TestParseFields(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(upc.parse_fields({}), {})
 
+    def test_unknown_field_type_defaults_to_field(self):
+        data = {"fields": [{"id": "X", "name": "Due", "type": "ProjectV2DateField"}]}
+        fields = upc.parse_fields(data)
+        self.assertEqual(fields["Due"]["type"], "field")
+
 
 class TestSelectProject(unittest.TestCase):
     ONE = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"}]
@@ -140,6 +149,7 @@ class TestSelectProject(unittest.TestCase):
     def test_empty_marker_named_title_discovers(self):
         status, payload = upc.select_project(self.TWO, named_title="")
         self.assertEqual(status, "needs_selection")
+        self.assertEqual(len(payload), 2)
 
     def test_discovery_single(self):
         status, payload = upc.select_project(self.ONE)
