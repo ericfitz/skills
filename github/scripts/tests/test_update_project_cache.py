@@ -15,6 +15,54 @@ class TestScaffold(unittest.TestCase):
         self.assertEqual(upc.LEGACY_CONFIG_FILENAME, ".local-projects.json")
 
 
+class TestParseFields(unittest.TestCase):
+    SAMPLE = {
+        "fields": [
+            {"id": "PVTF_title", "name": "Title", "type": "ProjectV2Field"},
+            {"id": "PVTSSF_s", "name": "Status", "type": "ProjectV2SingleSelectField",
+             "options": [
+                 {"id": "o1", "name": "Backlog"},
+                 {"id": "o2", "name": "This milestone"},
+                 {"id": "o3", "name": "Done"},
+             ]},
+            {"id": "PVTIF_sp", "name": "Sprint", "type": "ProjectV2IterationField",
+             "configuration": {"iterations": [
+                 {"id": "it1", "title": "Sprint 1"},
+                 {"id": "it2", "title": "Sprint 2"},
+             ]}},
+        ],
+        "totalCount": 3,
+    }
+
+    def test_field_keyed_by_name(self):
+        fields = upc.parse_fields(self.SAMPLE)
+        self.assertEqual(set(fields), {"Title", "Status", "Sprint"})
+
+    def test_generic_field(self):
+        fields = upc.parse_fields(self.SAMPLE)
+        self.assertEqual(fields["Title"], {"id": "PVTF_title", "type": "field"})
+
+    def test_single_select_options_ordered(self):
+        fields = upc.parse_fields(self.SAMPLE)
+        self.assertEqual(fields["Status"]["type"], "single_select")
+        self.assertEqual(fields["Status"]["options"], [
+            {"name": "Backlog", "id": "o1"},
+            {"name": "This milestone", "id": "o2"},
+            {"name": "Done", "id": "o3"},
+        ])
+
+    def test_iteration_options_from_configuration(self):
+        fields = upc.parse_fields(self.SAMPLE)
+        self.assertEqual(fields["Sprint"]["type"], "iteration")
+        self.assertEqual(fields["Sprint"]["options"], [
+            {"name": "Sprint 1", "id": "it1"},
+            {"name": "Sprint 2", "id": "it2"},
+        ])
+
+    def test_empty(self):
+        self.assertEqual(upc.parse_fields({}), {})
+
+
 class TestSelectProject(unittest.TestCase):
     ONE = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"}]
     TWO = ONE + [{"number": 5, "id": "PVT_b", "title": "Security", "owner": "ericfitz"}]

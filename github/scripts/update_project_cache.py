@@ -27,6 +27,34 @@ CACHE_FILENAME = "project-cache.json"
 LEGACY_CONFIG_FILENAME = ".local-projects.json"
 
 
+FIELD_TYPE_MAP = {
+    "ProjectV2SingleSelectField": "single_select",
+    "ProjectV2IterationField": "iteration",
+    "ProjectV2Field": "field",
+}
+
+
+def parse_fields(data):
+    """Convert `gh project field-list --format json` output to the cache fields map."""
+    fields = {}
+    for f in (data or {}).get("fields", []) or []:
+        name = f.get("name")
+        if not name:
+            continue
+        ftype = FIELD_TYPE_MAP.get(f.get("type"), "field")
+        entry = {"id": f.get("id"), "type": ftype}
+        if f.get("options"):
+            entry["options"] = [{"name": o.get("name"), "id": o.get("id")}
+                                for o in f["options"]]
+        elif ftype == "iteration":
+            iters = (f.get("configuration") or {}).get("iterations") or []
+            if iters:
+                entry["options"] = [{"name": it.get("title"), "id": it.get("id")}
+                                    for it in iters]
+        fields[name] = entry
+    return fields
+
+
 def _find_by_title(linked, title):
     for p in linked:
         if (p.get("title") or "").lower() == title.lower():
