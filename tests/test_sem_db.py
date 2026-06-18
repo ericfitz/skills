@@ -139,6 +139,49 @@ class TestBuildDropsOrphans(unittest.TestCase):
                 "full build must delete orphan rows for files no longer in scope")
 
 
+import sem_scope
+
+
+class TestAutoUpdateIncludeFilter(unittest.TestCase):
+    """FIX 3: auto_update must honor include prefixes, not just exclude globs."""
+
+    def setUp(self):
+        self._orig_changed_files = db.changed_files
+        self._orig_index_files = db.index_files
+        self._orig_stamp_head = db.stamp_head
+        self._orig_load_scope = sem_scope.load_scope
+        self._indexed = []
+
+    def tearDown(self):
+        db.changed_files = self._orig_changed_files
+        db.index_files = self._orig_index_files
+        db.stamp_head = self._orig_stamp_head
+        sem_scope.load_scope = self._orig_load_scope
+
+    def test_auto_update_filters_by_include_prefix(self):
+        with tempfile.TemporaryDirectory() as d:
+            # Seed a stored head so auto_update takes the incremental path
+            conn = db.connect(db.db_path(d))
+            db.set_meta(conn, "head_sha", "aabbcc")
+            conn.close()
+
+            # Scope: only src/ is included
+            sem_scope.load_scope = lambda cwd=None: {"include": ["src/"]}
+
+            # changed_files returns one in-scope and one out-of-scope file
+            db.changed_files = lambda cwd, head: ["src/a.py", "tools/b.py"]
+
+            # Capture which files are actually indexed
+            indexed = self._indexed
+            db.index_files = lambda conn, files, cwd=None: indexed.extend(files) or 0
+            db.stamp_head = lambda conn, cwd=None: None
+
+            db.auto_update(cwd=d)
+
+            self.assertEqual(indexed, ["src/a.py"],
+                "auto_update should only index files matching include prefixes")
+
+
 class TestAutoAndStatus(unittest.TestCase):
     def test_auto_update_falls_back_to_build_when_no_head(self):
         with tempfile.TemporaryDirectory() as d:

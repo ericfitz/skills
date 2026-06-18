@@ -212,8 +212,10 @@ def auto_update(cwd=None):
         return res
     import sem_scope
     scope = sem_scope.load_scope(cwd)
+    include = (scope or {}).get("include") or []
     files = [f for f in changed_files(cwd, head)
-             if not (scope is not None and sem_scope.is_excluded(f, scope))]
+             if (not include or any(f.startswith(p) for p in include))
+             and not (scope is not None and sem_scope.is_excluded(f, scope))]
     conn = connect(path)
     try:
         n = index_files(conn, files, cwd=cwd)
