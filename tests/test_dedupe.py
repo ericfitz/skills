@@ -99,5 +99,37 @@ class TestFilterGraph(unittest.TestCase):
         self.assertEqual(n, 2)
 
 
+class TestIngestDescriptions(unittest.TestCase):
+    def test_attaches_marker_desc_above_entity(self):
+        conn = mem_db()
+        conn.execute("""INSERT INTO entities
+            (id,name,entity_type,file_path,start_line,end_line,
+             is_exported,is_entrypoint,is_test)
+            VALUES ('api/h.go::function::handle','handle','function','api/h.go',
+                    3,9,0,0,0)""")
+        conn.commit()
+        dd._read_lines = lambda path: [
+            "package api",                                  # 1
+            "// SEM@abc1234: handle an inbound request",    # 2  (above start_line 3)
+            "func handle() {}",                             # 3
+        ]
+        n = dd.ingest_descriptions(conn)
+        self.assertEqual(n, 1)
+        desc = conn.execute(
+            "SELECT description FROM entities WHERE name='handle'").fetchone()[0]
+        self.assertEqual(desc, "handle an inbound request")
+
+    def test_no_marker_leaves_null(self):
+        conn = mem_db()
+        conn.execute("""INSERT INTO entities
+            (id,name,entity_type,file_path,start_line,end_line,
+             is_exported,is_entrypoint,is_test)
+            VALUES ('api/h.go::function::handle','handle','function','api/h.go',
+                    2,2,0,0,0)""")
+        conn.commit()
+        dd._read_lines = lambda path: ["package api", "func handle() {}"]
+        self.assertEqual(dd.ingest_descriptions(conn), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

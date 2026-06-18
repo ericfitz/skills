@@ -1,6 +1,7 @@
 """dedupe: find dead code and duplication via the sem CLI entity graph."""
 import json
 import os
+import re
 import sqlite3
 import subprocess
 
@@ -132,3 +133,37 @@ def load_graph(conn, scope_paths, exts=None, cwd=None):
         edges)
     conn.commit()
     return {"entities": len(ents), "edges": len(edges)}
+
+
+_SEM_MARKER_RE = re.compile(
+    r"^\s*(?://|#)\s*SEM@[0-9a-fA-F]{4,40}:\s?(?P<desc>.*)$")
+
+
+def _read_lines(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read().splitlines()
+
+
+def ingest_descriptions(conn, cwd=None):
+    rows = conn.execute(
+        "SELECT id, file_path, start_line FROM entities").fetchall()
+    by_file = {}
+    for eid, fp, start in rows:
+        by_file.setdefault(fp, []).append((eid, start))
+    attached = 0
+    for fp, ents in by_file.items():
+        path = fp if cwd is None else os.path.join(cwd, fp)
+        try:
+            lines = _read_lines(path)
+        except OSError:
+            continue
+        for eid, start in ents:
+            if not start or start < 2 or start - 2 >= len(lines):
+                continue
+            m = _SEM_MARKER_RE.match(lines[start - 2])
+            if m:
+                conn.execute("UPDATE entities SET description=? WHERE id=?",
+                             (m.group("desc"), eid))
+                attached += 1
+    conn.commit()
+    return attached
