@@ -96,7 +96,9 @@ def _read_text(path):
 
 
 def run_sem(args, cwd=None):
-    cmd = ["sem"] + args + ["--json"]
+    if not args:
+        raise SemError("run_sem called with empty args")
+    cmd = ["sem", args[0], "--json"] + list(args[1:])
     try:
         r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
     except FileNotFoundError:
@@ -115,16 +117,21 @@ def sem_blame(file, cwd=None):
     return json.loads(run_sem(["blame", file], cwd=cwd))
 
 
+def _parse_changed_entities(data):
+    """Names of entities with a logical (modified) change in a sem diff --json payload."""
+    names = set()
+    for ch in data.get("changes", []):
+        if ch.get("changeType") == "modified":
+            n = ch.get("entityName")
+            if n:
+                names.add(n)
+    return names
+
+
 def logic_changed_entities(base_sha, file, cwd=None):
     """Names of entities in `file` with a non-cosmetic change since base_sha."""
     out = run_sem(["diff", f"{base_sha}..HEAD", "--no-cosmetics", "--", file], cwd=cwd)
-    data = json.loads(out)
-    names = set()
-    for ch in data.get("changes", []):
-        n = ch.get("name") or ch.get("entity")
-        if n:
-            names.add(n)
-    return names
+    return _parse_changed_entities(json.loads(out))
 
 
 def scan(paths, cwd=None, rebuild=False):
@@ -202,6 +209,10 @@ def parse_args(argv):
     p = argparse.ArgumentParser(prog="sem_annotate")
     p.add_argument("--update", nargs="+", metavar="FILE",
                    help="scan only these files (entity-granular update)")
+    p.add_argument("-C", "--cwd", default=None,
+                   help="working directory forwarded to sem CLI")
+    p.add_argument("--rebuild", action="store_true",
+                   help="regenerate all markers, ignoring existing ones")
     sub = p.add_subparsers(dest="cmd")
     s = sub.add_parser("scan")
     s.add_argument("paths", nargs="*", default=["."])
