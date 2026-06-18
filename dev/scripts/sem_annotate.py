@@ -61,3 +61,15 @@ def apply_marker(lines, start_line, prefix, sha, desc):
     else:
         lines.insert(idx, marker)
     return lines
+
+
+def classify(existing_sha, blame_commit, logic_changed):
+    """Classify entity status: missing (no marker) / fresh (sha current or change cosmetic) / stale (logic changed).
+
+    SHA comparison is prefix-based: blame_commit.startswith(existing_sha).
+    """
+    if not existing_sha:
+        return "missing"
+    if blame_commit.startswith(existing_sha):
+        return "fresh"
+    return "stale" if logic_changed else "fresh"

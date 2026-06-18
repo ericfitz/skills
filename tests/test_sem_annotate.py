@@ -76,5 +76,21 @@ class TestApplyMarker(unittest.TestCase):
         self.assertEqual(out[2], "    def m(self): pass")
 
 
+class TestClassify(unittest.TestCase):
+    FULL = "b14a829fd98bc22eaf2939ee51854649b9620cb0"
+
+    def test_missing_when_no_marker(self):
+        self.assertEqual(sa.classify(None, self.FULL, False), "missing")
+
+    def test_fresh_when_sha_prefix_matches_blame(self):
+        self.assertEqual(sa.classify("b14a829", self.FULL, True), "fresh")
+
+    def test_stale_when_blame_moved_and_logic_changed(self):
+        self.assertEqual(sa.classify("deadbee", self.FULL, True), "stale")
+
+    def test_fresh_when_blame_moved_but_cosmetic_only(self):
+        self.assertEqual(sa.classify("deadbee", self.FULL, False), "fresh")
+
+
 if __name__ == "__main__":
     unittest.main()
