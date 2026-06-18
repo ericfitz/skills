@@ -84,6 +84,31 @@ JSON array — do not read large transcripts back.
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sem_annotate.py write -C <repo-dir> < /tmp/sem-updates.json
 ```
 
+### 4b. Refresh the `.local/sem.db` index
+
+After writing markers, update the SQLite annotation index so it reflects the new state:
+
+- **Full-scope annotate** (no `--update`):
+  ```bash
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sem_annotate.py db build [paths] -C <repo-dir>
+  ```
+- **`--update <files>` annotate** (targeted refresh):
+  ```bash
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sem_annotate.py db update <files> -C <repo-dir>
+  ```
+
+`.local/sem.db` is a gitignored, regenerable mirror of in-source markers. The source markers
+remain the source of truth. Run `db update` (no files) to re-index only files changed since
+the stamped HEAD commit (auto-incremental); run `db build` to rebuild everything from scratch.
+
+**Freshness check:** run
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sem_annotate.py db status -C <repo-dir>
+```
+to compare the stored "highest commit covered" (`head_sha` / `head_commit_count`) against the
+current HEAD. Verdict is one of `up-to-date`, `stale`, or `unknown`. When stale, run
+`db update` (no files) to re-index only files changed since the stamped commit.
+
 ### 5. Review
 Show the user `git diff` (markers only) for a quick review. Do not commit automatically
 unless asked — `sem-auto` owns the commit-time workflow.
