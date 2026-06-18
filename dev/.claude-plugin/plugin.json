@@ -1,6 +1,6 @@
 {
   "name": "dev",
   "version": "1.0.0",
-  "description": "Developer toolkit: find and analyze duplicate or overlapping functionality across a codebase (dedupe). Supports Go, Python, and TypeScript; orchestrates per-file analysis, grouping, and deep comparison via worker agents.",
+  "description": "Developer toolkit: annotate code with durable SEM@<sha> intent markers (sem-annotate), and find/analyze duplicate or overlapping functionality (dedupe). Uses the sem CLI for entity-level semantic intelligence. Supports Go, TypeScript/JavaScript, and Python.",
   "author": { "name": "efitz" }
 }
