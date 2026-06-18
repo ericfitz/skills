@@ -34,12 +34,19 @@ consulted at all).
 }
 ```
 
-Both keys are optional lists of glob patterns. An absent or empty `include` means whole-repo
-(dedupe passes no prefix filter to `sem graph`). `exclude` glob patterns drop matching files
-from the entity graph before dead-code and duplication analysis.
+Both keys are optional. An absent or empty `include` means whole-repo (dedupe passes no
+prefix filter to `sem graph`). `exclude` patterns drop matching files from the entity graph
+before dead-code and duplication analysis.
 
-**Glob syntax:** `**` crosses path separators; `*` and `?` do not; a trailing `/` is a
-directory-prefix match (e.g. `scripts/` matches `scripts` itself and any file underneath).
+`include` entries are **path prefixes** (directories like `src/`, `pkg/`) — they are matched
+by `str.startswith`, NOT glob-matched. Use directory paths ending in `/`.
+
+`exclude` entries are **glob patterns** — they support `**` (crosses path separators), `*`
+and `?` (do not cross `/`), and a trailing `/` as a directory-prefix match (e.g. `scripts/`
+matches `scripts` itself and any file underneath).
+
+**Glob syntax (exclude only):** `**` crosses path separators; `*` and `?` do not; a trailing
+`/` is a directory-prefix match.
 
 The file lives in `.local/` and is gitignored (machine-local convention). Create it with
 `mkdir -p .local && echo '{"include":["src/"],"exclude":["**/*.spec.ts"]}' > .local/sem-scope.json`.
