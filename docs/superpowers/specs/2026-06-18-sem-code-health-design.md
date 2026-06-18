@@ -84,6 +84,53 @@ cosmetic/reordered), and is rename/move-aware (`sem` tracks moves with `prev_fil
 Trade-offs accepted: drift detection depends on git history and on `sem`'s classifier
 accuracy; it requires the repo to be under git (true for all target projects).
 
+### Description content standard (load-bearing for dedup recall)
+
+The marker description **is** the duplicate-detection signal for `dedupe`'s cheap SQL
+pre-filter (no embeddings are available; an LLM pass over every pair is too expensive at
+scale). The pre-filter therefore only works if same-intent entities reliably produce
+lexically-similar descriptions. Standardization is biased toward **recall** (true positives
+/ minimizing false negatives): a false positive merely wastes one verifier subagent, while a
+false negative misses a real duplicate permanently. Two coordinated levers:
+
+**Write-side standard** — handed identically to every annotation subagent (in `sem-annotate`
+and via the `sem-auto` hook), in priority order:
+
+1. **Describe intent (the contract), never mechanism.** "validate a JWT and return its
+   claims" — not "loop over header, split on '.', base64-decode each part". Intent converges
+   across duplicates and drifts less than mechanism (so markers also stay fresh longer).
+2. **Lead with a canonical verb** from a recommended lexicon (~30 verbs), mapping synonyms to
+   one canonical form: `validate` (not check/verify/ensure), `fetch` (not get/retrieve/load
+   for I/O reads), `store`, `build` (not create/make/construct), `convert`, `parse`,
+   `format`, `serialize`/`deserialize`, `encode`/`decode`, `filter`, `map`, `compute`,
+   `aggregate`, `register`, `route`, `dispatch`, `handle`, `authenticate`, `authorize`,
+   `connect`, `subscribe`, `notify`, `retry`, `cache`, `lock`, `schedule`, `list`, `search`,
+   `update`, `delete`.
+3. **Name the subject with a canonical domain noun** — one consistent term per concept (a
+   "session token", not token / auth-string / credential), reusing the project's existing
+   vocabulary.
+4. **Abstract incidental specifics** — describe roles, not identifiers/types: "the user's
+   email", not "req.body.email" (a true duplicate elsewhere may use different names).
+5. **One line, ≤ ~12 words, do not restate the entity name** (the name is already indexed;
+   the description adds intent).
+6. **Tag a strong side-effect when it discriminates** — `(pure)`, `(reads DB)`,
+   `(mutates shared state)`. Aids the verifier and reduces false matches.
+
+Examples:
+```
+// SEM@abc123: validate a JWT and return its claims; reject if expired (pure)
+// SEM@abc123: fetch open issues for a repo from the GitHub API
+// SEM@abc123: convert a domain User to its API DTO
+```
+
+**Compare-side normalization** — `dedupe` P3 normalizes before matching (belt-and-suspenders
+for residual prose variation): lowercase, stem, drop stopwords, canonicalize the verb via a
+small synonym table, then match on `(leading verb + subject)` exactly plus a token-set
+Jaccard on the remainder, thresholded for recall.
+
+Optional future lever (deferred): a small accumulating per-project glossary that
+`sem-annotate` consults and grows, to stabilize canonical domain nouns across runs.
+
 ### Entity-granular updates (critical invariant)
 
 A commit changes *files*, but a file may contain many entities. The `@sha` must mean "the
@@ -153,7 +200,8 @@ General-purpose: works on any `sem`-indexed repo, takes a **path-scope argument*
     Entities reachable *only* from tests are flagged as a separate, lower-priority
     "production-dead" tier.
   - **Duplication candidates** = mechanical pre-filter → `candidate_clusters`: SEM-description
-    similarity when descriptions are present, else normalized-name / shared-n-gram /
+    similarity when descriptions are present (using the compare-side normalization in
+    "Description content standard" above), else normalized-name / shared-n-gram /
     signature-shape matching. High recall; the LLM pass supplies precision.
 - **P4 — Verify (parallel LLM, one subagent per candidate).**
   - **Dead-code verifier** actively tries to *refute* deadness — the failure modes a static
