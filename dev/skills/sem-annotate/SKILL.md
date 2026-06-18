@@ -80,16 +80,21 @@ Split the worklist into batches (~20 entities each). For each batch, dispatch a
 passing the batch JSON and `REPO_DIR=<repo-dir>`. This agent runs on **Sonnet** by default
 (via its frontmatter `model: sonnet`) — description writing is short and mechanical, and a
 full pass can be hundreds of batches, so Sonnet is the right cost/quality point. Each
-subagent returns a JSON array of `{file, name, start_line, sha, desc}`. Collect and
-concatenate all arrays into one JSON array `/tmp/sem-updates.json`.
+subagent returns a JSON array of `{file, name, start_line, desc}` — no `sha` field; the
+SHA is stamped by the tool in Step 4. Collect and concatenate all arrays into one JSON
+array `/tmp/sem-updates.json`.
 
 Dispatch batches in parallel (one message, multiple Task calls). Subagents return only the
 JSON array — do not read large transcripts back.
 
 ### 4. Write markers
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sem_annotate.py write -C <repo-dir> < /tmp/sem-updates.json
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sem_annotate.py write --worklist /tmp/sem-work.json -C <repo-dir> < /tmp/sem-updates.json
 ```
+
+The `write` command stamps the authoritative SHA from the worklist (the `anchor_sha` field
+from each scan entry). The LLM never supplies a SHA. If an entity's `anchor_sha` is blank,
+`write` falls back to the current HEAD sha.
 
 ### 4b. Refresh the `.local/sem.db` index
 
@@ -119,6 +124,20 @@ current HEAD. Verdict is one of `up-to-date`, `stale`, or `unknown`. When stale,
 ### 5. Review
 Show the user `git diff` (markers only) for a quick review. Do not commit automatically
 unless asked — `sem-auto` owns the commit-time workflow.
+
+**Post-write re-scan:** after writing markers, a re-scan (`scan`) works correctly on a
+dirty (uncommitted) tree. Anchors come from committed history via `sem log`, so
+just-written markers whose `anchor_sha` matches will read `fresh`. A clean pass re-scans
+to `{missing: 0}` with no `stale` entries.
+
+**Status vocabulary:**
+- `missing` — no marker exists yet
+- `stale` — marker present but entity has a logical change since the anchored commit
+- `uncommitted` — marker present but the anchor SHA is blank or all-zeros (dirty tree with
+  no committed history for this entity); will resolve once changes are committed
+- `invalid-sha` — a previously-written marker carries a SHA that `sem diff` cannot resolve
+  (the commit was garbage-collected or the SHA is corrupt); the entity will be re-annotated
+  by the next annotate pass
 
 ### 6. Offer the CLAUDE.md convention note (once)
 If the project's `CLAUDE.md` does not already mention SEM markers, offer to add a short

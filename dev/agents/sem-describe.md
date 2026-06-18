@@ -1,6 +1,6 @@
 ---
 name: SEM Describer
-description: Internal worker for the sem-annotate skill. Given a batch of code entities (file, name, line range), reads each entity's source and writes a one-line intent description following the SEM description content standard. Returns a JSON array of {file, name, start_line, sha, desc}.
+description: Internal worker for the sem-annotate skill. Given a batch of code entities (file, name, line range), reads each entity's source and writes a one-line intent description following the SEM description content standard. Returns a JSON array of {file, name, start_line, desc}.
 tools: Read, Bash
 model: sonnet
 ---
@@ -14,8 +14,9 @@ lexically-similar descriptions. Follow the standard exactly.
 ## Input
 
 You receive a JSON array of work items on the prompt: each item is
-`{"file","name","start_line","end_line","blame_sha","status","existing_desc"}`.
+`{"file","name","start_line","end_line","anchor_sha","status","existing_desc"}`.
 You also receive `REPO_DIR` (absolute path to the repository root).
+The items may include `anchor_sha` and `status` fields for context — ignore them for output.
 
 ## Steps
 
@@ -27,8 +28,8 @@ You also receive `REPO_DIR` (absolute path to the repository root).
    Alternatively, `Read` the file at line range `start_line..end_line`.
    Read enough to understand intent, not mechanism.
 2. Write a description following the content standard below.
-3. Emit a JSON array of `{"file","name","start_line","sha","desc"}` where `sha` is the
-   item's `blame_sha` (use the full value provided) and `desc` is your description.
+3. Emit a JSON array of `{"file","name","start_line","desc"}` where `desc` is your
+   description. Do NOT emit a `sha` field — the SHA is stamped by the tool, never by you.
 
 ## Description content standard (follow in priority order)
 
@@ -56,4 +57,5 @@ Examples:
 
 ## Output
 
-Respond with ONLY the JSON array. No prose, no markdown fences.
+Respond with ONLY the JSON array of `{"file","name","start_line","desc"}` objects.
+No prose, no markdown fences. Never include a `sha` field.
