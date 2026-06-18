@@ -148,6 +148,47 @@ class TestInvalidRevError(unittest.TestCase):
                 self.fail("should be plain SemError, not InvalidRevError")
 
 
+class TestEntityLogicSha(unittest.TestCase):
+    def setUp(self):
+        self._orig_log = sa.sem_log_entity
+
+    def tearDown(self):
+        sa.sem_log_entity = self._orig_log
+
+    def test_picks_newest_logic_ignoring_later_cosmetic(self):
+        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": [
+            {"change_type": "added", "commit": {"sha": "aaa111"}},
+            {"change_type": "modified (logic)", "commit": {"sha": "bbb222"}},
+            {"change_type": "modified (cosmetic)", "commit": {"sha": "ccc333"}},
+        ]}
+        self.assertEqual(sa.entity_logic_sha("E", "f.py"), "bbb222")
+
+    def test_added_only(self):
+        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": [
+            {"change_type": "added", "commit": {"sha": "aaa111"}}]}
+        self.assertEqual(sa.entity_logic_sha("E", "f.py"), "aaa111")
+
+    def test_fallback_when_only_cosmetic(self):
+        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": [
+            {"change_type": "modified (cosmetic)", "commit": {"sha": "ccc333"}}]}
+        self.assertEqual(sa.entity_logic_sha("E", "f.py", fallback_sha="zzz999"), "zzz999")
+
+    def test_fallback_when_empty(self):
+        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": []}
+        self.assertEqual(sa.entity_logic_sha("E", "f.py", fallback_sha="zzz999"), "zzz999")
+        self.assertEqual(sa.entity_logic_sha("E", "f.py"), "")
+
+    def test_sem_log_entity_returns_empty_on_semerror(self):
+        def boom(args, cwd=None):
+            raise sa.SemError("nope")
+        orig = sa.run_sem
+        sa.run_sem = boom
+        try:
+            self.assertEqual(sa.sem_log_entity("E", "f.py"), {"changes": []})
+        finally:
+            sa.run_sem = orig
+
+
 class TestScan(unittest.TestCase):
     def setUp(self):
         self.files = {}  # path -> source text

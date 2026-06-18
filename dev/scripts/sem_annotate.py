@@ -160,6 +160,50 @@ def logic_changed_entities(base_sha, file, cwd=None):
     return _parse_changed_entities(json.loads(out))
 
 
+_LOGIC_CHANGE_TYPES = ("added", "modified (logic)")
+
+
+def sem_log_entity(name, file, cwd=None):
+    """Parsed `sem log --json <name> --file <file>`; {'changes': []} on any failure."""
+    try:
+        out = run_sem(["log", name, "--file", file], cwd=cwd)
+    except SemError:
+        return {"changes": []}
+    try:
+        data = json.loads(out)
+    except (ValueError, json.JSONDecodeError):
+        return {"changes": []}
+    if not isinstance(data, dict):
+        return {"changes": []}
+    return data
+
+
+def entity_logic_sha(name, file, cwd=None, fallback_sha=""):
+    """SHA of the entity's newest added/logic change (cosmetic-aware anchor).
+
+    `sem log` changes are oldest-first, so the last matching entry is newest.
+    Falls back to fallback_sha (e.g. the entity's sem blame commit) when there
+    is no added/logic entry.
+    """
+    sha = ""
+    for ch in sem_log_entity(name, file, cwd=cwd).get("changes", []):
+        if ch.get("change_type") in _LOGIC_CHANGE_TYPES:
+            s = (ch.get("commit") or {}).get("sha")
+            if s:
+                sha = s
+    return sha or (fallback_sha or "")
+
+
+def head_sha(cwd=None):
+    """git rev-parse HEAD, or '' if unavailable."""
+    try:
+        r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=cwd,
+                           capture_output=True, text=True, check=True)
+        return r.stdout.strip()
+    except Exception:
+        return ""
+
+
 def scan(paths, cwd=None, rebuild=False):
     """Worklist for entities classified missing/stale (or all when rebuild=True).
 
