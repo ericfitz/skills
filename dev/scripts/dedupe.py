@@ -1,7 +1,10 @@
 """dedupe: find dead code and duplication via the sem CLI entity graph."""
+import os
 import sqlite3
 
 CODE_TYPES = {"function", "method", "type", "constant"}
+
+_ENTRYPOINT_PREFIXES = ("Test", "Benchmark", "Example", "Fuzz")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS run_meta (
@@ -32,3 +35,29 @@ def init_db(conn):
     conn.execute("PRAGMA busy_timeout=10000")
     conn.executescript(_SCHEMA)
     conn.commit()
+
+
+def is_unexported(name, file_path):
+    """Check if a name is unexported (private) based on file type and naming convention."""
+    _, ext = os.path.splitext(file_path)
+    if ext.lower() == ".go":
+        return bool(name) and name[0].islower()
+    # python / ts / js convention: leading underscore is private
+    return name.startswith("_")
+
+
+def is_entrypoint(name):
+    """Check if a name is a special entrypoint (main, init, Test*, Benchmark*, Example*, Fuzz*)."""
+    return name in ("main", "init") or name.startswith(_ENTRYPOINT_PREFIXES)
+
+
+def is_test(file_path):
+    """Check if a file path indicates a test file."""
+    p = file_path
+    base = os.path.basename(p)
+    if any(s in p for s in ("_test.go", ".test.", ".spec.",
+                            "/test/", "/tests/", "/__tests__/")):
+        return True
+    if p.startswith(("test/", "tests/")):
+        return True
+    return base.startswith("test_")
