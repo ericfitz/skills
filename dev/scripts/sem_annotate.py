@@ -38,3 +38,26 @@ def find_marker_above(lines, start_line):
     if not m:
         return None
     return {"sha": m.group("sha"), "desc": m.group("desc")}
+
+
+def build_marker(prefix, indent, sha, desc):
+    """Build a SEM marker line with the given prefix, indentation, SHA, and description."""
+    return f"{indent}{prefix} SEM@{sha}: {desc}"
+
+
+def apply_marker(lines, start_line, prefix, sha, desc):
+    """Insert or replace the SEM marker directly above 1-based start_line.
+
+    Indentation is copied from the entity definition line. Returns a NEW list.
+    """
+    lines = list(lines)
+    idx = start_line - 1                       # entity line, 0-based
+    entity_line = lines[idx] if 0 <= idx < len(lines) else ""
+    indent = entity_line[: len(entity_line) - len(entity_line.lstrip())]
+    marker = build_marker(prefix, indent, sha, desc)
+    above = idx - 1
+    if above >= 0 and SEM_MARKER_RE.match(lines[above]):
+        lines[above] = marker
+    else:
+        lines.insert(idx, marker)
+    return lines

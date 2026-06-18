@@ -50,5 +50,31 @@ class TestParseMarkers(unittest.TestCase):
         self.assertIsNone(sa.find_marker_above(lines, 2))
 
 
+class TestApplyMarker(unittest.TestCase):
+    def test_build_marker_format(self):
+        self.assertEqual(
+            sa.build_marker("//", "  ", "abc1234", "validate a token"),
+            "  // SEM@abc1234: validate a token",
+        )
+
+    def test_insert_when_absent(self):
+        lines = ["package p", "", "func F() {}"]
+        out = sa.apply_marker(lines, 3, "//", "abc1234", "compute a checksum")
+        self.assertEqual(out[2], "// SEM@abc1234: compute a checksum")
+        self.assertEqual(out[3], "func F() {}")
+        self.assertEqual(len(out), 4)
+
+    def test_replace_when_present(self):
+        lines = ["package p", "// SEM@abc0000: stale desc", "func F() {}"]
+        out = sa.apply_marker(lines, 3, "//", "def2222", "fresh desc")
+        self.assertEqual(out, ["package p", "// SEM@def2222: fresh desc", "func F() {}"])
+
+    def test_indentation_matches_entity(self):
+        lines = ["class C:", "    def m(self): pass"]
+        out = sa.apply_marker(lines, 2, "#", "abc1234", "handle a request")
+        self.assertEqual(out[1], "    # SEM@abc1234: handle a request")
+        self.assertEqual(out[2], "    def m(self): pass")
+
+
 if __name__ == "__main__":
     unittest.main()
