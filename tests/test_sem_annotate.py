@@ -230,5 +230,42 @@ class TestArgs(unittest.TestCase):
         self.assertEqual(ns.cwd, "/repo")
 
 
+class TestScanScope(unittest.TestCase):
+    def setUp(self):
+        # No markers => both entities classify as "missing" (surfaced by scan).
+        self.files = {"src/a.ts": "function A() {}\n",
+                      "scripts/b.ts": "function B() {}\n"}
+        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
+                      sa.logic_changed_entities, sa.sem_scope.load_scope)
+        sa._read_text = lambda p: self.files[p]
+        sa.sem_entities = lambda paths, cwd=None: [
+            {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 1, "end_line": 1},
+            {"name": "B", "type": "function", "file": "scripts/b.ts", "start_line": 1, "end_line": 1},
+        ]
+        sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "ccc"}, {"name": "B", "commit": "ddd"}]
+        sa.logic_changed_entities = lambda base, f, cwd=None: set()
+
+    def tearDown(self):
+        (sa._read_text, sa.sem_entities, sa.sem_blame,
+         sa.logic_changed_entities, sa.sem_scope.load_scope) = self._orig
+
+    def test_scope_exclude_drops_entities(self):
+        sa.sem_scope.load_scope = lambda cwd=None: {"include": ["src/", "scripts/"],
+                                                    "exclude": ["scripts/"]}
+        work = sa.scan(None)
+        names = {w["name"] for w in work}
+        self.assertIn("A", names)            # src/ kept (missing marker -> surfaced)
+        self.assertNotIn("B", names)         # scripts/ excluded by scope
+
+    def test_explicit_paths_ignore_scope(self):
+        called = {"n": 0}
+        def boom(cwd=None):
+            called["n"] += 1
+            return {"exclude": ["**/*"]}
+        sa.sem_scope.load_scope = boom
+        sa.scan(["src/a.ts"])
+        self.assertEqual(called["n"], 0)     # explicit args => scope file never consulted
+
+
 if __name__ == "__main__":
     unittest.main()

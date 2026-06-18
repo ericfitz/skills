@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import sem_scope
 
 COMMENT_BY_EXT = {
     ".go": "//", ".ts": "//", ".tsx": "//", ".js": "//", ".jsx": "//",
@@ -135,13 +136,26 @@ def logic_changed_entities(base_sha, file, cwd=None):
 
 
 def scan(paths, cwd=None, rebuild=False):
-    """Return worklist items for entities classified missing/stale (or all when rebuild=True)."""
-    entities = [e for e in sem_entities(paths, cwd=cwd) if e.get("type") in CODE_TYPES]
+    """Worklist for entities classified missing/stale (or all when rebuild=True).
+
+    paths is None or [] => consult .local/sem-scope.json (include/exclude). Non-empty
+    paths are explicit and bypass the scope file entirely.
+    """
+    if paths:
+        scope = None
+        scan_paths = list(paths)
+    else:
+        scope = sem_scope.load_scope(cwd)
+        scan_paths = sem_scope.include_paths(scope)
+    entities = [e for e in sem_entities(scan_paths, cwd=cwd) if e.get("type") in CODE_TYPES]
     by_file = {}
     for e in entities:
-        f = e.get("file") or (paths[0] if len(paths) == 1 else None)
-        if f:
-            by_file.setdefault(f, []).append(e)
+        f = e.get("file") or (scan_paths[0] if len(scan_paths) == 1 else None)
+        if f is None:
+            continue
+        if scope is not None and sem_scope.is_excluded(f, scope):
+            continue
+        by_file.setdefault(f, []).append(e)
 
     work = []
     for f, ents in by_file.items():
@@ -215,7 +229,7 @@ def parse_args(argv):
                    help="regenerate all markers, ignoring existing ones")
     sub = p.add_subparsers(dest="cmd")
     s = sub.add_parser("scan")
-    s.add_argument("paths", nargs="*", default=["."])
+    s.add_argument("paths", nargs="*", default=None)
     s.add_argument("--rebuild", action="store_true")
     s.add_argument("-C", "--cwd", default=None)
     w = sub.add_parser("write")
