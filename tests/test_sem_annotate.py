@@ -96,6 +96,26 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(sa.classify("deadbee", self.FULL, False), "fresh")
 
 
+class TestClassifyRobust(unittest.TestCase):
+    def test_uncommitted_none(self):
+        self.assertEqual(sa.classify("b14a829", None, False), "uncommitted")
+
+    def test_uncommitted_empty(self):
+        self.assertEqual(sa.classify("b14a829", "", False), "uncommitted")
+
+    def test_uncommitted_all_zeros(self):
+        self.assertEqual(sa.classify("b14a829", "0000000000000000000000000000000000000000", False), "uncommitted")
+
+    def test_missing_takes_precedence_over_uncommitted(self):
+        self.assertEqual(sa.classify(None, None, False), "missing")
+
+    def test_is_uncommitted_helper(self):
+        self.assertTrue(sa._is_uncommitted(None))
+        self.assertTrue(sa._is_uncommitted(""))
+        self.assertTrue(sa._is_uncommitted("0000000"))
+        self.assertFalse(sa._is_uncommitted("b14a829"))
+
+
 class TestScan(unittest.TestCase):
     def setUp(self):
         self.files = {}  # path -> source text

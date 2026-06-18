@@ -68,14 +68,27 @@ def apply_marker(lines, start_line, prefix, sha, desc):
     return lines
 
 
-def classify(existing_sha, blame_commit, logic_changed):
-    """Classify entity status: missing (no marker) / fresh (sha current or change cosmetic) / stale (logic changed).
+_ZERO_SHA_RE = re.compile(r"0{7,40}")
 
-    SHA comparison is prefix-based: blame_commit.startswith(existing_sha).
+
+def _is_uncommitted(sha):
+    """True for a missing/blank/all-zeros blame sha (git's 'Not Committed Yet')."""
+    return not sha or _ZERO_SHA_RE.fullmatch(sha) is not None
+
+
+def classify(existing_sha, anchor_sha, logic_changed):
+    """Classify entity status.
+
+    missing      no marker
+    uncommitted  marker present but anchor is uncommitted/blank (dirty tree)
+    fresh        anchor sha current, or change cosmetic
+    stale        anchor moved and a logical change occurred
     """
     if not existing_sha:
         return "missing"
-    if blame_commit.startswith(existing_sha):
+    if _is_uncommitted(anchor_sha):
+        return "uncommitted"
+    if anchor_sha.startswith(existing_sha):
         return "fresh"
     return "stale" if logic_changed else "fresh"
 
