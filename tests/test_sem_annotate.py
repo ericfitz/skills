@@ -200,6 +200,7 @@ class TestScan(unittest.TestCase):
         self._orig_entities = sa.sem_entities
         self._orig_blame = sa.sem_blame
         self._orig_logic = sa.logic_changed_entities
+        self._orig_logic_sha = sa.entity_logic_sha
         sa._read_text = fake_read
 
     def tearDown(self):
@@ -207,6 +208,7 @@ class TestScan(unittest.TestCase):
         sa.sem_entities = self._orig_entities
         sa.sem_blame = self._orig_blame
         sa.logic_changed_entities = self._orig_logic
+        sa.entity_logic_sha = self._orig_logic_sha
 
     def test_scan_flags_missing_and_stale_only(self):
         path = "auth/x.go"
@@ -227,11 +229,68 @@ class TestScan(unittest.TestCase):
         sa.sem_entities = lambda paths, cwd=None: entities
         sa.sem_blame = lambda f, cwd=None: blame
         sa.logic_changed_entities = lambda base, f, cwd=None: set()
+        sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": \
+            {"Fresh": "aaaaaaa000111222333", "Missing": "bbbbbbb000111222333"}.get(name, "")
 
         work = sa.scan([path])
         names = {w["name"]: w["status"] for w in work}
         self.assertEqual(names, {"Missing": "missing"})
-        self.assertEqual(work[0]["blame_sha"], "bbbbbbb000111222333")
+        self.assertEqual(work[0]["anchor_sha"], "bbbbbbb000111222333")
+
+
+class TestScanInvalidSha(unittest.TestCase):
+    def setUp(self):
+        self.files = {"src/a.ts": "// SEM@deadbee: old\nfunction A() {}\n"}
+        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
+                      sa.entity_logic_sha, sa.logic_changed_entities)
+        sa._read_text = lambda p: self.files[p]
+        sa.sem_entities = lambda paths, cwd=None: [
+            {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 2, "end_line": 2}]
+        sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "ffff999"}]
+        sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "ffff999"
+        def boom(base, f, cwd=None):
+            raise sa.InvalidRevError("revspec not found")
+        sa.logic_changed_entities = boom
+
+    def tearDown(self):
+        (sa._read_text, sa.sem_entities, sa.sem_blame,
+         sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
+
+    def test_bad_hash_reported_not_crashed(self):
+        work = sa.scan(["src/a.ts"])
+        self.assertEqual(len(work), 1)
+        self.assertEqual(work[0]["status"], "invalid-sha")
+        self.assertEqual(work[0]["bad_sha"], "deadbee")
+        self.assertEqual(work[0]["name"], "A")
+
+
+class TestScanFreshAfterWrite(unittest.TestCase):
+    """#13 regression: marker anchored to the entity's last logic change is fresh."""
+    def setUp(self):
+        # decl-line blame is commit A, but body last changed in commit B; marker carries B.
+        self.files = {"src/g.ts": "// SEM@bbbbbbb: guard\nclass G {}\n"}
+        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
+                      sa.entity_logic_sha, sa.logic_changed_entities)
+        sa._read_text = lambda p: self.files[p]
+        sa.sem_entities = lambda paths, cwd=None: [
+            {"name": "G", "type": "class", "file": "src/g.ts", "start_line": 2, "end_line": 2}]
+        sa.sem_blame = lambda f, cwd=None: [{"name": "G", "commit": "aaaaaaa_declline"}]
+        sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "bbbbbbb000111"  # commit B
+        # Must NOT be consulted: anchor already prefix-matches the marker, so classify
+        # returns fresh without a logic diff. Make it explode to prove that.
+        def must_not_call(base, f, cwd=None):
+            raise AssertionError("logic_changed_entities should not be called when anchor matches marker")
+        sa.logic_changed_entities = must_not_call
+
+    def tearDown(self):
+        (sa._read_text, sa.sem_entities, sa.sem_blame,
+         sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
+
+    def test_marker_matching_anchor_is_fresh(self):
+        # anchor 'bbbbbbb000111' startswith marker 'bbbbbbb' -> fresh, logic check skipped
+        work = sa.scan(["src/g.ts"])
+        names = {w["name"]: w["status"] for w in work}
+        self.assertNotIn("G", names)  # fresh -> not surfaced
 
 
 class TestWrite(unittest.TestCase):
@@ -329,7 +388,7 @@ class TestScanScope(unittest.TestCase):
         self.files = {"src/a.ts": "function A() {}\n",
                       "scripts/b.ts": "function B() {}\n"}
         self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
-                      sa.logic_changed_entities, sa.sem_scope.load_scope)
+                      sa.logic_changed_entities, sa.entity_logic_sha, sa.sem_scope.load_scope)
         sa._read_text = lambda p: self.files[p]
         sa.sem_entities = lambda paths, cwd=None: [
             {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 1, "end_line": 1},
@@ -337,10 +396,11 @@ class TestScanScope(unittest.TestCase):
         ]
         sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "ccc"}, {"name": "B", "commit": "ddd"}]
         sa.logic_changed_entities = lambda base, f, cwd=None: set()
+        sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "ccc" if f.startswith("src/") else "ddd"
 
     def tearDown(self):
         (sa._read_text, sa.sem_entities, sa.sem_blame,
-         sa.logic_changed_entities, sa.sem_scope.load_scope) = self._orig
+         sa.logic_changed_entities, sa.entity_logic_sha, sa.sem_scope.load_scope) = self._orig
 
     def test_scope_exclude_drops_entities(self):
         sa.sem_scope.load_scope = lambda cwd=None: {"include": ["src/", "scripts/"],

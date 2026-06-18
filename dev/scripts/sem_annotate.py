@@ -231,24 +231,38 @@ def scan(paths, cwd=None, rebuild=False):
         read_path = f if cwd is None else os.path.join(cwd, f)
         text = _read_text(read_path)
         lines = text.splitlines()
-        blame = {b["name"]: b for b in sem_blame(f, cwd=cwd)}
+        blame_by_name = {b["name"]: (b.get("commit") or "")
+                         for b in sem_blame(f, cwd=cwd)}
         for e in ents:
             marker = find_marker_above(lines, e["start_line"])
             existing_sha = marker["sha"] if marker else None
-            blame_sha = blame.get(e["name"], {}).get("commit", "")
+            anchor_sha = entity_logic_sha(
+                e["name"], f, cwd=cwd,
+                fallback_sha=blame_by_name.get(e["name"], "")) or ""
+            existing_desc = marker["desc"] if marker else None
             if rebuild:
                 status = "missing"
             else:
                 logic = False
-                if existing_sha and blame_sha and not blame_sha.startswith(existing_sha):
-                    logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
-                status = classify(existing_sha, blame_sha, logic)
+                if existing_sha and not _is_uncommitted(anchor_sha) \
+                        and not anchor_sha.startswith(existing_sha):
+                    try:
+                        logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
+                    except InvalidRevError:
+                        work.append({
+                            "file": f, "name": e["name"],
+                            "start_line": e["start_line"], "end_line": e["end_line"],
+                            "status": "invalid-sha", "anchor_sha": anchor_sha,
+                            "existing_desc": existing_desc, "bad_sha": existing_sha,
+                        })
+                        continue
+                status = classify(existing_sha, anchor_sha, logic)
             if status in ("missing", "stale"):
                 work.append({
                     "file": f, "name": e["name"],
                     "start_line": e["start_line"], "end_line": e["end_line"],
-                    "status": status, "blame_sha": blame_sha,
-                    "existing_desc": marker["desc"] if marker else None,
+                    "status": status, "anchor_sha": anchor_sha,
+                    "existing_desc": existing_desc,
                 })
     return work
 
