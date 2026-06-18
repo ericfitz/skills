@@ -22,3 +22,7 @@ writing/skills/boring/dist/
 
 # Agent-created git worktrees must never be committed (stray gitlinks)
 .claude/worktrees/
+
+# Machine-local, non-tracked config and cache (per the .local/ convention):
+# e.g. sem-scope.json, sem.db, project caches, and SDD progress/reports.
+.local/
