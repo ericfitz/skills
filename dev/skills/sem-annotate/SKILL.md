@@ -46,10 +46,12 @@ Read the count. If empty, report "All markers fresh — nothing to do." and stop
 
 ### 3. Generate descriptions (parallel subagents)
 Split the worklist into batches (~20 entities each). For each batch, dispatch a
-`general-purpose` subagent that follows `${CLAUDE_PLUGIN_ROOT}/agents/sem-describe.md`,
-passing the batch JSON and `REPO_DIR=<repo-dir>`. Each subagent returns a JSON array of
-`{file, name, start_line, sha, desc}`. Collect and concatenate all arrays into one JSON
-array `/tmp/sem-updates.json`.
+**`dev:SEM Describer`** subagent (defined by `${CLAUDE_PLUGIN_ROOT}/agents/sem-describe.md`),
+passing the batch JSON and `REPO_DIR=<repo-dir>`. This agent runs on **Sonnet** by default
+(via its frontmatter `model: sonnet`) — description writing is short and mechanical, and a
+full pass can be hundreds of batches, so Sonnet is the right cost/quality point. Each
+subagent returns a JSON array of `{file, name, start_line, sha, desc}`. Collect and
+concatenate all arrays into one JSON array `/tmp/sem-updates.json`.
 
 Dispatch batches in parallel (one message, multiple Task calls). Subagents return only the
 JSON array — do not read large transcripts back.
