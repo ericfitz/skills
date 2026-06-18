@@ -100,10 +100,16 @@ class TestScan(unittest.TestCase):
             return self.files[path]
 
         self._orig_read = sa._read_text
+        self._orig_entities = sa.sem_entities
+        self._orig_blame = sa.sem_blame
+        self._orig_logic = sa.logic_changed_entities
         sa._read_text = fake_read
 
     def tearDown(self):
         sa._read_text = self._orig_read
+        sa.sem_entities = self._orig_entities
+        sa.sem_blame = self._orig_blame
+        sa.logic_changed_entities = self._orig_logic
 
     def test_scan_flags_missing_and_stale_only(self):
         path = "auth/x.go"
