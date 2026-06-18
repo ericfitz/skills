@@ -97,7 +97,10 @@ def run_sem_graph(exts, cwd=None):
         raise SemError("'sem' CLI not found on PATH")
     except subprocess.CalledProcessError as e:
         raise SemError(f"sem graph failed: {e.stderr.strip()}")
-    return json.loads(r.stdout)
+    try:
+        return json.loads(r.stdout)
+    except json.JSONDecodeError as e:
+        raise SemError(f"sem graph returned invalid JSON: {e}")
 
 
 def _in_scope(path, scope_paths, exts, exclude=None):

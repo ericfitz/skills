@@ -268,5 +268,51 @@ class TestScopeFile(unittest.TestCase):
         self.assertFalse(dd._in_scope("other/a.ts", ["src/"], dd.CODE_FILE_EXTS))
 
 
+class TestRunSemGraphJSON(unittest.TestCase):
+    def tearDown(self):
+        if hasattr(self, "_orig"):
+            dd.subprocess.run = self._orig
+
+    def test_malformed_json_raises_semerror(self):
+        class FakeProc:
+            returncode = 0
+            stdout = "{not json"
+            stderr = ""
+        self._orig = dd.subprocess.run
+        dd.subprocess.run = lambda *a, **k: FakeProc()
+        with self.assertRaises(dd.SemError):
+            dd.run_sem_graph([])
+
+    def test_valid_json_still_parses(self):
+        class FakeProc:
+            returncode = 0
+            stdout = '{"entities": [], "edges": []}'
+            stderr = ""
+        self._orig = dd.subprocess.run
+        dd.subprocess.run = lambda *a, **k: FakeProc()
+        self.assertEqual(dd.run_sem_graph([]), {"entities": [], "edges": []})
+
+
+class TestReportFilename(unittest.TestCase):
+    def test_report_filename_is_timestamped(self):
+        import io, json, re, tempfile, os as _os
+        with tempfile.TemporaryDirectory() as d:
+            db = _os.path.join(d, "dedupe.db")
+            # initialize the db so the report subcommand can connect/query
+            conn = dd._connect(db)
+            conn.close()
+            buf = io.StringIO()
+            _orig = sys.stdout
+            sys.stdout = buf
+            try:
+                rc = dd.main(["report", "--db", db])
+            finally:
+                sys.stdout = _orig
+            self.assertEqual(rc, 0)
+            path = json.loads(buf.getvalue())["report"]
+            self.assertRegex(_os.path.basename(path), r"^dedupe-\d{8}T\d{6}\.md$")
+            self.assertTrue(_os.path.exists(path))
+
+
 if __name__ == "__main__":
     unittest.main()
