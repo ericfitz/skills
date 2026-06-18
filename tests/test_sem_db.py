@@ -87,5 +87,33 @@ class TestIndexFiles(unittest.TestCase):
             conn.close()
 
 
+class TestAutoAndStatus(unittest.TestCase):
+    def test_auto_update_falls_back_to_build_when_no_head(self):
+        with tempfile.TemporaryDirectory() as d:
+            conn = db.connect(os.path.join(d, ".local", "sem.db"))
+            conn.close()
+            called = {"build": 0}
+            orig = db.build
+            db.build = lambda cwd=None, paths=None: called.__setitem__("build", 1) or {"files": 0, "entities": 0, "mode": "full"}
+            try:
+                res = db.auto_update(cwd=d)
+                self.assertEqual(called["build"], 1)
+            finally:
+                db.build = orig
+
+    def test_status_verdict(self):
+        with tempfile.TemporaryDirectory() as d:
+            conn = db.connect(os.path.join(d, ".local", "sem.db"))
+            db.set_meta(conn, "head_sha", "aaaa")
+            db.set_meta(conn, "head_commit_count", "5")
+            conn.close()
+            db.git_head = lambda cwd=None: ("aaaa", "5")
+            self.assertEqual(db.status(cwd=d)["verdict"], "up-to-date")
+            db.git_head = lambda cwd=None: ("bbbb", "6")
+            self.assertEqual(db.status(cwd=d)["verdict"], "stale")
+            db.git_head = lambda cwd=None: ("", "")
+            self.assertEqual(db.status(cwd=d)["verdict"], "unknown")
+
+
 if __name__ == "__main__":
     unittest.main()
