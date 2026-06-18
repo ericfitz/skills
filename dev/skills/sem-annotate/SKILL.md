@@ -25,6 +25,29 @@ Bundled agent: `${CLAUDE_PLUGIN_ROOT}/agents/sem-describe.md`.
 If the target repository is not the current directory, pass it through to the tool via
 `-C <repo-dir>` (the tool forwards it to the `sem` CLI).
 
+## Scope file
+
+When no path argument is given, `scan` consults `.local/sem-scope.json` in the repo root for
+default include/exclude globs. Explicit path arguments fully override this file (it is not
+consulted at all).
+
+**Shape:**
+```json
+{
+  "include": ["src/", "pkg/"],
+  "exclude": ["**/*.spec.ts", "scripts/"]
+}
+```
+
+Both keys are optional lists of glob patterns. An absent or empty `include` defaults to
+scanning the whole repo (`"."`). `exclude` patterns drop matching files from the scan.
+
+**Glob syntax:** `**` crosses path separators; `*` and `?` do not; a trailing `/` is a
+directory-prefix match (e.g. `scripts/` matches `scripts` itself and any file underneath).
+
+The file lives in `.local/` and is gitignored (machine-local convention). Create it with
+`mkdir -p .local && echo '{"include":["src/"],"exclude":["**/*.spec.ts"]}' > .local/sem-scope.json`.
+
 ## Process
 
 ### 1. Preflight

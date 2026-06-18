@@ -20,6 +20,30 @@ Bundled agents: `${CLAUDE_PLUGIN_ROOT}/agents/dedupe-verify-dead.md`, `dedupe-ve
 /dedupe server/ --exts .go    # scope to a dir and language
 ```
 
+## Scope file
+
+When no path argument is given, `load` consults `.local/sem-scope.json` in the repo root for
+default include/exclude globs. Explicit path arguments fully override this file (it is not
+consulted at all).
+
+**Shape:**
+```json
+{
+  "include": ["src/", "pkg/"],
+  "exclude": ["**/*.spec.ts", "scripts/"]
+}
+```
+
+Both keys are optional lists of glob patterns. An absent or empty `include` means whole-repo
+(dedupe passes no prefix filter to `sem graph`). `exclude` glob patterns drop matching files
+from the entity graph before dead-code and duplication analysis.
+
+**Glob syntax:** `**` crosses path separators; `*` and `?` do not; a trailing `/` is a
+directory-prefix match (e.g. `scripts/` matches `scripts` itself and any file underneath).
+
+The file lives in `.local/` and is gitignored (machine-local convention). Create it with
+`mkdir -p .local && echo '{"include":["src/"],"exclude":["**/*.spec.ts"]}' > .local/sem-scope.json`.
+
 ## Scope of detection (important)
 - **Dead code** (Go, Python, TypeScript): candidates are non-entrypoint, non-test
   functions/methods with no callers in sem's graph, then filtered by a deterministic
