@@ -267,5 +267,36 @@ class TestScanScope(unittest.TestCase):
         self.assertEqual(called["n"], 0)     # explicit args => scope file never consulted
 
 
+class TestDbSubcommand(unittest.TestCase):
+    def test_db_status_dispatches(self):
+        import sem_db
+        orig = sem_db.status
+        sem_db.status = lambda cwd=None: {"verdict": "up-to-date", "stored_sha": "x",
+                                          "stored_count": "1", "current_sha": "x",
+                                          "current_count": "1"}
+        out = io.StringIO()
+        _stdout = sys.stdout
+        sys.stdout = out
+        try:
+            rc = sa.main(["db", "status", "-C", "/tmp"])
+        finally:
+            sys.stdout = _stdout
+            sem_db.status = orig
+        self.assertEqual(rc, 0)
+        self.assertIn("up-to-date", out.getvalue())
+
+    def test_db_update_no_files_is_auto(self):
+        import sem_db
+        called = {"auto": 0}
+        orig = sem_db.auto_update
+        sem_db.auto_update = lambda cwd=None: called.__setitem__("auto", 1) or {"mode": "auto", "files": 0, "entities": 0}
+        try:
+            rc = sa.main(["db", "update", "-C", "/tmp"])
+        finally:
+            sem_db.auto_update = orig
+        self.assertEqual(rc, 0)
+        self.assertEqual(called["auto"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

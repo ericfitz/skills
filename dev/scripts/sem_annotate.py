@@ -234,6 +234,10 @@ def parse_args(argv):
     s.add_argument("-C", "--cwd", default=None)
     w = sub.add_parser("write")
     w.add_argument("-C", "--cwd", default=None)
+    dbp = sub.add_parser("db")
+    dbp.add_argument("db_action", choices=["build", "update", "status"])
+    dbp.add_argument("paths", nargs="*", default=None)
+    dbp.add_argument("-C", "--cwd", default=None)
     ns = p.parse_args(argv)
     if ns.update:
         ns.cmd = "scan"
@@ -253,7 +257,20 @@ def main(argv=None):
         n = write(updates, cwd=ns.cwd)
         print(json.dumps({"files_written": n}))
         return 0
-    print("usage: sem_annotate [scan|write|--update FILES]", file=sys.stderr)
+    if ns.cmd == "db":
+        import sem_db
+        action = ns.db_action
+        paths = ns.paths or None
+        if action == "build":
+            res = sem_db.build(cwd=ns.cwd, paths=paths)
+        elif action == "update":
+            res = sem_db.update(cwd=ns.cwd, files=paths) if paths \
+                else sem_db.auto_update(cwd=ns.cwd)
+        else:  # status
+            res = sem_db.status(cwd=ns.cwd)
+        print(json.dumps(res))
+        return 0
+    print("usage: sem_annotate [scan|write|db|--update FILES]", file=sys.stderr)
     return 2
 
 
