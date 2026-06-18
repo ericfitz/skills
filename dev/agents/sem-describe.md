@@ -30,6 +30,10 @@ The items may include `anchor_sha` and `status` fields for context — ignore th
 2. Write a description following the content standard below.
 3. Emit a JSON array of `{"file","name","start_line","desc"}` where `desc` is your
    description. Do NOT emit a `sha` field — the SHA is stamped by the tool, never by you.
+   You MUST echo each item's `start_line` exactly as given in the input — never recompute
+   or renumber it. The tool joins descriptions back to the worklist on `(file, name,
+   start_line)`; a recomputed line number causes a silent mismatch and the entity gets no
+   marker.
 
 ## Description content standard (follow in priority order)
 

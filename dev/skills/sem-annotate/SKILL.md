@@ -96,6 +96,15 @@ The `write` command stamps the authoritative SHA from the worklist (the `anchor_
 from each scan entry). The LLM never supplies a SHA. If an entity's `anchor_sha` is blank,
 `write` falls back to the current HEAD sha.
 
+**After running `write`, check the returned JSON and warn loudly if:**
+- `skipped > 0` — descriptions whose `(file, name, start_line)` triple did not match the
+  worklist were silently dropped; those entities got NO marker. This usually means the
+  subagent recomputed or renumbered `start_line` instead of echoing it exactly.
+- `markers` is less than the number of items in the worklist — some entities were not
+  written (either skipped due to mismatch, or their file type is unsupported).
+
+In either case, surface the count to the user before proceeding to Step 4b.
+
 ### 4b. Refresh the `.local/sem.db` index
 
 After writing markers, update the SQLite annotation index so it reflects the new state:
