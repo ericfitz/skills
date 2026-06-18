@@ -1,5 +1,6 @@
 """dedupe: find dead code and duplication via the sem CLI entity graph."""
 import argparse
+import datetime
 import json
 import os
 import re
@@ -429,8 +430,8 @@ def main(argv=None):
         conn = _connect(ns.db)
         os.makedirs(os.path.join(os.path.dirname(ns.db) or ".", "reports"),
                     exist_ok=True)
-        path = os.path.join(os.path.dirname(ns.db) or ".", "reports",
-                            "dedupe-report.md")
+        fname = f"dedupe-{datetime.datetime.now():%Y%m%dT%H%M%S}.md"
+        path = os.path.join(os.path.dirname(ns.db) or ".", "reports", fname)
         with open(path, "w", encoding="utf-8") as f:
             f.write(render_report(conn))
         print(json.dumps({"report": path}))

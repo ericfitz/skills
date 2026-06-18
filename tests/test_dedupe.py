@@ -93,8 +93,12 @@ class TestFilterGraph(unittest.TestCase):
 
     def test_load_graph_inserts(self):
         conn = mem_db()
-        dd.run_sem_graph = lambda exts, cwd=None: self.GRAPH
-        stats = dd.load_graph(conn, ["api/"])
+        _orig_rsg = dd.run_sem_graph
+        try:
+            dd.run_sem_graph = lambda exts, cwd=None: self.GRAPH
+            stats = dd.load_graph(conn, ["api/"])
+        finally:
+            dd.run_sem_graph = _orig_rsg
         self.assertEqual(stats["entities"], 2)
         self.assertEqual(stats["edges"], 1)
         n = conn.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
@@ -305,7 +309,7 @@ class TestReportFilename(unittest.TestCase):
             _orig = sys.stdout
             sys.stdout = buf
             try:
-                rc = dd.main(["report", "--db", db])
+                rc = dd.main(["--db", db, "report"])
             finally:
                 sys.stdout = _orig
             self.assertEqual(rc, 0)
