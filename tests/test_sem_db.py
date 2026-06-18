@@ -87,6 +87,58 @@ class TestIndexFiles(unittest.TestCase):
             conn.close()
 
 
+class TestBuildDropsOrphans(unittest.TestCase):
+    """FIX 2: full build (paths=None) must wipe orphan rows for removed/renamed files."""
+
+    def setUp(self):
+        self._orig_sa = (sa._read_text, sa.sem_entities, sa.sem_blame)
+        self._orig_scope_files = db._scope_files
+        self._orig_git_head = db.git_head
+        # Default entity for src/a.ts
+        sa._read_text = lambda p, *a, **k: "// SEM@aaaaaaa: thing\nfunction A() {}\n"
+        sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "aaaaaaa999"}]
+        db.git_head = lambda cwd=None: ("deadbeef", "1")
+
+    def tearDown(self):
+        sa._read_text, sa.sem_entities, sa.sem_blame = self._orig_sa
+        db._scope_files = self._orig_scope_files
+        db.git_head = self._orig_git_head
+
+    def test_full_build_drops_rows_for_files_no_longer_in_scope(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "src"))
+            with open(os.path.join(d, "src", "a.ts"), "w") as f:
+                f.write("// SEM@aaaaaaa: thing\nfunction A() {}\n")
+
+            # First build: src/a.ts is in scope, entity A is discovered
+            sa.sem_entities = lambda paths, cwd=None: [
+                {"name": "A", "type": "function", "file": "src/a.ts",
+                 "start_line": 2, "end_line": 2}
+            ]
+            db._scope_files = lambda cwd, paths: ["src/a.ts"]
+            db.build(cwd=d)
+
+            # Verify row is present after first build
+            conn = db.connect(db.db_path(d))
+            cnt = conn.execute(
+                "SELECT COUNT(*) FROM entities WHERE file='src/a.ts'").fetchone()[0]
+            conn.close()
+            self.assertEqual(cnt, 1, "row should exist after first build")
+
+            # Second build: src/a.ts is no longer in scope (e.g., deleted/renamed)
+            sa.sem_entities = lambda paths, cwd=None: []
+            db._scope_files = lambda cwd, paths: []
+            db.build(cwd=d)
+
+            # The orphan row must be gone after a full rebuild
+            conn = db.connect(db.db_path(d))
+            cnt = conn.execute(
+                "SELECT COUNT(*) FROM entities WHERE file='src/a.ts'").fetchone()[0]
+            conn.close()
+            self.assertEqual(cnt, 0,
+                "full build must delete orphan rows for files no longer in scope")
+
+
 class TestAutoAndStatus(unittest.TestCase):
     def test_auto_update_falls_back_to_build_when_no_head(self):
         with tempfile.TemporaryDirectory() as d:

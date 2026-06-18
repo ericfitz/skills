@@ -163,6 +163,9 @@ def build(cwd=None, paths=None):
     conn = connect(path)
     try:
         files = _scope_files(cwd, paths)
+        if paths is None:
+            conn.execute("DELETE FROM entities")
+            conn.commit()
         n = index_files(conn, files, cwd=cwd)
         stamp_head(conn, cwd=cwd)
         return {"files": len(files), "entities": n}
