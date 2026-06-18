@@ -7,6 +7,11 @@ import subprocess
 
 CODE_TYPES = {"function", "method", "type", "constant"}
 
+CODE_FILE_EXTS = (".go", ".py", ".ts", ".tsx", ".js", ".jsx")
+_SKIP_DIRS = {"vendor", "node_modules", ".git", ".dedupe", "dist", "build",
+              "__pycache__", ".venv", "venv", "testdata"}
+_TOKEN_RE = re.compile(r"[A-Za-z_]\w*")
+
 _ENTRYPOINT_PREFIXES = ("Test", "Benchmark", "Example", "Fuzz")
 
 _SCHEMA = """
@@ -133,6 +138,75 @@ def load_graph(conn, scope_paths, exts=None, cwd=None):
         edges)
     conn.commit()
     return {"entities": len(ents), "edges": len(edges)}
+
+
+def find_dead_candidates(conn):
+    conn.execute("DELETE FROM dead_candidates")
+    conn.execute("""
+        INSERT INTO dead_candidates (entity_id, reason)
+        SELECT e.id, 'no incoming edges (non-entrypoint, production)'
+        FROM entities e
+        WHERE e.entity_type IN ('function','method')
+          AND e.is_entrypoint = 0 AND e.is_test = 0
+          AND e.id NOT IN (SELECT to_id FROM edges)
+    """)
+    conn.commit()
+    return conn.execute("SELECT COUNT(*) FROM dead_candidates").fetchone()[0]
+
+
+def _iter_code_files(root, exts):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for fn in filenames:
+            if fn.endswith(tuple(exts)):
+                yield os.path.join(dirpath, fn)
+
+
+def refute_dead_by_usage(conn, cwd=None, exts=CODE_FILE_EXTS):
+    rows = conn.execute(
+        """SELECT d.entity_id, e.name FROM dead_candidates d
+           JOIN entities e ON e.id = d.entity_id""").fetchall()
+    if not rows:
+        return 0
+    names = {}                       # name -> [entity_id, ...]
+    for eid, name in rows:
+        names.setdefault(name, []).append(eid)
+    # definition spans to exclude, per relative file path: name -> list of (start,end)
+    defspans = {}
+    qmarks = ",".join("?" * len(names))
+    for name, fp, sl, el in conn.execute(
+        f"SELECT name,file_path,start_line,end_line FROM entities WHERE name IN ({qmarks})",
+            tuple(names)):
+        defspans.setdefault(fp, {}).setdefault(name, []).append((sl or 0, el or 0))
+    root = cwd or "."
+    used = set()
+    pending = set(names)
+    for path in _iter_code_files(root, exts):
+        if not pending:
+            break
+        rel = os.path.relpath(path, root)
+        file_spans = defspans.get(rel, {})
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                for lineno, line in enumerate(f, 1):
+                    for m in _TOKEN_RE.finditer(line):
+                        tok = m.group(0)
+                        if tok not in pending:
+                            continue
+                        spans = file_spans.get(tok, ())
+                        if any(s <= lineno <= e for (s, e) in spans):
+                            continue  # this is (part of) a definition of tok
+                        used.add(tok)
+                        pending.discard(tok)
+        except OSError:
+            continue
+    removed = 0
+    for name in used:
+        for eid in names[name]:
+            conn.execute("DELETE FROM dead_candidates WHERE entity_id=?", (eid,))
+            removed += 1
+    conn.commit()
+    return removed
 
 
 _SEM_MARKER_RE = re.compile(

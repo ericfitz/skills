@@ -1,5 +1,7 @@
+import os
 import sqlite3
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -129,6 +131,57 @@ class TestIngestDescriptions(unittest.TestCase):
         conn.commit()
         dd._read_lines = lambda path: ["package api", "func handle() {}"]
         self.assertEqual(dd.ingest_descriptions(conn), 0)
+
+
+class TestDeadCandidates(unittest.TestCase):
+    def _ent(self, conn, eid, name, etype, exp, ep, test, sl=1, el=2):
+        conn.execute("""INSERT INTO entities
+            (id,name,entity_type,file_path,start_line,end_line,
+             is_exported,is_entrypoint,is_test)
+            VALUES (?,?,?,?,?,?,?,?,?)""",
+            (eid, name, etype, eid.split("::")[0], sl, el, exp, ep, test))
+
+    def test_flags_unreferenced_prod_funcs_regardless_of_export(self):
+        conn = mem_db()
+        self._ent(conn, "a.go::function::dead", "dead", "function", 0, 0, 0)
+        self._ent(conn, "a.go::function::Exported", "Exported", "function", 1, 0, 0)  # exported IS a candidate now
+        self._ent(conn, "a.go::function::live", "live", "function", 0, 0, 0)   # has incoming
+        self._ent(conn, "a.go::function::main", "main", "function", 0, 1, 0)   # entrypoint
+        self._ent(conn, "a_test.go::function::helper", "helper", "function", 0, 0, 1)  # test
+        self._ent(conn, "a.go::type::Thing", "Thing", "type", 0, 0, 0)         # not func/method
+        conn.execute("INSERT INTO edges VALUES ('a.go::function::dead','a.go::function::live','calls')")
+        conn.commit()
+        dd.find_dead_candidates(conn)
+        ids = {r[0] for r in conn.execute("SELECT entity_id FROM dead_candidates")}
+        self.assertEqual(ids, {"a.go::function::dead", "a.go::function::Exported"})
+
+    def test_idempotent(self):
+        conn = mem_db()
+        self._ent(conn, "a.go::function::dead", "dead", "function", 0, 0, 0)
+        conn.commit()
+        dd.find_dead_candidates(conn)
+        dd.find_dead_candidates(conn)
+        self.assertEqual(
+            conn.execute("SELECT COUNT(*) FROM dead_candidates").fetchone()[0], 1)
+
+    def test_usage_refutation_removes_referenced_names(self):
+        with tempfile.TemporaryDirectory() as d:
+            # candidate `readPump` is defined at lines 1-2 of hub.go and launched via `go c.readPump()` in run.go
+            with open(os.path.join(d, "hub.go"), "w") as f:
+                f.write("func (c *Client) readPump() {}\n// def end\n")
+            with open(os.path.join(d, "run.go"), "w") as f:
+                f.write("func start(c *Client) {\n    go c.readPump()\n}\n")
+            with open(os.path.join(d, "lonely.go"), "w") as f:
+                f.write("func (c *Client) orphan() {}\n")
+            conn = mem_db()
+            self._ent(conn, "hub.go::method::readPump", "readPump", "method", 0, 0, 0, sl=1, el=2)
+            self._ent(conn, "lonely.go::method::orphan", "orphan", "method", 0, 0, 0, sl=1, el=1)
+            conn.commit()
+            dd.find_dead_candidates(conn)  # both are candidates (zero edges)
+            removed = dd.refute_dead_by_usage(conn, cwd=d)
+            self.assertEqual(removed, 1)  # readPump refuted by the `go c.readPump()` use
+            ids = {r[0] for r in conn.execute("SELECT entity_id FROM dead_candidates")}
+            self.assertEqual(ids, {"lonely.go::method::orphan"})  # orphan survives
 
 
 if __name__ == "__main__":
