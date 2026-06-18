@@ -49,5 +49,55 @@ class TestClassifiers(unittest.TestCase):
         self.assertFalse(dd.is_test("api/handler.go"))
 
 
+class TestFilterGraph(unittest.TestCase):
+    GRAPH = {
+        "entities": [
+            {"id": "api/h.go::function::handle", "name": "handle",
+             "entityType": "function", "filePath": "api/h.go",
+             "startLine": 10, "endLine": 20},
+            {"id": "api/h.go::function::Public", "name": "Public",
+             "entityType": "function", "filePath": "api/h.go",
+             "startLine": 22, "endLine": 30},
+            {"id": "tools/gen.go::function::helper", "name": "helper",
+             "entityType": "function", "filePath": "tools/gen.go",
+             "startLine": 1, "endLine": 5},
+            {"id": "README.md::heading::Intro", "name": "Intro",
+             "entityType": "heading", "filePath": "README.md",
+             "startLine": 1, "endLine": 1},
+        ],
+        "edges": [
+            {"fromEntity": "api/h.go::function::handle",
+             "toEntity": "api/h.go::function::Public", "refType": "calls"},
+            {"fromEntity": "api/h.go::function::handle",
+             "toEntity": "tools/gen.go::function::helper", "refType": "calls"},
+        ],
+        "stats": {},
+    }
+
+    def test_scope_and_type_filtering(self):
+        ents, edges = dd._filter_graph(self.GRAPH, ["api/"], None)
+        ids = {e["id"] for e in ents}
+        self.assertEqual(ids, {"api/h.go::function::handle",
+                               "api/h.go::function::Public"})  # tools/ + README dropped
+        # the edge to tools/ is dropped (endpoint out of scope); the in-scope edge kept
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["to_id"], "api/h.go::function::Public")
+
+    def test_classifier_columns(self):
+        ents, _ = dd._filter_graph(self.GRAPH, ["api/"], None)
+        by_name = {e["name"]: e for e in ents}
+        self.assertEqual(by_name["handle"]["is_exported"], 0)
+        self.assertEqual(by_name["Public"]["is_exported"], 1)
+
+    def test_load_graph_inserts(self):
+        conn = mem_db()
+        dd.run_sem_graph = lambda exts, cwd=None: self.GRAPH
+        stats = dd.load_graph(conn, ["api/"])
+        self.assertEqual(stats["entities"], 2)
+        self.assertEqual(stats["edges"], 1)
+        n = conn.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
+        self.assertEqual(n, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

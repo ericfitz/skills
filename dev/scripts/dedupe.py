@@ -1,6 +1,8 @@
 """dedupe: find dead code and duplication via the sem CLI entity graph."""
+import json
 import os
 import sqlite3
+import subprocess
 
 CODE_TYPES = {"function", "method", "type", "constant"}
 
@@ -61,3 +63,72 @@ def is_test(file_path):
     if p.startswith(("test/", "tests/")):
         return True
     return base.startswith("test_")
+
+
+class SemError(RuntimeError):
+    pass
+
+
+def run_sem_graph(exts, cwd=None):
+    cmd = ["sem", "graph", "--json"]
+    if exts:
+        cmd += ["--file-exts", *exts]
+    try:
+        r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
+    except FileNotFoundError:
+        raise SemError("'sem' CLI not found on PATH")
+    except subprocess.CalledProcessError as e:
+        raise SemError(f"sem graph failed: {e.stderr.strip()}")
+    return json.loads(r.stdout)
+
+
+def _in_scope(path, scope_paths, exts):
+    if scope_paths and not any(path.startswith(s) for s in scope_paths):
+        return False
+    if exts and not any(path.endswith(x) for x in exts):
+        return False
+    return True
+
+
+def _filter_graph(graph, scope_paths, exts):
+    entity_rows = []
+    kept = set()
+    for e in graph.get("entities", []):
+        if e.get("entityType") not in CODE_TYPES:
+            continue
+        fp = e.get("filePath", "")
+        if not _in_scope(fp, scope_paths, exts):
+            continue
+        name = e.get("name", "")
+        kept.add(e["id"])
+        entity_rows.append({
+            "id": e["id"], "name": name, "entity_type": e["entityType"],
+            "file_path": fp, "start_line": e.get("startLine"),
+            "end_line": e.get("endLine"),
+            "is_exported": 0 if is_unexported(name, fp) else 1,
+            "is_entrypoint": 1 if is_entrypoint(name) else 0,
+            "is_test": 1 if is_test(fp) else 0,
+        })
+    edge_rows = []
+    for ed in graph.get("edges", []):
+        if ed.get("fromEntity") in kept and ed.get("toEntity") in kept:
+            edge_rows.append({"from_id": ed["fromEntity"],
+                              "to_id": ed["toEntity"],
+                              "ref_type": ed.get("refType")})
+    return entity_rows, edge_rows
+
+
+def load_graph(conn, scope_paths, exts=None, cwd=None):
+    graph = run_sem_graph(exts, cwd=cwd)
+    ents, edges = _filter_graph(graph, scope_paths, exts)
+    conn.executemany(
+        """INSERT OR REPLACE INTO entities
+        (id,name,entity_type,file_path,start_line,end_line,
+         is_exported,is_entrypoint,is_test)
+        VALUES (:id,:name,:entity_type,:file_path,:start_line,:end_line,
+                :is_exported,:is_entrypoint,:is_test)""", ents)
+    conn.executemany(
+        "INSERT INTO edges (from_id,to_id,ref_type) VALUES (:from_id,:to_id,:ref_type)",
+        edges)
+    conn.commit()
+    return {"entities": len(ents), "edges": len(edges)}
