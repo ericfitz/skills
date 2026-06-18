@@ -116,6 +116,38 @@ class TestClassifyRobust(unittest.TestCase):
         self.assertFalse(sa._is_uncommitted("b14a829"))
 
 
+class TestInvalidRevError(unittest.TestCase):
+    def _patch(self, stderr):
+        import subprocess as sp
+        def fake_run(cmd, cwd=None, capture_output=True, text=True, check=True):
+            raise sp.CalledProcessError(1, cmd, stderr=stderr)
+        self._orig = sa.subprocess.run
+        sa.subprocess.run = fake_run
+
+    def tearDown(self):
+        if hasattr(self, "_orig"):
+            sa.subprocess.run = self._orig
+
+    def test_revspec_not_found_raises_invalidrev(self):
+        self._patch("Error: git error: revspec 'abc123' not found; class=Reference (4); code=NotFound (-3)")
+        with self.assertRaises(sa.InvalidRevError):
+            sa.run_sem(["diff", "abc123..HEAD", "--no-cosmetics", "--", "x.ts"])
+
+    def test_invalidrev_is_semerror(self):
+        self.assertTrue(issubclass(sa.InvalidRevError, sa.SemError))
+
+    def test_other_failure_is_plain_semerror(self):
+        self._patch("some unrelated failure")
+        with self.assertRaises(sa.SemError):
+            sa.run_sem(["entities", "."])
+        # and NOT InvalidRevError
+        with self.assertRaises(sa.SemError):
+            try:
+                sa.run_sem(["entities", "."])
+            except sa.InvalidRevError:
+                self.fail("should be plain SemError, not InvalidRevError")
+
+
 class TestScan(unittest.TestCase):
     def setUp(self):
         self.files = {}  # path -> source text

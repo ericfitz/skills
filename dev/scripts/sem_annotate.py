@@ -104,6 +104,15 @@ class SemError(RuntimeError):
     pass
 
 
+class InvalidRevError(SemError):
+    """A sem command failed because a commit/revspec does not exist."""
+
+
+def _is_revspec_not_found(stderr):
+    s = (stderr or "").lower()
+    return "not found" in s and ("revspec" in s or "reference" in s)
+
+
 def _read_text(path):
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
@@ -118,7 +127,10 @@ def run_sem(args, cwd=None):
     except FileNotFoundError:
         raise SemError("'sem' CLI not found on PATH")
     except subprocess.CalledProcessError as e:
-        raise SemError(f"sem {' '.join(args)} failed: {e.stderr.strip()}")
+        msg = f"sem {' '.join(args)} failed: {e.stderr.strip()}"
+        if _is_revspec_not_found(e.stderr):
+            raise InvalidRevError(msg)
+        raise SemError(msg)
     return r.stdout
 
 
