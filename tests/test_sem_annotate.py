@@ -92,5 +92,44 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(sa.classify("deadbee", self.FULL, False), "fresh")
 
 
+class TestScan(unittest.TestCase):
+    def setUp(self):
+        self.files = {}  # path -> source text
+
+        def fake_read(path):
+            return self.files[path]
+
+        self._orig_read = sa._read_text
+        sa._read_text = fake_read
+
+    def tearDown(self):
+        sa._read_text = self._orig_read
+
+    def test_scan_flags_missing_and_stale_only(self):
+        path = "auth/x.go"
+        self.files[path] = (
+            "package auth\n"
+            "// SEM@aaaaaaa: validate a token\n"   # fresh: sha matches blame below
+            "func Fresh() {}\n"
+            "func Missing() {}\n"                   # no marker -> missing
+        )
+        entities = [
+            {"name": "Fresh", "type": "function", "start_line": 3, "end_line": 3},
+            {"name": "Missing", "type": "function", "start_line": 4, "end_line": 4},
+        ]
+        blame = [
+            {"name": "Fresh", "lines": [3, 3], "commit": "aaaaaaa000111222333"},
+            {"name": "Missing", "lines": [4, 4], "commit": "bbbbbbb000111222333"},
+        ]
+        sa.sem_entities = lambda paths, cwd=None: entities
+        sa.sem_blame = lambda f, cwd=None: blame
+        sa.logic_changed_entities = lambda base, f, cwd=None: set()
+
+        work = sa.scan([path])
+        names = {w["name"]: w["status"] for w in work}
+        self.assertEqual(names, {"Missing": "missing"})
+        self.assertEqual(work[0]["blame_sha"], "bbbbbbb000111222333")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,8 @@
 """sem-annotate: generate and refresh SEM@<sha> intent markers on code entities."""
-import re
+import json
 import os
+import re
+import subprocess
 
 COMMENT_BY_EXT = {
     ".go": "//", ".ts": "//", ".tsx": "//", ".js": "//", ".jsx": "//",
@@ -73,3 +75,87 @@ def classify(existing_sha, blame_commit, logic_changed):
     if blame_commit.startswith(existing_sha):
         return "fresh"
     return "stale" if logic_changed else "fresh"
+
+
+# ---------------------------------------------------------------------------
+# sem CLI wrappers
+# ---------------------------------------------------------------------------
+
+CODE_TYPES = {"function", "method", "class", "type"}
+
+
+class SemError(RuntimeError):
+    pass
+
+
+def _read_text(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def run_sem(args, cwd=None):
+    cmd = ["sem"] + args + ["--json"]
+    try:
+        r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
+    except FileNotFoundError:
+        raise SemError("'sem' CLI not found on PATH")
+    except subprocess.CalledProcessError as e:
+        raise SemError(f"sem {' '.join(args)} failed: {e.stderr.strip()}")
+    return r.stdout
+
+
+def sem_entities(paths, cwd=None):
+    out = run_sem(["entities", *paths], cwd=cwd)
+    return json.loads(out)
+
+
+def sem_blame(file, cwd=None):
+    return json.loads(run_sem(["blame", file], cwd=cwd))
+
+
+def logic_changed_entities(base_sha, file, cwd=None):
+    """Names of entities in `file` with a non-cosmetic change since base_sha."""
+    out = run_sem(["diff", f"{base_sha}..HEAD", "--no-cosmetics", "--", file], cwd=cwd)
+    data = json.loads(out)
+    names = set()
+    for ch in data.get("changes", []):
+        n = ch.get("name") or ch.get("entity")
+        if n:
+            names.add(n)
+    return names
+
+
+def scan(paths, cwd=None, rebuild=False):
+    """Return worklist items for entities classified missing/stale (or all when rebuild=True)."""
+    entities = [e for e in sem_entities(paths, cwd=cwd) if e.get("type") in CODE_TYPES]
+    by_file = {}
+    for e in entities:
+        f = e.get("file") or (paths[0] if len(paths) == 1 else None)
+        if f:
+            by_file.setdefault(f, []).append(e)
+
+    work = []
+    for f, ents in by_file.items():
+        read_path = f if cwd is None else os.path.join(cwd, f)
+        text = _read_text(read_path)
+        lines = text.splitlines()
+        blame = {b["name"]: b for b in sem_blame(f, cwd=cwd)}
+        for e in ents:
+            marker = find_marker_above(lines, e["start_line"])
+            existing_sha = marker["sha"] if marker else None
+            blame_sha = blame.get(e["name"], {}).get("commit", "")
+            if rebuild:
+                status = "missing"
+            else:
+                logic = False
+                if existing_sha and blame_sha and not blame_sha.startswith(existing_sha):
+                    logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
+                status = classify(existing_sha, blame_sha, logic)
+            if status in ("missing", "stale"):
+                work.append({
+                    "file": f, "name": e["name"],
+                    "start_line": e["start_line"], "end_line": e["end_line"],
+                    "status": status, "blame_sha": blame_sha,
+                    "existing_desc": marker["desc"] if marker else None,
+                })
+    return work
