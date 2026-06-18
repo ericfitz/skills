@@ -264,6 +264,38 @@ class TestScanInvalidSha(unittest.TestCase):
         self.assertEqual(work[0]["name"], "A")
 
 
+class TestScanInvalidShaPlainSemError(unittest.TestCase):
+    """#12 regression: logic_changed_entities raises plain SemError (not InvalidRevError)
+    for a bad marker SHA — scan must treat it as invalid-sha, not re-raise."""
+
+    def setUp(self):
+        self.files = {"src/a.ts": "// SEM@deadbee: old\nfunction A() {}\n"}
+        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
+                      sa.entity_logic_sha, sa.logic_changed_entities)
+        sa._read_text = lambda p: self.files[p]
+        sa.sem_entities = lambda paths, cwd=None: [
+            {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 2, "end_line": 2}]
+        sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "ffff999"}]
+        sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "ffff999"
+        def boom(base, f, cwd=None):
+            raise sa.SemError(
+                "sem diff failed: the git_object of id 'deadbee...' "
+                "can not be successfully peeled into a commit"
+            )
+        sa.logic_changed_entities = boom
+
+    def tearDown(self):
+        (sa._read_text, sa.sem_entities, sa.sem_blame,
+         sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
+
+    def test_plain_semerror_on_bad_sha_reported_not_crashed(self):
+        work = sa.scan(["src/a.ts"])
+        self.assertEqual(len(work), 1)
+        self.assertEqual(work[0]["status"], "invalid-sha")
+        self.assertEqual(work[0]["bad_sha"], "deadbee")
+        self.assertEqual(work[0]["name"], "A")
+
+
 class TestScanFreshAfterWrite(unittest.TestCase):
     """#13 regression: marker anchored to the entity's last logic change is fresh."""
     def setUp(self):

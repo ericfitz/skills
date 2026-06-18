@@ -248,7 +248,7 @@ def scan(paths, cwd=None, rebuild=False):
                         and not anchor_sha.startswith(existing_sha):
                     try:
                         logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
-                    except InvalidRevError:
+                    except SemError:
                         work.append({
                             "file": f, "name": e["name"],
                             "start_line": e["start_line"], "end_line": e["end_line"],
