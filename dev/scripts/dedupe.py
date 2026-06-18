@@ -1,9 +1,11 @@
 """dedupe: find dead code and duplication via the sem CLI entity graph."""
+import argparse
 import json
 import os
 import re
 import sqlite3
 import subprocess
+import sys
 
 CODE_TYPES = {"function", "method", "type", "constant"}
 
@@ -287,3 +289,142 @@ def find_dup_candidates(conn):
         clusters += 1
     conn.commit()
     return clusters
+
+
+_RANK = {"high": 3, "medium": 2, "low": 1, "": 0, None: 0}
+DEAD_LIMITATION = (
+    "_Method: candidates are functions/methods with no callers in sem's graph, after "
+    "removing any whose name is referenced anywhere in the repo (a deterministic usage "
+    "scan that catches interface dispatch, goroutine launches, and cross-module imports "
+    "sem misses), then cleared by a verifier. Residual exported symbols may still be an "
+    "external/public API — confirm before removing. Detection favors precision over "
+    "recall: some genuinely-dead code may not be listed._")
+
+
+def record_finding(conn, kind, verdict, entity_id=None, cluster_id=None,
+                   impact="", risk="", effort="", recommendation="",
+                   notes="", behavior_diff=""):
+    cur = conn.execute(
+        """INSERT INTO findings
+        (kind,verdict,entity_id,cluster_id,impact,risk,effort,
+         recommendation,notes,behavior_diff)
+        VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (kind, verdict, entity_id, cluster_id, impact, risk, effort,
+         recommendation, notes, behavior_diff))
+    conn.commit()
+    return cur.lastrowid
+
+
+def _ranked(conn, kind, verdicts):
+    rows = [dict(zip(
+        ["finding_id", "entity_id", "cluster_id", "impact", "risk", "effort",
+         "recommendation", "notes", "behavior_diff"], r))
+        for r in conn.execute(
+            """SELECT finding_id,entity_id,cluster_id,impact,risk,effort,
+                      recommendation,notes,behavior_diff
+               FROM findings WHERE kind=? AND verdict IN ({})""".format(
+                ",".join("?" * len(verdicts))), (kind, *verdicts))]
+    rows.sort(key=lambda r: (-_RANK.get(r["impact"], 0), _RANK.get(r["risk"], 0)))
+    return rows
+
+
+def render_report(conn):
+    out = ["# Dedupe Report", ""]
+    out += ["## Dead code", "", DEAD_LIMITATION, ""]
+    dead = _ranked(conn, "dead", ["confirmed"])
+    if not dead:
+        out.append("_No confirmed dead code._")
+    for r in dead:
+        out.append(f"- **{r['entity_id']}** — impact {r['impact'] or 'n/a'}, "
+                   f"risk {r['risk'] or 'n/a'}, effort {r['effort'] or 'n/a'} — "
+                   f"{r['recommendation']}. {r['notes']}".rstrip())
+    out += ["", "## Duplication", ""]
+    dup = _ranked(conn, "dup", ["real-dup"])
+    if not dup:
+        out.append("_No confirmed duplication._")
+    for r in dup:
+        line = (f"- cluster {r['cluster_id']} — impact {r['impact'] or 'n/a'}, "
+                f"risk {r['risk'] or 'n/a'}, effort {r['effort'] or 'n/a'} — "
+                f"{r['recommendation']}.")
+        if r["behavior_diff"]:
+            line += f" Behavior diff: {r['behavior_diff']}."
+        if r["notes"]:
+            line += f" {r['notes']}"
+        out.append(line.rstrip())
+    return "\n".join(out) + "\n"
+
+
+def parse_args(argv):
+    p = argparse.ArgumentParser(prog="dedupe")
+    p.add_argument("--db", default=".dedupe/dedupe.db")
+    sub = p.add_subparsers(dest="cmd")
+    lo = sub.add_parser("load")
+    lo.add_argument("scope", nargs="*", default=[])
+    lo.add_argument("--exts", nargs="+", default=None)
+    lo.add_argument("-C", "--cwd", default=None)
+    ca = sub.add_parser("candidates")
+    ca.add_argument("-C", "--cwd", default=None)
+    re_ = sub.add_parser("report")
+    re_.add_argument("-C", "--cwd", default=None)
+    return p.parse_args(argv)
+
+
+def _connect(db_path):
+    d = os.path.dirname(db_path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    init_db(conn)
+    return conn
+
+
+def main(argv=None):
+    ns = parse_args(argv if argv is not None else sys.argv[1:])
+    if ns.cmd == "load":
+        conn = _connect(ns.db)
+        stats = load_graph(conn, ns.scope, exts=ns.exts, cwd=ns.cwd)
+        descs = ingest_descriptions(conn, cwd=ns.cwd)
+        raw_dead = find_dead_candidates(conn)
+        refuted = refute_dead_by_usage(conn, cwd=ns.cwd)
+        dup = find_dup_candidates(conn)
+        print(json.dumps({**stats, "descriptions": descs,
+                          "dead_candidates_raw": raw_dead,
+                          "dead_refuted_by_usage": refuted,
+                          "dead_candidates": raw_dead - refuted,
+                          "dup_clusters": dup}))
+        return 0
+    if ns.cmd == "candidates":
+        conn = _connect(ns.db)
+        dead = [dict(zip(["entity_id", "name", "file_path", "start_line",
+                          "end_line", "description", "is_exported"], r))
+                for r in conn.execute(
+            """SELECT e.id,e.name,e.file_path,e.start_line,e.end_line,
+                      e.description,e.is_exported
+               FROM dead_candidates d JOIN entities e ON e.id=d.entity_id""")]
+        dups = {}
+        for cid, eid, name, fp, sl, el, desc in conn.execute(
+            """SELECT c.cluster_id,e.id,e.name,e.file_path,e.start_line,
+                      e.end_line,e.description
+               FROM cluster_members c JOIN entities e ON e.id=c.entity_id
+               ORDER BY c.cluster_id"""):
+            dups.setdefault(cid, []).append(
+                {"entity_id": eid, "name": name, "file_path": fp,
+                 "start_line": sl, "end_line": el, "description": desc})
+        print(json.dumps({"dead": dead, "dup_clusters": dups}))
+        return 0
+    if ns.cmd == "report":
+        conn = _connect(ns.db)
+        os.makedirs(os.path.join(os.path.dirname(ns.db) or ".", "reports"),
+                    exist_ok=True)
+        path = os.path.join(os.path.dirname(ns.db) or ".", "reports",
+                            "dedupe-report.md")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(render_report(conn))
+        print(json.dumps({"report": path}))
+        return 0
+    print("usage: dedupe [load|candidates|report]", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

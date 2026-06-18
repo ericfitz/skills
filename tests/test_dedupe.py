@@ -218,5 +218,44 @@ class TestDupCandidates(unittest.TestCase):
         self.assertEqual(dd.find_dup_candidates(conn), 0)
 
 
+class TestFindingsAndReport(unittest.TestCase):
+    def test_record_and_rank(self):
+        conn = mem_db()
+        dd.record_finding(conn, "dead", "confirmed",
+                          entity_id="a.go::function::dead",
+                          impact="low", risk="low",
+                          recommendation="remove")
+        dd.record_finding(conn, "dead", "confirmed",
+                          entity_id="a.go::function::big",
+                          impact="high", risk="low",
+                          recommendation="remove")
+        dd.record_finding(conn, "dead", "false-positive",
+                          entity_id="a.go::function::fp")
+        report = dd.render_report(conn)
+        self.assertIn("Dead code", report)
+        # high-impact ranked above low-impact; false-positive excluded
+        self.assertLess(report.index("a.go::function::big"),
+                        report.index("a.go::function::dead"))
+        self.assertNotIn("a.go::function::fp", report)
+
+    def test_dup_section_and_limitation_note(self):
+        conn = mem_db()
+        dd.record_finding(conn, "dup", "real-dup", cluster_id=1,
+                          impact="medium", risk="medium",
+                          recommendation="consolidate",
+                          behavior_diff="one uses RS256, other HS256")
+        report = dd.render_report(conn)
+        self.assertIn("Duplication", report)
+        self.assertIn("RS256", report)
+        self.assertIn("exported", report.lower())  # the sem-limitation note
+
+    def test_parse_args_load(self):
+        ns = dd.parse_args(["load", "server/", "--exts", ".go", "-C", "/repo"])
+        self.assertEqual(ns.cmd, "load")
+        self.assertEqual(ns.scope, ["server/"])
+        self.assertEqual(ns.exts, [".go"])
+        self.assertEqual(ns.cwd, "/repo")
+
+
 if __name__ == "__main__":
     unittest.main()
