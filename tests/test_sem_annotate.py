@@ -294,22 +294,52 @@ class TestScanFreshAfterWrite(unittest.TestCase):
 
 
 class TestWrite(unittest.TestCase):
-    def test_write_applies_bottom_up(self):
+    def test_write_stamps_worklist_sha_and_desc(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "x.go")
             with open(p, "w") as f:
                 f.write("package p\nfunc A() {}\nfunc B() {}\n")
-            n = sa.write([
-                {"file": p, "start_line": 2, "sha": "aaa1111", "desc": "build A"},
-                {"file": p, "start_line": 3, "sha": "bbb2222", "desc": "build B"},
-            ])
-            self.assertEqual(n, 1)  # one file written
-            with open(p) as fh:
-                out = fh.read().splitlines()
+            worklist = [
+                {"file": p, "name": "A", "start_line": 2, "anchor_sha": "aaa1111"},
+                {"file": p, "name": "B", "start_line": 3, "anchor_sha": "bbb2222"},
+            ]
+            descriptions = [
+                {"file": p, "name": "A", "start_line": 2, "desc": "build A"},
+                {"file": p, "name": "B", "start_line": 3, "desc": "build B"},
+            ]
+            res = sa.write(descriptions, worklist)
+            self.assertEqual(res["files_written"], 1)
+            self.assertEqual(res["markers"], 2)
+            self.assertEqual(res["skipped"], 0)
+            out = open(p).read().splitlines()
             self.assertEqual(out[1], "// SEM@aaa1111: build A")
-            self.assertEqual(out[2], "func A() {}")
             self.assertEqual(out[3], "// SEM@bbb2222: build B")
-            self.assertEqual(out[4], "func B() {}")
+
+    def test_write_skips_unmatched_description(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "x.go")
+            with open(p, "w") as f:
+                f.write("package p\nfunc A() {}\n")
+            res = sa.write(
+                [{"file": p, "name": "A", "start_line": 2, "desc": "x"},
+                 {"file": p, "name": "Ghost", "start_line": 99, "desc": "y"}],
+                [{"file": p, "name": "A", "start_line": 2, "anchor_sha": "aaa1111"}])
+            self.assertEqual(res["skipped"], 1)
+            self.assertEqual(res["markers"], 1)
+
+    def test_write_blank_anchor_falls_back_to_head(self):
+        orig = sa.head_sha
+        sa.head_sha = lambda cwd=None: "headfff"
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                p = os.path.join(d, "x.go")
+                with open(p, "w") as f:
+                    f.write("package p\nfunc A() {}\n")
+                sa.write([{"file": p, "name": "A", "start_line": 2, "desc": "x"}],
+                         [{"file": p, "name": "A", "start_line": 2, "anchor_sha": ""}])
+                self.assertEqual(open(p).read().splitlines()[1], "// SEM@headfff: x")
+        finally:
+            sa.head_sha = orig
 
 
 REAL_DIFF_PAYLOAD = {
@@ -376,10 +406,22 @@ class TestArgs(unittest.TestCase):
         self.assertEqual(ns.paths, ["a.go"])
         self.assertTrue(ns.rebuild)
 
-    def test_write_subcommand_with_cwd(self):
-        ns = sa.parse_args(["write", "-C", "/repo"])
-        self.assertEqual(ns.cmd, "write")
-        self.assertEqual(ns.cwd, "/repo")
+    def test_write_subcommand_with_worklist(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "x.go")
+            with open(p, "w") as f:
+                f.write("package p\nfunc A() {}\n")
+            wl = os.path.join(d, "wl.json")
+            json.dump([{"file": "x.go", "name": "A", "start_line": 2, "anchor_sha": "aaa1111"}], open(wl, "w"))
+            stdin = io.StringIO(json.dumps([{"file": "x.go", "name": "A", "start_line": 2, "desc": "build A"}]))
+            _orig = sys.stdin
+            sys.stdin = stdin
+            try:
+                rc = sa.main(["write", "--worklist", wl, "-C", d])
+            finally:
+                sys.stdin = _orig
+            self.assertEqual(rc, 0)
+            self.assertEqual(open(p).read().splitlines()[1], "// SEM@aaa1111: build A")
 
 
 class TestScanScope(unittest.TestCase):

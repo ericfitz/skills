@@ -271,31 +271,41 @@ def scan(paths, cwd=None, rebuild=False):
 # write
 # ---------------------------------------------------------------------------
 
-def write(updates, cwd=None):
-    """Apply a list of marker updates to files, return count of files written.
+def write(descriptions, worklist, cwd=None):
+    """Apply markers, stamping the authoritative anchor_sha from the worklist.
 
-    updates: list of {"file", "start_line", "sha", "desc"}.
-    Skips files whose comment_prefix is None. Applies markers bottom-up so
-    inserting a marker above one entity doesn't shift line numbers of entities
-    below it.
+    descriptions: list of {"file","name","start_line","desc"} (LLM output, no sha).
+    worklist:     list of {"file","name","start_line","anchor_sha", ...} (scan output).
+    The sha is taken from the worklist (NEVER the LLM); a blank anchor falls back to
+    the current HEAD sha. Returns {"files_written","markers","skipped"}.
     """
+    anchors = {(w["file"], w["name"], w["start_line"]): (w.get("anchor_sha") or "")
+               for w in worklist}
     by_file = {}
-    for u in updates:
-        by_file.setdefault(u["file"], []).append(u)
+    skipped = 0
+    for d in descriptions:
+        key = (d["file"], d["name"], d["start_line"])
+        if key not in anchors:
+            skipped += 1
+            continue
+        sha = anchors[key] or head_sha(cwd)
+        by_file.setdefault(d["file"], []).append(
+            {"start_line": d["start_line"], "sha": sha, "desc": d["desc"]})
     written = 0
+    markers = 0
     for f, ups in by_file.items():
         abspath = f if cwd is None else os.path.join(cwd, f)
         prefix = comment_prefix(f)
         if prefix is None:
             continue
         lines = _read_text(abspath).splitlines()
-        # Apply bottom-up so insertions above don't shift later start_lines.
         for u in sorted(ups, key=lambda x: x["start_line"], reverse=True):
             lines = apply_marker(lines, u["start_line"], prefix, u["sha"], u["desc"])
         with open(abspath, "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
         written += 1
-    return written
+        markers += len(ups)
+    return {"files_written": written, "markers": markers, "skipped": skipped}
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +326,7 @@ def parse_args(argv):
     s.add_argument("--rebuild", action="store_true")
     s.add_argument("-C", "--cwd", default=None)
     w = sub.add_parser("write")
+    w.add_argument("--worklist", required=True)
     w.add_argument("-C", "--cwd", default=None)
     dbp = sub.add_parser("db")
     dbp.add_argument("db_action", choices=["build", "update", "status"])
@@ -336,9 +347,11 @@ def main(argv=None):
         print(json.dumps(scan(ns.paths, cwd=ns.cwd, rebuild=ns.rebuild), indent=2))
         return 0
     if ns.cmd == "write":
-        updates = json.load(sys.stdin)
-        n = write(updates, cwd=ns.cwd)
-        print(json.dumps({"files_written": n}))
+        descriptions = json.load(sys.stdin)
+        with open(ns.worklist, "r", encoding="utf-8") as wf:
+            worklist = json.load(wf)
+        res = write(descriptions, worklist, cwd=ns.cwd)
+        print(json.dumps(res))
         return 0
     if ns.cmd == "db":
         import sem_db
