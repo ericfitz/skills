@@ -7,6 +7,15 @@ import subprocess
 
 CODE_TYPES = {"function", "method", "type", "constant"}
 
+_VERB_SYNONYMS = {
+    "get": "fetch", "retrieve": "fetch", "load": "fetch",
+    "check": "validate", "verify": "validate", "ensure": "validate",
+    "create": "build", "make": "build", "construct": "build",
+    "remove": "delete",
+}
+
+_CAMEL_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z0-9]+|[A-Z]+")
+
 CODE_FILE_EXTS = (".go", ".py", ".ts", ".tsx", ".js", ".jsx")
 _SKIP_DIRS = {"vendor", "node_modules", ".git", ".dedupe", "dist", "build",
               "__pycache__", ".venv", "venv", "testdata"}
@@ -241,3 +250,40 @@ def ingest_descriptions(conn, cwd=None):
                 attached += 1
     conn.commit()
     return attached
+
+
+def normalize_name(name):
+    """Normalize a name by splitting camelCase/snake_case into tokens, lowercasing,
+    applying verb synonyms, and returning sorted tokens joined by spaces."""
+    tokens = [t.lower() for t in _CAMEL_RE.findall(name) if t]
+    tokens = [_VERB_SYNONYMS.get(t, t) for t in tokens]
+    return " ".join(sorted(tokens))
+
+
+def find_dup_candidates(conn):
+    """Cluster functions/methods (non-test) that share a normalized signature
+    across different files. Keep only clusters with ≥2 members spanning ≥2 distinct files.
+    Returns the cluster count. Idempotent."""
+    conn.execute("DELETE FROM cluster_members")
+    conn.execute("DELETE FROM dup_clusters")
+    rows = conn.execute(
+        """SELECT id, name, file_path FROM entities
+           WHERE entity_type IN ('function','method') AND is_test = 0""").fetchall()
+    groups = {}
+    for eid, name, fp in rows:
+        groups.setdefault(normalize_name(name), []).append((eid, fp))
+    clusters = 0
+    for key, members in groups.items():
+        if len(members) < 2:
+            continue
+        if len({fp for _, fp in members}) < 2:
+            continue
+        cur = conn.execute(
+            "INSERT INTO dup_clusters (method, key) VALUES ('name', ?)", (key,))
+        cid = cur.lastrowid
+        conn.executemany(
+            "INSERT INTO cluster_members (cluster_id, entity_id) VALUES (?, ?)",
+            [(cid, eid) for eid, _ in members])
+        clusters += 1
+    conn.commit()
+    return clusters

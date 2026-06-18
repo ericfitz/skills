@@ -184,5 +184,39 @@ class TestDeadCandidates(unittest.TestCase):
             self.assertEqual(ids, {"lonely.go::method::orphan"})  # orphan survives
 
 
+class TestDupCandidates(unittest.TestCase):
+    def _ent(self, conn, eid, name):
+        conn.execute("""INSERT INTO entities
+            (id,name,entity_type,file_path,start_line,end_line,
+             is_exported,is_entrypoint,is_test)
+            VALUES (?,?, 'function', ?, 1, 2, 1, 0, 0)""",
+            (eid, name, eid.split("::")[0]))
+
+    def test_normalize_name_synonyms_and_tokens(self):
+        self.assertEqual(dd.normalize_name("getUser"), dd.normalize_name("fetchUser"))
+        self.assertEqual(dd.normalize_name("validate_token"),
+                         dd.normalize_name("checkToken"))
+
+    def test_clusters_cross_file_synonym_dupes(self):
+        conn = mem_db()
+        self._ent(conn, "a.go::function::getUser", "getUser")
+        self._ent(conn, "b.go::function::fetchUser", "fetchUser")
+        self._ent(conn, "c.go::function::unrelated", "unrelated")
+        conn.commit()
+        n = dd.find_dup_candidates(conn)
+        self.assertEqual(n, 1)
+        members = {r[0] for r in conn.execute(
+            "SELECT entity_id FROM cluster_members")}
+        self.assertEqual(members,
+                         {"a.go::function::getUser", "b.go::function::fetchUser"})
+
+    def test_same_file_not_clustered(self):
+        conn = mem_db()
+        self._ent(conn, "a.go::function::getUser", "getUser")
+        self._ent(conn, "a.go::function::fetchUser", "fetchUser")  # same file
+        conn.commit()
+        self.assertEqual(dd.find_dup_candidates(conn), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
