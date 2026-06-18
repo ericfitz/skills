@@ -19,9 +19,13 @@ You also receive `REPO_DIR` (absolute path to the repository root).
 
 ## Steps
 
-1. For each item, read the entity's source. Prefer:
-   `sem context <name> --json -C <REPO_DIR>` for the file (or `Read` the file at the line
-   range `start_line..end_line`). Read enough to understand intent, not mechanism.
+1. For each item, read the entity's source. Prefer running in a Bash shell:
+   ```bash
+   cd <REPO_DIR> && sem context <name> --file <relative-path> --json
+   ```
+   (`sem context` has no `-C` flag; cd into the repo first and use `--file` to disambiguate.)
+   Alternatively, `Read` the file at line range `start_line..end_line`.
+   Read enough to understand intent, not mechanism.
 2. Write a description following the content standard below.
 3. Emit a JSON array of `{"file","name","start_line","sha","desc"}` where `sha` is the
    item's `blame_sha` (use the full value provided) and `desc` is your description.

@@ -160,6 +160,45 @@ class TestWrite(unittest.TestCase):
             self.assertEqual(out[4], "func B() {}")
 
 
+REAL_DIFF_PAYLOAD = {
+    "summary": {"added": 0, "deleted": 0, "modified": 1},
+    "changes": [
+        {
+            "entityName": "classify",
+            "changeType": "modified",
+            "entityType": "function",
+            "startLine": 10,
+            "endLine": 20,
+            "filePath": "dev/scripts/sem_annotate.py",
+        },
+        {
+            "entityName": "some_added",
+            "changeType": "added",
+            "entityType": "function",
+            "startLine": 30,
+            "endLine": 40,
+            "filePath": "dev/scripts/sem_annotate.py",
+        },
+    ],
+    "binaryChanges": [],
+}
+
+
+class TestParseChangedEntities(unittest.TestCase):
+    def test_returns_only_modified_entities(self):
+        result = sa._parse_changed_entities(REAL_DIFF_PAYLOAD)
+        self.assertEqual(result, {"classify"})
+
+    def test_added_entities_are_excluded(self):
+        result = sa._parse_changed_entities(
+            {"changes": [{"changeType": "added", "entityName": "foo"}]}
+        )
+        self.assertEqual(result, set())
+
+    def test_empty_payload_returns_empty_set(self):
+        self.assertEqual(sa._parse_changed_entities({}), set())
+
+
 class TestArgs(unittest.TestCase):
     def test_scan_subcommand(self):
         ns = sa.parse_args(["scan", "auth/", "-C", "/repo"])
@@ -172,6 +211,23 @@ class TestArgs(unittest.TestCase):
         ns = sa.parse_args(["--update", "a.go", "b.go"])
         self.assertEqual(ns.cmd, "scan")
         self.assertEqual(ns.paths, ["a.go", "b.go"])
+
+    def test_update_with_cwd(self):
+        ns = sa.parse_args(["--update", "a.go", "-C", "/repo"])
+        self.assertEqual(ns.cmd, "scan")
+        self.assertEqual(ns.paths, ["a.go"])
+        self.assertEqual(ns.cwd, "/repo")
+
+    def test_update_with_rebuild(self):
+        ns = sa.parse_args(["--update", "a.go", "--rebuild"])
+        self.assertEqual(ns.cmd, "scan")
+        self.assertEqual(ns.paths, ["a.go"])
+        self.assertTrue(ns.rebuild)
+
+    def test_write_subcommand_with_cwd(self):
+        ns = sa.parse_args(["write", "-C", "/repo"])
+        self.assertEqual(ns.cmd, "write")
+        self.assertEqual(ns.cwd, "/repo")
 
 
 if __name__ == "__main__":
