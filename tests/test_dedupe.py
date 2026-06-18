@@ -257,5 +257,16 @@ class TestFindingsAndReport(unittest.TestCase):
         self.assertEqual(ns.cwd, "/repo")
 
 
+class TestScopeFile(unittest.TestCase):
+    def test_in_scope_excludes_glob(self):
+        # include prefix kept, exclude glob drops the file
+        self.assertTrue(dd._in_scope("src/a.ts", ["src/"], dd.CODE_FILE_EXTS, exclude=["**/*.spec.ts"]))
+        self.assertFalse(dd._in_scope("src/a.spec.ts", ["src/"], dd.CODE_FILE_EXTS, exclude=["**/*.spec.ts"]))
+
+    def test_in_scope_no_exclude_unchanged(self):
+        self.assertTrue(dd._in_scope("src/a.ts", ["src/"], dd.CODE_FILE_EXTS))
+        self.assertFalse(dd._in_scope("other/a.ts", ["src/"], dd.CODE_FILE_EXTS))
+
+
 if __name__ == "__main__":
     unittest.main()

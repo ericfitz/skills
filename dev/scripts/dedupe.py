@@ -6,6 +6,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import sem_scope
 
 CODE_TYPES = {"function", "method", "type", "constant"}
 
@@ -99,22 +100,24 @@ def run_sem_graph(exts, cwd=None):
     return json.loads(r.stdout)
 
 
-def _in_scope(path, scope_paths, exts):
+def _in_scope(path, scope_paths, exts, exclude=None):
     if scope_paths and not any(path.startswith(s) for s in scope_paths):
+        return False
+    if exclude and sem_scope.is_excluded(path, {"exclude": exclude}):
         return False
     if exts and not any(path.endswith(x) for x in exts):
         return False
     return True
 
 
-def _filter_graph(graph, scope_paths, exts):
+def _filter_graph(graph, scope_paths, exts, exclude=None):
     entity_rows = []
     kept = set()
     for e in graph.get("entities", []):
         if e.get("entityType") not in CODE_TYPES:
             continue
         fp = e.get("filePath", "")
-        if not _in_scope(fp, scope_paths, exts):
+        if not _in_scope(fp, scope_paths, exts, exclude=exclude):
             continue
         name = e.get("name", "")
         kept.add(e["id"])
@@ -135,9 +138,9 @@ def _filter_graph(graph, scope_paths, exts):
     return entity_rows, edge_rows
 
 
-def load_graph(conn, scope_paths, exts=None, cwd=None):
+def load_graph(conn, scope_paths, exts=None, cwd=None, exclude=None):
     graph = run_sem_graph(exts, cwd=cwd)
-    ents, edges = _filter_graph(graph, scope_paths, exts)
+    ents, edges = _filter_graph(graph, scope_paths, exts, exclude=exclude)
     conn.executemany(
         """INSERT OR REPLACE INTO entities
         (id,name,entity_type,file_path,start_line,end_line,
@@ -382,7 +385,14 @@ def main(argv=None):
     ns = parse_args(argv if argv is not None else sys.argv[1:])
     if ns.cmd == "load":
         conn = _connect(ns.db)
-        stats = load_graph(conn, ns.scope, exts=ns.exts, cwd=ns.cwd)
+        scope_paths = list(ns.scope)
+        exclude = None
+        if not scope_paths:
+            scope_file = sem_scope.load_scope(ns.cwd)
+            if scope_file:
+                scope_paths = list(scope_file.get("include") or [])   # [] => whole repo
+                exclude = scope_file.get("exclude") or None
+        stats = load_graph(conn, scope_paths, exts=ns.exts, cwd=ns.cwd, exclude=exclude)
         descs = ingest_descriptions(conn, cwd=ns.cwd)
         raw_dead = find_dead_candidates(conn)
         refuted = refute_dead_by_usage(conn, cwd=ns.cwd)
