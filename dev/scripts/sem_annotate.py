@@ -288,6 +288,9 @@ def write(descriptions, worklist, cwd=None):
         if key not in anchors:
             skipped += 1
             continue
+        if comment_prefix(d["file"]) is None:
+            skipped += 1
+            continue
         sha = anchors[key] or head_sha(cwd)
         by_file.setdefault(d["file"], []).append(
             {"start_line": d["start_line"], "sha": sha, "desc": d["desc"]})

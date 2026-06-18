@@ -359,6 +359,26 @@ class TestWrite(unittest.TestCase):
             self.assertEqual(res["skipped"], 1)
             self.assertEqual(res["markers"], 1)
 
+    def test_write_unsupported_file_type_counts_in_skipped(self):
+        """FIX 3: a description for README.md (comment_prefix None) that matches the
+        worklist key must be counted in skipped, not silently dropped."""
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as d:
+            # README.md is an unsupported type (comment_prefix returns None)
+            readme = os.path.join(d, "README.md")
+            with open(readme, "w") as f:
+                f.write("# Title\nSome section\n")
+            worklist = [{"file": readme, "name": "Some section", "start_line": 2,
+                         "anchor_sha": "aaa1111"}]
+            descriptions = [{"file": readme, "name": "Some section", "start_line": 2,
+                             "desc": "overview of the project"}]
+            res = sa.write(descriptions, worklist)
+            self.assertEqual(res["skipped"], 1, "unsupported file type must count in skipped")
+            self.assertEqual(res["markers"], 0)
+            self.assertEqual(res["files_written"], 0)
+            # no file should be written/modified for README.md
+            self.assertEqual(open(readme).read(), "# Title\nSome section\n")
+
     def test_write_blank_anchor_falls_back_to_head(self):
         orig = sa.head_sha
         sa.head_sha = lambda cwd=None: "headfff"
