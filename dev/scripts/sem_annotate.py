@@ -1,8 +1,10 @@
 """sem-annotate: generate and refresh SEM@<sha> intent markers on code entities."""
+import argparse
 import json
 import os
 import re
 import subprocess
+import sys
 
 COMMENT_BY_EXT = {
     ".go": "//", ".ts": "//", ".tsx": "//", ".js": "//", ".jsx": "//",
@@ -159,3 +161,76 @@ def scan(paths, cwd=None, rebuild=False):
                     "existing_desc": marker["desc"] if marker else None,
                 })
     return work
+
+
+# ---------------------------------------------------------------------------
+# write
+# ---------------------------------------------------------------------------
+
+def write(updates, cwd=None):
+    """Apply a list of marker updates to files, return count of files written.
+
+    updates: list of {"file", "start_line", "sha", "desc"}.
+    Skips files whose comment_prefix is None. Applies markers bottom-up so
+    inserting a marker above one entity doesn't shift line numbers of entities
+    below it.
+    """
+    by_file = {}
+    for u in updates:
+        by_file.setdefault(u["file"], []).append(u)
+    written = 0
+    for f, ups in by_file.items():
+        abspath = f if cwd is None else os.path.join(cwd, f)
+        prefix = comment_prefix(f)
+        if prefix is None:
+            continue
+        lines = _read_text(abspath).splitlines()
+        # Apply bottom-up so insertions above don't shift later start_lines.
+        for u in sorted(ups, key=lambda x: x["start_line"], reverse=True):
+            lines = apply_marker(lines, u["start_line"], prefix, u["sha"], u["desc"])
+        with open(abspath, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+        written += 1
+    return written
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def parse_args(argv):
+    p = argparse.ArgumentParser(prog="sem_annotate")
+    p.add_argument("--update", nargs="+", metavar="FILE",
+                   help="scan only these files (entity-granular update)")
+    sub = p.add_subparsers(dest="cmd")
+    s = sub.add_parser("scan")
+    s.add_argument("paths", nargs="*", default=["."])
+    s.add_argument("--rebuild", action="store_true")
+    s.add_argument("-C", "--cwd", default=None)
+    w = sub.add_parser("write")
+    w.add_argument("-C", "--cwd", default=None)
+    ns = p.parse_args(argv)
+    if ns.update:
+        ns.cmd = "scan"
+        ns.paths = ns.update
+        ns.rebuild = getattr(ns, "rebuild", False)
+        ns.cwd = getattr(ns, "cwd", None)
+    return ns
+
+
+def main(argv=None):
+    ns = parse_args(argv if argv is not None else sys.argv[1:])
+    if ns.cmd == "scan":
+        print(json.dumps(scan(ns.paths, cwd=ns.cwd, rebuild=ns.rebuild), indent=2))
+        return 0
+    if ns.cmd == "write":
+        updates = json.load(sys.stdin)
+        n = write(updates, cwd=ns.cwd)
+        print(json.dumps({"files_written": n}))
+        return 0
+    print("usage: sem_annotate [scan|write|--update FILES]", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

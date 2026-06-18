@@ -1,4 +1,8 @@
+import io
+import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -135,6 +139,38 @@ class TestScan(unittest.TestCase):
         names = {w["name"]: w["status"] for w in work}
         self.assertEqual(names, {"Missing": "missing"})
         self.assertEqual(work[0]["blame_sha"], "bbbbbbb000111222333")
+
+
+class TestWrite(unittest.TestCase):
+    def test_write_applies_bottom_up(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "x.go")
+            with open(p, "w") as f:
+                f.write("package p\nfunc A() {}\nfunc B() {}\n")
+            n = sa.write([
+                {"file": p, "start_line": 2, "sha": "aaa1111", "desc": "build A"},
+                {"file": p, "start_line": 3, "sha": "bbb2222", "desc": "build B"},
+            ])
+            self.assertEqual(n, 1)  # one file written
+            out = open(p).read().splitlines()
+            self.assertEqual(out[1], "// SEM@aaa1111: build A")
+            self.assertEqual(out[2], "func A() {}")
+            self.assertEqual(out[3], "// SEM@bbb2222: build B")
+            self.assertEqual(out[4], "func B() {}")
+
+
+class TestArgs(unittest.TestCase):
+    def test_scan_subcommand(self):
+        ns = sa.parse_args(["scan", "auth/", "-C", "/repo"])
+        self.assertEqual(ns.cmd, "scan")
+        self.assertEqual(ns.paths, ["auth/"])
+        self.assertEqual(ns.cwd, "/repo")
+        self.assertFalse(ns.rebuild)
+
+    def test_update_is_scan_over_files(self):
+        ns = sa.parse_args(["--update", "a.go", "b.go"])
+        self.assertEqual(ns.cmd, "scan")
+        self.assertEqual(ns.paths, ["a.go", "b.go"])
 
 
 if __name__ == "__main__":
