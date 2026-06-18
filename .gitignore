@@ -19,3 +19,6 @@ writing/skills/boring/dist/
 
 # IDE local state
 .vscode/
+
+# Agent-created git worktrees must never be committed (stray gitlinks)
+.claude/worktrees/
