@@ -1,6 +1,6 @@
 {
   "name": "dev",
-  "version": "1.0.0",
-  "description": "Developer toolkit: annotate code with durable SEM@<sha> intent markers (sem-annotate), and find/analyze duplicate or overlapping functionality (dedupe). Uses the sem CLI for entity-level semantic intelligence. Supports Go, TypeScript/JavaScript, and Python.",
+  "version": "2.0.0",
+  "description": "Developer toolkit (sem-powered): annotate code with durable SEM@<sha> intent markers (sem-annotate), and find dead code + duplication and produce a ranked plan (dedupe). Uses the sem CLI entity graph. Supports Go, TypeScript/JavaScript, and Python.",
   "author": { "name": "efitz" }
 }
