@@ -152,7 +152,8 @@ class TestWrite(unittest.TestCase):
                 {"file": p, "start_line": 3, "sha": "bbb2222", "desc": "build B"},
             ])
             self.assertEqual(n, 1)  # one file written
-            out = open(p).read().splitlines()
+            with open(p) as fh:
+                out = fh.read().splitlines()
             self.assertEqual(out[1], "// SEM@aaa1111: build A")
             self.assertEqual(out[2], "func A() {}")
             self.assertEqual(out[3], "// SEM@bbb2222: build B")
