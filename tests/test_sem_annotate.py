@@ -21,5 +21,34 @@ class TestCommentPrefix(unittest.TestCase):
         self.assertIsNone(sa.comment_prefix("x.rs"))
 
 
+class TestParseMarkers(unittest.TestCase):
+    SRC = (
+        "package auth\n"                                  # 0
+        "\n"                                              # 1
+        "// SEM@b14a829: validate an oauth token (pure)\n"  # 2
+        "func Validate() {}\n"                            # 3
+        "    # SEM@deadbee: parse a config file\n"        # 4 (indented, hash)
+        "x = 1\n"                                         # 5
+    )
+
+    def test_parse_returns_indexed_markers(self):
+        got = sa.parse_markers(self.SRC)
+        self.assertEqual(set(got), {2, 4})
+        self.assertEqual(got[2]["sha"], "b14a829")
+        self.assertEqual(got[2]["desc"], "validate an oauth token (pure)")
+        self.assertEqual(got[4]["sha"], "deadbee")
+
+    def test_find_marker_above_entity(self):
+        lines = self.SRC.splitlines()
+        m = sa.find_marker_above(lines, 4)   # entity 'func Validate' is on 1-based line 4
+        self.assertIsNotNone(m)
+        self.assertEqual(m["sha"], "b14a829")
+
+    def test_find_marker_above_none_when_not_a_marker(self):
+        lines = self.SRC.splitlines()
+        # entity on 1-based line 2 ('// SEM...') -> line above is blank line 1 -> no marker
+        self.assertIsNone(sa.find_marker_above(lines, 2))
+
+
 if __name__ == "__main__":
     unittest.main()
