@@ -12,7 +12,7 @@ Analyze dependencies across all ecosystems, check for security vulnerabilities, 
 
 This command performs a controlled, multi-ecosystem dependency update:
 1. Detects which ecosystems are present (Go, Python, Node) or uses the specified one
-2. Manages branch state (switch to main if needed, with auto-stash)
+2. Manages branch state. When working from `main`, it creates a dedicated bump branch and runs the whole update there (never commits dependency bumps directly to `main`). On any other branch it works in place.
 3. Loads exclusion rules from multiple sources
 4. Refreshes package manager caches
 5. Gathers security advisories, audit results, outdated packages, and GitHub context
@@ -21,8 +21,9 @@ This command performs a controlled, multi-ecosystem dependency update:
 8. Validates with build, test, and lint
 9. If validation fails, bisects to isolate problematic packages
 10. Commits successful updates
-11. Presents a prioritized plan for remaining updates
-12. Restores original branch and stash state
+11. When working from `main`: pushes the bump branch, opens a pull request, monitors it until checks pass and it is mergeable, squash-merges it automatically, and deletes the branch
+12. Presents a prioritized plan for remaining updates
+13. Restores original branch and stash state
 
 ## Usage
 
@@ -92,6 +93,13 @@ Arguments:
 
 ### Phase 1: Branch Management
 
+This phase decides **where** the bump happens and sets a mode that later phases depend on:
+
+- **`MODE=pr`** — work is done on a freshly created bump branch off `main`, and integrated via a pull request (Phase 11). This is the mode whenever the effective working base is `main`.
+- **`MODE=direct`** — work is committed directly to the current branch, with no pull request. This is the mode on any non-`main` branch the user chooses to stay on.
+
+Record the chosen mode; Phases 10, 11, and 13 read it.
+
 1. Check current branch:
    ```bash
    git rev-parse --abbrev-ref HEAD
@@ -100,7 +108,7 @@ Arguments:
 2. If current branch is NOT `main`:
    - Display: `Current branch: <branch-name>`
    - Ask the user: "You're not on main. Would you like to switch to main before bumping dependencies?"
-   - If user says **no**: continue on the current branch.
+   - If user says **no**: set `MODE=direct` and continue on the current branch. (No bump branch, no PR — the rest of the run commits directly here, as before.)
    - If user says **yes**:
      a. Check for uncommitted changes:
         ```bash
@@ -115,9 +123,22 @@ Arguments:
         ```bash
         git checkout main && git pull
         ```
-     d. Record `ORIGINAL_BRANCH=<branch-name>` for cleanup in Phase 12.
+     d. Record `ORIGINAL_BRANCH=<branch-name>` for cleanup in Phase 13.
+     e. The effective base is now `main` — fall through to step 3 to set up `MODE=pr`.
 
-3. If already on `main`: continue. Run `git pull` to ensure main is up to date.
+3. If on `main` (either started there, or just switched in step 2):
+   - Run `git pull` to ensure main is up to date.
+   - Determine whether a pull request is possible by checking the remote (this reuses the GitHub detection from Phase 4a; you may run it now):
+     ```bash
+     git remote get-url origin 2>/dev/null
+     ```
+   - **If the remote is GitHub:** set `MODE=pr`. Create and switch to a dedicated bump branch so that `main` is never modified directly:
+     ```bash
+     BUMP_BRANCH="chore/bump-deps-$(date +%Y%m%d-%H%M%S)"
+     git checkout -b "$BUMP_BRANCH"
+     ```
+     Record `BUMP_BRANCH` for Phases 11 and 13. Display: `Working on bump branch: <BUMP_BRANCH> (will open a PR into main)`.
+   - **If the remote is NOT GitHub:** a pull request cannot be opened. Display: `Remote is not GitHub -- cannot open a pull request. Committing directly to main instead.` Set `MODE=direct` and continue on `main`. (This preserves the original direct-to-main behavior for non-GitHub repos.)
 
 ### Phase 2: Load Exclusion Rules
 
@@ -662,7 +683,18 @@ If build or tests fail after applying all safe updates:
 
 ### Phase 10: Commit
 
-After all validations pass (or after bisection stabilizes the safe subset):
+This commits to the **current working branch** — the bump branch when `MODE=pr`, or the user's branch when `MODE=direct`.
+
+**No-change guard:** If no safe updates were applied (or bisection reverted everything), there is nothing to commit:
+- If `MODE=pr`: do not create an empty PR. Switch back to `main` and delete the unused bump branch, then skip Phase 11:
+  ```bash
+  git checkout main
+  git branch -D "$BUMP_BRANCH"
+  ```
+  Record that no PR was opened and continue to Phase 12 (plan) and Phase 13 (cleanup/report).
+- If `MODE=direct`: report that there was nothing to update and continue to Phase 12/13.
+
+Otherwise, after all validations pass (or after bisection stabilizes the safe subset):
 
 1. **Stage all changes** -- include manifest files and lockfiles:
    ```bash
@@ -695,7 +727,85 @@ After all validations pass (or after bisection stabilizes the safe subset):
    git commit -m "<message>"
    ```
 
-### Phase 11: Plan for Remaining Updates
+### Phase 11: Pull Request Flow (MODE=pr only)
+
+**Skip this entire phase when `MODE=direct`.** In direct mode the commit from Phase 10 is the final integration step — go straight to Phase 12.
+
+When `MODE=pr` and a commit was produced, push the bump branch, open a PR, monitor it until it is ready, then squash-merge and clean up.
+
+**Step 1: Push the bump branch**
+
+```bash
+git push -u origin "$BUMP_BRANCH"
+```
+
+If the push fails because of an inaccessible SSH key (e.g. a required physical touch was not provided), do **not** attempt to work around it — report the failure, leave the branch and commit intact locally, and stop the PR flow. The user can push and open the PR manually.
+
+**Step 2: Open the pull request**
+
+Reuse the Phase 10 commit message body as the PR body so the PR lists every updated package and security fix.
+
+```bash
+gh pr create \
+  --base main \
+  --head "$BUMP_BRANCH" \
+  --title "chore(deps): bump dependencies" \
+  --body "<commit message body>"
+```
+
+Capture the PR number/URL from the output. Display: `Opened PR #<number>: <url>`.
+
+**Step 3: Monitor until ready to merge**
+
+The PR is "ready to merge" when its required status checks have **passed** AND it is in a mergeable state (no conflicts, no blocking required review).
+
+1. Wait for checks to complete:
+   ```bash
+   gh pr checks <number> --watch --interval 30
+   ```
+   - `gh pr checks` exits non-zero if any required check **fails**, and reports `no checks` when the repo has none configured (treat "no checks" as nothing to wait on, not as an error).
+
+2. Confirm the merge state once checks settle:
+   ```bash
+   gh pr view <number> --json state,mergeable,mergeStateStatus,reviewDecision
+   ```
+   - Ready: `mergeable` is `MERGEABLE` and `mergeStateStatus` is `CLEAN` (or `UNSTABLE` only due to non-required checks).
+   - Not ready: any of failing checks, `mergeStateStatus` of `DIRTY`/`BLOCKED`/`BEHIND`, or `reviewDecision` of `REVIEW_REQUIRED`.
+
+**Step 4: Handle a not-ready PR — stop and report (do NOT merge)**
+
+If checks fail, never complete, or the PR is otherwise not mergeable (conflicts, required review pending), **stop here**. Do not merge and do not delete anything. Leave the branch and the open PR in place so the user can inspect and resolve them. Display a clear report, e.g.:
+
+```
+PR #<number> is not ready to merge -- stopping.
+  Reason: <failing check name(s) / merge conflict / review required>
+  PR: <url>
+The bump branch and PR have been left in place for manual resolution.
+```
+
+Then skip Steps 5-6, leave `MODE=pr` state as-is, and proceed to Phase 12 (plan). In Phase 13, because the PR is still open, do **not** delete the bump branch; just restore the user's original branch/stash if applicable.
+
+**Step 5: Merge automatically (squash)**
+
+Once the PR is ready, merge it without asking for confirmation, deleting the remote branch as part of the merge:
+
+```bash
+gh pr merge <number> --squash --delete-branch
+```
+
+Display: `Merged PR #<number> (squash) and deleted remote branch.`
+
+**Step 6: Local cleanup of the bump branch**
+
+```bash
+git checkout main
+git pull
+git branch -D "$BUMP_BRANCH"
+```
+
+`git pull` fast-forwards `main` to include the squash-merged commit. Use `-D` (force delete) because the squash merge leaves the branch's individual commits unreachable, so `git branch -d` would refuse. Record that the PR was merged for the Phase 13 report.
+
+### Phase 12: Plan for Remaining Updates
 
 For all packages categorized as "Needs Plan", produce a prioritized action plan:
 
@@ -742,18 +852,27 @@ Packages with explicit hold reasons. Example:
 
 Include changelog summaries where they were successfully fetched in Phase 4e. If no changelog was available, note that.
 
-### Phase 12: Cleanup and Final Report
+### Phase 13: Cleanup and Final Report
 
-**Step 1: Restore branch state**
+**Step 1: Reconcile the bump branch (MODE=pr only)**
 
-If the user switched to main from another branch:
+By the time this phase runs in `MODE=pr`, the bump branch has already been handled by an earlier phase. Confirm the expected end state and do nothing further to it here:
+- **PR merged** (Phase 11 Step 6): the bump branch was already deleted locally and remotely, and `main` was fast-forwarded. The current branch is `main`.
+- **PR left open** (Phase 11 Step 4, not ready): the bump branch and PR remain on purpose. Do **not** delete them.
+- **No commit produced** (Phase 10 no-change guard): the empty bump branch was already deleted and the current branch is `main`.
+
+In `MODE=direct`, there is no bump branch to reconcile.
+
+**Step 2: Restore branch state**
+
+If the user switched to main from another branch (`ORIGINAL_BRANCH` is set):
 ```bash
 git checkout ORIGINAL_BRANCH
 ```
 
 **Important:** This MUST happen BEFORE the stash pop. `git stash pop` applies changes to the *current* branch.
 
-**Step 2: Restore stashed changes**
+**Step 3: Restore stashed changes**
 
 If `STASH_APPLIED=true`:
 ```bash
@@ -762,7 +881,7 @@ git stash pop
 
 This restores the user's uncommitted changes to their original branch.
 
-**Step 3: Display final summary**
+**Step 4: Display final summary**
 
 ```
 === Bump Complete ===
@@ -774,6 +893,7 @@ Updates Applied:
   Total: 32 packages updated
 
 Commit: abc1234 chore(deps): bump dependencies
+Pull Request: #42 merged (squash) -- branch chore/bump-deps-20260623-101500 deleted
 
 Reverted During Bisection: 2 packages
   - github.com/foo/bar v1.5.0: build error
@@ -790,6 +910,12 @@ Tests: PASSED
 Lint: PASSED
 ```
 
+The `Pull Request:` line reflects the actual outcome:
+- `#<n> merged (squash) -- branch <name> deleted` when the PR was merged.
+- `#<n> OPEN -- not ready to merge (<reason>); branch <name> left in place` when Phase 11 stopped.
+- `none (committed directly to <branch>)` in `MODE=direct`.
+- Omit the line entirely if no changes were committed.
+
 ## Error Handling
 
 - **Tool not installed** (govulncheck, safety, pip-audit): Skip that specific check, display a note with install instructions, and continue. Never fail the entire command because one optional tool is missing.
@@ -800,6 +926,10 @@ Lint: PASSED
 - **Git operations fail** (stash, checkout): Report the error and stop. Do not continue if git state is uncertain.
 - **Network errors on package registry**: Retry once, then report and skip that check.
 - **Lint fails**: Report the failure but do not revert dependency updates because of it. Lint failures are often pre-existing and unrelated to dependency changes.
+- **`git push` fails (e.g. inaccessible SSH key)**: Do not attempt to work around it. Leave the local bump branch and commit intact, report the failure, and stop the PR flow so the user can push and open the PR manually.
+- **`gh` not installed or not authenticated**: The PR flow cannot run. Report it, leave the committed bump branch in place, and stop the PR flow (skip merge/cleanup). Suggest `gh auth login`.
+- **PR checks fail or never complete, or PR is not mergeable** (conflicts, required review): Stop and report (Phase 11 Step 4). Never merge a not-ready PR, and leave the branch and open PR in place for manual resolution.
+- **`gh pr merge` fails**: Report the error, leave the PR open and the branch in place, and stop. Do not delete the branch if the merge did not succeed.
 
 ## Implementation Notes
 
@@ -822,6 +952,12 @@ Lint: PASSED
 9. **Commit message**: The commit message lists every package that was updated with old and new versions, grouped by ecosystem. Security fixes are called out separately with CVE identifiers.
 
 10. **Branch restore order**: When restoring state after completion, always checkout the original branch FIRST, then pop the stash. This ensures stashed changes are applied to the correct branch.
+
+11. **Main is never bumped directly (on GitHub repos)**: When the effective base is `main` and the remote is GitHub, the bump runs on a dedicated `chore/bump-deps-<timestamp>` branch and is integrated only through a pull request. `main` is updated solely by merging that PR. The only time changes land on `main` without a PR is when the remote is not GitHub (no PR mechanism available), in which case the original direct-to-main behavior is preserved.
+
+12. **Squash merge + force delete**: The PR is squash-merged (`gh pr merge --squash`), which collapses the bump branch's commits into one new commit on `main`. Because the branch's original commits then become unreachable, the local branch must be removed with `git branch -D` (force) — `git branch -d` would refuse, wrongly believing the branch is unmerged.
+
+13. **Automatic merge, conservative on failure**: A ready PR (checks passed, mergeable, no required review pending) is squash-merged automatically without confirmation. A not-ready PR is never merged — the branch and PR are left in place and the user is told why. This asymmetry keeps the happy path hands-off while never forcing a questionable merge.
 
 ---
 
