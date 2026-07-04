@@ -44,7 +44,7 @@ declare -a PLUGINS=(
   "github:development:backlog,create-issue"
   "ui:development:vrt"
   "wiki:documentation:verify-doc"
-  "dev:development:dedupe"
+  "dev:development:dedupe,sem-annotate,sem-auto"
   "writing:writing:boring"
   "deps:development:bump"
 )
@@ -105,7 +105,8 @@ declare -a SCRIPTS=(
   "loc/scripts/check-i18n.py"
   "loc/scripts/find_duplicate_localizations.py"
   "github/scripts/gh-issues.py"
-  "dev/scripts/dedupe-report.py"
+  "dev/scripts/dedupe.py"
+  "dev/scripts/sem_annotate.py"
 )
 for s in "${SCRIPTS[@]}"; do
   if [ -f "$s" ]; then ok "$s exists"; else bad "$s missing"; fi
@@ -119,9 +120,9 @@ else
 fi
 
 # ---------- dev worker agents ----------
-hdr "dev worker agents (dedupe)"
+hdr "dev worker agents"
 
-for agent in dedupe-analyzer dedupe-grouper dedupe-deduplicator; do
+for agent in dedupe-verify-dead dedupe-verify-dup sem-describe; do
   af="dev/agents/$agent.md"
   if [ ! -f "$af" ]; then bad "dev/agents/$agent.md missing"; continue; fi
   n=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$af")
@@ -129,11 +130,11 @@ for agent in dedupe-analyzer dedupe-grouper dedupe-deduplicator; do
   ok "dev/agents/$agent.md (name='$n')"
 done
 
-for agent in dedupe-analyzer dedupe-grouper dedupe-deduplicator; do
-  if grep -q "\${CLAUDE_PLUGIN_ROOT}/agents/$agent.md" dev/skills/dedupe/SKILL.md; then
-    ok "dev SKILL.md references $agent via \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
+for agent in dedupe-verify-dead dedupe-verify-dup sem-describe; do
+  if grep -rq "\${CLAUDE_PLUGIN_ROOT}/agents/$agent.md" dev/skills/*/SKILL.md; then
+    ok "a dev SKILL.md references $agent via \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
   else
-    bad "dev SKILL.md does not reference \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
+    bad "no dev SKILL.md references \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
   fi
 done
 

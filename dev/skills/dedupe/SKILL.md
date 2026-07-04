@@ -11,7 +11,7 @@ subagents, and produce a prioritized plan. SQLite is the coordination spine; the
 spent only on per-candidate verification.
 
 Bundled tool: `${CLAUDE_PLUGIN_ROOT}/scripts/dedupe.py`.
-Bundled agents: `${CLAUDE_PLUGIN_ROOT}/agents/dedupe-verify-dead.md`, `dedupe-verify-dup.md`.
+Bundled agents: `${CLAUDE_PLUGIN_ROOT}/agents/dedupe-verify-dead.md`, `${CLAUDE_PLUGIN_ROOT}/agents/dedupe-verify-dup.md`.
 
 ## Usage
 

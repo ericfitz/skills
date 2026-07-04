@@ -1,7 +1,7 @@
 ---
 name: sem-annotate
 version: 1.0.0
-description: Generate and refresh SEM@<sha> intent markers on code entities using the sem CLI. Use when the user asks to annotate code with SEM markers, add or refresh entity descriptions, or prepare a codebase for dedupe. Supports Go, TypeScript/JavaScript, and Python. Modes: full-scope, --update <files>, --rebuild.
+description: "Generate and refresh SEM@<sha> intent markers on code entities using the sem CLI. Use when the user asks to annotate code with SEM markers, add or refresh entity descriptions, or prepare a codebase for dedupe. Supports Go, TypeScript/JavaScript, and Python. Modes: full-scope, --update <files>, --rebuild."
 ---
 
 # sem-annotate
