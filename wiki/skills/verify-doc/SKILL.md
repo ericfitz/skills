@@ -1,6 +1,6 @@
 ---
 name: verify-doc
-description: Use when asked to verify a documentation file's accuracy against source code and external references, then migrate it into a project wiki. Reads target repo and wiki path from .local-projects.json.
+description: Use when asked to verify a documentation file's accuracy against source code and external references, then migrate it into a project wiki. Reads target repo and wiki path from .local/repos.json.
 allowed-tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Edit, Write
 argument-hint: <target-project-name> <path-to-doc-file>
 ---
@@ -11,26 +11,25 @@ Verify the accuracy of a single documentation file against authoritative sources
 
 ## Inputs
 
-- **target** (argument 1): Project name in `.local-projects.json` whose codebase the doc describes and whose wiki will receive content.
+- **target** (argument 1): Project name (a key in `.local/repos.json`) whose codebase the doc describes and whose wiki will receive content.
 - **doc_path** (argument 2): Path to the documentation file to process.
 
 If either is missing, ask the user.
 
 ## Configuration
 
-Reads from `.local-projects.json` (walked up from `pwd`):
+Reads from `.local/repos.json` (walked up from `pwd`), a JSON object keyed by name:
 
 ```jsonc
 {
-  "projects": [{
-    "name": "<target>",
+  "<target>": {
     "path": "<absolute local path to repo>",
     "github": {
       "owner": "...",
       "repo": "...",
       "wiki_path": "<absolute local path to wiki clone>"
     }
-  }]
+  }
 }
 ```
 
@@ -100,7 +99,7 @@ Items needing review:
 
 ## Phase 4: Migrate to Wiki
 
-`WIKI_PATH` comes from `.local-projects.json` (`github.wiki_path`).
+`WIKI_PATH` comes from `.local/repos.json` (`<target>.github.wiki_path`).
 
 ### 4.1 Discover wiki pages
 
