@@ -20,7 +20,9 @@ GitHub Project metadata is* currently disagree on file name, location, and shape
   by name), used only by the `github` skills.
 
 The goal: one canonical name, location, and format for each concern, adopted by
-every consuming skill, with no `*_REPO` env vars anywhere.
+every consuming skill, with no `*_REPO` env vars anywhere. Provisioning of the
+`.local/` files is done **out-of-band by a script the user runs once per repo**,
+not by an in-repo skill.
 
 ## Decisions
 
@@ -29,14 +31,20 @@ every consuming skill, with no `*_REPO` env vars anywhere.
 2. **Registry file → `.local/repos.json`**, a **top-level map keyed by name**.
 3. **Cache file → `.local/gh-projects.json`**, a **top-level map keyed by name**
    (same content as today's `project-cache.json`, renamed).
-4. **Refactor freely.** github's currently-tested `{"projects":[...]}` shape is
-   dropped in favor of the keyed map. All four consuming skills are updated.
-5. **No `*_REPO` environment variables.** A repo's local path comes only from
+4. **The `update-project-cache` skill is removed.** Its resolution/enumeration/
+   migration logic moves into a standalone provisioning script that lives at
+   `~/Scripts/provision-repo-config.py` (uncommitted; not part of this repo).
+   The script is the sole writer/migrator of both `.local/` files.
+5. **Consuming skills are read-only.** They read the canonical keyed maps and never
+   write, migrate, or auto-refresh. When a needed file/entry is absent, they
+   instruct the user to run the provisioning script and stop (or fall back to
+   their existing unconfigured behavior — see per-skill notes).
+6. **No `*_REPO` environment variables.** A repo's local path comes only from
    `.local/repos.json` (`<name>.path`).
 
 ## Schemas
 
-### `.local/repos.json` (registry; skills read it, `update-project-cache` writes back)
+### `.local/repos.json` (registry; written by the provisioning script, read by skills)
 
 Top-level object keyed by the repo's local handle (`name`). Each entry is a
 superset object; a consumer reads only the fields it needs and degrades
@@ -62,12 +70,12 @@ gracefully when an optional field is absent.
 
 Field ownership by consumer:
 
-| Field | create-issue | update-project-cache | wiki/verify-doc | ui/vrt |
+| Field | create-issue | provision script | wiki/verify-doc | ui/vrt |
 |-------|:---:|:---:|:---:|:---:|
-| `path` | – | – | reads | reads (matches `pwd`) |
-| `github.owner` / `github.repo` | reads | reads / derives | reads | reads |
-| `github.project` | reads/writes state | reads, writes back title | – | – |
-| `github.wiki_path` | – | – | reads | – |
+| `path` | – | prompts / preserves | reads | reads (matches `pwd`) |
+| `github.owner` / `github.repo` | reads | derives / writes | reads | reads |
+| `github.project` | reads | resolves, writes title | – | – |
+| `github.wiki_path` | – | prompts / preserves | reads | – |
 
 ### `.local/gh-projects.json` (generated cache; keyed by name — unchanged content)
 
@@ -102,13 +110,28 @@ Schema is otherwise identical to the prior `project-cache.json` design: `fields`
 keyed by field name; options and milestones are ordered `{name, id}` arrays;
 default-status selection is policy that lives in `create-issue`, not the cache.
 
-## Migration (on-disk legacy → new files)
+## Provisioning script — `~/Scripts/provision-repo-config.py`
 
-`update-project-cache` (the only writer) owns migration. On any run it normalizes
-whatever legacy shape it finds into `.local/repos.json` (keyed map) and, if a
-legacy cache exists, renames it to `.local/gh-projects.json`.
+A standalone, uncommitted CLI the user runs **once per repo** (from inside the
+repo, or with `--dir <path>`). It is the sole writer and migrator of the two
+`.local/` files. It carries forward the logic currently in
+`github/scripts/update_project_cache.py`.
 
-Legacy shapes to accept and normalize:
+Behavior per run:
+
+1. Determine `owner/repo` from the git remote (or an existing legacy entry).
+2. Build/refresh the `.local/repos.json` entry for the repo's `name`:
+   - preserve existing `path` / `github.wiki_path`; prompt for them when absent.
+   - resolve `github.project` via Projects v2 discovery
+     (`repository.projectsV2`). On multiple linked projects, prompt the user to
+     choose interactively (stdin). Write the resolved title back.
+3. Enumerate GitHub Project metadata (ids, fields, milestones, labels, issue
+   types) and write `.local/gh-projects.json` keyed by `name`.
+4. Migrate any legacy files found (see table) into the canonical files.
+5. Ensure `.local/` is present in `.gitignore`.
+6. Writes are atomic (temp file + rename).
+
+### Migration (on-disk legacy → canonical)
 
 | Legacy | Location | Shape | Normalize to |
 |--------|----------|-------|--------------|
@@ -117,50 +140,50 @@ Legacy shapes to accept and normalize:
 | Already keyed | `.local/repos.json` | `{name: {...}}` | idempotent no-op |
 | Old cache | `.local/project-cache.json` | keyed map | rename → `.local/gh-projects.json` |
 
-Normalization also drops any legacy `github.issues_project` id block (as the
-current migrator already does). The legacy source files are left in place (not
-deleted) after the new files are written.
-
-Read-only consumers (`create-issue`, `wiki/verify-doc`, `ui/vrt`) look up
-`.["<name>"]` in `.local/repos.json`. If `.local/repos.json` is absent, they fall
-back to reading a legacy file **read-only** (normalizing in-memory) and note that
-the user should run `update-project-cache` once to persist the migration. They do
-not write the new files themselves.
+Normalization drops any legacy `github.issues_project` id block. Legacy source
+files are left in place (not deleted) after the canonical files are written.
 
 ## Skill changes
 
-### `github/update-project-cache` (+ `scripts/update_project_cache.py`, `tests/test_update_project_cache.py`)
-- Registry constant → `repos.json`; cache constant → `gh-projects.json`.
-- Replace `config["projects"]` list access (`get_entry`, `set_project_title`)
-  with keyed-map access (`config[name]`).
-- Add normalization for the three legacy registry shapes and the cache rename.
-- Update `find_config` / write paths and gitignore ensuring accordingly.
-- Update unit tests to the keyed-map shape and new filenames; add a migration test
-  per legacy shape.
+### Removed: `github/update-project-cache`
+- Delete the skill directory `github/skills/update-project-cache/`.
+- Delete `github/scripts/update_project_cache.py` (logic extracted to the
+  external provisioning script) and `tests/test_update_project_cache.py`.
+- Remove it from `github/.claude-plugin/plugin.json`, the root
+  `.claude-plugin/marketplace.json`, `README.md`, and
+  `scripts/verify-marketplace.sh` (both the skill list and the script-path list).
 
 ### `github/create-issue`
-- Read `.local/repos.json` by key (`.["<name>"]`) instead of scanning a list.
-- Read the cache from `.local/gh-projects.json`.
-- Fix the SKILL.md wording ("maps name → …") to describe the true keyed map and
-  the new filenames.
+- Read `.local/repos.json` by key (`.["<name>"]`) and the cache from
+  `.local/gh-projects.json`.
+- Remove all auto-invocation of `update-project-cache`. When the cache file or
+  the `<name>` entry is **missing**: instruct the user to run
+  `~/Scripts/provision-repo-config.py` against this repo, then stop. (The `""`
+  "no project" marker still means "create a plain repo issue".)
+- Fix the SKILL.md wording ("maps name → …", "cache built by the
+  update-project-cache skill") to describe the keyed map, the new filenames, and
+  the external script.
 
 ### `wiki/verify-doc`
-- Read `.local/repos.json` (keyed map) for `path` + `github.wiki_path`; legacy
-  root array as read-only fallback.
+- Read `.local/repos.json` (keyed map) for `path` + `github.wiki_path`.
+- When absent, keep the existing graceful behavior (verification-only, migration
+  skipped) and note the provisioning script.
 - Update the `description` frontmatter and body references from `.local-projects.json`.
 
 ### `ui/vrt`
 - Read `.local/repos.json` (keyed map) for `github.{owner, repo}`, matching the
-  current project by `path` vs `pwd`; legacy root array as read-only fallback.
+  current project by `path` vs `pwd`.
+- When absent, keep the existing fallback to plain `gh` and note the provisioning
+  script.
 - Update body references from `.local-projects.json`.
 
 ## Documentation
 
-- This spec is the canonical description of both files.
+- This spec is the canonical description of both files and the provisioning script.
 - Update the `.local/` convention note in `~/.claude/CLAUDE.md` and its global
   memory pointer to: (a) name `repos.json` and `gh-projects.json`, (b) describe
-  the keyed-map registry, (c) forbid `*_REPO` environment variables for repo
-  locations.
+  the keyed-map registry, (c) name `~/Scripts/provision-repo-config.py` as the
+  sole provisioner, (d) forbid `*_REPO` environment variables for repo locations.
 
 ## Out of scope
 
