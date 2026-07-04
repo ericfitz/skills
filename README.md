@@ -18,9 +18,8 @@ for race conditions and concurrency bugs).
 
 ## github
 
-`backlog` (pick the next issue to work on) · `update-project-cache` (cache a
-repo's GitHub Project metadata locally) · `create-issue` (file a detailed issue
-into a repo/Project using that cache).
+`backlog` (pick the next issue to work on) · `create-issue` (file a detailed issue into a
+repo/Project using a locally-provisioned metadata cache).
 
 ## ui
 

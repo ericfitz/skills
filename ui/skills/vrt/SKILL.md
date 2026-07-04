@@ -9,19 +9,18 @@ When a Playwright visual regression test fails, present the baseline, actual, an
 
 ## Configuration (optional)
 
-Reads `.local-projects.json` (walked up from `pwd`) to look up the GitHub owner/repo for the current project so that `gh issue view` can fetch task context. If `.local-projects.json` is missing or the current project isn't found, the skill falls back to whatever `gh` is configured to use.
+Reads `.local/repos.json` (walked up from `pwd`) to look up the GitHub owner/repo for the current project so that `gh issue view` can fetch task context. If `.local/repos.json` is missing or the current project isn't found, the skill falls back to whatever `gh` is configured to use.
 
 ```jsonc
 {
-  "projects": [{
-    "name": "...",
+  "<name>": {
     "path": "<absolute repo path matching pwd>",
     "github": {"owner": "...", "repo": "..."}
-  }]
+  }
 }
 ```
 
-The skill identifies the current project by matching the parent directory of `pwd` to a project's `path` value.
+The skill identifies the current project by matching `pwd` (or its parent) to an entry's `path` value; the matching entry's key is `<name>`.
 
 A skill-specific config file `.claude/visual-regression.config.json` is supported but optional:
 
@@ -50,8 +49,8 @@ Before examining images, understand what the user is working on:
 2. `git log --oneline -5` — recent commits; look for issue numbers and Conventional Commit types.
 3. If commits or branch name reference an issue number `#N`, look up the issue:
    ```bash
-   OWNER=$(jq -r ... .local-projects.json)   # from config
-   REPO=$(jq -r ...)
+   OWNER=$(jq -r --arg n "$NAME" '.[$n].github.owner // empty' .local/repos.json)  # $NAME = matched key
+   REPO=$(jq -r --arg n "$NAME" '.[$n].github.repo // empty' .local/repos.json)
    gh issue view "$N" --repo "$OWNER/$REPO" --json title,body
    ```
    If `OWNER`/`REPO` are unavailable, run `gh issue view "$N"` with no `--repo` flag.
