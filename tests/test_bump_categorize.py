@@ -69,6 +69,14 @@ class TestCategorize(unittest.TestCase):
                              [], {}, set())
         self.assertEqual(out.needsPlan[0]["reason"], "pinned")
 
+    def test_pinned_with_advisory_goes_to_plan_not_security(self):
+        adv = [c.Advisory(package="qs", ecosystem="node", severity="HIGH",
+                          current="6.14.1", fixed="6.14.2", ids=["CVE-1"])]
+        out = cat.categorize([rec("qs", "6.14.1", "6.14.2", pinned=True)], adv, [], {}, set())
+        self.assertEqual(len(out.securityFixes), 0)
+        self.assertEqual(len(out.needsPlan), 1)
+        self.assertEqual(out.needsPlan[0]["reason"], "pinned")
+
     def test_hold_needs_plan(self):
         out = cat.categorize([rec("@antv/x6", "2.19.2", "2.20.0")], [], [],
                              {"@antv/x6": "v3 breaking"}, set())
