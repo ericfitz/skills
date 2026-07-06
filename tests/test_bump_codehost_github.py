@@ -18,6 +18,15 @@ class TestGitHubCodeHost(unittest.TestCase):
         self.assertEqual(advs[0].severity, "HIGH")
         self.assertEqual(advs[0].fixed, "6.14.2")
 
+    def test_parse_alerts_null_first_patched_version(self):
+        """Regression: an alert with first_patched_version=null (no fix
+        released yet, e.g. nltk GHSA-p4gq-832x-fm9v) must parse, not crash,
+        and yield an empty `fixed`."""
+        advs = gh.parse_alerts((FIX / "dependabot_alerts.json").read_text())
+        nltk = next(a for a in advs if a.package == "nltk")
+        self.assertEqual(nltk.fixed, "")
+        self.assertEqual(nltk.severity, "HIGH")
+
     def test_parse_prs(self):
         ctx = gh.parse_prs((FIX / "dep_prs.json").read_text())
         self.assertEqual(ctx.pullRequests[0]["id"], "#42")
