@@ -167,12 +167,12 @@ Adapters: `python`, `go`, `node`, or `none` (special case).
 
 | Verb | Return Shape | Notes |
 |------|--------------|-------|
-| `detect` | dict | `{"present": bool, "ecosystem": str, "packageManager": str, "workspace"?: bool}` — detects if the ecosystem is present in the project; `workspace` is optional (e.g., go.work for Go). For `none`: `{"present": false}` |
+| `detect` | dict | Detects if the ecosystem is present. When `present: true`, includes `ecosystem`, `packageManager` (string, may be empty for Go). When `present: false`, returns only `{"present": false, "ecosystem": "<name>"}` (packageManager omitted). Optional `workspace` field for Go (indicates go.work). For `none`: `{"present": false}` |
 | `cache-clear` | dict | `{"warnings": []}` — clears package manager cache (no-op for some managers like Go) |
 | `outdated` | list | `[UpdateRecord, ...]` — list of available updates; empty if no updates or if ecosystem not detected |
 | `audit` | list | `[Advisory, ...]` — list of security vulnerabilities; empty if tool not installed or no vulns found |
 | `apply` | dict | `{"applied": [spec, ...], "filesModified": [path, ...]}` — applies the updates specified in argv; files are relative paths that were changed |
-| `validate` | dict | `{"build": "pass"/"fail", "build_output": "...", "test": "pass"/"fail", "test_output": "...", "lint": "pass"/"fail", "lint_output": "..."}` — runs build, test, lint steps after applying updates |
+| `validate` | dict | Returns `{"<step>": "pass"/"fail", "<step>_output": "..."}` for each step. **Per-ecosystem shapes differ:** Go and Node include `build`, `test`, `lint` (all three); Python includes only `test` and `lint` (no build step). Output keys are literally `build_output`, `test_output`, `lint_output` for applicable steps. |
 
 **Example invocation & output:**
 ```bash
@@ -190,7 +190,7 @@ Adapters: `github`, or `none` (special case).
 | `alerts` | list | `[Advisory, ...]` — list of security alerts from the code host (e.g., Dependabot alerts); empty if code host not detected or no alerts. Returns `[]` if tool (gh) not installed |
 | `prs` | Context | `Context(pullRequests=[...])` — dependency-related PRs; empty list if no PRs or tool not installed |
 | `open-pr` | dict | `{"ok": bool, "output": str}` — creates a new PR; `ok` is true if successful. argv: `[branch, title, body]` |
-| `pr-status` | dict | `{...}` — PR status information; shape depends on code host (GitHub returns `state`, `mergeable`, `mergeStateStatus`, `reviewDecision`). argv: `[pr_number]` |
+| `pr-status` | dict | PR status information; shape depends on code host. GitHub returns `{"state": ..., "mergeable": ..., "mergeStateStatus": ..., "reviewDecision": ...}` on success. On error (tool missing or command fails): `{"error": "error message"}`. argv: `[pr_number]` |
 | `merge-pr` | dict | `{"ok": bool, "output": str}` — merges and deletes the PR. argv: `[pr_number]` |
 
 **Example invocation & output:**
@@ -205,8 +205,8 @@ Adapters: `github`, or `none` (special case).
 
 | Verb | Return Shape | Notes |
 |------|--------------|-------|
-| `issues` | Context | `Context(issues=[...])` — dependency-related issues; empty list if none. Returns empty Context if tool not installed |
-| `advisories` | list | `[Advisory, ...]` — *optional* verb; not all trackers implement it. Some trackers (like GitHub) may derive advisories from issues. |
+| `issues` | Context | `Context(issues=[...])` — dependency-related issues; empty list if none. Returns empty Context if tool not installed. Required verb — all trackers must implement. |
+| `advisories` | list | `[Advisory, ...]` — *optional* verb; not all trackers implement it. GitHub tracker does NOT support this verb and raises `ValueError` for it. |
 
 **Example invocation & output:**
 ```bash

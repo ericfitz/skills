@@ -129,18 +129,26 @@ return [{"name": "pkg", ...}]  # Missing UpdateRecord fields
 
 ## Step 5: Register via `.bump-config.json`
 
-The CLI reads `.bump-config.json` to select adapters:
+The CLI reads `.bump-config.json` to select adapters. **Ecosystems are ALWAYS auto-detected** by each ecosystem's `detect` verb — you do not and cannot configure them in `.bump-config.json`. Configure only `codeHost` and `issueTracker`:
 
 ```json
 {
-  "ecosystem": "auto",
   "codeHost": "github",
-  "issueTracker": "github"
+  "issueTracker": "github",
+  "exclude": ["package1", "package2"],
+  "hold": {"package3": "1.0.0"},
+  "ecosystems": {
+    "python": {"test": "pytest --cov"},
+    "go": {"lint": "golangci-lint run"}
+  }
 }
 ```
 
-- **Ecosystems**: `"auto"` means auto-detect via the `detect` verb. You can also specify explicitly (e.g., `"python"`, `"go"`, `"node"`, `"my_ecosystem"`).
-- **codeHost** and **issueTracker**: Specify the adapter name (e.g., `"github"`, `"gitlab"`, `"none"`). No auto-detect for these.
+- **Ecosystems**: Auto-detected by calling each ecosystem's `detect` verb (Python, Go, Node are built-in). OMIT the ecosystem key entirely — there is no `"ecosystem"` config key.
+- **codeHost** and **issueTracker**: Specify the adapter name (e.g., `"github"`, `"gitlab"`, `"none"`). OMIT the key to auto-detect GitHub (when git remote is github.com) or fall back to `"none"`.
+- **exclude**: Patterns to skip (optional)
+- **hold**: Version pins (optional)
+- **ecosystems**: Per-ecosystem command overrides (optional)
 
 The special `"none"` adapter is always available and returns empty shapes for all verbs.
 
@@ -359,16 +367,29 @@ def handle(verb, argv):
 
 ## How Adapters Are Discovered
 
-The dispatch module (`dispatch.py`) uses dynamic imports:
+The dispatch module (`dispatch.py`) validates the axis, then either returns a fixed empty result (for `name=="none"`) or dynamically imports the adapter:
 
 ```python
 AXES = {"ecosystem": "ecosystems", "codeHost": "codehosts", "issueTracker": "trackers"}
 
+NONE_RESULTS = {
+    "detect": {"present": False},
+    "outdated": [],
+    "audit": [],
+    "alerts": [],
+    "prs": c.Context(),
+    "issues": c.Context(),
+}
+
 def run(axis, name, verb, argv):
+    if axis not in AXES:
+        raise ValueError(f"unknown axis: {axis}")
     if name == "none":
-        return NONE_RESULTS[verb]  # Special case: always available
+        if verb not in NONE_RESULTS:
+            raise ValueError(f"'none' adapter has no verb '{verb}' on axis {axis}")
+        return NONE_RESULTS[verb]
     
-    # Dynamically import: bumplib.ecosystems.<name> or bumplib.codehosts.<name>, etc.
+    # Dynamically import: bumplib.ecosystems.<name>, bumplib.codehosts.<name>, etc.
     mod = importlib.import_module(f"bumplib.{AXES[axis]}.{name}")
     return mod.handle(verb, argv)
 ```
