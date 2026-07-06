@@ -1,0 +1,4 @@
+[ { "state": "open",
+    "security_advisory": { "summary": "qs DoS", "severity": "high" },
+    "security_vulnerability": { "first_patched_version": { "identifier": "6.14.2" } },
+    "dependency": { "package": { "ecosystem": "npm", "name": "qs" } } } ]
