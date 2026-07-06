@@ -1,17 +1,35 @@
 # /// script
 # requires-python = ">=3.10"
 # ///
-"""bump: unified CLI over bump adapters. Usage: bump.py <axis> <name> <verb> [args...]"""
+"""bump: unified CLI over bump adapters.
+
+Usage:
+  bump.py <axis> <name> <verb> [args...]   run an adapter verb
+  bump.py categorize [--root DIR]          read a payload JSON from stdin, print Categories
+"""
+import json
 import sys
 from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from bumplib import contracts, dispatch  # noqa: E402
+from bumplib import contracts, dispatch, orchestrate  # noqa: E402
+
+
+def _categorize(argv):
+    root = "."
+    if len(argv) >= 2 and argv[0] == "--root":
+        root = argv[1]
+    payload = json.load(sys.stdin)
+    result = orchestrate.categorize_payload(payload, root=root)
+    print(contracts.dump(result))
+    return 0
 
 
 def main(argv):
+    if argv and argv[0] == "categorize":
+        return _categorize(argv[1:])
     if len(argv) < 3:
         print("usage: bump.py <axis> <name> <verb> [args...]", file=sys.stderr)
         return 2
