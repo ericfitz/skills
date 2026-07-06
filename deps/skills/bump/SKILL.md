@@ -213,6 +213,8 @@ Skipped: 2 replace directives
 
 Repeat per ecosystem (Node's format additionally distinguishes override updates and security fixes — keep those sub-tables when the data has them). If no exclusions were found from any source, note `No exclusion rules found.`
 
+**Note on transitive/override updates:** Override and transitive version pins are surfaced in the display and Phase 10 manual plan; they are not auto-applied by the `apply` phase in this version.
+
 ### Phase 6: Changelog Research (Needs-Plan majors)
 
 For each Needs-Plan **major** update, attempt to fetch changelog context — **GitHub releases only**, no web searches. Extract `owner/repo` from the module path (Go `github.com/foo/bar` → `foo/bar`) or registry metadata, then:
@@ -409,6 +411,7 @@ The `Pull Request:` line reflects the actual outcome:
 
 ## Error Handling
 
+- **Network/registry errors:** transient failures surface as empty adapter output; re-run that single `outdated`/`audit` once before treating the result as empty, then continue (never fail the whole run for one flaky check).
 - **Optional tool not installed** (`govulncheck`, `safety`, `pip-audit`, `gh`): the adapter returns the empty contract shape (`[]`, empty `Context`) — treat as "nothing found," display a brief note where useful, and continue. Never fail the whole run because one optional tool is missing.
 - **Audit/alerts fail**: adapters return empty; continue with outdated checks. An audit failure never blocks updates.
 - **Non-GitHub remote**: `HOST`/`TRACKER` resolve to `none`; gather calls return empty shapes. Skip GitHub-specific behavior gracefully — not an error.

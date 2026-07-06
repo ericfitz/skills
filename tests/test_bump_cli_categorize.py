@@ -79,6 +79,37 @@ class TestCategorizePayload(unittest.TestCase):
         self.assertEqual(out.needsPlan, [])
         self.assertEqual(out.skipped, [])
 
+    def test_disk_config_exclusions_merge(self):
+        import json
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / ".bump-config.json").write_text(json.dumps({
+                "exclude": ["lodash"], "hold": {"react": "pinned to 17"}}))
+            payload = {"updates": [
+                _rec("lodash", "4.17.20", "4.17.21", "patch"),
+                _rec("react", "17.0.2", "17.0.3", "patch")],
+                "advisories": []}
+            out = orchestrate.categorize_payload(payload, root=td)
+            names = {i["name"]: i["reason"] for i in out.needsPlan}
+            self.assertIn("lodash", names)
+            self.assertIn("react", names)
+            self.assertEqual(len(out.safe), 0)
+
+    def test_cli_categorize_dispatch(self):
+        import io
+        import json
+        from unittest import mock
+        import importlib
+        bump_cli = importlib.import_module("bump")
+        payload = io.StringIO(json.dumps({"updates": [], "advisories": []}))
+        buf = io.StringIO()
+        with mock.patch("sys.stdin", payload), mock.patch("sys.stdout", buf):
+            rc = bump_cli.main(["categorize"])
+        self.assertEqual(rc, 0)
+        result = json.loads(buf.getvalue())
+        for k in ("securityFixes", "safe", "needsPlan", "skipped"):
+            self.assertIn(k, result)
+            self.assertEqual(result[k], [])
+
 
 if __name__ == "__main__":
     unittest.main()
