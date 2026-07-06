@@ -27,6 +27,52 @@ class TestGoOutdated(unittest.TestCase):
         self.assertIn("github.com/foo/bar", go.replace_targets(gomod))
         self.assertIn("github.com/foo/bar", go.pinned_names(gomod))
 
+    def test_replace_targets_block_form_two_entries(self):
+        gomod = (
+            "module x\n"
+            "replace (\n"
+            "\tgithub.com/foo/bar => ./local\n"
+            "\tgithub.com/baz/qux v1.0.0 => github.com/baz/qux v1.0.1\n"
+            ")\n"
+        )
+        targets = go.replace_targets(gomod)
+        self.assertEqual({"github.com/foo/bar", "github.com/baz/qux"}, targets)
+        self.assertNotIn("(", targets)
+
+    def test_replace_targets_single_line(self):
+        gomod = "module x\nreplace github.com/foo/bar => ./local\n"
+        targets = go.replace_targets(gomod)
+        self.assertEqual({"github.com/foo/bar"}, targets)
+        self.assertNotIn("(", targets)
+
+    def test_pinned_names_single_line_require(self):
+        gomod = "module x\nrequire github.com/foo/bar v1.2.3 // pinned: compat\n"
+        names = go.pinned_names(gomod)
+        self.assertIn("github.com/foo/bar", names)
+        self.assertNotIn("require", names)
+
+    def test_pinned_names_block_form_require(self):
+        gomod = (
+            "module x\n"
+            "require (\n"
+            "\tgithub.com/foo/bar v1.2.3 // pinned: compat\n"
+            "\tgithub.com/other/pkg v2.0.0\n"
+            ")\n"
+        )
+        names = go.pinned_names(gomod)
+        self.assertIn("github.com/foo/bar", names)
+        self.assertNotIn("github.com/other/pkg", names)
+        self.assertNotIn("require", names)
+
+
+class TestGoParseVuln(unittest.TestCase):
+    def test_parse_vuln(self):
+        text = (FIX / "govulncheck.json").read_text()
+        advs = go.parse_vuln(text)
+        self.assertEqual(len(advs), 1)
+        self.assertEqual(advs[0].ids, ["GO-2024-1234"])
+        self.assertEqual(advs[0].package, "github.com/foo/bar")
+
 
 if __name__ == "__main__":
     unittest.main()

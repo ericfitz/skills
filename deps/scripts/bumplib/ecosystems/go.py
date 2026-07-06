@@ -1,5 +1,7 @@
 """Go ecosystem adapter."""
+import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -23,38 +25,60 @@ def parse_outdated(text: str) -> list:
 
 
 def replace_targets(gomod_text: str) -> set:
-    out = set()
+    out, in_block = set(), False
     for line in gomod_text.splitlines():
         s = line.strip()
-        if s.startswith("replace "):
-            body = s[len("replace "):].split("=>")[0].strip()
-            out.add(body.split()[0])
+        if not s or s.startswith("//"):
+            continue
+        if s.startswith("replace (") or (s == "replace ("):
+            in_block = True
+            continue
+        if in_block:
+            if s == ")":
+                in_block = False
+            elif "=>" in s:
+                out.add(s.split("=>")[0].strip().split()[0])
+            continue
+        if s.startswith("replace ") and "=>" in s:
+            out.add(s[len("replace "):].split("=>")[0].strip().split()[0])
     return out
 
 
 def pinned_names(gomod_text: str) -> set:
     out = set()
     for line in gomod_text.splitlines():
-        if "// pinned:" in line:
-            out.add(line.strip().split()[0])
+        if "// pinned:" not in line:
+            continue
+        toks = line.split("//")[0].strip().split()
+        if not toks:
+            continue
+        name = toks[1] if toks[0] == "require" and len(toks) > 1 else toks[0]
+        out.add(name)
     return out
 
 
 def parse_vuln(json_text: str) -> list:
-    import json
-    advs = []
-    for line in json_text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
+    """Parse govulncheck -json output: a stream of concatenated JSON objects.
+    Emit one Advisory per OSV record (dedup by id)."""
+    advs, seen = [], set()
+    dec = json.JSONDecoder()
+    idx, n = 0, len(json_text)
+    while idx < n:
+        while idx < n and json_text[idx].isspace():
+            idx += 1
+        if idx >= n:
+            break
         try:
-            obj = json.loads(line)
+            obj, end = dec.raw_decode(json_text, idx)
         except ValueError:
-            continue
-        osv = obj.get("osv") or obj.get("finding")
-        if isinstance(osv, dict) and osv.get("id"):
-            advs.append(c.Advisory(package=osv.get("affected", [{}])[0].get("package", {}).get("name", ""),
-                                   ecosystem="go", severity=osv.get("database_specific", {}).get("severity", ""),
+            break
+        idx = end
+        osv = obj.get("osv") if isinstance(obj, dict) else None
+        if isinstance(osv, dict) and osv.get("id") and osv["id"] not in seen:
+            seen.add(osv["id"])
+            affected = osv.get("affected") or [{}]
+            pkg = affected[0].get("package", {}).get("name", "") if affected else ""
+            advs.append(c.Advisory(package=pkg, ecosystem="go", severity="",
                                    current="", fixed="", ids=[osv["id"]],
                                    summary=osv.get("summary", ""), source="govulncheck"))
     return advs
@@ -84,9 +108,9 @@ def handle(verb, argv):
         out = _run(["go", "list", "-m", "-u", "all"])
         return parse_outdated(out.stdout)
     if verb == "audit":
-        out = _run(["govulncheck", "-json", "./..."])
-        if "not found" in out.stderr or out.returncode == 127:
+        if shutil.which("govulncheck") is None:
             return []
+        out = _run(["govulncheck", "-json", "./..."])
         return parse_vuln(out.stdout)
     if verb == "apply":
         for spec in argv:               # spec e.g. "github.com/foo/bar@v1.2.3"
