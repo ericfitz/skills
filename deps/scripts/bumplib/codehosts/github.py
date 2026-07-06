@@ -22,7 +22,9 @@ def parse_alerts(json_text: str) -> list:
             continue
         sa = a.get("security_advisory", {})
         dep = a.get("dependency", {}).get("package", {})
-        fixed = a.get("security_vulnerability", {}).get("first_patched_version", {}).get("identifier", "")
+        # first_patched_version can be JSON null (no fix released yet); `or {}`
+        # guards against None.get(...) when the key is present but null.
+        fixed = (a.get("security_vulnerability", {}).get("first_patched_version") or {}).get("identifier", "")
         advs.append(c.Advisory(package=dep.get("name", ""), ecosystem=dep.get("ecosystem", ""),
                                severity=sa.get("severity", "").upper(), current="", fixed=fixed,
                                ids=[], summary=sa.get("summary", ""), source="dependabot"))
