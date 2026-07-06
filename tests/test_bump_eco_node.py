@@ -37,6 +37,12 @@ class TestNode(unittest.TestCase):
             result = node.handle("audit", [])
             self.assertEqual(result, [])
 
+    def test_outdated_missing_binary(self):
+        """Regression test: outdated verb should return [] when binary is missing."""
+        with mock.patch("bumplib.ecosystems.node.shutil.which", return_value=None):
+            result = node.handle("outdated", [])
+            self.assertEqual(result, [])
+
 
 if __name__ == "__main__":
     unittest.main()

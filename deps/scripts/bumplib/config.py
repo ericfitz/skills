@@ -2,14 +2,6 @@
 import json
 from pathlib import Path
 
-DEFAULT_COMMANDS = {
-    ("go", ""): {"cacheClear": "", "build": "go build ./...", "test": "go test ./...", "lint": "go vet ./..."},
-    ("python", "uv"): {"cacheClear": "uv cache clean", "build": "", "test": "uv run pytest", "lint": "uv run ruff check ."},
-    ("python", "pip"): {"cacheClear": "pip cache purge", "build": "", "test": "pytest", "lint": "ruff check ."},
-    ("node", "pnpm"): {"cacheClear": "pnpm store prune && npm cache clean --force", "build": "pnpm run build", "test": "pnpm test", "lint": "pnpm run lint:all"},
-    ("node", "npm"): {"cacheClear": "npm cache clean --force", "build": "npm run build", "test": "npm test", "lint": "npm run lint"},
-}
-
 
 def parse_claude_exclusions(text: str) -> list:
     out, in_section = [], False
@@ -58,10 +50,3 @@ def resolve_adapter(axis: str, config: dict, remote_url) -> str:
     if axis == "ecosystem":
         return ""  # ecosystem is detected, not configured
     return "none"
-
-
-def ecosystem_commands(config: dict, eco: str, manager: str = "") -> dict:
-    base = dict(DEFAULT_COMMANDS.get((eco, manager), {}))
-    override = (config.get("ecosystems", {}) or {}).get(eco, {}) or {}
-    base.update({k: v for k, v in override.items() if k in ("cacheClear", "build", "test", "lint")})
-    return base

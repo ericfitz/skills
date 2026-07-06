@@ -34,7 +34,11 @@ def main(argv):
         print("usage: bump.py <axis> <name> <verb> [args...]", file=sys.stderr)
         return 2
     axis, name, verb, rest = argv[0], argv[1], argv[2], argv[3:]
-    result = dispatch.run(axis, name, verb, rest)
+    try:
+        result = dispatch.run(axis, name, verb, rest)
+    except Exception as e:
+        print(json.dumps({"error": f"{type(e).__name__}: {e}"}), file=sys.stderr)
+        return 1
     print(contracts.dump(result))
     return 0
 

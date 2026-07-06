@@ -90,9 +90,16 @@ def handle(verb, argv):
     if verb == "detect":
         return detect(root)
     if verb == "cache-clear":
-        _run(["pnpm", "store", "prune"] if mgr == "pnpm" else ["npm", "cache", "clean", "--force"])
+        # registry metadata can be stale in either cache -- always clear both, each
+        # guarded so a missing binary is skipped rather than fatal.
+        if shutil.which("pnpm"):
+            _run(["pnpm", "store", "prune"])
+        if shutil.which("npm"):
+            _run(["npm", "cache", "clean", "--force"])
         return {"warnings": []}
     if verb == "outdated":
+        if shutil.which(mgr) is None:
+            return []
         cmd = ["pnpm", "outdated", "--format", "json"] if mgr == "pnpm" else ["npm", "outdated", "--json"]
         out = _run(cmd)
         return parse_outdated(out.stdout, mgr)

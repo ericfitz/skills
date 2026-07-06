@@ -172,11 +172,11 @@ echo '{
 
 `bump.py categorize` reads the payload JSON from stdin (optional `--root DIR`, default `.`), merges disk exclusions/holds, and prints a `Categories` value with four buckets: `securityFixes`, `safe`, `needsPlan`, `skipped` (each an UpdateRecord with an added `reason`, and `advisory` when one applies). See `reference/contracts.md`.
 
-**Categorization rules** (enforced by the CLI, summarized for the reader):
-- **Security Fix** (auto-apply): patch/minor bump that resolves an advisory, not excluded/held/pinned. Major security fixes go to Needs Plan.
-- **Safe Update** (auto-apply): patch or minor bump, not excluded/held/pinned, not a major, not a replace target.
-- **Needs Plan** (never auto-apply): major bumps, excluded/held/pinned packages, major security fixes, packages GitHub issues/Dependabot context flag as complicated.
-- **Skipped**: replace-directive targets and up-to-date packages.
+**Categorization rules.** The rules below marked *(CLI)* are mechanically enforced by `bump.py categorize` from bump level, exclude globs, holds, replace targets, and pins. Rules marked *(judgment)* are not implemented by the categorizer — they are applied by you, the skill, when reading gathered issues/Dependabot context/changelogs, and should route a package into Needs Plan manually even though the CLI would otherwise call it safe:
+- **Security Fix** (auto-apply) *(CLI)*: patch/minor bump that resolves an advisory, not excluded/held/pinned. Major security fixes go to Needs Plan.
+- **Safe Update** (auto-apply) *(CLI)*: patch or minor bump, not excluded/held/pinned, not a major, not a replace target.
+- **Needs Plan** (never auto-apply): major bumps, excluded/held/pinned packages, and major security fixes are routed here by the CLI *(CLI)*; additionally, treat a package as Needs Plan yourself *(judgment)* when GitHub issues or Dependabot context indicate complications the categorizer can't see.
+- **Skipped** *(CLI)*: replace-directive targets and up-to-date packages.
 
 **Display** the four categories per ecosystem using the original table formats:
 

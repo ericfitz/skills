@@ -51,12 +51,5 @@ class TestResolveAdapter(unittest.TestCase):
         self.assertEqual(cfg.resolve_adapter("codeHost", {}, "git@gitlab.com:o/r.git"), "none")
 
 
-class TestEcosystemCommands(unittest.TestCase):
-    def test_override_beats_default(self):
-        merged = cfg.ecosystem_commands({"ecosystems": {"node": {"test": "custom"}}}, "node", "pnpm")
-        self.assertEqual(merged["test"], "custom")
-        self.assertEqual(merged["build"], "pnpm run build")
-
-
 if __name__ == "__main__":
     unittest.main()
