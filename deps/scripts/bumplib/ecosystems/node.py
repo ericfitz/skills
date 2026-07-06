@@ -20,7 +20,7 @@ def parse_outdated(json_text: str, manager: str) -> list:
     data = json.loads(json_text or "{}")
     recs = []
     for name, info in data.items():
-        cur = info.get("current") or (info.get("current", ""))
+        cur = info.get("current", "")
         lat = info.get("latest", "")
         wanted = info.get("wanted", lat)
         kind = "direct"
@@ -34,6 +34,21 @@ def parse_outdated(json_text: str, manager: str) -> list:
 def parse_audit(json_text: str, manager: str) -> list:
     data = json.loads(json_text or "{}")
     advs = []
+    if isinstance(data.get("advisories"), dict):   # pnpm / npm-v6 bulk shape
+        for adv in data["advisories"].values():
+            if not isinstance(adv, dict) or "severity" not in adv:
+                continue
+            patched = adv.get("patched_versions", "") or ""
+            fixed = patched.lstrip("><= ").strip() if patched and patched != "<0.0.0" else ""
+            findings = adv.get("findings") or []
+            current = findings[0].get("version", "") if findings and isinstance(findings[0], dict) else ""
+            advs.append(c.Advisory(package=adv.get("module_name", ""), ecosystem="node",
+                                   severity=str(adv.get("severity", "")).upper(),
+                                   current=current, fixed=fixed,
+                                   ids=list(adv.get("cves") or []),
+                                   summary=adv.get("vulnerable_versions", ""), source="audit"))
+        return advs
+    # npm v7+ shape
     vulns = data.get("vulnerabilities", {})
     for name, v in vulns.items():
         if not isinstance(v, dict) or "severity" not in v:
@@ -82,8 +97,7 @@ def handle(verb, argv):
         out = _run(cmd)
         return parse_outdated(out.stdout, mgr)
     if verb == "audit":
-        tool = "pnpm" if mgr == "pnpm" else "npm"
-        if shutil.which(tool) is None:
+        if shutil.which(mgr) is None:
             return []
         out = _run(["pnpm", "audit", "--json"] if mgr == "pnpm" else ["npm", "audit", "--json"])
         return parse_audit(out.stdout, mgr)

@@ -22,6 +22,15 @@ class TestNode(unittest.TestCase):
         advs = node.parse_audit((FIX / "npm_audit.json").read_text(), "npm")
         self.assertTrue(any(a.package == "qs" for a in advs))
 
+    def test_parse_audit_pnpm(self):
+        advs = node.parse_audit((FIX / "pnpm_audit.json").read_text(), "pnpm")
+        self.assertEqual(len(advs), 1)
+        adv = advs[0]
+        self.assertEqual(adv.package, "qs")
+        self.assertEqual(adv.severity, "HIGH")
+        self.assertEqual(adv.fixed, "6.14.2")
+        self.assertEqual(adv.ids, ["CVE-2022-24999"])
+
     def test_audit_missing_binary(self):
         """Regression test: audit verb should return [] when binary is missing."""
         with mock.patch("bumplib.ecosystems.node.shutil.which", return_value=None):

@@ -1,0 +1,7 @@
+{ "advisories": {
+    "1179": { "module_name": "qs", "severity": "high",
+              "cves": ["CVE-2022-24999"], "vulnerable_versions": "<6.14.2",
+              "patched_versions": ">=6.14.2",
+              "findings": [ { "version": "6.14.1", "paths": ["qs"] } ],
+              "url": "https://example.com/advisories/1179" } },
+  "metadata": {} }
