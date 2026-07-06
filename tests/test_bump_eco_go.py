@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.dont_write_bytecode = True
 BASE = Path(__file__).resolve().parents[1]
@@ -72,6 +73,10 @@ class TestGoParseVuln(unittest.TestCase):
         self.assertEqual(len(advs), 1)
         self.assertEqual(advs[0].ids, ["GO-2024-1234"])
         self.assertEqual(advs[0].package, "github.com/foo/bar")
+
+    def test_audit_returns_empty_when_govulncheck_missing(self):
+        with mock.patch.object(go.shutil, "which", return_value=None):
+            self.assertEqual(go.handle("audit", []), [])
 
 
 if __name__ == "__main__":

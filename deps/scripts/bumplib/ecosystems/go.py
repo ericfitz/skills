@@ -30,7 +30,7 @@ def replace_targets(gomod_text: str) -> set:
         s = line.strip()
         if not s or s.startswith("//"):
             continue
-        if s.startswith("replace (") or (s == "replace ("):
+        if s.startswith("replace ("):
             in_block = True
             continue
         if in_block:
@@ -78,7 +78,7 @@ def parse_vuln(json_text: str) -> list:
             seen.add(osv["id"])
             affected = osv.get("affected") or [{}]
             pkg = affected[0].get("package", {}).get("name", "") if affected else ""
-            advs.append(c.Advisory(package=pkg, ecosystem="go", severity="",
+            advs.append(c.Advisory(package=pkg, ecosystem="go", severity=osv.get("database_specific", {}).get("severity", ""),
                                    current="", fixed="", ids=[osv["id"]],
                                    summary=osv.get("summary", ""), source="govulncheck"))
     return advs
