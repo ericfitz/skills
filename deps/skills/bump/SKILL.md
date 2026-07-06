@@ -15,10 +15,11 @@ This skill is a **thin orchestrator**. All provider mechanics — detecting ecos
 **The CLI.** Every provider call goes through one command:
 
 ```bash
-uv run "$CLAUDE_PLUGIN_ROOT/scripts/bump.py" <axis> <name> <verb> [args...]
+uv run "${CLAUDE_PLUGIN_ROOT}/scripts/bump.py" <axis> <name> <verb> [args...]
 ```
 
-- `$CLAUDE_PLUGIN_ROOT/scripts/bump.py` is the script (falls back to `python3 <path>/scripts/bump.py` if `uv` is unavailable). Below this is written as `bump.py` for brevity.
+- `${CLAUDE_PLUGIN_ROOT}` is this plugin's install root — typically `~/.claude/plugins/cache/efitz-skills/deps/<version>/`. If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md and walk up two levels (`skills/bump/` → plugin root), then use that absolute path. Do **not** use a path relative to the user's project — `bump.py` lives inside the installed plugin, not the target repo.
+- The scripts are **stdlib-only**, so `uv run` needs no setup; if `uv` is unavailable, fall back to `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/bump.py" ...`. Below this is written as `bump.py` for brevity.
 - **Axes:** `ecosystem` (`go`|`python`|`node`), `codeHost` (`github`|`none`), `issueTracker` (`github`|`none`).
 - Each verb prints **exactly one JSON value** to stdout. Output shapes are defined in `reference/contracts.md` — read it to know what each verb returns. Adapters **degrade gracefully**: a missing tool (`gh`, `govulncheck`, `pip-audit`, …) yields the empty contract shape (`[]`, empty `Context`, `{"error": ...}`) rather than an error.
 - The special `none` adapter is a no-op returning fixed empty shapes; use it whenever an axis resolves to `none`.
