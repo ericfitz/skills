@@ -1,0 +1,4 @@
+{
+  "eslint": { "current": "9.38.0", "latest": "9.39.2", "wanted": "9.39.2", "dependencyType": "devDependencies" },
+  "rxjs":   { "current": "7.8.1",  "latest": "7.8.2",  "wanted": "7.8.2",  "dependencyType": "dependencies" }
+}

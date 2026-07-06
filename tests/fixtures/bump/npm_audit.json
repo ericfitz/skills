@@ -1,0 +1,4 @@
+{ "vulnerabilities": {
+  "qs": { "name": "qs", "severity": "high", "range": "<6.14.2",
+          "fixAvailable": { "name": "qs", "version": "6.14.2" },
+          "via": [{ "source": 1, "name": "qs", "cwe": [], "cvss": {}, "url": "CVE-1" }] } } }
