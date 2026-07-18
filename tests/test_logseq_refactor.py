@@ -41,6 +41,17 @@ class TestRenameRefs(unittest.TestCase):
             index = scan.scan_graph(build_graph(td))
             self.assertEqual(refactor.rename_refs(index, "nothere", "x"), [])
 
+    def test_skips_unreadable_file_without_raising(self):
+        with tempfile.TemporaryDirectory() as td:
+            g = build_graph(td)
+            (g / "pages" / "Bad.md").write_bytes(b"\xff\xfe- foo\n")
+            index = scan.scan_graph(g)
+            changes = refactor.rename_refs(index, "foo", "Food Court")
+            by_rel = {str(c.path.relative_to(g)): c.new_content
+                      for c in changes}
+            self.assertNotIn("pages/Bad.md", by_rel)
+            self.assertIn("pages/Bar.md", by_rel)  # good files still processed
+
 
 class TestMergePages(unittest.TestCase):
     def test_merge_deletes_source_rewrites_refs(self):
@@ -55,11 +66,19 @@ class TestMergePages(unittest.TestCase):
             self.assertEqual(by_rel["pages/Bar.md"],
                              "- combined\n- from [[Bar]]\n")
 
-    def test_unknown_page_raises(self):
+    def test_unknown_source_raises_with_message(self):
         with tempfile.TemporaryDirectory() as td:
             index = scan.scan_graph(build_graph(td))
-            with self.assertRaises(KeyError):
+            with self.assertRaises(KeyError) as ctx:
                 refactor.merge_pages(index, "Nope", "Bar", "- x\n")
+            self.assertIn("unknown page", str(ctx.exception))
+
+    def test_unknown_target_raises_with_message(self):
+        with tempfile.TemporaryDirectory() as td:
+            index = scan.scan_graph(build_graph(td))
+            with self.assertRaises(KeyError) as ctx:
+                refactor.merge_pages(index, "Foo", "Nope", "- x\n")
+            self.assertIn("unknown page", str(ctx.exception))
 
 
 if __name__ == "__main__":

@@ -70,6 +70,14 @@ class TestCli(unittest.TestCase):
         f = self.g / "journals" / "2026_07_17.md"
         self.assertEqual(f.read_text(), "- note\n")
 
+    def test_append_journal_invalid_date_is_json_error_and_no_escape(self):
+        code, out = self._run("append", "--journal", "--text", "note",
+                              "--date", "../../x")
+        self.assertEqual(code, 1)
+        self.assertIn("error", out)
+        escaped = Path(self.td.name) / "x.md"
+        self.assertFalse(escaped.exists())
+
     def test_lint_and_scan(self):
         code, out = self._run("lint", "--types", "orphan")
         self.assertEqual(code, 0)
@@ -94,7 +102,7 @@ class TestCli(unittest.TestCase):
         code, out = self._run("merge", "--source", "Nope", "--target", "Bar",
                               "--content-file", "/dev/null")
         self.assertEqual(code, 1)
-        self.assertIn("error", out)
+        self.assertEqual(out["error"], "unknown page: Nope")
 
     def test_convert_plan_and_import(self):
         vault = Path(self.td.name) / "vault"

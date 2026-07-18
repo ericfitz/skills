@@ -29,7 +29,11 @@ class Index:
 
 def _scan_file(path: Path, is_journal: bool) -> PageInfo:
     name = pg.filename_to_page_name(path.stem)
-    text = path.read_text()
+    try:
+        text = path.read_text()
+    except (OSError, UnicodeDecodeError) as e:
+        return PageInfo(name=name, path=path, is_journal=is_journal,
+                        parse_error=f"unreadable: {e}")
     info = PageInfo(name=name, path=path, is_journal=is_journal,
                     links=set(LINK_RE.findall(text)),
                     tags=set(TAG_RE.findall(text)))

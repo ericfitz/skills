@@ -51,6 +51,20 @@ class TestScan(unittest.TestCase):
         b = self.index.pages["broken"]
         self.assertIsNotNone(b.parse_error)
 
+    def test_undecodable_file_does_not_abort_scan(self):
+        with tempfile.TemporaryDirectory() as td:
+            g = build_graph(td)
+            (g / "pages" / "Bad.md").write_bytes(b"\xff\xfe- x\n")
+            index = scan.scan_graph(g)
+            self.assertIn("bad", index.pages)
+            self.assertIsNotNone(index.pages["bad"].parse_error)
+            self.assertEqual(index.pages["bad"].links, set())
+            self.assertEqual(index.pages["bad"].tags, set())
+            self.assertEqual(index.pages["bad"].properties, {})
+            # other pages still indexed despite the unreadable one
+            self.assertIn("alpha", index.pages)
+            self.assertIn("beta", index.pages)
+
 
 class TestLint(unittest.TestCase):
     def setUp(self):
@@ -84,6 +98,15 @@ class TestLint(unittest.TestCase):
     def test_near_duplicate(self):
         details = " ".join(f["detail"] for f in self.by_type["near-duplicate"])
         self.assertIn("Betta", details)
+
+    def test_undecodable_file_reported_as_unparseable(self):
+        with tempfile.TemporaryDirectory() as td:
+            g = build_graph(td)
+            (g / "pages" / "Bad.md").write_bytes(b"\xff\xfe- x\n")
+            findings = scan.lint_all(scan.scan_graph(g))
+            unparseable_pages = [f["page"] for f in findings
+                                 if f["type"] == "unparseable"]
+            self.assertIn("Bad", unparseable_pages)
 
 
 if __name__ == "__main__":

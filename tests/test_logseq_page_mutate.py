@@ -34,6 +34,10 @@ class TestNaming(unittest.TestCase):
     def test_journal_filename(self):
         self.assertEqual(pg.journal_filename("2026-07-17"), "2026_07_17.md")
 
+    def test_journal_filename_rejects_path_traversal(self):
+        with self.assertRaises(ValueError):
+            pg.journal_filename("../../outside/evil")
+
     def test_page_filename_roundtrip(self):
         self.assertEqual(pg.page_filename("project/roadmap"),
                          "project%2Froadmap.md")
