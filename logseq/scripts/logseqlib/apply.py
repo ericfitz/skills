@@ -52,7 +52,13 @@ def backup(graph: Path, changes: list, now_stamp: str):
 
 
 def git_is_dirty(graph: Path):
-    if not (graph / ".git").exists():
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(graph), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    if r.stdout.strip() != "true":
         return None
     try:
         r = subprocess.run(["git", "-C", str(graph), "status", "--porcelain"],
