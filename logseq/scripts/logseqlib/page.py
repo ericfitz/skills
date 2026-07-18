@@ -14,6 +14,7 @@ from urllib.parse import unquote
 
 BULLET_RE = re.compile(r"^(?P<indent>[ \t]*)- (?P<rest>.*)$")
 PROP_RE = re.compile(r"^\s*(?P<key>[A-Za-z0-9_-]+):: (?P<val>.*)$")
+JOURNAL_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 class PageParseError(Exception):
@@ -169,6 +170,9 @@ def append_block(page: Page, content: str) -> Page:
 
 
 def journal_filename(date_iso: str) -> str:
+    if not JOURNAL_DATE_RE.match(date_iso):
+        raise ValueError(
+            f"invalid journal date: {date_iso!r} (expected YYYY-MM-DD)")
     return date_iso.replace("-", "_") + ".md"
 
 

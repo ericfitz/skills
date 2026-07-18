@@ -220,8 +220,12 @@ def main(argv=None):
     try:
         out = args.fn(args)
         rc = 0
+    except KeyError as e:
+        # e.args[0] is the original message (e.g. "unknown page: Nope");
+        # str(e) would instead be its repr, doubling the quotes in JSON.
+        out, rc = {"error": e.args[0]}, 1
     except (cfg.ConfigError, ap.ApplyError, pg.PageParseError,
-            FileExistsError, KeyError, OSError, ValueError) as e:
+            FileExistsError, OSError, ValueError) as e:
         out, rc = {"error": str(e)}, 1
     json.dump(out, sys.stdout, indent=2)
     print()

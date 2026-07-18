@@ -16,7 +16,12 @@ def _substitute(text: str, old: str, new: str) -> str:
 def rename_refs(index, old: str, new: str) -> list:
     changes = []
     for info in index.pages.values():
-        text = info.path.read_text()
+        try:
+            text = info.path.read_text()
+        except (OSError, UnicodeDecodeError):
+            # An undecodable file is not a valid Logseq page; it must not
+            # be rewritten.
+            continue
         replaced = _substitute(text, old, new)
         if replaced != text:
             changes.append(Change(info.path, replaced))
@@ -24,6 +29,10 @@ def rename_refs(index, old: str, new: str) -> list:
 
 
 def merge_pages(index, source: str, target: str, merged_content: str) -> list:
+    if source.lower() not in index.pages:
+        raise KeyError(f"unknown page: {source}")
+    if target.lower() not in index.pages:
+        raise KeyError(f"unknown page: {target}")
     src = index.pages[source.lower()]
     tgt = index.pages[target.lower()]
     changes = [

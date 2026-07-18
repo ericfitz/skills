@@ -185,6 +185,20 @@ class TestMalformedConfig(unittest.TestCase):
             with self.assertRaises(cfg.ConfigError):
                 cfg.resolve(config_path=cp, env={})
 
+    def test_graphs_entry_wrong_type_raises(self):
+        with tempfile.TemporaryDirectory() as td:
+            cp = Path(td) / "config.json"
+            cp.write_text(json.dumps({"graphs": {"main": "/path"}}))
+            with self.assertRaises(cfg.ConfigError):
+                cfg.resolve(config_path=cp, env={})
+
+    def test_api_wrong_type_raises(self):
+        with tempfile.TemporaryDirectory() as td:
+            cp = Path(td) / "config.json"
+            cp.write_text(json.dumps({"api": "x"}))
+            with self.assertRaises(cfg.ConfigError):
+                cfg.resolve(config_path=cp, env={})
+
 
 class TestWriteConfig(unittest.TestCase):
     def test_write_and_reread(self):

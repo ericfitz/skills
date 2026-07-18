@@ -57,9 +57,21 @@ def _validate_config_shape(data, config_path: Path) -> None:
             f"malformed config {config_path}: expected a JSON object at the top level"
         )
     graphs = data.get("graphs")
-    if graphs is not None and not isinstance(graphs, dict):
+    if graphs is not None:
+        if not isinstance(graphs, dict):
+            raise ConfigError(
+                f"malformed config {config_path}: 'graphs' must be an object"
+            )
+        for name, entry in graphs.items():
+            if not isinstance(entry, dict):
+                raise ConfigError(
+                    f"malformed config {config_path}: graphs[{name!r}] "
+                    f"must be an object"
+                )
+    api = data.get("api")
+    if api is not None and not isinstance(api, dict):
         raise ConfigError(
-            f"malformed config {config_path}: 'graphs' must be an object"
+            f"malformed config {config_path}: 'api' must be an object"
         )
 
 
