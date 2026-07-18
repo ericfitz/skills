@@ -35,11 +35,25 @@ OPAQUE = (
     "  :END:\n"
 )
 
+NO_FINAL_NEWLINE = "- a"
+
+NESTED_NO_FINAL_NEWLINE = "- a\n\t- a1\n\t\t- a1x\n- b"
+
 
 class TestRoundTrip(unittest.TestCase):
     def test_round_trips(self):
-        for text in (SIMPLE, NESTED_TABS, NESTED_SPACES, PROPS, OPAQUE, ""):
+        for text in (SIMPLE, NESTED_TABS, NESTED_SPACES, PROPS, OPAQUE, "",
+                     NO_FINAL_NEWLINE, NESTED_NO_FINAL_NEWLINE):
             self.assertEqual(pg.write(pg.parse(text)), text)
+
+    def test_no_final_newline_single_block(self):
+        self.assertEqual(pg.write(pg.parse("- a")), "- a")
+
+    def test_no_final_newline_nested(self):
+        pg_text = NESTED_NO_FINAL_NEWLINE
+        p = pg.parse(pg_text)
+        self.assertFalse(p.final_newline)
+        self.assertEqual(pg.write(p), pg_text)
 
 
 class TestStructure(unittest.TestCase):
