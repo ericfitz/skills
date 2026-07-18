@@ -51,6 +51,18 @@ def discover_graphs(graphs_dir: Path) -> list[Path]:
     return found
 
 
+def _validate_config_shape(data, config_path: Path) -> None:
+    if not isinstance(data, dict):
+        raise ConfigError(
+            f"malformed config {config_path}: expected a JSON object at the top level"
+        )
+    graphs = data.get("graphs")
+    if graphs is not None and not isinstance(graphs, dict):
+        raise ConfigError(
+            f"malformed config {config_path}: 'graphs' must be an object"
+        )
+
+
 def _from_config(data: dict, graph: str | None, env: dict) -> Resolved | None:
     graphs = data.get("graphs", {})
     name = graph or data.get("default_graph")
@@ -84,9 +96,16 @@ def resolve(graph: str | None = None, config_path: Path = CONFIG_PATH,
             data = json.loads(config_path.read_text())
         except (OSError, json.JSONDecodeError) as e:
             raise ConfigError(f"unreadable config {config_path}: {e}") from e
+        _validate_config_shape(data, config_path)
         r = _from_config(data, graph, env)
         if r is not None:
             return r
+
+    if graph is not None:
+        raise ConfigError(
+            f"graph {graph!r} not found in {config_path} or its recorded "
+            f"path no longer exists"
+        )
 
     candidates = discover_graphs(graphs_dir)
     if len(candidates) == 1:
