@@ -233,13 +233,13 @@ def _find_asset(vault: Path, ref: str) -> Path | None:
     if direct.is_file():
         return direct
     name = PurePosixPath(ref).name
-    hits = [f for f in vault.rglob(name)
-            if not (set(f.relative_to(vault).parts) & SKIP_DIRS)]
+    hits = sorted(f for f in vault.rglob(name)
+                  if not (set(f.relative_to(vault).parts) & SKIP_DIRS))
     return hits[0] if hits else None
 
 
 def asset_copies(vault: Path, graph: Path, plans):
-    pairs, seen = [], set()
+    pairs, seen, queued = [], set(), {}
     for plan in plans:
         for ref in plan.assets:
             src = _find_asset(vault, ref)
@@ -247,12 +247,19 @@ def asset_copies(vault: Path, graph: Path, plans):
                 plan.warnings.append(f"asset not found in vault: {ref}")
                 continue
             dest = graph / "assets" / src.name
+            queued_src = queued.get(dest)
+            if queued_src is not None:
+                if queued_src == src or queued_src.read_bytes() == src.read_bytes():
+                    continue  # dedup: identical bytes already queued here
+                h8 = hashlib.sha256(src.read_bytes()).hexdigest()[:8]
+                dest = dest.with_name(f"{dest.stem}-{h8}{dest.suffix}")
             if dest.exists() and dest.read_bytes() != src.read_bytes():
                 h8 = hashlib.sha256(src.read_bytes()).hexdigest()[:8]
                 dest = dest.with_name(f"{dest.stem}-{h8}{dest.suffix}")
             if dest.exists() or (src, dest) in seen:
                 continue
             seen.add((src, dest))
+            queued[dest] = src
             pairs.append((src, dest))
     return pairs
 
