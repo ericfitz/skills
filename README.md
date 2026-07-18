@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal Claude Code marketplace (`efitz-skills`). Eight plugins, each
+efitz's personal Claude Code marketplace (`efitz-skills`). Nine plugins, each
 bundling one or more skills. Invoke a skill as `/<plugin>:<skill>`.
 
 ## loc — localization / i18n
@@ -44,6 +44,14 @@ sub-dimensions; mechanical analyzer + LLM-judged dimensions).
 
 `bump` (update dependencies safely across Go/Python/Node — patch/minor auto,
 build+test+lint validated, bisects failures, plans majors).
+
+## logseq
+
+`capture` (add notes/TODOs to today's journal or a page) · `query` (answer
+questions from the graph, read-only) · `lint` (broken links, case conflicts,
+orphans, near-duplicates) · `organize` (merge/dedupe and restructure pages
+with safe changesets) · `from-obsidian` (convert + import an Obsidian vault,
+repeatable with hash-skip).
 
 ---
 
