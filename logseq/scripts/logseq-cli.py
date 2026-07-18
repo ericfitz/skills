@@ -140,15 +140,20 @@ def cmd_convert_import(args):
 
 def main(argv=None):
     # --graph/--config are declared on this shared parent parser and mixed
-    # into every subparser (as well as the top-level parser) so they can be
-    # passed either before or after the subcommand name; argparse only
-    # accepts an optional after the subcommand positional if the subparser
-    # itself defines it.
+    # into every subparser so they can follow the subcommand name (e.g.
+    # `resolve --config PATH`), which is how they're documented and tested.
+    # They are deliberately NOT also added to the top-level parser: argparse
+    # subparsers parse into a fresh sub-namespace and then overwrite the
+    # whole namespace with it, so a flag accepted by both the top-level
+    # parser and the subparser would be silently reset to the subparser's
+    # default whenever it was only given before the subcommand. Keeping
+    # these options only on the subparsers means giving them in the wrong
+    # place is a loud argparse error instead of a silently ignored value.
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--graph")
     common.add_argument("--config")
 
-    top = argparse.ArgumentParser(prog="logseq-cli", parents=[common])
+    top = argparse.ArgumentParser(prog="logseq-cli")
     sub = top.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("resolve", parents=[common])
