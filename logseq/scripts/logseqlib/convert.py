@@ -1,8 +1,12 @@
 # logseq/scripts/logseqlib/convert.py
 """Obsidian markdown -> Logseq outline conversion (pure text, no I/O)."""
+import hashlib
 import re
+import shutil
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+
+from . import page as pg
 
 ADMONITIONS = {"note": "NOTE", "warning": "WARNING", "tip": "TIP",
                "important": "IMPORTANT", "caution": "CAUTION"}
@@ -149,3 +153,114 @@ def convert_note(text: str, title: str) -> ConvertResult:
     body = "\n".join(out) + "\n" if out else ""
     return ConvertResult(content=head + body, warnings=warnings,
                          assets=assets)
+
+
+# --- import pipeline (Task 10) ---
+@dataclass
+class NotePlan:
+    source: Path
+    page_name: str
+    target: Path
+    status: str
+    warnings: list = field(default_factory=list)
+    assets: list = field(default_factory=list)
+    content: str | None = None
+
+
+def source_hash(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+SKIP_DIRS = {".obsidian", ".trash"}
+
+
+def _vault_notes(vault: Path, scope: Path | None):
+    if scope and scope.is_file():
+        return [scope]
+    base = scope if scope else vault
+    return [f for f in sorted(base.rglob("*.md"))
+            if not (set(f.relative_to(vault).parts) & SKIP_DIRS)]
+
+
+def _existing_import_hash(target: Path) -> str | None:
+    """None if page absent; '' if present without import-hash (native page)."""
+    if not target.is_file():
+        return None
+    try:
+        props = pg.page_properties(pg.parse(target.read_text()))
+    except pg.PageParseError:
+        return ""
+    return props.get("import-hash", "")
+
+
+def plan_import(vault: Path, graph: Path, scope: Path | None = None):
+    plans = []
+    for src in _vault_notes(vault, scope):
+        rel = src.relative_to(vault)
+        page_name = str(rel.with_suffix("")).replace("\\", "/")
+        target = graph / "pages" / pg.page_filename(page_name)
+        text = src.read_text()
+        h = source_hash(text)
+        existing = _existing_import_hash(target)
+        if existing is None:
+            status = "new"
+        elif existing == h:
+            status = "unchanged"
+        elif existing == "":
+            status = "collision"
+        else:
+            status = "changed"
+        plan = NotePlan(source=src, page_name=page_name, target=target,
+                        status=status)
+        if status in ("new", "changed"):
+            r = convert_note(text, page_name)
+            plan.warnings = r.warnings
+            plan.assets = r.assets
+            plan.content = (f"imported-from:: {rel}\n"
+                            f"import-hash:: {h}\n\n{r.content}")
+        plans.append(plan)
+    return plans
+
+
+def import_changes(plans):
+    from .apply import Change
+    return [Change(p.target, p.content) for p in plans
+            if p.status in ("new", "changed")]
+
+
+def _find_asset(vault: Path, ref: str) -> Path | None:
+    direct = vault / ref
+    if direct.is_file():
+        return direct
+    name = PurePosixPath(ref).name
+    hits = [f for f in vault.rglob(name)
+            if not (set(f.relative_to(vault).parts) & SKIP_DIRS)]
+    return hits[0] if hits else None
+
+
+def asset_copies(vault: Path, graph: Path, plans):
+    pairs, seen = [], set()
+    for plan in plans:
+        for ref in plan.assets:
+            src = _find_asset(vault, ref)
+            if src is None:
+                plan.warnings.append(f"asset not found in vault: {ref}")
+                continue
+            dest = graph / "assets" / src.name
+            if dest.exists() and dest.read_bytes() != src.read_bytes():
+                h8 = hashlib.sha256(src.read_bytes()).hexdigest()[:8]
+                dest = dest.with_name(f"{dest.stem}-{h8}{dest.suffix}")
+            if dest.exists() or (src, dest) in seen:
+                continue
+            seen.add((src, dest))
+            pairs.append((src, dest))
+    return pairs
+
+
+def copy_assets(pairs):
+    out = []
+    for src, dest in pairs:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        out.append(str(dest))
+    return out
