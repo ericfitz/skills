@@ -152,7 +152,14 @@ def page_properties(page: Page) -> dict[str, str]:
 
 def make_block(content: str, indent_unit: str = "  ") -> Block:
     first, *rest = content.split("\n")
-    lines = [f"- {first}"] + [f"  {ln}" for ln in rest]
+    cont = [f"  {ln}" for ln in rest]
+    for ln in cont:
+        if BULLET_RE.match(ln):
+            raise PageParseError(
+                "continuation line would parse as a bullet; append it as "
+                "its own block"
+            )
+    lines = [f"- {first}"] + cont
     return Block(lines=lines)
 
 

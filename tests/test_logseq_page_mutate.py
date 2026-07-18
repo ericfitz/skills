@@ -19,6 +19,10 @@ class TestMakeAppend(unittest.TestCase):
         b = pg.make_block("meeting notes\nwith [[Alice]]")
         self.assertEqual(b.lines, ["- meeting notes", "  with [[Alice]]"])
 
+    def test_make_block_bullet_like_continuation_raises(self):
+        with self.assertRaises(pg.PageParseError):
+            pg.make_block("x\n- y")
+
     def test_append_block_preserves_existing(self):
         text = "- a\n\t- a1\n"
         p = pg.parse(text)
@@ -69,6 +73,24 @@ class TestAppendToFile(unittest.TestCase):
             f.write_text("- a")
             pg.append_to_file(f, "b")
             self.assertEqual(f.read_text(), "- a\n- b")
+
+    def test_appends_plain_multiline_content(self):
+        # Multiline content whose continuation lines don't look like
+        # bullets is unaffected by the bullet-guard in make_block.
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "j.md"
+            f.write_text("- existing\n")
+            pg.append_to_file(f, "meeting notes\nwith [[Alice]]")
+            self.assertEqual(f.read_text(),
+                             "- existing\n- meeting notes\n  with [[Alice]]\n")
+
+    def test_bullet_like_continuation_raises_and_leaves_file_untouched(self):
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "j.md"
+            f.write_text("- existing\n")
+            with self.assertRaises(pg.PageParseError):
+                pg.append_to_file(f, "x\n- y")
+            self.assertEqual(f.read_text(), "- existing\n")
 
 
 if __name__ == "__main__":
