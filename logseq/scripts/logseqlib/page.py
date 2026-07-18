@@ -6,8 +6,11 @@ Unmodeled syntax (queries, embeds, logbook, code fences) rides along as raw
 continuation lines and is never rewritten. Pages we cannot parse raise
 PageParseError and must never be written back.
 """
+import os
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
+from urllib.parse import unquote
 
 BULLET_RE = re.compile(r"^(?P<indent>[ \t]*)- (?P<rest>.*)$")
 PROP_RE = re.compile(r"^\s*(?P<key>[A-Za-z0-9_-]+):: (?P<val>.*)$")
@@ -19,6 +22,11 @@ class PageParseError(Exception):
 
 @dataclass
 class Block:
+    """A bullet and its continuation/child lines.
+
+    Invariant: lines is never empty. parse() always seeds it with the
+    bullet line, and make_block() always produces at least one line.
+    """
     lines: list[str] = field(default_factory=list)
     children: list["Block"] = field(default_factory=list)
 
@@ -33,6 +41,7 @@ class Page:
     pre_lines: list[str] = field(default_factory=list)
     blocks: list[Block] = field(default_factory=list)
     indent_unit: str = "  "
+    final_newline: bool = True
 
 
 def _detect_indent_unit(lines: list[str]) -> str:
@@ -58,7 +67,9 @@ def parse(text: str) -> Page:
     lines = text.split("\n")
     if lines and lines[-1] == "":
         lines.pop()  # trailing newline; write() re-adds one per line
-    page = Page(indent_unit=_detect_indent_unit(lines))
+    final_newline = text == "" or text.endswith("\n")
+    page = Page(indent_unit=_detect_indent_unit(lines),
+                final_newline=final_newline)
     stack: list[Block] = []  # stack[i] = open block at depth i
     for i, line in enumerate(lines, start=1):
         m = BULLET_RE.match(line)
@@ -94,7 +105,10 @@ def write(page: Page) -> str:
     out: list[str] = list(page.pre_lines)
     for block in page.blocks:
         _write_block(out, block, page.indent_unit, 0)
-    return "\n".join(out) + "\n" if out else ""
+    if not out:
+        return ""
+    text = "\n".join(out)
+    return text + "\n" if page.final_newline else text
 
 
 def _prop_text(block: Block, idx: int) -> str:
@@ -131,3 +145,38 @@ def page_properties(page: Page) -> dict[str, str]:
         if _is_props_only_block(first):
             props = block_properties(first)
     return props
+
+
+# --- mutation + naming helpers (Task 4) ---
+
+
+def make_block(content: str, indent_unit: str = "  ") -> Block:
+    first, *rest = content.split("\n")
+    lines = [f"- {first}"] + [f"  {ln}" for ln in rest]
+    return Block(lines=lines)
+
+
+def append_block(page: Page, content: str) -> Page:
+    page.blocks.append(make_block(content, page.indent_unit))
+    return page
+
+
+def journal_filename(date_iso: str) -> str:
+    return date_iso.replace("-", "_") + ".md"
+
+
+def page_filename(name: str) -> str:
+    return name.replace("/", "%2F") + ".md"
+
+
+def filename_to_page_name(stem: str) -> str:
+    return unquote(stem)
+
+
+def append_to_file(path: Path, content: str) -> None:
+    text = path.read_text() if path.is_file() else ""
+    page = parse(text)  # PageParseError propagates; file untouched
+    append_block(page, content)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(write(page))
+    os.replace(tmp, path)
