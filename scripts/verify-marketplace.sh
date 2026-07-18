@@ -28,10 +28,10 @@ fi
 ok ".claude-plugin/marketplace.json parses as JSON"
 
 PLUGIN_COUNT=$(python3 -c "import json; print(len(json.load(open('.claude-plugin/marketplace.json'))['plugins']))")
-if [ "$PLUGIN_COUNT" -eq 8 ]; then
-  ok "marketplace.json has 8 plugin entries"
+if [ "$PLUGIN_COUNT" -eq 9 ]; then
+  ok "marketplace.json has 9 plugin entries"
 else
-  bad "marketplace.json has $PLUGIN_COUNT plugin entries (expected 8)"
+  bad "marketplace.json has $PLUGIN_COUNT plugin entries (expected 9)"
 fi
 
 # ---------- Per-plugin structural checks ----------
@@ -47,6 +47,7 @@ declare -a PLUGINS=(
   "dev:development:dedupe,sem-annotate,sem-auto"
   "writing:writing:boring"
   "deps:development:bump"
+  "logseq:productivity:capture,query,lint,organize,from-obsidian"
 )
 
 for entry in "${PLUGINS[@]}"; do
@@ -107,6 +108,7 @@ declare -a SCRIPTS=(
   "github/scripts/gh-issues.py"
   "dev/scripts/dedupe.py"
   "dev/scripts/sem_annotate.py"
+  "logseq/scripts/logseq-cli.py"
 )
 for s in "${SCRIPTS[@]}"; do
   if [ -f "$s" ]; then ok "$s exists"; else bad "$s missing"; fi
