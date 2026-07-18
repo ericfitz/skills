@@ -92,6 +92,35 @@ class TestGitGuard(unittest.TestCase):
             ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP)
             self.assertEqual(f.read_text(), "- new\n")
 
+    def test_dirty_tree_blocks_when_graph_is_subdirectory_of_repo(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._git(root, "init", "-q")
+            (root / "graph").mkdir()
+            g, f = graph_with_page(str(root / "graph"))
+            self._git(root, "add", "-A")
+            self._git(root, "-c", "user.email=t@t", "-c", "user.name=t",
+                      "commit", "-qm", "init")
+            f.write_text("- dirty\n")  # uncommitted change, outside graph dir
+            with self.assertRaises(ap.ApplyError):
+                ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP)
+            out = ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP,
+                                     force=True)
+            self.assertEqual(f.read_text(), "- new\n")
+            self.assertIn("pages/A.md", out["applied"])
+
+    def test_clean_tree_applies_when_graph_is_subdirectory_of_repo(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._git(root, "init", "-q")
+            (root / "graph").mkdir()
+            g, f = graph_with_page(str(root / "graph"))
+            self._git(root, "add", "-A")
+            self._git(root, "-c", "user.email=t@t", "-c", "user.name=t",
+                      "commit", "-qm", "init")
+            ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP)
+            self.assertEqual(f.read_text(), "- new\n")
+
 
 if __name__ == "__main__":
     unittest.main()
