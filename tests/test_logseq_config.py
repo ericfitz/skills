@@ -143,6 +143,48 @@ class TestResolve(unittest.TestCase):
                 cfg.resolve(config_path=root / "absent.json",
                             graphs_dir=root / "graphs", env={})
 
+    def test_explicit_graph_missing_config_raises(self):
+        # An explicitly-named graph must not silently fall back to a
+        # different discovered graph when the config file is absent.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            g = make_graph(root)
+            gdir = root / "graphs"
+            gdir.mkdir()
+            (gdir / f"logseq_local_{str(g).replace('/', '++')}.transit").write_text("{}")
+            with self.assertRaises(cfg.ConfigError):
+                cfg.resolve(graph="work", config_path=root / "absent.json",
+                            graphs_dir=gdir, env={})
+
+    def test_explicit_graph_stale_path_raises(self):
+        # An explicitly-named graph with a stale path in config must not
+        # silently fall back to a different discovered graph.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            g = make_graph(root)
+            cp = self._config(root, root / "moved-away", name="work")
+            gdir = root / "graphs"
+            gdir.mkdir()
+            (gdir / f"logseq_local_{str(g).replace('/', '++')}.transit").write_text("{}")
+            with self.assertRaises(cfg.ConfigError):
+                cfg.resolve(graph="work", config_path=cp, graphs_dir=gdir, env={})
+
+
+class TestMalformedConfig(unittest.TestCase):
+    def test_top_level_list_raises(self):
+        with tempfile.TemporaryDirectory() as td:
+            cp = Path(td) / "config.json"
+            cp.write_text("[]")
+            with self.assertRaises(cfg.ConfigError):
+                cfg.resolve(config_path=cp, env={})
+
+    def test_graphs_wrong_type_raises(self):
+        with tempfile.TemporaryDirectory() as td:
+            cp = Path(td) / "config.json"
+            cp.write_text(json.dumps({"graphs": "x"}))
+            with self.assertRaises(cfg.ConfigError):
+                cfg.resolve(config_path=cp, env={})
+
 
 class TestWriteConfig(unittest.TestCase):
     def test_write_and_reread(self):
