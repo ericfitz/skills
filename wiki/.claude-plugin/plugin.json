@@ -1,6 +1,6 @@
 {
   "name": "wiki",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Documentation toolkit: verify a doc's accuracy against source code and external references, then migrate it into a project wiki (verify-doc).",
   "author": { "name": "efitz" }
 }
