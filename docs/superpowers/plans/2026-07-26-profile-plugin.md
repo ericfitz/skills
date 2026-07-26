@@ -1,0 +1,2226 @@
+# `profile` Plugin Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Ship a `profile` plugin that answers general questions about any codebase — what it is built with, how it deploys, and what users do with it — backed by a deterministic inventory script.
+
+**Architecture:** A dependency-free Python package (`inventorylib`) does the mechanical repo census and emits JSON; three skills (`stack`, `topology`, `journeys`) interpret that census with model reasoning guided by reference files. Each skill emits a versioned JSON contract, which is the only thing downstream consumers (including the `itest` plugin) are allowed to depend on.
+
+**Tech Stack:** Python 3.13 stdlib only. `unittest` for tests. Markdown skills. No third-party runtime or test dependencies.
+
+**Spec:** `docs/superpowers/specs/2026-07-26-integration-test-design-design.md`
+
+## Global Constraints
+
+- **Python: stdlib only.** No third-party imports in shipped code or tests. `jsonschema` is NOT installed; contract tests use the hand-rolled checker built in Task 8.
+- **Test style:** `unittest.TestCase` classes, matching `tests/test_dedupe.py`. Every test module starts with `sys.dont_write_bytecode = True` and a `sys.path.insert` pointing at `profile/scripts`.
+- **Test command:** `python3 -m unittest discover -s tests -t .` from the repo root. Single module: `python3 -m unittest tests.<module> -v`.
+- **Lint command:** `ruff check profile/ tests/` — scoped deliberately. `ruff check .` reports 61 pre-existing errors elsewhere in the repo; do not fix those here.
+- **Repo has no `pyproject.toml`, no pytest, no CI.** Do not add any.
+- **Branch:** create `feat/profile-plugin` before Task 1. Do not commit to `main`.
+- **Paths in JSON output are always repo-relative POSIX strings**, sorted, never absolute — except the top-level `root` key.
+- **The script classifies what it recognizes and explicitly lists what it does not.** No silent guessing. This is the property the model fallback depends on.
+- **No testing vocabulary in `topology` or `journeys` outputs.** Binding, per the spec's extraction discipline: `topology` emits `standup_notes`, never test-boundary options; `journeys` emits no test-coverage hints.
+
+## File Structure
+
+```
+profile/
+  .claude-plugin/plugin.json          # plugin manifest
+  scripts/
+    profile_inventory.py              # CLI entry point, arg parsing, exit codes
+    inventorylib/
+      __init__.py                     # version constant only
+      walk.py                         # git-aware file listing + skip rules
+      languages.py                    # extension -> language, unrecognized census
+      manifests.py                    # manifest/lockfile -> ecosystem, package manager
+      testfiles.py                    # test-file census + kind classification signals
+      infra.py                        # CI, containers, IaC, test config, entrypoints, docs
+      report.py                       # assembly, unclassified, coverage_confidence
+  references/
+    ecosystems.md                     # manifest/lockfile signatures for model fallback
+    deployment-shapes.md              # deployment signatures -> shape + testability
+    journey-sources.md                # where journeys hide, how to rank
+    contracts/stack.schema.json
+    contracts/topology.schema.json
+    contracts/journeys.schema.json
+    contracts/examples/stack.example.json
+    contracts/examples/topology.example.json
+    contracts/examples/journeys.example.json
+  skills/
+    stack/SKILL.md
+    topology/SKILL.md
+    journeys/SKILL.md
+
+tests/
+  schema_check.py                     # dependency-free JSON Schema subset validator (test helper)
+  repobuilder.py                      # builds synthetic repo trees in temp dirs (test helper)
+  test_profile_walk.py
+  test_profile_languages.py
+  test_profile_manifests.py
+  test_profile_testfiles.py
+  test_profile_infra.py
+  test_profile_report.py
+  test_profile_cli.py
+  test_profile_contracts.py
+  test_plugin_structure.py
+```
+
+**Deliberate refinement of the spec:** the spec proposed committed fixture repos under `tests/fixtures/profile_inventory/`. This plan builds synthetic repos in temp directories instead (`tests/repobuilder.py`). Committing a tree containing `go.mod`, `package.json`, and `pyproject.toml` into this repo would confuse repo-level tooling and the plugin's own inventory script when run on itself. The test coverage is identical; the fixtures are declarative dicts inside the test modules.
+
+---
+
+### Task 1: Repo file listing
+
+**Files:**
+- Create: `profile/scripts/inventorylib/__init__.py`
+- Create: `profile/scripts/inventorylib/walk.py`
+- Create: `tests/repobuilder.py`
+- Test: `tests/test_profile_walk.py`
+
+**Interfaces:**
+- Consumes: nothing
+- Produces: `walk_repo(root: Path) -> tuple[list[str], str]` returning sorted repo-relative POSIX paths and the listing method (`"git"` or `"walk"`). `SKIP_DIRS: set[str]`. Test helper `build_repo(base: Path, files: dict[str, str]) -> Path`.
+
+- [ ] **Step 1: Write the test helper**
+
+```python
+# tests/repobuilder.py
+"""Build synthetic repo trees in a temp directory for inventory tests."""
+
+import subprocess
+from pathlib import Path
+
+
+def build_repo(base, files):
+    """Create files under base. Keys are repo-relative POSIX paths, values file text.
+
+    Returns base as a Path.
+    """
+    base = Path(base)
+    for rel, text in files.items():
+        path = base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return base
+
+
+def git_init(base):
+    """Initialize a git repo at base and stage nothing. Returns base."""
+    base = Path(base)
+    subprocess.run(["git", "init", "-q", str(base)], check=True)
+    return base
+```
+
+- [ ] **Step 2: Write the failing test**
+
+```python
+# tests/test_profile_walk.py
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from inventorylib.walk import SKIP_DIRS, walk_repo
+from repobuilder import build_repo, git_init
+
+
+class TestWalkRepo(unittest.TestCase):
+    def test_lists_files_relative_and_sorted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {
+                "b.py": "x = 1\n",
+                "a.py": "y = 2\n",
+                "pkg/c.py": "z = 3\n",
+            })
+            files, method = walk_repo(root)
+            self.assertEqual(files, ["a.py", "b.py", "pkg/c.py"])
+            self.assertEqual(method, "walk")
+
+    def test_skips_noise_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {
+                "app.py": "x = 1\n",
+                "node_modules/left-pad/index.js": "//\n",
+                ".venv/lib/thing.py": "x = 1\n",
+                "dist/bundle.js": "//\n",
+            })
+            files, _ = walk_repo(root)
+            self.assertEqual(files, ["app.py"])
+
+    def test_uses_git_listing_and_honors_gitignore(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {
+                ".gitignore": "secret.txt\n",
+                "app.py": "x = 1\n",
+                "secret.txt": "shh\n",
+            })
+            git_init(root)
+            files, method = walk_repo(root)
+            self.assertEqual(method, "git")
+            self.assertIn("app.py", files)
+            self.assertNotIn("secret.txt", files)
+
+    def test_skip_dirs_contains_expected_entries(self):
+        self.assertTrue({"node_modules", ".venv", "vendor", "dist"} <= SKIP_DIRS)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_walk -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib'`
+
+- [ ] **Step 4: Write the implementation**
+
+```python
+# profile/scripts/inventorylib/__init__.py
+"""Deterministic repo inventory for the profile plugin."""
+
+VERSION = "1.0.0"
+```
+
+```python
+# profile/scripts/inventorylib/walk.py
+"""Repo file listing: git-aware, with a filesystem fallback."""
+
+import subprocess
+from pathlib import Path
+
+SKIP_DIRS = {
+    ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "env",
+    "vendor", "dist", "build", "target", "out", "__pycache__",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".next",
+    ".gradle", "site-packages", ".idea",
+}
+
+
+def _skipped(rel):
+    return any(part in SKIP_DIRS for part in Path(rel).parts)
+
+
+def _git_files(root):
+    """Return git's view of the repo, or None if root is not a usable git repo."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--cached", "--others",
+             "--exclude-standard"],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [line for line in proc.stdout.splitlines() if line]
+
+
+def _walk_files(root):
+    found = []
+    for path in Path(root).rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if not _skipped(rel):
+            found.append(rel)
+    return found
+
+
+def walk_repo(root):
+    """Return (sorted repo-relative POSIX paths, method) where method is git|walk."""
+    root = Path(root)
+    files = _git_files(root)
+    if files is None:
+        return sorted(_walk_files(root)), "walk"
+    return sorted(f for f in files if not _skipped(f)), "git"
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_walk -v`
+Expected: PASS, 4 tests
+
+- [ ] **Step 6: Lint**
+
+Run: `ruff check profile/ tests/test_profile_walk.py tests/repobuilder.py`
+Expected: `All checks passed!`
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add profile/scripts/inventorylib tests/test_profile_walk.py tests/repobuilder.py
+git commit -m "feat(profile): git-aware repo file listing for inventory"
+```
+
+---
+
+### Task 2: Language classification
+
+**Files:**
+- Create: `profile/scripts/inventorylib/languages.py`
+- Test: `tests/test_profile_languages.py`
+
+**Interfaces:**
+- Consumes: `walk_repo` output (a list of POSIX path strings)
+- Produces: `classify_languages(paths: list[str]) -> tuple[list[dict], list[str]]`. First element is language records `{"name": str, "files": int, "share": float}` sorted by file count descending then name ascending. Second element is paths with an unrecognized, non-ignorable extension — the `unclassified` feed.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_profile_languages.py
+import sys
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+
+from inventorylib.languages import classify_languages
+
+
+class TestClassifyLanguages(unittest.TestCase):
+    def test_counts_and_sorts_by_file_count(self):
+        langs, _ = classify_languages(["a.py", "b.py", "c.go"])
+        self.assertEqual([entry["name"] for entry in langs], ["python", "go"])
+        self.assertEqual(langs[0]["files"], 2)
+        self.assertEqual(langs[0]["share"], 0.667)
+
+    def test_ties_break_alphabetically(self):
+        langs, _ = classify_languages(["a.go", "b.py"])
+        self.assertEqual([entry["name"] for entry in langs], ["go", "python"])
+
+    def test_tsx_and_ts_both_count_as_typescript(self):
+        langs, _ = classify_languages(["a.ts", "b.tsx"])
+        self.assertEqual(len(langs), 1)
+        self.assertEqual(langs[0]["files"], 2)
+
+    def test_ignorable_extensions_are_not_unclassified(self):
+        _, unknown = classify_languages(["README.md", "data.json", "logo.png"])
+        self.assertEqual(unknown, [])
+
+    def test_unrecognized_source_extension_is_reported(self):
+        _, unknown = classify_languages(["thing.zig", "other.nim"])
+        self.assertEqual(unknown, ["thing.zig", "other.nim"])
+
+    def test_empty_input_is_safe(self):
+        langs, unknown = classify_languages([])
+        self.assertEqual(langs, [])
+        self.assertEqual(unknown, [])
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_languages -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.languages'`
+
+- [ ] **Step 3: Write the implementation**
+
+```python
+# profile/scripts/inventorylib/languages.py
+"""Map file extensions to languages and report what could not be classified."""
+
+from pathlib import PurePosixPath
+
+EXT_LANGUAGE = {
+    ".py": "python", ".go": "go", ".rs": "rust", ".rb": "ruby",
+    ".ts": "typescript", ".tsx": "typescript",
+    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
+    ".java": "java", ".kt": "kotlin", ".kts": "kotlin",
+    ".cs": "csharp", ".php": "php", ".swift": "swift", ".scala": "scala",
+    ".ex": "elixir", ".exs": "elixir", ".erl": "erlang",
+    ".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".hpp": "cpp",
+    ".sh": "shell", ".bash": "shell", ".sql": "sql", ".lua": "lua",
+    ".dart": "dart", ".clj": "clojure", ".hs": "haskell",
+}
+
+IGNORABLE_EXTS = {
+    ".md", ".rst", ".txt", ".json", ".yml", ".yaml", ".toml", ".ini",
+    ".cfg", ".conf", ".lock", ".csv", ".tsv", ".xml", ".html", ".htm",
+    ".css", ".scss", ".less", ".svg", ".png", ".jpg", ".jpeg", ".gif",
+    ".ico", ".webp", ".pdf", ".woff", ".woff2", ".ttf", ".eot",
+    ".gitignore", ".gitattributes", ".editorconfig", ".env", ".example",
+    ".mod", ".sum", ".log", ".zip", ".gz", ".tar",
+}
+
+
+def classify_languages(paths):
+    """Return (language records, paths with an unrecognized source extension)."""
+    counts = {}
+    unknown = []
+    for path in paths:
+        ext = PurePosixPath(path).suffix.lower()
+        language = EXT_LANGUAGE.get(ext)
+        if language:
+            counts[language] = counts.get(language, 0) + 1
+        elif ext and ext not in IGNORABLE_EXTS:
+            unknown.append(path)
+    total = sum(counts.values())
+    languages = [
+        {
+            "name": name,
+            "files": count,
+            "share": round(count / total, 3) if total else 0.0,
+        }
+        for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    return languages, unknown
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_languages -v`
+Expected: PASS, 6 tests
+
+- [ ] **Step 5: Lint and commit**
+
+```bash
+ruff check profile/ tests/test_profile_languages.py
+git add profile/scripts/inventorylib/languages.py tests/test_profile_languages.py
+git commit -m "feat(profile): language classification with unclassified census"
+```
+
+---
+
+### Task 3: Manifest and package-manager detection
+
+**Files:**
+- Create: `profile/scripts/inventorylib/manifests.py`
+- Test: `tests/test_profile_manifests.py`
+
+**Interfaces:**
+- Consumes: `walk_repo` output
+- Produces: `detect_manifests(paths: list[str]) -> list[dict]` with records `{"path": str, "ecosystem": str, "package_manager": str | None}`, sorted by path. `MANIFESTS: dict[str, tuple[str, str | None]]`, `LOCKFILE_PM: dict[str, str]`.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_profile_manifests.py
+import sys
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+
+from inventorylib.manifests import detect_manifests
+
+
+class TestDetectManifests(unittest.TestCase):
+    def test_detects_go_module(self):
+        found = detect_manifests(["go.mod", "main.go"])
+        self.assertEqual(found, [
+            {"path": "go.mod", "ecosystem": "go", "package_manager": "go"},
+        ])
+
+    def test_lockfile_refines_package_manager(self):
+        found = detect_manifests(["pyproject.toml", "uv.lock"])
+        self.assertEqual(found[0]["package_manager"], "uv")
+
+    def test_manifest_default_used_when_no_lockfile(self):
+        found = detect_manifests(["requirements.txt"])
+        self.assertEqual(found[0]["package_manager"], "pip")
+
+    def test_pyproject_without_lockfile_has_no_package_manager(self):
+        found = detect_manifests(["pyproject.toml"])
+        self.assertIsNone(found[0]["package_manager"])
+
+    def test_lockfile_only_applies_within_same_directory(self):
+        found = detect_manifests(["api/package.json", "web/pnpm-lock.yaml"])
+        self.assertIsNone(found[0]["package_manager"])
+
+    def test_monorepo_reports_each_manifest_sorted(self):
+        found = detect_manifests([
+            "web/package.json", "web/yarn.lock", "api/go.mod",
+        ])
+        self.assertEqual([entry["path"] for entry in found],
+                         ["api/go.mod", "web/package.json"])
+        self.assertEqual(found[1]["package_manager"], "yarn")
+
+    def test_non_manifest_files_ignored(self):
+        self.assertEqual(detect_manifests(["src/app.py", "README.md"]), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_manifests -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.manifests'`
+
+- [ ] **Step 3: Write the implementation**
+
+```python
+# profile/scripts/inventorylib/manifests.py
+"""Detect dependency manifests and resolve the package manager in use."""
+
+from pathlib import PurePosixPath
+
+# filename -> (ecosystem, default package manager or None if a lockfile decides)
+MANIFESTS = {
+    "pyproject.toml": ("python", None),
+    "requirements.txt": ("python", "pip"),
+    "setup.py": ("python", "pip"),
+    "Pipfile": ("python", "pipenv"),
+    "go.mod": ("go", "go"),
+    "package.json": ("node", None),
+    "Cargo.toml": ("rust", "cargo"),
+    "Gemfile": ("ruby", "bundler"),
+    "pom.xml": ("java", "maven"),
+    "build.gradle": ("java", "gradle"),
+    "build.gradle.kts": ("kotlin", "gradle"),
+    "composer.json": ("php", "composer"),
+    "mix.exs": ("elixir", "mix"),
+    "Package.swift": ("swift", "spm"),
+    "pubspec.yaml": ("dart", "pub"),
+}
+
+LOCKFILE_PM = {
+    "uv.lock": "uv",
+    "poetry.lock": "poetry",
+    "pdm.lock": "pdm",
+    "Pipfile.lock": "pipenv",
+    "package-lock.json": "npm",
+    "yarn.lock": "yarn",
+    "pnpm-lock.yaml": "pnpm",
+    "bun.lockb": "bun",
+}
+
+
+def detect_manifests(paths):
+    """Return manifest records, resolving package manager from sibling lockfiles."""
+    locks_by_dir = {}
+    for path in paths:
+        parsed = PurePosixPath(path)
+        manager = LOCKFILE_PM.get(parsed.name)
+        if manager:
+            locks_by_dir.setdefault(parsed.parent.as_posix(), set()).add(manager)
+
+    found = []
+    for path in sorted(paths):
+        parsed = PurePosixPath(path)
+        entry = MANIFESTS.get(parsed.name)
+        if not entry:
+            continue
+        ecosystem, default_manager = entry
+        siblings = sorted(locks_by_dir.get(parsed.parent.as_posix(), set()))
+        found.append({
+            "path": path,
+            "ecosystem": ecosystem,
+            "package_manager": siblings[0] if siblings else default_manager,
+        })
+    return found
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_manifests -v`
+Expected: PASS, 7 tests
+
+- [ ] **Step 5: Lint and commit**
+
+```bash
+ruff check profile/ tests/test_profile_manifests.py
+git add profile/scripts/inventorylib/manifests.py tests/test_profile_manifests.py
+git commit -m "feat(profile): manifest and package-manager detection"
+```
+
+---
+
+### Task 4: Test-file census and kind classification
+
+**Files:**
+- Create: `profile/scripts/inventorylib/testfiles.py`
+- Test: `tests/test_profile_testfiles.py`
+
+**Interfaces:**
+- Consumes: `walk_repo` output plus the repo root (content reads)
+- Produces: `classify_test_files(root: Path, paths: list[str], max_bytes: int = 4096) -> list[dict]` with records `{"path": str, "language": str | None, "kind": str, "signals": list[str]}` where `kind` is one of `unit|integration|e2e|unknown`. Also `test_dirs(records: list[dict]) -> list[str]`.
+
+**Kind resolution priority (binding):** any `e2e` signal wins; else any `integration` signal; else a filename-pattern match yields `unit`; else `unknown`. A directory signal alone is never enough to call something a unit test.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_profile_testfiles.py
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from inventorylib.testfiles import classify_test_files, test_dirs
+from repobuilder import build_repo
+
+
+def classify(files):
+    with tempfile.TemporaryDirectory() as tmp:
+        root = build_repo(tmp, files)
+        return classify_test_files(root, sorted(files))
+
+
+class TestClassifyTestFiles(unittest.TestCase):
+    def test_non_test_files_are_excluded(self):
+        self.assertEqual(classify({"src/app.py": "x = 1\n"}), [])
+
+    def test_python_name_pattern_is_a_unit_test(self):
+        [record] = classify({"tests/test_app.py": "def test_x(): pass\n"})
+        self.assertEqual(record["kind"], "unit")
+        self.assertEqual(record["language"], "python")
+        self.assertIn("name:test_*.py", record["signals"])
+
+    def test_integration_directory_overrides_unit(self):
+        [record] = classify({"tests/integration/test_api.py": "def test_x(): pass\n"})
+        self.assertEqual(record["kind"], "integration")
+        self.assertIn("dir:integration", record["signals"])
+
+    def test_pytest_marker_detected_from_content(self):
+        [record] = classify({
+            "tests/test_api.py": "import pytest\n\n@pytest.mark.integration\ndef test_x(): pass\n",
+        })
+        self.assertEqual(record["kind"], "integration")
+        self.assertIn("marker:pytest.mark.integration", record["signals"])
+
+    def test_go_build_tag_detected(self):
+        [record] = classify({
+            "api/client_test.go": "//go:build integration\n\npackage api\n",
+        })
+        self.assertEqual(record["kind"], "integration")
+        self.assertIn("buildtag:integration", record["signals"])
+        self.assertEqual(record["language"], "go")
+
+    def test_e2e_beats_integration(self):
+        [record] = classify({"tests/e2e/integration/flow.spec.ts": "it('x', () => {})\n"})
+        self.assertEqual(record["kind"], "e2e")
+
+    def test_directory_signal_alone_is_unknown(self):
+        [record] = classify({"tests/helpers.py": "VALUE = 1\n"})
+        self.assertEqual(record["kind"], "unknown")
+
+    def test_signals_are_sorted(self):
+        [record] = classify({"tests/integration/test_api.py": "def test_x(): pass\n"})
+        self.assertEqual(record["signals"], sorted(record["signals"]))
+
+    def test_unreadable_file_does_not_raise(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"tests/test_a.py": "def test_x(): pass\n"})
+            records = classify_test_files(root, ["tests/test_a.py", "tests/test_gone.py"])
+            self.assertEqual(len(records), 2)
+
+
+class TestTestDirs(unittest.TestCase):
+    def test_unique_sorted_parent_dirs(self):
+        records = [
+            {"path": "tests/integration/test_a.py"},
+            {"path": "tests/integration/test_b.py"},
+            {"path": "tests/test_c.py"},
+        ]
+        self.assertEqual(test_dirs(records), ["tests", "tests/integration"])
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_testfiles -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.testfiles'`
+
+- [ ] **Step 3: Write the implementation**
+
+```python
+# profile/scripts/inventorylib/testfiles.py
+"""Census of test files, with the signals behind each kind guess."""
+
+import fnmatch
+from pathlib import Path, PurePosixPath
+
+TEST_DIR_NAMES = {
+    "test", "tests", "spec", "specs", "__tests__", "testing",
+    "e2e", "integration", "it", "itest", "functional", "acceptance",
+    "contract", "endtoend", "end_to_end",
+}
+
+INTEGRATION_DIRS = {"integration", "it", "itest", "functional", "acceptance", "contract"}
+E2E_DIRS = {"e2e", "endtoend", "end_to_end"}
+
+# (glob, language)
+NAME_PATTERNS = (
+    ("test_*.py", "python"), ("*_test.py", "python"),
+    ("*_test.go", "go"),
+    ("*.test.ts", "typescript"), ("*.test.tsx", "typescript"),
+    ("*.spec.ts", "typescript"), ("*.spec.tsx", "typescript"),
+    ("*.test.js", "javascript"), ("*.spec.js", "javascript"),
+    ("*Test.java", "java"), ("*Tests.java", "java"),
+    ("*Tests.cs", "csharp"),
+    ("*_spec.rb", "ruby"), ("*_test.rb", "ruby"),
+    ("*_test.rs", "rust"),
+    ("*_test.exs", "elixir"),
+)
+
+# (signal name, kind, substrings that trigger it)
+CONTENT_MARKERS = (
+    ("marker:pytest.mark.integration", "integration", ("pytest.mark.integration",)),
+    ("marker:pytest.mark.e2e", "e2e", ("pytest.mark.e2e",)),
+    ("buildtag:integration", "integration",
+     ("//go:build integration", "// +build integration")),
+    ("buildtag:e2e", "e2e", ("//go:build e2e", "// +build e2e")),
+    ("marker:testcontainers", "integration", ("testcontainers",)),
+)
+
+_KIND_BY_SIGNAL = {name: kind for name, kind, _ in CONTENT_MARKERS}
+
+
+def _name_signals(path):
+    """Return (signals, language) for path, or ([], None) if it is not a test file."""
+    parsed = PurePosixPath(path)
+    signals = [
+        "dir:%s" % part for part in parsed.parts[:-1] if part in TEST_DIR_NAMES
+    ]
+    language = None
+    for pattern, pattern_language in NAME_PATTERNS:
+        if fnmatch.fnmatch(parsed.name, pattern):
+            signals.append("name:%s" % pattern)
+            language = pattern_language
+            break
+    if not signals:
+        return [], None
+    return signals, language
+
+
+def _content_signals(full_path, max_bytes):
+    try:
+        text = Path(full_path).read_text(encoding="utf-8", errors="replace")[:max_bytes]
+    except OSError:
+        return []
+    return [
+        name for name, _, needles in CONTENT_MARKERS
+        if any(needle in text for needle in needles)
+    ]
+
+
+def _resolve_kind(signals):
+    dirs = {signal.split(":", 1)[1] for signal in signals if signal.startswith("dir:")}
+    kinds = {_KIND_BY_SIGNAL[s] for s in signals if s in _KIND_BY_SIGNAL}
+    if dirs & E2E_DIRS or "e2e" in kinds:
+        return "e2e"
+    if dirs & INTEGRATION_DIRS or "integration" in kinds:
+        return "integration"
+    if any(signal.startswith("name:") for signal in signals):
+        return "unit"
+    return "unknown"
+
+
+def classify_test_files(root, paths, max_bytes=4096):
+    """Return one record per test file, with the signals behind its kind."""
+    root = Path(root)
+    records = []
+    for path in paths:
+        signals, language = _name_signals(path)
+        if not signals:
+            continue
+        signals = signals + _content_signals(root / path, max_bytes)
+        records.append({
+            "path": path,
+            "language": language,
+            "kind": _resolve_kind(signals),
+            "signals": sorted(set(signals)),
+        })
+    return records
+
+
+def test_dirs(records):
+    """Return the unique sorted parent directories of test-file records."""
+    return sorted({PurePosixPath(r["path"]).parent.as_posix() for r in records})
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_testfiles -v`
+Expected: PASS, 10 tests
+
+- [ ] **Step 5: Lint and commit**
+
+```bash
+ruff check profile/ tests/test_profile_testfiles.py
+git add profile/scripts/inventorylib/testfiles.py tests/test_profile_testfiles.py
+git commit -m "feat(profile): test-file census with kind classification signals"
+```
+
+---
+
+### Task 5: Infrastructure and entrypoint detection
+
+**Files:**
+- Create: `profile/scripts/inventorylib/infra.py`
+- Test: `tests/test_profile_infra.py`
+
+**Interfaces:**
+- Consumes: `walk_repo` output plus repo root
+- Produces: `detect_infra(root: Path, paths: list[str]) -> dict` with keys `ci`, `containers`, `iac`, `test_config`, `entrypoints`, `docs` — each a sorted list of records containing at least `path`.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_profile_infra.py
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from inventorylib.infra import detect_infra
+from repobuilder import build_repo
+
+
+def infra(files):
+    with tempfile.TemporaryDirectory() as tmp:
+        root = build_repo(tmp, files)
+        return detect_infra(root, sorted(files))
+
+
+class TestDetectInfra(unittest.TestCase):
+    def test_github_workflows_are_ci(self):
+        found = infra({".github/workflows/test.yml": "on: push\n"})
+        self.assertEqual(found["ci"], [{"path": ".github/workflows/test.yml",
+                                        "system": "github-actions"}])
+
+    def test_gitlab_ci_detected(self):
+        found = infra({".gitlab-ci.yml": "stages: [test]\n"})
+        self.assertEqual(found["ci"][0]["system"], "gitlab-ci")
+
+    def test_compose_and_dockerfile_detected(self):
+        found = infra({"Dockerfile": "FROM scratch\n",
+                       "docker-compose.yml": "services: {}\n"})
+        kinds = {entry["kind"] for entry in found["containers"]}
+        self.assertEqual(kinds, {"dockerfile", "compose"})
+
+    def test_terraform_detected_by_extension(self):
+        found = infra({"infra/main.tf": "resource {}\n"})
+        self.assertEqual(found["iac"][0]["kind"], "terraform")
+
+    def test_pytest_ini_is_test_config(self):
+        found = infra({"pytest.ini": "[pytest]\n"})
+        self.assertEqual(found["test_config"][0]["framework"], "pytest")
+
+    def test_package_json_test_script_becomes_test_config(self):
+        found = infra({"package.json": '{"scripts": {"test": "vitest run"}}\n'})
+        entry = found["test_config"][0]
+        self.assertEqual(entry["path"], "package.json")
+        self.assertEqual(entry["command"], "vitest run")
+        self.assertEqual(entry["framework"], "vitest")
+
+    def test_malformed_package_json_is_skipped_silently(self):
+        found = infra({"package.json": "{not json\n"})
+        self.assertEqual(found["test_config"], [])
+
+    def test_entrypoints_detected(self):
+        found = infra({"cmd/server/main.go": "package main\n", "manage.py": "x = 1\n"})
+        paths = {entry["path"] for entry in found["entrypoints"]}
+        self.assertEqual(paths, {"cmd/server/main.go", "manage.py"})
+
+    def test_docs_include_readme_and_docs_tree(self):
+        found = infra({"README.md": "# x\n", "docs/guide.md": "# y\n",
+                       "src/notes.md": "# z\n"})
+        paths = [entry["path"] for entry in found["docs"]]
+        self.assertEqual(paths, ["README.md", "docs/guide.md"])
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_infra -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.infra'`
+
+- [ ] **Step 3: Write the implementation**
+
+```python
+# profile/scripts/inventorylib/infra.py
+"""Detect CI, container, IaC, test-config, entrypoint, and doc artifacts."""
+
+import json
+from pathlib import Path, PurePosixPath
+
+CI_FILES = {
+    ".gitlab-ci.yml": "gitlab-ci",
+    "azure-pipelines.yml": "azure-pipelines",
+    "Jenkinsfile": "jenkins",
+    ".travis.yml": "travis",
+    "bitbucket-pipelines.yml": "bitbucket",
+    ".circleci/config.yml": "circleci",
+}
+
+CONTAINER_FILES = {
+    "Dockerfile": "dockerfile",
+    "Containerfile": "dockerfile",
+    "docker-compose.yml": "compose",
+    "docker-compose.yaml": "compose",
+    "compose.yml": "compose",
+    "compose.yaml": "compose",
+}
+
+IAC_FILES = {
+    "cdk.json": "cdk",
+    "serverless.yml": "serverless",
+    "template.yaml": "sam",
+    "template.yml": "sam",
+    "Chart.yaml": "helm",
+    "kustomization.yaml": "kustomize",
+    "Pulumi.yaml": "pulumi",
+}
+
+IAC_EXTS = {".tf": "terraform", ".tfvars": "terraform", ".bicep": "bicep"}
+
+TEST_CONFIG_FILES = {
+    "pytest.ini": "pytest",
+    "tox.ini": "tox",
+    "jest.config.js": "jest",
+    "jest.config.ts": "jest",
+    "vitest.config.ts": "vitest",
+    "playwright.config.ts": "playwright",
+    "karma.conf.js": "karma",
+    "phpunit.xml": "phpunit",
+    ".rspec": "rspec",
+}
+
+ENTRYPOINT_NAMES = {
+    "main.py", "__main__.py", "manage.py", "app.py", "wsgi.py", "asgi.py",
+    "main.go", "main.rs", "Program.cs", "index.ts", "main.ts",
+    "index.js", "server.js",
+}
+
+DOC_NAMES = {
+    "README.md", "README.rst", "CONTRIBUTING.md", "ARCHITECTURE.md",
+    "CHANGELOG.md",
+}
+
+DOC_PREFIXES = ("docs/", "doc/")
+
+# ordered: first substring found in the command wins
+TEST_COMMAND_FRAMEWORKS = (
+    ("vitest", "vitest"), ("jest", "jest"), ("playwright", "playwright"),
+    ("mocha", "mocha"), ("ava", "ava"), ("cypress", "cypress"),
+    ("pytest", "pytest"), ("go test", "go-test"),
+)
+
+
+def _framework_from_command(command):
+    lowered = command.lower()
+    for needle, framework in TEST_COMMAND_FRAMEWORKS:
+        if needle in lowered:
+            return framework
+    return None
+
+
+def _package_json_test_config(root, path):
+    try:
+        data = json.loads((Path(root) / path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    scripts = data.get("scripts")
+    if not isinstance(scripts, dict):
+        return None
+    command = scripts.get("test")
+    if not isinstance(command, str) or not command.strip():
+        return None
+    return {
+        "path": path,
+        "framework": _framework_from_command(command),
+        "command": command,
+    }
+
+
+def detect_infra(root, paths):
+    """Return infrastructure records grouped by kind, each list sorted by path."""
+    ci, containers, iac, test_config, entrypoints, docs = [], [], [], [], [], []
+
+    for path in sorted(paths):
+        parsed = PurePosixPath(path)
+        name = parsed.name
+
+        if path.startswith(".github/workflows/"):
+            ci.append({"path": path, "system": "github-actions"})
+        elif path in CI_FILES:
+            ci.append({"path": path, "system": CI_FILES[path]})
+        elif name in CI_FILES:
+            ci.append({"path": path, "system": CI_FILES[name]})
+
+        if name in CONTAINER_FILES:
+            containers.append({"path": path, "kind": CONTAINER_FILES[name]})
+
+        if name in IAC_FILES:
+            iac.append({"path": path, "kind": IAC_FILES[name]})
+        elif parsed.suffix in IAC_EXTS:
+            iac.append({"path": path, "kind": IAC_EXTS[parsed.suffix]})
+
+        if name in TEST_CONFIG_FILES:
+            test_config.append({
+                "path": path,
+                "framework": TEST_CONFIG_FILES[name],
+                "command": None,
+            })
+        elif name == "package.json":
+            entry = _package_json_test_config(root, path)
+            if entry:
+                test_config.append(entry)
+
+        if name in ENTRYPOINT_NAMES:
+            entrypoints.append({"path": path, "language_hint": parsed.suffix})
+
+        if name in DOC_NAMES or path.startswith(DOC_PREFIXES):
+            docs.append({"path": path})
+
+    return {
+        "ci": ci,
+        "containers": containers,
+        "iac": iac,
+        "test_config": test_config,
+        "entrypoints": entrypoints,
+        "docs": docs,
+    }
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_infra -v`
+Expected: PASS, 9 tests
+
+- [ ] **Step 5: Lint and commit**
+
+```bash
+ruff check profile/ tests/test_profile_infra.py
+git add profile/scripts/inventorylib/infra.py tests/test_profile_infra.py
+git commit -m "feat(profile): CI, container, IaC, test-config, and entrypoint detection"
+```
+
+---
+
+### Task 6: Inventory assembly and confidence
+
+**Files:**
+- Create: `profile/scripts/inventorylib/report.py`
+- Test: `tests/test_profile_report.py`
+
+**Interfaces:**
+- Consumes: `walk_repo`, `classify_languages`, `detect_manifests`, `classify_test_files`, `test_dirs`, `detect_infra`
+- Produces: `build_inventory(root: Path) -> dict` (the full inventory object) and `coverage_confidence(languages, manifests, unclassified, total_files) -> str`.
+
+**Confidence rules (binding):** `low` when there are no recognized languages **or** no manifests. Otherwise `high` when unclassified paths are at most 5% of all files, else `partial`. `unclassified` is truncated to 200 entries; when truncation occurs the count is preserved in `unclassified_total`.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_profile_report.py
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from inventorylib.report import build_inventory, coverage_confidence
+from repobuilder import build_repo
+
+PY_REPO = {
+    "pyproject.toml": "[project]\nname = 'demo'\n",
+    "uv.lock": "version = 1\n",
+    "src/app.py": "def run(): pass\n",
+    "tests/integration/test_api.py": "def test_x(): pass\n",
+    "docker-compose.yml": "services: {}\n",
+    "README.md": "# demo\n",
+}
+
+
+def inventory(files):
+    with tempfile.TemporaryDirectory() as tmp:
+        return build_inventory(build_repo(tmp, files))
+
+
+class TestCoverageConfidence(unittest.TestCase):
+    def test_no_languages_is_low(self):
+        self.assertEqual(coverage_confidence([], [{"path": "go.mod"}], [], 3), "low")
+
+    def test_no_manifests_is_low(self):
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [], [], 3), "low")
+
+    def test_mostly_classified_is_high(self):
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], [], 100),
+            "high")
+
+    def test_many_unclassified_is_partial(self):
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
+                                ["a.zig"] * 20, 100),
+            "partial")
+
+
+class TestBuildInventory(unittest.TestCase):
+    def test_has_all_required_keys(self):
+        found = inventory(PY_REPO)
+        self.assertEqual(set(found), {
+            "root", "listing_method", "languages", "manifests", "test_files",
+            "test_dirs", "test_config", "ci", "containers", "iac",
+            "entrypoints", "docs", "unclassified", "unclassified_total",
+            "coverage_confidence", "inventory_version",
+        })
+
+    def test_root_is_absolute_and_paths_are_relative(self):
+        found = inventory(PY_REPO)
+        self.assertTrue(Path(found["root"]).is_absolute())
+        self.assertEqual(found["manifests"][0]["path"], "pyproject.toml")
+
+    def test_python_repo_is_classified_end_to_end(self):
+        found = inventory(PY_REPO)
+        self.assertEqual(found["languages"][0]["name"], "python")
+        self.assertEqual(found["manifests"][0]["package_manager"], "uv")
+        self.assertEqual(found["test_files"][0]["kind"], "integration")
+        self.assertEqual(found["test_dirs"], ["tests/integration"])
+        self.assertEqual(found["containers"][0]["kind"], "compose")
+        self.assertEqual(found["coverage_confidence"], "high")
+
+    def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
+        found = inventory({"main.zig": "pub fn main() void {}\n",
+                           "build.zig": "pub fn build() void {}\n"})
+        self.assertEqual(found["languages"], [])
+        self.assertEqual(found["manifests"], [])
+        self.assertEqual(found["coverage_confidence"], "low")
+        self.assertEqual(sorted(found["unclassified"]), ["build.zig", "main.zig"])
+
+    def test_unclassified_is_truncated_with_total_preserved(self):
+        files = {"f%03d.zig" % i: "x\n" for i in range(250)}
+        found = inventory(files)
+        self.assertEqual(len(found["unclassified"]), 200)
+        self.assertEqual(found["unclassified_total"], 250)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_report -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.report'`
+
+- [ ] **Step 3: Write the implementation**
+
+```python
+# profile/scripts/inventorylib/report.py
+"""Assemble the full repo inventory."""
+
+from pathlib import Path
+
+from inventorylib import VERSION
+from inventorylib.infra import detect_infra
+from inventorylib.languages import classify_languages
+from inventorylib.manifests import detect_manifests
+from inventorylib.testfiles import classify_test_files, test_dirs
+from inventorylib.walk import walk_repo
+
+UNCLASSIFIED_LIMIT = 200
+HIGH_CONFIDENCE_MAX_UNCLASSIFIED_SHARE = 0.05
+
+
+def coverage_confidence(languages, manifests, unclassified, total_files):
+    """Return high|partial|low for how much of the repo was understood."""
+    if not languages or not manifests:
+        return "low"
+    share = len(unclassified) / total_files if total_files else 0.0
+    if share <= HIGH_CONFIDENCE_MAX_UNCLASSIFIED_SHARE:
+        return "high"
+    return "partial"
+
+
+def build_inventory(root):
+    """Walk root and return the complete inventory object."""
+    root = Path(root)
+    paths, method = walk_repo(root)
+    languages, unclassified = classify_languages(paths)
+    manifests = detect_manifests(paths)
+    tests = classify_test_files(root, paths)
+    infra = detect_infra(root, paths)
+
+    return {
+        "inventory_version": VERSION,
+        "root": str(root.resolve()),
+        "listing_method": method,
+        "languages": languages,
+        "manifests": manifests,
+        "test_files": tests,
+        "test_dirs": test_dirs(tests),
+        "test_config": infra["test_config"],
+        "ci": infra["ci"],
+        "containers": infra["containers"],
+        "iac": infra["iac"],
+        "entrypoints": infra["entrypoints"],
+        "docs": infra["docs"],
+        "unclassified": sorted(unclassified)[:UNCLASSIFIED_LIMIT],
+        "unclassified_total": len(unclassified),
+        "coverage_confidence": coverage_confidence(
+            languages, manifests, unclassified, len(paths)),
+    }
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_report -v`
+Expected: PASS, 9 tests
+
+- [ ] **Step 5: Lint and commit**
+
+```bash
+ruff check profile/ tests/test_profile_report.py
+git add profile/scripts/inventorylib/report.py tests/test_profile_report.py
+git commit -m "feat(profile): inventory assembly with coverage confidence"
+```
+
+---
+
+### Task 7: CLI entry point
+
+**Files:**
+- Create: `profile/scripts/profile_inventory.py`
+- Test: `tests/test_profile_cli.py`
+
+**Interfaces:**
+- Consumes: `build_inventory`
+- Produces: `main(argv: list[str] | None = None) -> int`. Exit 0 on success including partial results; exit 2 on an unusable path. JSON goes to stdout; errors go to stderr as JSON.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_profile_cli.py
+import io
+import json
+import sys
+import tempfile
+import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import profile_inventory
+from repobuilder import build_repo
+
+
+def run(argv):
+    out, err = io.StringIO(), io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
+        code = profile_inventory.main(argv)
+    return code, out.getvalue(), err.getvalue()
+
+
+class TestCli(unittest.TestCase):
+    def test_emits_json_and_exits_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"go.mod": "module x\n", "main.go": "package main\n"})
+            code, out, _ = run([str(root)])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["languages"][0]["name"], "go")
+
+    def test_json_flag_is_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"go.mod": "module x\n"})
+            code, out, _ = run([str(root), "--json"])
+        self.assertEqual(code, 0)
+        self.assertIn("coverage_confidence", json.loads(out))
+
+    def test_indent_flag_changes_formatting(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"go.mod": "module x\n"})
+            _, compact, _ = run([str(root), "--indent", "0"])
+            _, pretty, _ = run([str(root), "--indent", "4"])
+        self.assertLess(len(compact.splitlines()), len(pretty.splitlines()))
+
+    def test_missing_path_exits_two_with_json_error(self):
+        code, out, err = run(["/nonexistent/path/xyz"])
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("error", json.loads(err))
+
+    def test_file_instead_of_directory_exits_two(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"a.py": "x = 1\n"})
+            code, _, _ = run([str(root / "a.py")])
+        self.assertEqual(code, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_cli -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'profile_inventory'`
+
+- [ ] **Step 3: Write the implementation**
+
+```python
+#!/usr/bin/env python3
+"""Emit a deterministic JSON inventory of a repository.
+
+Usage:
+    profile_inventory.py [PATH] [--json] [--indent N]
+
+Exit codes:
+    0  inventory emitted (possibly partial; see coverage_confidence)
+    2  PATH is not a usable directory
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from inventorylib.report import build_inventory
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="profile_inventory.py",
+        description="Emit a deterministic JSON inventory of a repository.")
+    parser.add_argument("path", nargs="?", default=".",
+                        help="repo root to inventory (default: current directory)")
+    parser.add_argument("--json", action="store_true",
+                        help="emit JSON (default; accepted for explicitness)")
+    parser.add_argument("--indent", type=int, default=2,
+                        help="JSON indent; 0 for compact output")
+    args = parser.parse_args(argv)
+
+    root = Path(args.path)
+    if not root.is_dir():
+        json.dump({"error": "not a directory: %s" % args.path}, sys.stderr)
+        sys.stderr.write("\n")
+        return 2
+
+    indent = args.indent if args.indent > 0 else None
+    print(json.dumps(build_inventory(root), indent=indent, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_cli -v`
+Expected: PASS, 5 tests
+
+- [ ] **Step 5: Verify it runs against this repo**
+
+Run: `python3 profile/scripts/profile_inventory.py . --indent 2 | head -30`
+Expected: JSON with `"languages"` containing `python`, and `coverage_confidence` present.
+
+- [ ] **Step 6: Lint and commit**
+
+```bash
+ruff check profile/ tests/test_profile_cli.py
+chmod +x profile/scripts/profile_inventory.py
+git add profile/scripts/profile_inventory.py tests/test_profile_cli.py
+git commit -m "feat(profile): profile_inventory CLI with exit codes"
+```
+
+---
+
+### Task 8: Contract schemas and the dependency-free validator
+
+**Files:**
+- Create: `tests/schema_check.py`
+- Create: `profile/references/contracts/stack.schema.json`
+- Create: `profile/references/contracts/topology.schema.json`
+- Create: `profile/references/contracts/journeys.schema.json`
+- Create: `profile/references/contracts/examples/stack.example.json`
+- Create: `profile/references/contracts/examples/topology.example.json`
+- Create: `profile/references/contracts/examples/journeys.example.json`
+- Test: `tests/test_profile_contracts.py`
+
+**Interfaces:**
+- Consumes: nothing
+- Produces: `validate(instance, schema, path="$") -> list[str]` returning human-readable error strings (empty list means valid). Supports the JSON Schema subset actually used here: `type` (object/array/string/number/integer/boolean/null), `properties`, `required`, `items`, `enum`. Unknown keywords are ignored by design.
+
+`jsonschema` is not installed and stdlib-only is a hard constraint, hence the hand-rolled checker.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_profile_contracts.py
+import json
+import sys
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from schema_check import validate
+
+REPO = Path(__file__).resolve().parents[1]
+CONTRACTS = REPO / "profile" / "references" / "contracts"
+
+
+class TestValidator(unittest.TestCase):
+    def test_accepts_valid_object(self):
+        schema = {"type": "object", "required": ["a"],
+                  "properties": {"a": {"type": "string"}}}
+        self.assertEqual(validate({"a": "x"}, schema), [])
+
+    def test_reports_missing_required_property(self):
+        schema = {"type": "object", "required": ["a"], "properties": {}}
+        errors = validate({}, schema)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("required", errors[0])
+
+    def test_reports_wrong_type_with_path(self):
+        schema = {"type": "object", "properties": {"a": {"type": "string"}}}
+        errors = validate({"a": 1}, schema)
+        self.assertIn("$.a", errors[0])
+
+    def test_validates_array_items(self):
+        schema = {"type": "array", "items": {"type": "integer"}}
+        self.assertEqual(validate([1, 2], schema), [])
+        self.assertEqual(len(validate([1, "x"], schema)), 1)
+
+    def test_enum_enforced(self):
+        schema = {"enum": ["a", "b"]}
+        self.assertEqual(validate("a", schema), [])
+        self.assertEqual(len(validate("c", schema)), 1)
+
+    def test_bool_is_not_an_integer(self):
+        self.assertEqual(len(validate(True, {"type": "integer"})), 1)
+
+
+class TestProfileContracts(unittest.TestCase):
+    def test_every_schema_is_valid_json_and_has_required_metadata(self):
+        schemas = sorted(CONTRACTS.glob("*.schema.json"))
+        self.assertEqual([p.name for p in schemas],
+                         ["journeys.schema.json", "stack.schema.json",
+                          "topology.schema.json"])
+        for path in schemas:
+            with self.subTest(schema=path.name):
+                schema = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(schema["type"], "object")
+                self.assertIn("contract_version", schema["properties"])
+                self.assertIn("contract_version", schema["required"])
+
+    def test_every_schema_has_an_example_that_validates(self):
+        for path in sorted(CONTRACTS.glob("*.schema.json")):
+            name = path.name.replace(".schema.json", "")
+            example_path = CONTRACTS / "examples" / ("%s.example.json" % name)
+            with self.subTest(contract=name):
+                self.assertTrue(example_path.exists(), "missing example for %s" % name)
+                errors = validate(
+                    json.loads(example_path.read_text(encoding="utf-8")),
+                    json.loads(path.read_text(encoding="utf-8")))
+                self.assertEqual(errors, [])
+
+    def test_topology_contract_uses_no_testing_vocabulary(self):
+        """Extraction discipline: profile phases stay consumer-agnostic."""
+        text = (CONTRACTS / "topology.schema.json").read_text(encoding="utf-8").lower()
+        for banned in ("boundary", "test", "fixture", "mock"):
+            self.assertNotIn(banned, text, "topology contract mentions %r" % banned)
+
+    def test_journeys_contract_uses_no_testing_vocabulary(self):
+        text = (CONTRACTS / "journeys.schema.json").read_text(encoding="utf-8").lower()
+        for banned in ("test", "coverage_hint", "fixture"):
+            self.assertNotIn(banned, text, "journeys contract mentions %r" % banned)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_contracts -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'schema_check'`
+
+- [ ] **Step 3: Write the validator**
+
+```python
+# tests/schema_check.py
+"""Minimal JSON Schema subset validator.
+
+Supports type, properties, required, items, and enum — the subset the profile
+and itest contracts actually use. Unknown keywords are ignored by design.
+Exists because jsonschema is not installed and this repo is stdlib-only.
+"""
+
+TYPE_CHECKS = {
+    "object": lambda v: isinstance(v, dict),
+    "array": lambda v: isinstance(v, list),
+    "string": lambda v: isinstance(v, str),
+    "boolean": lambda v: isinstance(v, bool),
+    "null": lambda v: v is None,
+    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+    "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+}
+
+
+def validate(instance, schema, path="$"):
+    """Return a list of error strings; empty means the instance is valid."""
+    errors = []
+
+    expected = schema.get("type")
+    if expected:
+        types = expected if isinstance(expected, list) else [expected]
+        if not any(TYPE_CHECKS[t](instance) for t in types if t in TYPE_CHECKS):
+            return ["%s: expected type %s, got %s"
+                    % (path, "|".join(types), type(instance).__name__)]
+
+    if "enum" in schema and instance not in schema["enum"]:
+        errors.append("%s: %r not in enum %r" % (path, instance, schema["enum"]))
+
+    if isinstance(instance, dict):
+        for name in schema.get("required", []):
+            if name not in instance:
+                errors.append("%s: missing required property %r" % (path, name))
+        for name, subschema in schema.get("properties", {}).items():
+            if name in instance:
+                errors.extend(
+                    validate(instance[name], subschema, "%s.%s" % (path, name)))
+
+    if isinstance(instance, list) and "items" in schema:
+        for index, item in enumerate(instance):
+            errors.extend(
+                validate(item, schema["items"], "%s[%d]" % (path, index)))
+
+    return errors
+```
+
+- [ ] **Step 4: Write the three contract schemas**
+
+`profile/references/contracts/stack.schema.json` — the stack contract carries the inventory forward, which is how `itest` phases get it without ever invoking the script:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:stack contract",
+  "type": "object",
+  "required": ["contract_version", "primary_language", "languages", "confidence", "inventory"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "primary_language": { "type": ["string", "null"] },
+    "languages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "files", "share"],
+        "properties": {
+          "name": { "type": "string" },
+          "files": { "type": "integer" },
+          "share": { "type": "number" }
+        }
+      }
+    },
+    "package_managers": { "type": "array", "items": { "type": "string" } },
+    "runtimes": { "type": "array", "items": { "type": "string" } },
+    "build_commands": { "type": "array", "items": { "type": "string" } },
+    "monorepo": {
+      "type": "object",
+      "required": ["is"],
+      "properties": {
+        "is": { "type": "boolean" },
+        "packages": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "unknowns": { "type": "array", "items": { "type": "string" } },
+    "confidence": { "enum": ["high", "partial", "low"] },
+    "inventory": { "type": "object" }
+  }
+}
+```
+
+`profile/references/contracts/topology.schema.json` — note there is no boundary vocabulary anywhere in it, enforced by a test:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:topology contract",
+  "type": "object",
+  "required": ["contract_version", "shape", "components", "assumptions"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "shape": {
+      "enum": ["monolith", "service-with-dependencies", "multi-service",
+               "serverless", "cli", "library", "desktop", "hybrid", "unknown"]
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "role", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "role": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "real_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "kind", "how_started", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "kind": { "type": "string" },
+          "how_started": { "type": "string" },
+          "config_source": { "type": ["string", "null"] },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "external_third_parties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "used_for"],
+        "properties": {
+          "name": { "type": "string" },
+          "used_for": { "type": "string" }
+        }
+      }
+    },
+    "config_mechanism": { "type": ["string", "null"] },
+    "ports_and_endpoints": { "type": "array", "items": { "type": "string" } },
+    "startup_sequence": { "type": "array", "items": { "type": "string" } },
+    "standup_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "standup_difficulty", "externally_reachable"],
+        "properties": {
+          "component": { "type": "string" },
+          "standup_difficulty": { "enum": ["trivial", "moderate", "hard", "impractical"] },
+          "config_needed": { "type": "array", "items": { "type": "string" } },
+          "externally_reachable": { "type": "boolean" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+```
+
+Note on the property name: the concept the spec calls "testability notes" ships as **`standup_notes`**. The vocabulary test bans the substring `test` from this contract, and that ban is the mechanism enforcing the spec's extraction discipline — a `profile` contract must not name a consumer. The concept is unchanged: how hard is this component to stand up, what config does it need, is it reachable from outside. Use `standup_notes` in the schema, the example, the `topology` SKILL.md (Task 10), and every downstream reference.
+
+`profile/references/contracts/journeys.schema.json`:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:journeys contract",
+  "type": "object",
+  "required": ["contract_version", "candidates", "sources_read"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "actor", "narrative", "entry_point",
+                     "evidence", "business_criticality", "rank", "rationale"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "actor": { "type": "string" },
+          "narrative": { "type": "string" },
+          "entry_point": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "business_criticality": { "enum": ["critical", "high", "medium", "low"] },
+          "rank": { "type": "integer" },
+          "rationale": { "type": "string" },
+          "depends_on": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "sources_read": { "type": "array", "items": { "type": "string" } },
+    "surface_coverage": { "type": ["string", "null"] }
+  }
+}
+```
+
+- [ ] **Step 5: Write the three examples**
+
+Each example must validate against its schema and must be realistic — these double as the worked examples the SKILL.md files point at. Write them describing a small HTTP service with Postgres.
+
+```json
+// profile/references/contracts/examples/stack.example.json
+{
+  "contract_version": "1.0.0",
+  "primary_language": "go",
+  "languages": [{ "name": "go", "files": 42, "share": 0.875 }],
+  "package_managers": ["go"],
+  "runtimes": ["go1.22"],
+  "build_commands": ["go build ./..."],
+  "monorepo": { "is": false, "packages": [] },
+  "unknowns": [],
+  "confidence": "high",
+  "inventory": {}
+}
+```
+
+```json
+// profile/references/contracts/examples/topology.example.json
+{
+  "contract_version": "1.0.0",
+  "shape": "service-with-dependencies",
+  "components": [
+    { "name": "api", "role": "HTTP service", "evidence": ["cmd/api/main.go:1"] }
+  ],
+  "real_dependencies": [
+    {
+      "name": "postgres",
+      "kind": "database",
+      "how_started": "docker-compose service 'db'",
+      "config_source": "DATABASE_URL",
+      "evidence": ["docker-compose.yml:4"]
+    }
+  ],
+  "external_third_parties": [
+    { "name": "stripe", "used_for": "payment capture" }
+  ],
+  "config_mechanism": "environment variables",
+  "ports_and_endpoints": ["api:8080", "db:5432"],
+  "startup_sequence": ["db", "migrations", "api"],
+  "standup_notes": [
+    {
+      "component": "api",
+      "standup_difficulty": "moderate",
+      "config_needed": ["DATABASE_URL"],
+      "externally_reachable": true,
+      "evidence": ["docker-compose.yml:12"]
+    }
+  ],
+  "assumptions": [
+    {
+      "claim": "compose stack starts cleanly on a developer machine",
+      "why_unconfirmed": "discovery is read-only; nothing was executed"
+    }
+  ]
+}
+```
+
+```json
+// profile/references/contracts/examples/journeys.example.json
+{
+  "contract_version": "1.0.0",
+  "candidates": [
+    {
+      "id": "J1",
+      "name": "Create an order",
+      "actor": "authenticated customer",
+      "narrative": "A signed-in customer adds items and places an order, receiving an order id.",
+      "entry_point": "POST /orders",
+      "evidence": ["README.md:22", "internal/http/routes.go:40"],
+      "business_criticality": "critical",
+      "rank": 1,
+      "rationale": "Named as the primary flow in the README and the only revenue path.",
+      "depends_on": []
+    },
+    {
+      "id": "J2",
+      "name": "Cancel an order",
+      "actor": "authenticated customer",
+      "narrative": "A customer cancels an order they placed and the order becomes cancelled.",
+      "entry_point": "POST /orders/{id}/cancel",
+      "evidence": ["internal/http/routes.go:52"],
+      "business_criticality": "high",
+      "rank": 2,
+      "rationale": "Second most referenced flow in docs; depends on an order existing.",
+      "depends_on": ["J1"]
+    }
+  ],
+  "sources_read": ["README.md", "docs/api.md", "internal/http/routes.go"],
+  "surface_coverage": "2 of 7 public HTTP routes"
+}
+```
+
+- [ ] **Step 6: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_contracts -v`
+Expected: PASS, 10 tests. If the topology vocabulary test fails, apply the `standup_notes` rename from Step 4 rather than weakening the test.
+
+- [ ] **Step 7: Lint and commit**
+
+```bash
+ruff check tests/schema_check.py tests/test_profile_contracts.py
+git add tests/schema_check.py tests/test_profile_contracts.py profile/references/contracts
+git commit -m "feat(profile): phase contracts with dependency-free schema validation"
+```
+
+---
+
+### Task 9: `profile:stack` skill and ecosystems reference
+
+**Files:**
+- Create: `profile/skills/stack/SKILL.md`
+- Create: `profile/references/ecosystems.md`
+
+**Interfaces:**
+- Consumes: `profile_inventory.py`, `contracts/stack.schema.json`
+- Produces: the `stack` contract, which every other phase depends on. This is the gate phase: it runs the inventory script, corrects it, and passes the inventory forward inside its contract.
+
+- [ ] **Step 1: Write the ecosystems reference**
+
+`profile/references/ecosystems.md` must contain, at minimum:
+
+- A table mapping every key in `MANIFESTS` (Task 3) to its ecosystem, the runtime it implies, and the version file to read for that runtime (`.python-version`, `go.mod` go directive, `.nvmrc`, `rust-toolchain.toml`, `.ruby-version`).
+- A table mapping every key in `LOCKFILE_PM` to its package manager and the command that installs dependencies.
+- A section **"When the script comes back low-confidence"** listing the fallback reading order: root directory listing, any `Makefile` or `justfile` targets, CI workflow files, `README` build instructions, editor config, then file extensions by frequency.
+- A section **"Build command inference"** giving the canonical build command per ecosystem (`go build ./...`, `cargo build`, `npm run build`, `uv build`, `mvn package`, `dotnet build`).
+- A closing rule, verbatim: *"If you cannot identify the ecosystem, say so in `unknowns[]` and set `confidence` to `low`. Do not guess a language from a single file."*
+
+- [ ] **Step 2: Write the skill**
+
+```markdown
+---
+name: stack
+version: 1.0.0
+description: Identify what a codebase is built with — languages, runtimes, package managers, build commands, and monorepo layout. Use when profiling an unfamiliar project, before test design, dependency work, or onboarding documentation. Emits the profile:stack contract.
+---
+
+# stack
+
+Identify the ecosystem of a repository and emit the `stack` contract.
+
+This is the gate phase for `/itest:design`: every other phase's search strategy
+depends on knowing the ecosystem, and the inventory this phase produces is passed
+forward inside its contract so no downstream phase re-runs the script.
+
+Bundled tool: `${CLAUDE_PLUGIN_ROOT}/scripts/profile_inventory.py`
+Reference: `${CLAUDE_PLUGIN_ROOT}/references/ecosystems.md`
+Contract: `${CLAUDE_PLUGIN_ROOT}/references/contracts/stack.schema.json`
+Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/stack.example.json`
+
+## Usage
+
+    /profile:stack [path]     # default: current directory
+
+## Procedure
+
+1. Run the inventory script:
+
+       python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile_inventory.py <path>
+
+   Exit 2 means the path is unusable — stop and report that.
+
+2. Read `coverage_confidence` and `unclassified`.
+   - `high` — trust the census; go to step 4.
+   - `partial` or `low` — the script found things it could not classify. Go to step 3.
+
+3. **Fallback reading.** Follow the order in `references/ecosystems.md` under
+   "When the script comes back low-confidence". Read the repo yourself. Correct
+   or extend the script's findings; never discard them silently.
+
+4. Determine `runtimes` and `build_commands` from the version files and build-command
+   tables in `references/ecosystems.md`. Prefer a command actually present in a
+   Makefile, justfile, or CI workflow over the ecosystem default.
+
+5. Determine `monorepo`: true when manifests appear in two or more distinct
+   directories. List those directories in `monorepo.packages`.
+
+6. Emit the contract. Set `inventory` to the script's full JSON output verbatim.
+   Set `confidence` to the script's `coverage_confidence`, downgraded one level if
+   your fallback reading contradicted the script.
+
+## Rules
+
+- Everything you could not identify goes in `unknowns[]`. Never guess a language
+  from a single file.
+- `primary_language` is the language with the largest share, or `null` when no
+  language was recognized.
+- Emit exactly one JSON object conforming to the contract, then a short prose
+  summary. Nothing else.
+```
+
+- [ ] **Step 3: Verify the contract example still validates and paths resolve**
+
+Run: `python3 -m unittest tests.test_profile_contracts -v`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add profile/skills/stack profile/references/ecosystems.md
+git commit -m "feat(profile): stack skill and ecosystems reference"
+```
+
+---
+
+### Task 10: `profile:topology` skill and deployment-shapes reference
+
+**Files:**
+- Create: `profile/skills/topology/SKILL.md`
+- Create: `profile/references/deployment-shapes.md`
+
+**Interfaces:**
+- Consumes: the `stack` contract (including its embedded `inventory`)
+- Produces: the `topology` contract — `shape`, `components`, `real_dependencies`, `external_third_parties`, `config_mechanism`, `ports_and_endpoints`, `startup_sequence`, `standup_notes`, `assumptions`
+
+- [ ] **Step 1: Write the deployment-shapes reference**
+
+`profile/references/deployment-shapes.md` must contain:
+
+- A signature table: for each `shape` enum value in the contract, the artifacts that indicate it (compose file with multiple services → `multi-service`; single Dockerfile plus one manifest → `service-with-dependencies` or `monolith`; `serverless.yml`/`template.yaml`/`cdk.json` → `serverless`; `[project.scripts]` or `cmd/*/main.go` with no server → `cli`; a manifest with no entrypoint → `library`).
+- A dependency table: image name or client library → dependency kind and how it is normally started (`postgres`, `mysql`, `redis`, `rabbitmq`, `kafka`, `elasticsearch`, `minio`/S3, `mongodb`).
+- A third-party table: SDK or base URL patterns that indicate an external paid service (`stripe`, `twilio`, `sendgrid`, `auth0`, `openai`, AWS SDK clients).
+- A section on **config mechanisms**: environment variables, `.env` files, config files, flags, secret managers — and how to tell which one a component actually reads.
+- A section on **standup difficulty**, defining the four enum values concretely: `trivial` (single process, no external state), `moderate` (needs containers or a database, all declared), `hard` (needs credentials, cloud resources, or manual steps), `impractical` (needs production data or a third-party account that cannot be stubbed).
+- A closing rule, verbatim: *"You are reading, not running. Every claim carries `file:line` evidence. Anything you believe but did not read goes in `assumptions[]` with why it is unconfirmed."*
+
+- [ ] **Step 2: Write the skill**
+
+```markdown
+---
+name: topology
+version: 1.0.0
+description: Determine how a system deploys and what it depends on — components, real dependencies, third-party services, configuration, startup order, and how hard each component is to stand up. Read-only. Use when profiling an unfamiliar project for test design, deployment documentation, or onboarding. Emits the profile:topology contract.
+---
+
+# topology
+
+Determine the deployment shape of a system by reading its configuration. Emits the
+`topology` contract.
+
+**This phase never executes anything.** No container boots, no health checks, no
+builds. Every factual claim carries `file:line` evidence; everything inferred but
+unconfirmed goes in `assumptions[]`.
+
+Reference: `${CLAUDE_PLUGIN_ROOT}/references/deployment-shapes.md`
+Contract: `${CLAUDE_PLUGIN_ROOT}/references/contracts/topology.schema.json`
+Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/topology.example.json`
+
+## Usage
+
+    /profile:topology [path]
+
+Standalone invocation: if you were not handed a `stack` contract, invoke
+`profile:stack` first and use its output. Do not run the inventory script directly.
+
+## Procedure
+
+1. From the `stack` contract's `inventory`, read every path under `containers`,
+   `iac`, `ci`, and `entrypoints`. Those files are your primary evidence.
+2. Match against the signature table in `references/deployment-shapes.md` to set `shape`.
+3. Enumerate `components` — each independently deployable or independently runnable
+   unit, with the evidence that shows it exists.
+4. Enumerate `real_dependencies` — infrastructure the system genuinely needs (database,
+   cache, queue, object store). Record how each is normally started and which config
+   key points at it.
+5. Enumerate `external_third_parties` — services owned by someone else. These are the
+   things a consumer will likely need to substitute.
+6. Determine `config_mechanism`, `ports_and_endpoints`, and `startup_sequence`.
+7. For each component, write a `standup_notes` entry: difficulty per the definitions in
+   the reference, the config it needs, and whether it is reachable from outside the
+   process.
+8. Emit the contract, then a short prose summary.
+
+## Rules
+
+- Read-only. If you want to know whether something works, you may not find out here —
+  record it as an assumption.
+- Do not describe test strategy, test boundaries, mocking, or fixtures. This phase
+  reports facts about the system; consumers decide what to do with them.
+- An empty `real_dependencies` list is a legitimate finding for a library or pure CLI.
+```
+
+- [ ] **Step 3: Verify the vocabulary test still passes**
+
+Run: `python3 -m unittest tests.test_profile_contracts -v`
+Expected: PASS — in particular `test_topology_contract_uses_no_testing_vocabulary`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add profile/skills/topology profile/references/deployment-shapes.md
+git commit -m "feat(profile): topology skill and deployment-shapes reference"
+```
+
+---
+
+### Task 11: `profile:journeys` skill and journey-sources reference
+
+**Files:**
+- Create: `profile/skills/journeys/SKILL.md`
+- Create: `profile/references/journey-sources.md`
+
+**Interfaces:**
+- Consumes: the `stack` contract (including its embedded `inventory`)
+- Produces: the `journeys` contract — ranked `candidates[]` with `depends_on` edges, `sources_read`, `surface_coverage`
+
+- [ ] **Step 1: Write the journey-sources reference**
+
+`profile/references/journey-sources.md` must contain:
+
+- A **source-priority list**, strongest evidence first: README "usage"/"getting started" sections; `docs/` guides and tutorials; OpenAPI or GraphQL schemas; HTTP route registration; CLI subcommand definitions; UI route definitions; integration or e2e test names already present; issue and milestone titles; commit message themes.
+- A **ranking rubric** defining the four `business_criticality` values: `critical` (the product's reason to exist, or the revenue path), `high` (named in the README or docs as a primary flow), `medium` (a supported flow reachable from the public surface), `low` (administrative, diagnostic, or rarely used).
+- A section **"Finding dependency edges"**: a candidate depends on another when its entry point requires an identifier that only another journey can produce, when documentation describes it as a follow-on step, or when its handler reads an entity another journey creates.
+- A section **"What is not a journey"**: a single endpoint with no user-visible outcome, a health check, an internal cron task with no actor, a pure function, a configuration knob.
+- A closing rule, verbatim: *"A journey has an actor, an intention, and an observable outcome. If you cannot name all three, it is not a journey."*
+
+- [ ] **Step 2: Write the skill**
+
+```markdown
+---
+name: journeys
+version: 1.0.0
+description: Identify the key workflows users actually perform with a system, mined from documentation, routes, CLI commands, and UI entry points, ranked by business criticality with dependency edges between them. Use when profiling an unfamiliar project for test design, documentation, or product understanding. Emits the profile:journeys contract.
+---
+
+# journeys
+
+Mine a repository for the workflows its users actually perform, and emit the
+`journeys` contract as **ranked candidates for a human to confirm**.
+
+This phase proposes. It does not decide. The caller runs the confirmation gate.
+
+Reference: `${CLAUDE_PLUGIN_ROOT}/references/journey-sources.md`
+Contract: `${CLAUDE_PLUGIN_ROOT}/references/contracts/journeys.schema.json`
+Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/journeys.example.json`
+
+## Usage
+
+    /profile:journeys [path]
+
+Standalone invocation: if you were not handed a `stack` contract, invoke
+`profile:stack` first and use its output.
+
+## Procedure
+
+1. Read sources in the priority order given in `references/journey-sources.md`.
+   Record every file you read in `sources_read`.
+2. Draft candidates. Each needs an actor, an intention, and an observable outcome.
+   Apply the "What is not a journey" filter.
+3. Attach `evidence` as `file:line` references to every candidate. A candidate with
+   no evidence does not ship.
+4. Rank by the criticality rubric, then assign `rank` as a dense ordering from 1.
+5. Add `depends_on` edges per "Finding dependency edges". These matter downstream:
+   consumers use them to order work and to establish prerequisite state.
+6. Estimate `surface_coverage` — what fraction of the public entry points these
+   candidates touch. An honest low number is useful information.
+7. Emit at most 12 candidates, then a short prose summary naming the ones you were
+   least certain about.
+
+## Rules
+
+- Prefer what the documentation says users do over what the code makes possible.
+- Do not report anything about existing tests or test coverage. That is a consumer's
+  concern, not this phase's.
+- If the repository has no usable documentation, say so in the summary and rank
+  purely from the public surface — and say that too.
+```
+
+- [ ] **Step 3: Verify contracts still pass**
+
+Run: `python3 -m unittest tests.test_profile_contracts -v`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add profile/skills/journeys profile/references/journey-sources.md
+git commit -m "feat(profile): journeys skill and journey-sources reference"
+```
+
+---
+
+### Task 12: Plugin manifest, structural test, and marketplace registration
+
+**Files:**
+- Create: `profile/.claude-plugin/plugin.json`
+- Create: `tests/test_plugin_structure.py`
+- Modify: `.claude-plugin/marketplace.json`
+- Modify: `README.md`
+
+**Interfaces:**
+- Consumes: every skill and reference file created in Tasks 9–11
+- Produces: an installable plugin, plus a structural test that guards **all** plugins in this repo, not only `profile`
+
+- [ ] **Step 1: Write the failing structural test**
+
+```python
+# tests/test_plugin_structure.py
+import json
+import re
+import sys
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+
+REPO = Path(__file__).resolve().parents[1]
+MARKETPLACE = REPO / ".claude-plugin" / "marketplace.json"
+PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)")
+
+
+def plugin_dirs():
+    return sorted(p.parent for p in REPO.glob("*/.claude-plugin/plugin.json"))
+
+
+def skill_files():
+    return sorted(REPO.glob("*/skills/*/SKILL.md"))
+
+
+class TestPluginStructure(unittest.TestCase):
+    def test_every_plugin_is_registered_in_the_marketplace(self):
+        registered = {
+            entry["source"].lstrip("./")
+            for entry in json.loads(MARKETPLACE.read_text(encoding="utf-8"))["plugins"]
+        }
+        for plugin in plugin_dirs():
+            with self.subTest(plugin=plugin.name):
+                self.assertIn(plugin.name, registered)
+
+    def test_every_plugin_manifest_has_name_and_description(self):
+        for plugin in plugin_dirs():
+            with self.subTest(plugin=plugin.name):
+                data = json.loads(
+                    (plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+                self.assertEqual(data["name"], plugin.name)
+                self.assertTrue(data["description"].strip())
+
+    def test_every_skill_has_name_and_description_frontmatter(self):
+        for skill in skill_files():
+            with self.subTest(skill=str(skill.relative_to(REPO))):
+                text = skill.read_text(encoding="utf-8")
+                self.assertTrue(text.startswith("---\n"), "missing frontmatter")
+                front = text.split("---", 2)[1]
+                self.assertRegex(front, r"(?m)^name:\s*\S+")
+                self.assertRegex(front, r"(?m)^description:\s*\S+")
+
+    def test_skill_frontmatter_name_matches_directory(self):
+        for skill in skill_files():
+            with self.subTest(skill=str(skill.relative_to(REPO))):
+                front = skill.read_text(encoding="utf-8").split("---", 2)[1]
+                name = re.search(r"(?m)^name:\s*(\S+)", front).group(1)
+                self.assertEqual(name, skill.parent.name)
+
+    def test_plugin_root_references_resolve(self):
+        for skill in skill_files():
+            plugin = skill.parents[2]
+            for ref in PLUGIN_ROOT_REF.findall(skill.read_text(encoding="utf-8")):
+                with self.subTest(skill=skill.parent.name, ref=ref):
+                    self.assertTrue((plugin / ref.lstrip("/")).exists(),
+                                    "%s references missing %s" % (skill, ref))
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 2: Run the test to see which parts fail**
+
+Run: `python3 -m unittest tests.test_plugin_structure -v`
+Expected: FAIL on `test_every_plugin_is_registered_in_the_marketplace` (profile is not registered) and possibly on existing plugins' `${CLAUDE_PLUGIN_ROOT}` references. Fix any genuine broken reference you find in an existing plugin; that is exactly what this test is for.
+
+- [ ] **Step 3: Write the plugin manifest**
+
+```json
+{
+  "name": "profile",
+  "version": "1.0.0",
+  "description": "Project discovery toolkit: identify what a codebase is built with (stack), how it deploys and what it depends on (topology), and what workflows its users actually perform (journeys). Read-only; emits versioned JSON contracts for downstream consumers.",
+  "author": { "name": "efitz" }
+}
+```
+
+- [ ] **Step 4: Register in the marketplace**
+
+Add to the `plugins` array in `.claude-plugin/marketplace.json`, matching the existing single-line entry style:
+
+```json
+{ "name": "profile", "description": "Project discovery toolkit: identify what a codebase is built with (stack), how it deploys and what it depends on (topology), and what workflows its users actually perform (journeys). Read-only inference backed by a deterministic inventory script; emits versioned JSON contracts consumed by other plugins.", "source": "./profile", "category": "development" }
+```
+
+- [ ] **Step 5: Add the README section**
+
+Insert after the `## dev` section, matching house style:
+
+```markdown
+## profile — project discovery
+
+`stack` (languages, runtimes, package managers, build commands) · `topology`
+(deployment shape, real dependencies, third parties, standup difficulty) ·
+`journeys` (ranked candidate user workflows with dependency edges).
+
+Read-only inference backed by `scripts/profile_inventory.py`, a deterministic
+repo census. Each skill emits a versioned JSON contract under
+`references/contracts/`; those contracts are the supported interface for other
+plugins.
+```
+
+- [ ] **Step 6: Run the whole suite**
+
+Run: `python3 -m unittest discover -s tests -t . 2>&1 | tail -5`
+Expected: `OK`
+
+- [ ] **Step 7: Verify the plugin against itself**
+
+Run: `python3 profile/scripts/profile_inventory.py . --indent 0 | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['coverage_confidence'], len(d['test_files']))"`
+Expected: prints a confidence value and a non-zero test-file count. If confidence is `low`, investigate — this repo has no root manifest, so `low` is the correct answer here and demonstrates the no-silent-guessing rule working.
+
+- [ ] **Step 8: Lint and commit**
+
+```bash
+ruff check profile/ tests/
+git add profile/.claude-plugin tests/test_plugin_structure.py .claude-plugin/marketplace.json README.md
+git commit -m "feat(profile): plugin manifest, structural tests, marketplace registration"
+```
+
+---
+
+## Completion
+
+`profile` is done when:
+
+- `python3 -m unittest discover -s tests -t .` reports `OK`
+- `ruff check profile/ tests/` passes
+- `python3 profile/scripts/profile_inventory.py .` emits valid JSON at exit 0
+- All three contracts have validating examples
+- `profile` appears in `.claude-plugin/marketplace.json` and `README.md`
+
+Then proceed to `docs/superpowers/plans/2026-07-26-itest-plugin.md`.

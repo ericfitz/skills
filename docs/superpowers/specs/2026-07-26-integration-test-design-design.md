@@ -165,7 +165,7 @@ file. Only the orchestrator hard-requires `profile`; no individual phase does.
 The `profile` phases must contain no testing vocabulary in their instructions or their
 outputs. Two specific corrections that came out of design and are binding:
 
-- `topology` emits **`testability_notes`** — per component, how hard it is to stand up,
+- `topology` emits **`standup_notes`** — per component, how hard it is to stand up,
   what configuration it needs, what is externally reachable. It does **not** emit test
   boundary options. Synthesis converts those notes into boundary options, because that
   framing is test-specific reasoning.
@@ -213,7 +213,7 @@ script misclassifications.
 | library | desktop | hybrid), `components[]`,
 `real_dependencies[{name, kind, how_started, config_source}]`,
 `external_third_parties[{name, used_for}]`, `config_mechanism`, `ports_and_endpoints[]`,
-`startup_sequence`, `testability_notes[{component, standup_difficulty, config_needed,
+`startup_sequence`, `standup_notes[{component, standup_difficulty, config_needed,
 externally_reachable, evidence}]`, `assumptions[]`.
 
 Because the phase is read-only, every factual claim carries `evidence` as `file:line`, and
@@ -260,7 +260,7 @@ store reachable only through the service — is a discovered fact, not a design 
 
 Runs in the main context, in seven ordered steps.
 
-**1. Boundary selection.** `testability_notes` × `integration_separation` × state affordances
+**1. Boundary selection.** `standup_notes` × `integration_separation` × state affordances
 → one chosen boundary, stated explicitly with rationale, plus what is real and what is
 stubbed at that boundary. This is the single most important sentence in the plan and it is
 written down, not assumed.
