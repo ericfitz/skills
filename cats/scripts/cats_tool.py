@@ -585,7 +585,13 @@ def main() -> None:
     args = parser.parse_args()
     try:
         args.func(args)
-    except (ConfigError, RuleError, ClassifyError, HookError, PreflightError) as exc:
+    # sqlite3.Error closes this off at the class level rather than per call site.
+    # open_results_db() already guards the call sites that go through it with a
+    # more specific, better-worded message; this is the backstop for the rest —
+    # e.g. reporting.summary()/render_html(), reached via report._connect(), which
+    # can't call sys.exit itself since it's a library, not a CLI command — so a
+    # malformed database doesn't traceback wherever it's touched next.
+    except (ConfigError, RuleError, ClassifyError, HookError, PreflightError, sqlite3.Error) as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(2)
 

@@ -244,6 +244,31 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("boom preflight", err)
 
+    def test_sqlite_error_from_run_summary(self):
+        """A malformed database reached via a path that does NOT go through
+        open_results_db (here: _print_run_summary -> reporting.summary() ->
+        report._connect(), all inside cmd_run) must still exit 2, not traceback.
+        Regression test for the class of bug fixed twice at two call sites
+        (cmd_report directly, and here via the summary() rewiring) before being
+        closed once at main()'s except tuple."""
+        config = make_config(self)
+        config.results_dir.mkdir(parents=True, exist_ok=True)
+        bad_db = config.results_dir / "bad.db"
+        bad_db.write_text("not a real sqlite database")
+        result = run.RunResult(
+            run_id="R1", db_path=bad_db, report_dir=config.results_dir,
+            cats_exit_code=0, parse_stats=P.ParseStats(processed=1), classify_result=None,
+        )
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            mock.patch.object(CT, "execute", return_value=result),
+        ):
+            code, err = self._run_main(["run"])
+        self.assertEqual(code, 2)
+        # This backstop is intentionally less specific than open_results_db's
+        # per-site guard (no path prefix) — it's just sqlite3's own message.
+        self.assertIn("file is not a database", err)
+
 
 class TestQueryCleanErrors(unittest.TestCase):
     """The `query` default (canned-summary) branch is the path a stale or
