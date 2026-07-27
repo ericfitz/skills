@@ -14,40 +14,11 @@ import yaml
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from catslib import config as cfg
+from cats_fixtures import CONFIG, make_config
 from catslib import runner as run
 from catslib.classify import ClassifyError
-
-CONFIG = """
-version: 1
-spec: openapi.json
-server: http://localhost:8080
-results_dir: results
-false_positives: fp.yaml
-identities:
-  admin: {token_cmd: "printf secret-token"}
-  other: {token_cmd: "printf other-token"}
-default_identity: admin
-cats:
-  max_requests_per_minute: 500
-  skip_fuzzers: [DuplicateHeaders, EnumCaseVariantFields]
-  skip_field_format: [uuid]
-  skip_field: [offset]
-  skip_fuzzers_for_extension:
-    - {extension: x-public-endpoint, value: "true", fuzzers: [BypassAuthentication]}
-  extra_args: ["--printExecutionStatistics"]
-"""
-
-
-def make_config(body=CONFIG):
-    root = Path(tempfile.mkdtemp())
-    (root / ".local" / "cats").mkdir(parents=True)
-    p = root / ".local" / "cats" / "config.yaml"
-    p.write_text(body)
-    (root / "openapi.json").write_text("{}")
-    (root / "fp.yaml").write_text("version: 1\nrules: []\n")
-    return cfg.load_config(p)
 
 
 class TestRedact(unittest.TestCase):
@@ -60,19 +31,19 @@ class TestRedact(unittest.TestCase):
 
 class TestResolveToken(unittest.TestCase):
     def test_captures_stdout_trimmed(self):
-        c = make_config()
+        c = make_config(self)
         self.assertEqual(run.resolve_token(c.identities["admin"], c.repo_root, {}), "secret-token")
 
     def test_empty_token_raises(self):
         # `printf ''` (single quotes) rather than `printf ""` — the latter breaks
         # the surrounding double-quoted YAML flow scalar (`{token_cmd: "printf """}`
         # is invalid YAML; PyYAML rejects it before resolve_token ever runs).
-        c = make_config(CONFIG.replace('printf secret-token', "printf ''"))
+        c = make_config(self, CONFIG.replace('printf secret-token', "printf ''"))
         with self.assertRaises(run.HookError):
             run.resolve_token(c.identities["admin"], c.repo_root, {})
 
     def test_failing_command_raises_with_command_in_message(self):
-        c = make_config(CONFIG.replace('printf secret-token', 'exit 3'))
+        c = make_config(self, CONFIG.replace('printf secret-token', 'exit 3'))
         with self.assertRaises(run.HookError) as ctx:
             run.resolve_token(c.identities["admin"], c.repo_root, {})
         self.assertIn("exit 3", str(ctx.exception))
@@ -81,7 +52,7 @@ class TestResolveToken(unittest.TestCase):
         # stdout is the token channel; stderr is the diagnostic channel — a
         # failing token_cmd's stderr is safe to surface and makes the error
         # actionable instead of a bare exit code.
-        c = make_config(CONFIG.replace(
+        c = make_config(self, CONFIG.replace(
             'printf secret-token', 'echo boom-diagnostic >&2; exit 3'
         ))
         with self.assertRaises(run.HookError) as ctx:
@@ -134,7 +105,7 @@ class TestHeadersFile(unittest.TestCase):
 
 class TestBuildArgv(unittest.TestCase):
     def _argv(self, **kw):
-        c = make_config()
+        c = make_config(self)
         return run.build_cats_argv(
             c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
             path_filter=kw.get("path_filter"), rate=kw.get("rate"),
@@ -273,7 +244,7 @@ class TestChecksAndPreflightAgree(unittest.TestCase):
     def test_first_failing_check_message_matches_preflight_exactly(self):
         server = _LiveServer()
         self.addCleanup(server.stop)
-        c = make_config(CONFIG.replace("http://localhost:8080", server.url))
+        c = make_config(self, CONFIG.replace("http://localhost:8080", server.url))
         c.spec.unlink()
 
         with tempfile.TemporaryDirectory() as bindir:
@@ -297,7 +268,7 @@ class TestPreflight(unittest.TestCase):
         body = CONFIG.replace("http://localhost:8080", self.server.url)
         for old, new in overrides.items():
             body = body.replace(old, new)
-        return make_config(body)
+        return make_config(self, body)
 
     def test_missing_spec_raises(self):
         c = self._config()
@@ -332,7 +303,7 @@ class TestPreflight(unittest.TestCase):
         self.server.stop()
         error_server = _LiveServer(_NotFoundHandler)
         self.addCleanup(error_server.stop)
-        c = make_config(CONFIG.replace("http://localhost:8080", error_server.url))
+        c = make_config(self, CONFIG.replace("http://localhost:8080", error_server.url))
         with self.assertRaises(run.PreflightError) as ctx:
             run.preflight(c)
         message = str(ctx.exception)
@@ -389,7 +360,7 @@ class TestExecute(unittest.TestCase):
 
     def _config(self, body=CONFIG):
         body = body.replace("http://localhost:8080", self.server.url)
-        return make_config(body)
+        return make_config(self, body)
 
     def test_successful_run_parses_classifies_and_stamps_finished_at(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)

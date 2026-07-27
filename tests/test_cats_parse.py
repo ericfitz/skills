@@ -1,34 +1,15 @@
 import json
 import sqlite3
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from cats_fixtures import _tmp_dir, cats_json
 from catslib import parse as P
-
-
-def cats_json(**over):
-    data = {
-        "testId": "Test 1", "traceId": "t-1", "fuzzer": "HappyPath",
-        "path": "/things", "contractPath": "/things", "fullRequestPath": "/things",
-        "scenario": "happy", "expectedResult": "Should return 200",
-        "result": "error", "resultReason": "Unexpected Response Code: 400",
-        "resultDetails": "details", "server": "http://h",
-        "request": {"httpMethod": "POST", "url": "http://h/things",
-                     "timestamp": "2026-07-26T00:00:00Z", "payload": '{"a":1}',
-                     "headers": [{"key": "Accept", "value": "application/json"}]},
-        "response": {"httpMethod": "POST", "responseCode": 400, "responseTimeInMs": 12,
-                      "numberOfWordsInResponse": 3, "numberOfLinesInResponse": 1,
-                      "contentLengthInBytes": 42, "responseContentType": "application/json",
-                      "jsonBody": {"error": "bad"},
-                      "headers": [{"key": "Content-Type", "value": "application/json"}]},
-    }
-    data.update(over)
-    return data
 
 
 class TestRecordNormalization(unittest.TestCase):
@@ -38,8 +19,10 @@ class TestRecordNormalization(unittest.TestCase):
         self.assertEqual(r["response_code"], 400)
         self.assertEqual(r["method"], "POST")
         self.assertEqual(r["path"], "/things")
-        self.assertEqual(r["json_body"], {"error": "bad"})
-        self.assertEqual(json.loads(r["response_body"]), {"error": "bad"})
+        self.assertEqual(r["json_body"], {"error": "bad", "error_description": "bad enum_values"})
+        self.assertEqual(
+            json.loads(r["response_body"]), {"error": "bad", "error_description": "bad enum_values"}
+        )
         self.assertEqual(r["request_body"], '{"a":1}')
         self.assertEqual(r["request_headers"], {"accept": "application/json"})
 
@@ -100,19 +83,14 @@ class TestExtractTestNumber(unittest.TestCase):
 
 
 class TestParseReport(unittest.TestCase):
-    def _tmp_dir(self) -> Path:
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        return Path(tmp.name)
-
     def _report(self, files):
-        d = self._tmp_dir()
+        d = _tmp_dir(self)
         for name, data in files.items():
             (d / name).write_text(json.dumps(data))
         return d
 
     def _db_path(self) -> Path:
-        return self._tmp_dir() / "r.db"
+        return _tmp_dir(self) / "r.db"
 
     def _connect(self, db_path: Path) -> sqlite3.Connection:
         conn = sqlite3.connect(db_path)
@@ -206,7 +184,7 @@ class TestParseReport(unittest.TestCase):
         self.assertEqual(stats.skipped, 1)
 
     def test_top_level_list_is_skipped(self):
-        d = self._tmp_dir()
+        d = _tmp_dir(self)
         (d / "Test1.json").write_text(json.dumps(["not", "an", "object"]))
         db = self._db_path()
         stats = P.parse_report(d, db, {"run_id": "R1"})
@@ -214,7 +192,7 @@ class TestParseReport(unittest.TestCase):
         self.assertEqual(stats.skipped, 1)
 
     def test_top_level_string_is_skipped(self):
-        d = self._tmp_dir()
+        d = _tmp_dir(self)
         (d / "Test1.json").write_text(json.dumps("just a string"))
         db = self._db_path()
         stats = P.parse_report(d, db, {"run_id": "R1"})

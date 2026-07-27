@@ -1,65 +1,16 @@
-import json
 import sqlite3
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from cats_fixtures import ONE_RULE, build_db, cats_json, write_rules
 from catslib import classify as C
 from catslib import parse as P
 from catslib import rules as R
-
-
-def cats_json(**over):
-    data = {
-        "testId": "Test 1", "traceId": "t-1", "fuzzer": "HappyPath",
-        "path": "/things", "contractPath": "/things", "scenario": "s",
-        "expectedResult": "200", "result": "error",
-        "resultReason": "Unexpected Response Code: 400", "resultDetails": "",
-        "server": "http://h",
-        "request": {"httpMethod": "POST", "url": "http://h/things",
-                     "timestamp": "", "payload": "", "headers": []},
-        "response": {"httpMethod": "POST", "responseCode": 400, "responseTimeInMs": 1,
-                      "numberOfWordsInResponse": 1, "numberOfLinesInResponse": 1,
-                      "contentLengthInBytes": 1, "responseContentType": "application/json",
-                      "jsonBody": {"error_description": "bad enum_values"}, "headers": []},
-    }
-    data.update(over)
-    return data
-
-
-def _tmp_dir() -> Path:
-    """A TemporaryDirectory whose cleanup is deferred to end-of-module.
-
-    build_db/write_rules are plain module-level helpers, not TestCase methods, so
-    there's no `self` to register a per-test `addCleanup` against; `addModuleCleanup`
-    is unittest's module-level equivalent and runs once after every test in this
-    module has finished, so nothing here leaks into /tmp across suite runs.
-    """
-    d = tempfile.TemporaryDirectory()
-    unittest.addModuleCleanup(d.cleanup)
-    return Path(d.name)
-
-
-def build_db(tests):
-    report = _tmp_dir()
-    for i, data in enumerate(tests, 1):
-        (report / f"Test{i}.json").write_text(json.dumps(data))
-    db = _tmp_dir() / "r.db"
-    P.parse_report(report, db, {"run_id": "R1"})
-    return db
-
-
-def write_rules(text):
-    path = _tmp_dir() / "rules.yaml"
-    path.write_text(text)
-    return R.load_rules(path)
-
-
-ONE_RULE = "version: 1\nrules:\n  - id: VALIDATION_400\n    why: correct rejection\n    when: {response_code: 400}\n"
 
 
 class TestClassifyDb(unittest.TestCase):
@@ -212,23 +163,85 @@ class TestClassifyDb(unittest.TestCase):
             conn.execute("SELECT rule_id FROM fp_rules").fetchall(), [("VALIDATION_400",)]
         )
 
-    def test_record_from_db_matches_classification_record(self):
-        db = build_db([cats_json()])
-        conn = sqlite3.connect(db)
-        conn.row_factory = sqlite3.Row
-        row_id = conn.execute("SELECT id FROM tests WHERE test_id = 'Test 1'").fetchone()[0]
-        record = C.record_from_db(conn, row_id)
-        self.assertEqual(record["response_code"], 400)
-        self.assertEqual(record["fuzzer"], "HappyPath")
-        self.assertEqual(record["result"], "error")
-        self.assertEqual(record["json_body"], {"error_description": "bad enum_values"})
-
     def test_record_from_db_unknown_id_raises(self):
         db = build_db([cats_json()])
         conn = sqlite3.connect(db)
         conn.row_factory = sqlite3.Row
         with self.assertRaises(ValueError):
             C.record_from_db(conn, 999999)
+
+
+class TestRecordEquivalence(unittest.TestCase):
+    """`parse.record_from_json` (used to classify inline, during parsing) and
+    `classify.record_from_db` (used to reclassify from a persisted database)
+    must normalize the *same* CATS JSON to the *same* record — that agreement
+    is this branch's central cross-module invariant. Each test here builds the
+    record both ways from identical input and compares the full dicts, not a
+    handful of spot-checked fields.
+    """
+
+    def _both(self, data):
+        record_json = P.record_from_json(data)
+        db = build_db([data])
+        conn = sqlite3.connect(db)
+        conn.row_factory = sqlite3.Row
+        row_id = conn.execute(
+            "SELECT id FROM tests WHERE test_id = ?", (data["testId"],)
+        ).fetchone()[0]
+        record_db = C.record_from_db(conn, row_id)
+        return record_json, record_db
+
+    def test_baseline(self):
+        record_json, record_db = self._both(cats_json())
+        self.assertEqual(record_json, record_db)
+
+    def test_missing_json_body(self):
+        data = cats_json()
+        del data["response"]["jsonBody"]
+        record_json, record_db = self._both(data)
+        self.assertEqual(record_json, record_db)
+
+    def test_null_response(self):
+        record_json, record_db = self._both(cats_json(response=None))
+        self.assertEqual(record_json, record_db)
+
+    def test_duplicate_header_keys(self):
+        data = cats_json()
+        data["request"]["headers"] = [
+            {"key": "X-Dup", "value": "first"},
+            {"key": "x-dup", "value": "second"},
+        ]
+        record_json, record_db = self._both(data)
+        self.assertEqual(record_json["request_headers"], {"x-dup": "second"})
+        self.assertEqual(record_json, record_db)
+
+    def test_non_json_body(self):
+        # jsonBody need not be an object — CATS reports a bare JSON scalar/array
+        # response body as-is.
+        data = cats_json()
+        data["response"]["jsonBody"] = "just a string"
+        record_json, record_db = self._both(data)
+        self.assertEqual(record_json["json_body"], "just a string")
+        self.assertEqual(record_json, record_db)
+
+    def test_empty_string_header_key_is_a_known_unreachable_divergence(self):
+        # The one shape where the two builders genuinely disagree: parse.record_
+        # from_json's _headers_dict skips a header whose key is "" (not just
+        # falsy-but-present) when building the in-memory record, so the key is
+        # absent entirely. The DB round trip does not apply that same filter at
+        # insert time, so classify.record_from_db's _headers() reads the row back
+        # and lower()s "" to "", producing a real (if empty) key. This can never
+        # be observed through a rule: rules.field_value's "request_header."
+        # prefix handling aside, rules.load_rules' _validate_field rejects any
+        # field name of the form "request_header." with nothing after the
+        # prefix at rule-*load* time (PREFIX_FIELDS requires len(name) >
+        # len(prefix)), so no rule can ever be written that looks up the empty
+        # header name to observe this divergence.
+        data = cats_json()
+        data["request"]["headers"] = [{"key": "", "value": "orphan"}]
+        record_json, record_db = self._both(data)
+        self.assertNotIn("", record_json["request_headers"])
+        self.assertEqual(record_db["request_headers"].get(""), "orphan")
 
 
 def _downgrade_run_meta_to_prefix_schema(db):

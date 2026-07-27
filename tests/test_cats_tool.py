@@ -4,7 +4,6 @@ import json
 import os
 import sqlite3
 import sys
-import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -12,62 +11,21 @@ from unittest import mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import cats_tool as CT
+from cats_fixtures import _tmp_dir, cats_json, make_config
 from catslib import config as cfg
 from catslib import parse as P
 from catslib import runner as run
 from catslib.classify import ClassifyError
 from catslib.rules import RuleError
 
-CONFIG = """
-version: 1
-spec: openapi.json
-server: http://localhost:8080
-results_dir: results
-false_positives: fp.yaml
-identities:
-  admin: {token_cmd: "echo tok"}
-default_identity: admin
-"""
-
-CATS_JSON = {
-    "testId": "Test 1", "traceId": "t-1", "fuzzer": "HappyPath",
-    "path": "/things", "contractPath": "/things", "scenario": "s",
-    "expectedResult": "200", "result": "error",
-    "resultReason": "Unexpected Response Code: 400", "resultDetails": "",
-    "server": "http://h",
-    "request": {"httpMethod": "POST", "url": "http://h/things",
-                 "timestamp": "", "payload": "", "headers": []},
-    "response": {"httpMethod": "POST", "responseCode": 400, "responseTimeInMs": 1,
-                  "numberOfWordsInResponse": 1, "numberOfLinesInResponse": 1,
-                  "contentLengthInBytes": 1, "responseContentType": "application/json",
-                  "jsonBody": {"error_description": "bad"}, "headers": []},
-}
-
-
-def _tmp_dir(case: unittest.TestCase) -> Path:
-    """A TemporaryDirectory cleaned up when `case` tears down, not at module end —
-    so temp dirs don't pile up for the whole file's run."""
-    d = tempfile.TemporaryDirectory()
-    case.addCleanup(d.cleanup)
-    return Path(d.name)
-
-
-def make_config(case: unittest.TestCase, body: str = CONFIG):
-    root = _tmp_dir(case)
-    (root / ".local" / "cats").mkdir(parents=True)
-    p = root / ".local" / "cats" / "config.yaml"
-    p.write_text(body)
-    (root / "openapi.json").write_text("{}")
-    (root / "fp.yaml").write_text("version: 1\nrules: []\n")
-    return cfg.load_config(p)
-
 
 def make_db(case: unittest.TestCase, config) -> Path:
     """Parse one Test*.json into a real database under config.results_dir."""
     report = _tmp_dir(case)
-    (report / "Test1.json").write_text(json.dumps(CATS_JSON))
+    (report / "Test1.json").write_text(json.dumps(cats_json()))
     db = config.results_dir / "cats-results-R1.db"
     config.results_dir.mkdir(parents=True, exist_ok=True)
     P.parse_report(report, db, {"run_id": "R1"})

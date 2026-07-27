@@ -10,7 +10,7 @@ from catslib import classify as C
 from catslib import report as Rep
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_cats_classify import build_db, cats_json, write_rules
+from cats_fixtures import build_db, cats_json, write_rules
 
 
 def _set_run_meta(db, **columns):
