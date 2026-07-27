@@ -231,5 +231,108 @@ class TestClassifyDb(unittest.TestCase):
             C.record_from_db(conn, 999999)
 
 
+def _downgrade_run_meta_to_prefix_schema(db):
+    """Simulate a DB parsed before run_meta.classified_at existed.
+
+    Rebuilds run_meta with exactly the pre-migration 12-column shape and copies
+    its one row across. Deliberately not `ALTER TABLE run_meta DROP COLUMN
+    classified_at`: SQLite's DROP COLUMN rewrites the stored CREATE TABLE text, and
+    (independently confirmed, unrelated to this codebase) it raises a spurious
+    "incomplete input" OperationalError whenever 2+ consecutive `--` comment lines
+    immediately precede the dropped column — which is exactly the shape of the
+    comment schema.sql now carries above `classified_at`. Recreating the table
+    directly sidesteps that SQLite quirk and is also just a more faithful model of
+    "a database created before this column was added to schema.sql" than dropping
+    a column that predates the DB never actually had.
+    """
+    conn = sqlite3.connect(db)
+    row = conn.execute(
+        "SELECT run_id, started_at, finished_at, identity, spec_path, spec_sha256, "
+        "rules_sha256, git_sha, cats_version, cats_args, server, tool_version FROM run_meta"
+    ).fetchone()
+    conn.execute("DROP TABLE run_meta")
+    conn.execute("""
+        CREATE TABLE run_meta (
+            run_id TEXT PRIMARY KEY,
+            started_at TEXT,
+            finished_at TEXT,
+            identity TEXT,
+            spec_path TEXT,
+            spec_sha256 TEXT,
+            rules_sha256 TEXT,
+            git_sha TEXT,
+            cats_version TEXT,
+            cats_args TEXT,
+            server TEXT,
+            tool_version TEXT
+        )
+    """)
+    if row is not None:
+        conn.execute(
+            "INSERT INTO run_meta (run_id, started_at, finished_at, identity, spec_path, "
+            "spec_sha256, rules_sha256, git_sha, cats_version, cats_args, server, tool_version) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            row,
+        )
+    conn.commit()
+    conn.close()
+
+
+class TestSchemaMigration(unittest.TestCase):
+    def test_pre_fix_database_is_migrated_and_treated_as_first_pass(self):
+        db = build_db([cats_json()])
+        _downgrade_run_meta_to_prefix_schema(db)
+        conn = sqlite3.connect(db)
+        self.assertNotIn(
+            "classified_at", [row[1] for row in conn.execute("PRAGMA table_info(run_meta)")]
+        )
+        conn.close()
+
+        result = C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)
+        self.assertEqual(result.flagged, 1)
+        self.assertEqual(result.newly_suppressed, [])
+        self.assertEqual(result.newly_surfaced, [])
+
+        conn = sqlite3.connect(db)
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(run_meta)")]
+        self.assertIn("classified_at", columns)
+
+    def test_second_pass_after_migration_reports_real_transitions(self):
+        db = build_db([cats_json()])
+        _downgrade_run_meta_to_prefix_schema(db)
+
+        C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)
+        result = C.classify_db(db, [], allow_5xx=False)
+        self.assertEqual(result.newly_surfaced, ["Test 1"])
+        self.assertEqual(result.newly_suppressed, [])
+
+    def test_migration_is_idempotent(self):
+        db = build_db([cats_json()])
+        _downgrade_run_meta_to_prefix_schema(db)
+
+        first = C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)
+        second = C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)
+        self.assertEqual(first.flagged, second.flagged)
+        # Second call sees a DB that already has the column (with a value already
+        # set by the first call), so it's a genuine second pass with no delta for
+        # an unchanged rule set.
+        self.assertEqual(second.newly_suppressed, [])
+        self.assertEqual(second.newly_surfaced, [])
+        conn = sqlite3.connect(db)
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(run_meta)")]
+        self.assertEqual(columns.count("classified_at"), 1)
+
+    def test_database_without_run_meta_raises_classify_error(self):
+        db = build_db([cats_json()])
+        conn = sqlite3.connect(db)
+        conn.execute("DROP TABLE run_meta")
+        conn.commit()
+        conn.close()
+
+        with self.assertRaises(C.ClassifyError) as ctx:
+            C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)
+        self.assertIn(str(db), str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -11,6 +11,11 @@ from typing import Any
 
 from .rules import Rule, classify_record
 
+
+class ClassifyError(Exception):
+    """The database is not one classify_db can work with."""
+
+
 # `:test_row_id` lets classify_db (all rows) and record_from_db (one row) share this
 # query without string-concatenating a trailing clause onto it — a later ORDER BY or
 # LIMIT added to the base would otherwise silently swallow a concatenated predicate.
@@ -95,6 +100,33 @@ def record_from_db(conn: sqlite3.Connection, test_row_id: int) -> dict[str, Any]
     return _record(conn, row)
 
 
+def _ensure_classified_at_column(conn: sqlite3.Connection, db_path: Path) -> None:
+    """Idempotent migration: add run_meta.classified_at if this DB predates it.
+
+    `parse.create_schema` only ever runs `CREATE TABLE IF NOT EXISTS`, so a database
+    parsed before this column existed keeps a `run_meta` without it forever — nothing
+    alters an existing table. Re-parsing a 100k+-row report just to pick up one
+    nullable column would be a poor trade, and reclassifying without re-parsing is
+    the whole point of separating classify_db from parse_report. So this migrates
+    in place instead.
+
+    A migrated pre-fix database ends up with `classified_at = NULL`, which is
+    correct, not a shortcut: we genuinely don't know what rule set produced
+    whatever classifications it already has, so its next pass is rightly treated as
+    a first pass (empty deltas) by `_is_first_pass`.
+
+    Raises `ClassifyError` (not a raw `sqlite3.OperationalError`) if `run_meta`
+    itself is missing — a database this module didn't create at all.
+    """
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "run_meta" not in tables:
+        raise ClassifyError(f"{db_path}: no run_meta table — not created by catslib.parse.create_schema")
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(run_meta)")}
+    if "classified_at" not in columns:
+        conn.execute("ALTER TABLE run_meta ADD COLUMN classified_at TEXT")
+        conn.commit()
+
+
 def _is_first_pass(conn: sqlite3.Connection) -> bool:
     """True if this DB has never been classified before.
 
@@ -118,6 +150,7 @@ def classify_db(db_path: Path, rules: list[Rule], *, allow_5xx: bool) -> Classif
     counts = {rule.id: 0 for rule in rules}
     updates: list[tuple[int, str | None, int]] = []
     try:
+        _ensure_classified_at_column(conn, db_path)
         first_pass = _is_first_pass(conn)
         for row in conn.execute(SELECT_CANDIDATES, {"test_row_id": None}):
             result.total += 1
