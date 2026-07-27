@@ -5,10 +5,15 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .rules import Rule, classify_record
 
+# `:test_row_id` lets classify_db (all rows) and record_from_db (one row) share this
+# query without string-concatenating a trailing clause onto it — a later ORDER BY or
+# LIMIT added to the base would otherwise silently swallow a concatenated predicate.
 SELECT_CANDIDATES = """
 SELECT t.id, t.test_id, t.is_false_positive, rt.name AS result, t.result_reason,
        t.result_details, t.scenario, f.name AS fuzzer, p.path, p.contract_path,
@@ -22,6 +27,7 @@ JOIN requests req ON req.test_id = t.id
 JOIN http_methods m ON req.http_method_id = m.id
 JOIN responses resp ON resp.test_id = t.id
 WHERE rt.name IN ('error', 'warn')
+  AND (:test_row_id IS NULL OR t.id = :test_row_id)
 """
 
 
@@ -36,19 +42,27 @@ class ClassifyResult:
 
 
 def _headers(conn: sqlite3.Connection, row_id: int) -> dict[str, str]:
+    # ORDER BY header_order so a duplicate header key resolves last-wins in the same
+    # order parse.record_from_json's _headers_dict does (JSON array order) — without
+    # it, "last" depends on whatever order SQLite happens to return rows in.
     rows = conn.execute(
         "SELECT header_key, header_value FROM request_headers rh "
-        "JOIN requests r ON rh.request_id = r.id WHERE r.test_id = ?",
+        "JOIN requests r ON rh.request_id = r.id WHERE r.test_id = ? "
+        "ORDER BY rh.header_order",
         (row_id,),
     ).fetchall()
     return {(k or "").lower(): v or "" for k, v in rows}
 
 
-def _record(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+def _record(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     body = row["response_body"] or ""
     try:
         json_body = json.loads(body) if body else None
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
+        # TypeError covers a non-str value in response_body: SQLite's flexible typing
+        # permits it even though the column is declared TEXT (e.g. a hand-edited or
+        # otherwise corrupted DB), and json.loads raises TypeError, not
+        # JSONDecodeError, for a non-str/bytes argument.
         json_body = None
     return {
         "result": row["result"],
@@ -69,16 +83,32 @@ def _record(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
     }
 
 
-def record_from_db(conn: sqlite3.Connection, test_row_id: int) -> dict:
+def record_from_db(conn: sqlite3.Connection, test_row_id: int) -> dict[str, Any]:
     """Rebuild the normalized record for one test row, by its internal `tests.id`.
 
     `conn.row_factory` must be `sqlite3.Row` (as `classify_db` sets on its own
     connection) — this function reads columns by name, not position.
     """
-    row = conn.execute(SELECT_CANDIDATES + " AND t.id = ?", (test_row_id,)).fetchone()
+    row = conn.execute(SELECT_CANDIDATES, {"test_row_id": test_row_id}).fetchone()
     if row is None:
         raise ValueError(f"no error/warn test row with id={test_row_id}")
     return _record(conn, row)
+
+
+def _is_first_pass(conn: sqlite3.Connection) -> bool:
+    """True if this DB has never been classified before.
+
+    `tests.is_false_positive` starts at 0 for every row at parse time (see
+    parse.py), so on a genuine first pass every "flagged" row would otherwise look
+    identical to a "newly suppressed" one — the delta would list the entire flagged
+    set instead of reporting nothing changed. `run_meta.classified_at` is the
+    explicit marker that disambiguates the two: NULL (or no `run_meta` row at all —
+    e.g. one deleted by hand) means first pass. classify_db sets it at the end of
+    every pass it can find a row for; if no row exists it never fabricates one, so a
+    DB missing run_meta stays a "first pass" on every future call, indefinitely.
+    """
+    row = conn.execute("SELECT classified_at FROM run_meta").fetchone()
+    return row is None or row[0] is None
 
 
 def classify_db(db_path: Path, rules: list[Rule], *, allow_5xx: bool) -> ClassifyResult:
@@ -88,17 +118,19 @@ def classify_db(db_path: Path, rules: list[Rule], *, allow_5xx: bool) -> Classif
     counts = {rule.id: 0 for rule in rules}
     updates: list[tuple[int, str | None, int]] = []
     try:
-        for row in conn.execute(SELECT_CANDIDATES):
+        first_pass = _is_first_pass(conn)
+        for row in conn.execute(SELECT_CANDIDATES, {"test_row_id": None}):
             result.total += 1
             record = _record(conn, row)
             is_fp, rule_id, violation = classify_record(rules, record, allow_5xx=allow_5xx)
             if violation:
                 result.violations.append((violation, row["test_id"]))
             was_fp = bool(row["is_false_positive"])
-            if is_fp and not was_fp:
-                result.newly_suppressed.append(row["test_id"])
-            elif was_fp and not is_fp:
-                result.newly_surfaced.append(row["test_id"])
+            if not first_pass:
+                if is_fp and not was_fp:
+                    result.newly_suppressed.append(row["test_id"])
+                elif was_fp and not is_fp:
+                    result.newly_surfaced.append(row["test_id"])
             if is_fp:
                 result.flagged += 1
                 counts[rule_id] = counts.get(rule_id, 0) + 1
@@ -114,6 +146,13 @@ def classify_db(db_path: Path, rules: list[Rule], *, allow_5xx: bool) -> Classif
                 "VALUES (?, ?, ?, ?, ?)",
                 [(r.id, r.why, r.order_index, 1 if r.enabled else 0, counts.get(r.id, 0))
                  for r in rules],
+            )
+            # No WHERE clause: run_meta always has at most one row (parse_report
+            # inserts exactly one). If that row is missing, this affects zero rows
+            # rather than fabricating one — _is_first_pass's docstring covers why.
+            conn.execute(
+                "UPDATE run_meta SET classified_at = ?",
+                (datetime.now(timezone.utc).isoformat(),),
             )
         result.by_rule = {k: v for k, v in counts.items() if v}
     finally:

@@ -105,7 +105,12 @@ CREATE TABLE IF NOT EXISTS run_meta (
     cats_version TEXT,
     cats_args TEXT,
     server TEXT,
-    tool_version TEXT
+    tool_version TEXT,
+    -- Added: set by classify_db at the end of every pass; NULL means this DB has
+    -- never been classified, which distinguishes a genuine first pass (where
+    -- tests.is_false_positive == 0 for every row because it was never set, not
+    -- because a prior pass suppressed nothing) from a later reclassification.
+    classified_at TEXT
 );
 
 -- Added: the rule set that produced this DB's classification

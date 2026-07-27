@@ -31,19 +31,32 @@ def cats_json(**over):
     return data
 
 
+def _tmp_dir() -> Path:
+    """A TemporaryDirectory whose cleanup is deferred to end-of-module.
+
+    build_db/write_rules are plain module-level helpers, not TestCase methods, so
+    there's no `self` to register a per-test `addCleanup` against; `addModuleCleanup`
+    is unittest's module-level equivalent and runs once after every test in this
+    module has finished, so nothing here leaks into /tmp across suite runs.
+    """
+    d = tempfile.TemporaryDirectory()
+    unittest.addModuleCleanup(d.cleanup)
+    return Path(d.name)
+
+
 def build_db(tests):
-    report = Path(tempfile.mkdtemp())
+    report = _tmp_dir()
     for i, data in enumerate(tests, 1):
         (report / f"Test{i}.json").write_text(json.dumps(data))
-    db = Path(tempfile.mkdtemp()) / "r.db"
+    db = _tmp_dir() / "r.db"
     P.parse_report(report, db, {"run_id": "R1"})
     return db
 
 
 def write_rules(text):
-    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
-        fh.write(text)
-    return R.load_rules(Path(fh.name))
+    path = _tmp_dir() / "rules.yaml"
+    path.write_text(text)
+    return R.load_rules(path)
 
 
 ONE_RULE = "version: 1\nrules:\n  - id: VALIDATION_400\n    why: correct rejection\n    when: {response_code: 400}\n"
@@ -108,15 +121,59 @@ class TestClassifyDb(unittest.TestCase):
         result = C.classify_db(db, [], allow_5xx=False)
         self.assertEqual(result.newly_surfaced, ["Test 1"])
         self.assertEqual(result.newly_suppressed, [])
+        # The delta is computed before the write; assert the write actually
+        # happened too, not just that the in-memory result object says so.
+        conn = sqlite3.connect(db)
+        row = conn.execute("SELECT is_false_positive, fp_rule FROM tests").fetchone()
+        self.assertEqual(row, (0, None))
 
     def test_classification_is_idempotent(self):
         db = build_db([cats_json()])
         rules = write_rules(ONE_RULE)
         first = C.classify_db(db, rules, allow_5xx=False)
+        conn = sqlite3.connect(db)
+        state_after_first = conn.execute("SELECT is_false_positive, fp_rule FROM tests").fetchall()
+        counts_after_first = dict(conn.execute("SELECT rule_id, match_count FROM fp_rules").fetchall())
+
         second = C.classify_db(db, rules, allow_5xx=False)
         self.assertEqual(first.flagged, second.flagged)
         self.assertEqual(second.newly_suppressed, [])
         self.assertEqual(second.newly_surfaced, [])
+        # Re-running with the same rules must leave the DB itself unchanged, not
+        # just report empty deltas.
+        state_after_second = conn.execute("SELECT is_false_positive, fp_rule FROM tests").fetchall()
+        counts_after_second = dict(conn.execute("SELECT rule_id, match_count FROM fp_rules").fetchall())
+        self.assertEqual(state_after_first, state_after_second)
+        self.assertEqual(counts_after_first, counts_after_second)
+
+    def test_first_pass_returns_empty_deltas_even_when_rows_flagged(self):
+        # A freshly parsed DB has is_false_positive=0 on every row, identical to
+        # what a prior pass that suppressed nothing would also leave behind. Without
+        # the explicit run_meta.classified_at marker, this first pass would
+        # misreport every flagged row as "newly suppressed".
+        db = build_db([cats_json()])
+        result = C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)
+        self.assertEqual(result.flagged, 1)
+        self.assertEqual(result.newly_suppressed, [])
+        self.assertEqual(result.newly_surfaced, [])
+
+    def test_missing_run_meta_row_treated_as_first_pass(self):
+        db = build_db([cats_json()])
+        conn = sqlite3.connect(db)
+        conn.execute("DELETE FROM run_meta")
+        conn.commit()
+        conn.close()
+
+        result = C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)
+        self.assertEqual(result.flagged, 1)
+        self.assertEqual(result.newly_suppressed, [])
+        self.assertEqual(result.newly_surfaced, [])
+
+        # classify_db must not fabricate a run_meta row, so every subsequent pass
+        # on this DB stays a "first pass" indefinitely — no crash, no false deltas.
+        result2 = C.classify_db(db, [], allow_5xx=False)
+        self.assertEqual(result2.newly_surfaced, [])
+        self.assertEqual(result2.newly_suppressed, [])
 
     def test_malformed_response_body_degrades_gracefully(self):
         db = build_db([cats_json()])
