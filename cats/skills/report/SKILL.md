@@ -20,6 +20,32 @@ after a run's parse **and** classify stages both succeed (see `run_meta`
 below), so it never points at a half-written or interrupted run. Pass an
 explicit `--db PATH` to target a specific run's database instead.
 
+## Re-parsing a retained report directory
+
+`/cats:run` normally drives parse and classify for you. But if
+`retain_raw_report: true` is set, the raw CATS report directory survives
+after the run — useful for re-parsing it later, e.g. after a schema change
+or to try a different `--db` location, without re-running the fuzzer:
+
+```
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py parse --report PATH [--db PATH]
+```
+
+`--report` is the CATS report directory (required). `--db` defaults to a
+fresh `cats-results-<run_id>.db` under `results_dir`, same as a normal run.
+
+Two caveats, both real:
+
+- **The report shows the "this run never finished" banner.** `parse` only
+  ever writes `run_meta.run_id` — it has no `finished_at` to stamp, because
+  that's set by the classify stage of a full `/cats:run`. Follow `parse`
+  with `classify` (see `/cats:fp`) against the same `--db` if you want a
+  report without that banner.
+- **It does not update `latest.db`.** Every command above defaults to
+  `--db latest`; a database produced by a bare `parse` is invisible to that
+  default until you either point `--db` at it explicitly on every
+  subsequent command, or repoint the `latest.db` symlink at it yourself.
+
 ## Schema
 
 ### Lookup tables
