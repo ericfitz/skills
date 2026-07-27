@@ -48,7 +48,7 @@ class Rule:
 
 
 def _validate_field(name: str, where: str) -> None:
-    if name in SCALAR_FIELDS or name in FIELDS:
+    if name in FIELDS:
         return
     if any(name.startswith(p) and len(name) > len(p) for p in PREFIX_FIELDS):
         return
@@ -69,6 +69,19 @@ def _validate_condition(name: str, spec: Any, where: str) -> None:
                     f"{where}: operator {op!r} on field {name!r} needs a list operand, "
                     f"got {type(operand).__name__}"
                 )
+            if op == "matches":
+                try:
+                    re.compile(str(operand))
+                except re.error as exc:
+                    raise RuleError(f"{where}: invalid regex for {name!r}: {exc}") from exc
+    elif isinstance(spec, list) and name in SCALAR_FIELDS:
+        # A scalar field's actual value is never a list, so a bare list spec can
+        # never match via the implicit-equals fallthrough — it silently never
+        # fires. Force the author to say what they meant (usually `in`).
+        raise RuleError(
+            f"{where}: bare list not allowed for scalar field {name!r} "
+            f"(it can never match; did you mean {{in: [...]}}?)"
+        )
 
 
 def _validate_condition_block(block: Any, where: str) -> None:
@@ -81,8 +94,10 @@ def _validate_condition_block(block: Any, where: str) -> None:
 def load_rules(path: Path) -> list[Rule]:
     try:
         raw = yaml.safe_load(path.read_text()) or {}
-    except FileNotFoundError as exc:
-        raise RuleError(f"rules file not found: {path}") from exc
+    except OSError as exc:
+        raise RuleError(f"cannot read rules file {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise RuleError(f"{path}: not valid UTF-8: {exc}") from exc
     except yaml.YAMLError as exc:
         raise RuleError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(raw, dict):
@@ -123,6 +138,18 @@ def load_rules(path: Path) -> list[Rule]:
                 f"{where} ({rule_id}): 'tags' must be a list, got {type(tags_raw).__name__}"
             )
 
+        if "enabled" in entry:
+            enabled_raw = entry.get("enabled")
+            if not isinstance(enabled_raw, bool):
+                # Catches both a bare `enabled:` (parses as None) and a quoted
+                # `enabled: "false"` (parses as a truthy string) — either would
+                # otherwise silently mis-set the rule's enabled state.
+                raise RuleError(
+                    f"{where} ({rule_id}): 'enabled' must be a boolean, got {type(enabled_raw).__name__}"
+                )
+        else:
+            enabled_raw = True
+
         when = entry.get("when")
         any_of = entry.get("any_of")
         if when is None and any_of is None:
@@ -141,7 +168,7 @@ def load_rules(path: Path) -> list[Rule]:
             why=why,
             when=when,
             any_of=any_of,
-            enabled=bool(entry.get("enabled", True)),
+            enabled=enabled_raw,
             tags=list(tags_raw or []),
             order_index=index,
         ))
@@ -152,7 +179,12 @@ _MISSING = object()
 
 
 def field_value(record: dict[str, Any], name: str) -> Any:
-    """Resolve a vocabulary field (including virtual and dotted fields) from a record."""
+    """Resolve a vocabulary field (including virtual and dotted fields) from a record.
+
+    Note: `any_text` always resolves to a string (`" "` at minimum, when both
+    `result_reason` and `result_details` are empty), never to the missing sentinel —
+    so `{any_text: {exists: false}}` can never match.
+    """
     if name == "any_text":
         return f"{record.get('result_reason') or ''} {record.get('result_details') or ''}"
     if name.startswith("json_body."):
@@ -163,8 +195,14 @@ def field_value(record: dict[str, Any], name: str) -> Any:
             cursor = cursor[part]
         return cursor
     if name.startswith("request_header."):
+        # Normalize both sides so this doesn't depend on the record contract
+        # pre-lowercasing header keys (it does today, but this stays correct if it stops).
+        wanted = name[len("request_header."):].lower()
         headers = record.get("request_headers") or {}
-        return headers.get(name[len("request_header."):].lower(), _MISSING)
+        for key, value in headers.items():
+            if key.lower() == wanted:
+                return value
+        return _MISSING
     return record.get(name, _MISSING)
 
 
@@ -176,11 +214,18 @@ def _as_text(value: Any) -> str:
 
 def _apply(op: str, actual: Any, expected: Any) -> bool:
     if op == "exists":
+        # A field that is absent from the record and one whose value is JSON `null`
+        # are treated identically here: both count as "does not exist". If a ported
+        # rule needs to distinguish "present but null" from "absent", `exists` is
+        # not the right operator for it.
         present = actual is not _MISSING and actual is not None
         return present is bool(expected)
     if op == "equals":
         return actual == expected
     if op == "not_equals":
+        # A field the record doesn't have (_MISSING) is not_equals to anything,
+        # including expected values that look like "empty" — there's no absent-field
+        # exemption here.
         return actual != expected
     if op == "in":
         return actual in expected
@@ -215,6 +260,11 @@ def _match_block(block: dict[str, Any], record: dict[str, Any]) -> bool:
 
 
 def match_rule(rule: Rule, record: dict[str, Any]) -> bool:
+    if rule.when is None and rule.any_of is None:
+        # load_rules never produces this (it requires 'when' or 'any_of'), but this
+        # function is public — a hand-built Rule with neither must not vacuously
+        # match every record.
+        return False
     if rule.when is not None and not _match_block(rule.when, record):
         return False
     if rule.any_of is not None and not any(_match_block(b, record) for b in rule.any_of):
@@ -227,9 +277,13 @@ def classify_record(
 ) -> tuple[bool, str | None, str | None]:
     """Return (is_false_positive, rule_id, violation_rule_id).
 
-    Only 'error' and 'warn' results are classified. A rule matching a 5xx response is
-    refused unless allow_5xx is set; the rule id is returned as violation_rule_id so the
-    caller can report it.
+    Only 'error' and 'warn' results are classified. Rules are evaluated in *list*
+    order — first match wins. `Rule.order_index` records each rule's position at
+    load time for callers that want to report it, but it is not read here; if a
+    caller reorders or concatenates rule lists, list order is what governs matching.
+
+    A rule matching a 5xx response is refused unless allow_5xx is set; the rule id
+    is returned as violation_rule_id so the caller can report it.
     """
     if record.get("result") not in ("error", "warn"):
         return (False, None, None)
@@ -237,8 +291,11 @@ def classify_record(
         if not rule.enabled:
             continue
         if match_rule(rule, record):
-            code = record.get("response_code") or 0
-            if 500 <= int(code) < 600 and not allow_5xx:
+            try:
+                code = int(record.get("response_code") or 0)
+            except (TypeError, ValueError):
+                code = 0
+            if 500 <= code < 600 and not allow_5xx:
                 return (False, None, rule.id)
             return (True, rule.id, None)
     return (False, None, None)
