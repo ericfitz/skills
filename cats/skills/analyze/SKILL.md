@@ -1,0 +1,99 @@
+---
+name: analyze
+version: 0.1.0
+description: Triage CATS true positives into a remediation plan (real bug, spec gap, or false-positive candidate). Use after a CATS run completes, or when asked to analyze/triage CATS findings.
+---
+
+# cats:analyze
+
+Turns the true positives from a completed CATS run into a remediation plan: for
+each cluster of similar findings, decide whether it's a real bug, a gap in the
+OpenAPI spec, or a false-positive candidate — and never guess. Every
+disposition must be backed by evidence from the spec or the response, not by
+how the finding "seems."
+
+## 1. Resolve the database and the spec
+
+```
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql "SELECT run_id, spec_path FROM run_meta"
+```
+
+`--db latest` is the default if the user doesn't name a specific run. Read
+`.local/cats/config.yaml`'s `spec:` value (or `spec_path` from the query
+above) and read that OpenAPI file — every disposition below needs to check
+against it.
+
+## 2. Pull and cluster the true positives
+
+```
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql "
+  SELECT path, contract_path, http_method, fuzzer, response_code,
+         COUNT(*) AS count, MIN(test_id) AS example_test_id
+  FROM true_positives_view
+  GROUP BY path, fuzzer, response_code
+  ORDER BY response_code DESC, count DESC
+"
+```
+
+Cluster by `(path, fuzzer, response_code)` — this is the unit of triage, not
+the individual test. For each cluster, pull the example test's
+`result_reason`, `result_details`, and (if useful) request/response bodies
+for closer inspection:
+
+```
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql "
+  SELECT * FROM test_results_view WHERE test_id = '<example_test_id>'
+"
+```
+
+(See `/cats:report` for the full schema and more query patterns.)
+
+## 3. Disposition each cluster
+
+Exactly one of three, and always with a cited reason:
+
+- **Real bug** — the response contradicts the spec's documented behavior for
+  a code it *does* document (e.g. spec says this operation returns 400 with
+  a validation-error body on malformed input; the server 500'd instead), or
+  the response is self-evidently broken regardless of the spec (a stack
+  trace in the body, a hung connection, corrupted JSON).
+- **Spec gap** — the response code is one the server plausibly means to
+  return, but that operation's `responses` object in the OpenAPI spec
+  doesn't document it. Cite the operation (path + method) and confirm by
+  reading the spec's `responses` keys for that operation — don't assert a
+  gap without checking.
+- **False-positive candidate** — the finding reflects fuzzer behavior that
+  isn't a defect in this API at all (the fuzzer's input isn't a request a
+  real client would ever send, or the "failure" is actually correct
+  behavior CATS scored wrong). This needs the same evidence bar as the
+  other two: point at what in the response or spec makes it not a bug.
+
+**Every 5xx response is Real bug and goes first, unconditionally.** Never
+disposition a 5xx as a false-positive candidate, regardless of how
+fuzzer-specific the triggering input looks — a server that crashes on bad
+input is a real defect no matter how contrived the input was. (This mirrors
+the tool-level rule: `classify` refuses to let any false-positive rule
+suppress a 5xx unless the repo has explicitly opted in via
+`allow_suppressing_5xx: true`.)
+
+## 4. Produce the remediation plan
+
+Order strictly by severity:
+
+1. Every 5xx cluster (Real bug, always).
+2. Remaining Real bug clusters, most-affected-paths first.
+3. Spec gap clusters.
+4. False-positive candidates, last.
+
+For each item: path, method, response code, fuzzer(s), affected test count,
+disposition, and the one-line evidence that justifies it (a spec quote, a
+response excerpt, or the specific contradiction).
+
+## 5. Hand off false-positive candidates
+
+For each false-positive candidate, draft a rule (id, `why`, `when`/`any_of`
+using the field/operator vocabulary from `/cats:fp`) and hand it to
+`/cats:fp add` rather than writing to the rules file yourself — that skill's
+dry-run-before-writing workflow is the safety check against suppressing a
+real bug by mistake. Present the drafted rule to the user as part of the
+plan; do not apply it here.

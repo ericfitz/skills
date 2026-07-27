@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal Claude Code marketplace (`efitz-skills`). Nine plugins, each
+efitz's personal Claude Code marketplace (`efitz-skills`). Ten plugins, each
 bundling one or more skills. Invoke a skill as `/<plugin>:<skill>`.
 
 ## loc — localization / i18n
@@ -52,6 +52,15 @@ questions from the graph, read-only) · `lint` (broken links, case conflicts,
 orphans, near-duplicates) · `organize` (merge/dedupe and restructure pages
 with safe changesets) · `from-obsidian` (convert + import an Obsidian vault,
 repeatable with hash-skip).
+
+## cats — CATS API fuzzing
+
+`init` (bootstrap per-repo `.local/cats/config.yaml`) · `run` (execute a fuzz
+campaign through config-declared shell hooks, via a background subagent) ·
+`report` (query and render results from SQLite — also the schema reference) ·
+`analyze` (triage true positives into a remediation plan) · `fp` (add/review/
+reclassify declarative false-positive rules). Portable across repos: setup is
+gitignored and repo-local, false-positive rules are a committed YAML file.
 
 ---
 
