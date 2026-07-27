@@ -13,7 +13,7 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,6 +32,12 @@ _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 # CATS pseudo-codes for connection refused / transport failure — not real HTTP
 # status codes, but rows CATS itself emits when a request never got a response.
 CONNECTION_ERROR_CODES = (953, 999)
+
+# Matches only per-run result databases (cats-results-<run_id>.db); the run_id
+# format is run_id_for's own output, so this is the sole thing that decides
+# what counts as a pruning candidate — never latest.db, report-*.html, or any
+# other file that happens to live in results_dir.
+_RUN_DB_RE = re.compile(r"^cats-results-(\d{8}T\d{6}Z)\.db$")
 
 
 def detect_port_forward(server_url: str, ps_output: str | None = None) -> str | None:
@@ -80,6 +86,8 @@ class RunResult:
     connection_errors: int | None = None
     total_tests: int | None = None
     max_connection_error_pct: float = 1.0
+    pruned: list[Path] = field(default_factory=list)
+    pruned_bytes: int = 0
 
     @property
     def contaminated(self) -> bool:
@@ -377,6 +385,77 @@ def _update_latest_symlink(results_dir: Path, db_path: Path) -> None:
     latest.symlink_to(db_path.name)
 
 
+def prune_run_dbs(
+    results_dir: Path, keep: int, *, protect: frozenset[str] = frozenset(), dry_run: bool = False,
+) -> list[Path]:
+    """Delete all but the `keep` most recent per-run databases in *results_dir*.
+
+    Candidates are direct children of *results_dir* whose name matches
+    `cats-results-<run_id>.db` (`_RUN_DB_RE`) — never `latest.db`, a report
+    directory/file, or any other file a caller might have dropped there.
+    Ordered by the run_id embedded in the filename (not mtime, which drifts
+    when a database is re-queried or re-classified), descending, so the
+    newest `keep` survive.
+
+    `latest.db`'s current target is always protected, even if it would
+    otherwise fall outside the keep window — including when `latest.db` is a
+    dangling symlink, since `readlink` still resolves the link text without
+    requiring the target to exist. Anything named in `protect` is protected
+    too (callers pass the run just written, which may not be `latest.db` yet
+    for a contaminated run).
+
+    Returns the list of database paths removed (or, under `dry_run=True`,
+    that would be removed) — callers can stat them beforehand to report bytes
+    reclaimed. Never raises: an individual unlink failure is logged and
+    skipped so pruning can never fail an otherwise-successful run.
+    """
+    if keep <= 0:
+        return []
+
+    protected = set(protect)
+    latest = results_dir / "latest.db"
+    try:
+        protected.add(latest.readlink().name)
+    except OSError:
+        # No latest.db, not a symlink, or some other race — nothing to protect
+        # from this source; caller-supplied `protect` still applies.
+        pass
+
+    try:
+        candidates = [
+            p for p in results_dir.iterdir() if p.is_file() and _RUN_DB_RE.fullmatch(p.name)
+        ]
+    except OSError as exc:
+        logger.warning("prune_run_dbs: could not list %s, skipping: %s", results_dir, exc)
+        return []
+
+    # The regex's captured group is exactly run_id_for's output format
+    # (YYYYMMDDTHHMMSSZ), which sorts lexicographically = chronologically.
+    candidates.sort(key=lambda p: _RUN_DB_RE.fullmatch(p.name).group(1), reverse=True)
+
+    to_delete = [p for p in candidates[keep:] if p.name not in protected]
+
+    if dry_run:
+        return to_delete
+
+    deleted: list[Path] = []
+    for db_path in to_delete:
+        try:
+            db_path.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("prune_run_dbs: failed to delete %s, continuing: %s", db_path, exc)
+            continue
+        deleted.append(db_path)
+        for suffix in ("-wal", "-shm"):
+            sidecar = db_path.with_name(db_path.name + suffix)
+            try:
+                sidecar.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning("prune_run_dbs: failed to delete %s, continuing: %s", sidecar, exc)
+
+    return deleted
+
+
 def _connection_error_stats(db_path: Path) -> tuple[int, int]:
     """Return (connection_errors, total_tests) for a parsed results database.
 
@@ -400,6 +479,7 @@ def execute(
     config: Config, *, identity_name: str | None = None, path_filter: str | None = None,
     rate: int | None = None, blackbox: bool = False, skip_seed: bool = False,
     skip_parse: bool = False, allow_port_forward: bool = False, now: datetime | None = None,
+    no_prune: bool = False,
 ) -> RunResult:
     """Run one full CATS campaign: preflight, hooks, fuzz, parse, classify.
 
@@ -411,6 +491,12 @@ def execute(
     time it runs the database is already written. On any failure before that
     point, `report_dir` (the raw CATS report) is deliberately left in place —
     it's the evidence needed to debug why parsing or classification failed.
+
+    Pruning of old per-run databases (`prune_run_dbs`) runs last, after the
+    post_run hook and raw-report cleanup, and only for a run that is itself
+    trustworthy — see the guard at the call site below for the exact
+    conditions. `no_prune=True` (CLI: `run --no-prune`) skips it for this
+    invocation without touching `config.keep_runs`.
     """
     if now is not None and now.tzinfo is None:
         # A naive `now` would be silently reinterpreted as local time by
@@ -505,6 +591,24 @@ def execute(
     if not config.retain_raw_report and parse_stats is not None:
         shutil.rmtree(report_dir, ignore_errors=True)
 
+    # Same trustworthiness gate as the latest.db update above, plus the
+    # pruning-specific opt-outs: a failed, skipped-parse, or contaminated run
+    # must never delete history that might be the only evidence of what went
+    # wrong. keep_runs == 0 means pruning is disabled entirely.
+    pruned: list[Path] = []
+    pruned_bytes = 0
+    if (
+        db_path.exists() and parse_stats is not None and not contaminated
+        and config.keep_runs > 0 and not no_prune
+    ):
+        protect = frozenset({db_path.name})
+        # Stat candidate sizes before the real deletion — once prune_run_dbs
+        # unlinks a file there is nothing left to stat, so this is the only
+        # point at which "bytes reclaimed" can be computed for the caller.
+        candidates = prune_run_dbs(config.results_dir, config.keep_runs, protect=protect, dry_run=True)
+        pruned_bytes = sum(p.stat().st_size for p in candidates if p.exists())
+        pruned = prune_run_dbs(config.results_dir, config.keep_runs, protect=protect)
+
     return RunResult(
         run_id=run_id,
         db_path=db_path,
@@ -515,4 +619,6 @@ def execute(
         connection_errors=connection_errors,
         total_tests=total_tests,
         max_connection_error_pct=config.max_connection_error_pct,
+        pruned=pruned,
+        pruned_bytes=pruned_bytes,
     )

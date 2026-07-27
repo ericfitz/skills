@@ -492,6 +492,77 @@ class TestExecute(unittest.TestCase):
         with self.assertRaises(ValueError):
             run.execute(c, now=datetime(2026, 7, 26, 22, 2, 0))  # noqa: DTZ001 (naive on purpose)
 
+    def test_successful_run_prunes_old_dbs_down_to_keep_runs(self):
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 2\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+
+        for minute in range(3):
+            result = run.execute(c, now=base.replace(minute=minute))
+
+        # only the third (most recent) run should have pruned anything, since
+        # keep_runs=2 first gets exceeded on that call
+        self.assertEqual(len(result.pruned), 1)
+        self.assertEqual(result.pruned[0].name, "cats-results-20260726T220000Z.db")
+        remaining = {p.name for p in c.results_dir.glob("cats-results-*.db")}
+        self.assertEqual(
+            remaining,
+            {"cats-results-20260726T220100Z.db", "cats-results-20260726T220200Z.db"},
+        )
+
+    def test_no_prune_flag_skips_pruning_for_this_invocation(self):
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 1\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        run.execute(c, now=base)
+
+        result = run.execute(c, now=base.replace(minute=1), no_prune=True)
+
+        self.assertEqual(result.pruned, [])
+        self.assertEqual(len(list(c.results_dir.glob("cats-results-*.db"))), 2)
+
+    def test_keep_runs_zero_disables_pruning(self):
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 0\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        for minute in range(3):
+            result = run.execute(c, now=base.replace(minute=minute))
+
+        self.assertEqual(result.pruned, [])
+        self.assertEqual(len(list(c.results_dir.glob("cats-results-*.db"))), 3)
+
+    def test_contaminated_run_does_not_prune(self):
+        # A single connection-error (999) test with no other tests puts the
+        # connection-error rate at 100%, over the default 1% threshold.
+        _fake_contaminated = """
+OUTPUT=""
+for arg in "$@"; do
+  case "$arg" in
+    --output=*) OUTPUT="${arg#--output=}" ;;
+  esac
+done
+mkdir -p "$OUTPUT"
+cat > "$OUTPUT/Test1.json" <<'EOF'
+{"testId":"Test 1","traceId":"t1","scenario":"s1","expectedResult":"2XX","result":"error",
+ "fuzzer":"FakeFuzzer","path":"/x","server":"http://x","request":{"httpMethod":"GET","url":"http://x/x","headers":[]},
+ "response":{"httpMethod":"GET","responseCode":999,"headers":[]}}
+EOF
+"""
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 1\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        run.execute(c, now=base)
+
+        _with_fake_cats(Path(self.bindir), _fake_contaminated)
+        result = run.execute(c, now=base.replace(minute=1))
+
+        self.assertTrue(result.contaminated)
+        self.assertEqual(result.pruned, [])
+        # the earlier clean run must survive — a contaminated run must never
+        # delete history that might be needed to debug what went wrong
+        self.assertEqual(len(list(c.results_dir.glob("cats-results-*.db"))), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

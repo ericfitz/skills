@@ -75,6 +75,32 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(c.cats.max_requests_per_minute, 3000)
         self.assertEqual(c.cats.http_methods, ["POST", "PUT", "GET", "DELETE", "PATCH"])
         self.assertIsNone(c.hooks.seed)
+        self.assertEqual(c.keep_runs, 5)
+
+    def test_keep_runs_custom_value_applied(self):
+        c = cfg.load_config(self._write(MINIMAL + "\nkeep_runs: 10\n"))
+        self.assertEqual(c.keep_runs, 10)
+
+    def test_keep_runs_zero_allowed(self):
+        c = cfg.load_config(self._write(MINIMAL + "\nkeep_runs: 0\n"))
+        self.assertEqual(c.keep_runs, 0)
+
+    def test_keep_runs_rejects_bool(self):
+        # bool is an int subclass in Python; `keep_runs: true` must not be
+        # silently accepted as 1.
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + "\nkeep_runs: true\n"))
+        self.assertIn("keep_runs", str(ctx.exception))
+
+    def test_keep_runs_rejects_negative(self):
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + "\nkeep_runs: -1\n"))
+        self.assertIn("keep_runs", str(ctx.exception))
+
+    def test_keep_runs_rejects_non_integer(self):
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + "\nkeep_runs: 2.5\n"))
+        self.assertIn("keep_runs", str(ctx.exception))
 
     def test_paths_resolve_against_repo_root(self):
         p = self._write(MINIMAL)
@@ -214,6 +240,13 @@ class TestInitTemplate(unittest.TestCase):
             c = cfg.load_config(p)
         self.assertEqual(c.server, "http://localhost:3000")
         self.assertEqual(c.health_url, "http://localhost:3000/health")
+        self.assertEqual(c.keep_runs, 5)
+
+    def test_template_documents_keep_runs(self):
+        text = cfg.render_init_config(
+            spec="s", server="http://h", health_url="http://h",
+            results_dir="r", rules="f.yaml")
+        self.assertIn("keep_runs:", text)
 
     def test_template_documents_hooks(self):
         text = cfg.render_init_config(

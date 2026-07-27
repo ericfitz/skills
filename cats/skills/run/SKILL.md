@@ -24,8 +24,8 @@ full CATS fuzzer against every configured path and typically takes
 why nothing has returned yet.
 
 Pass through any flags the user asked for (identity, path filter, rate limit,
-blackbox mode, skip-seed, skip-parse, allow-port-forward); the agent only
-forwards flags it's explicitly given, so be specific.
+blackbox mode, skip-seed, skip-parse, allow-port-forward, no-prune); the
+agent only forwards flags it's explicitly given, so be specific.
 
 ## Server path check
 
@@ -75,3 +75,26 @@ then a `RUN INVALID` block to stderr, and exits **3** — `latest.db` is
 defaults to `--db latest`) can't accidentally analyze it. Report the invalid
 run to the user with the likely cause CATS printed (unreachable server, or a
 throttled port-forward) rather than treating it as a normal completed run.
+
+## Retention
+
+Each run's database (`cats-results-<run_id>.db`) is roughly 1.4 GB, and
+nothing removed them automatically before this — a results directory could
+grow without bound. After a **successful, valid** run (same gate as the
+`latest.db` update above: parsed, classified, and not contaminated), `run`
+prunes old run databases down to the `keep_runs` most recent
+(`config.yaml`'s `keep_runs`, default 5), always keeping whichever one
+`latest.db` points at. A failed, skipped-parse, or contaminated run never
+prunes — only a run that was itself trustworthy is allowed to delete history.
+
+If anything was pruned, the summary includes a line like:
+
+```
+Pruned 3 old run database(s), reclaimed 4.2 GB (keep_runs: 5)
+```
+
+No line is printed if pruning is enabled but nothing was old enough to
+remove. Pass `--no-prune` to skip pruning for a single invocation without
+changing `keep_runs`. To prune outside of a run (e.g. to reclaim space
+between campaigns), use `uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py
+prune [--keep N] [--dry-run]` directly.

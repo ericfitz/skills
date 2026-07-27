@@ -12,6 +12,13 @@ A CATS run is parsed into a normalized SQLite database (one file per run,
 file is the durable reference for that schema, so a query can be written
 without opening any source file.
 
+**Retention**: a successful `/cats:run` prunes old run databases down to
+`config.yaml`'s `keep_runs` (default 5), always keeping whichever run
+`latest.db` points at. If a historical query needs to look back further than
+that window, raise `keep_runs` (or set it to `0` to disable pruning
+entirely) before the runs you want to keep are produced — pruning cannot be
+undone retroactively for runs it already removed.
+
 ## Resolving the database
 
 Every command below takes `--db`. Omit it, or pass `--db latest`, to use

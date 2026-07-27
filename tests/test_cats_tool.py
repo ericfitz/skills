@@ -478,5 +478,172 @@ class TestCmdInit(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 2)
 
 
+class TestCmdRunPruning(unittest.TestCase):
+    """cmd_run's --no-prune threading and its "Pruned ..." summary line
+    (runner.execute itself is exercised end-to-end in test_cats_runner.py;
+    these tests only cover cmd_run's own wiring, via a stubbed execute())."""
+
+    def _args(self, **over):
+        base = {
+            "identity": None, "path": None, "rate": None, "blackbox": False,
+            "skip_seed": False, "skip_parse": False, "allow_port_forward": False,
+            "no_prune": False,
+        }
+        base.update(over)
+        return argparse.Namespace(**base)
+
+    def _result(self, config, db, **over):
+        base = {
+            "run_id": "R1", "db_path": db, "report_dir": config.results_dir,
+            "cats_exit_code": 0, "parse_stats": P.ParseStats(processed=1), "classify_result": None,
+        }
+        base.update(over)
+        return run.RunResult(**base)
+
+    def test_no_prune_flag_is_threaded_to_execute(self):
+        config = make_config(self)
+        db = make_db(self, config)
+        captured = {}
+
+        def fake_execute(_config, **kwargs):
+            captured.update(kwargs)
+            return self._result(config, db)
+
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            mock.patch.object(CT, "execute", side_effect=fake_execute),
+            redirect_stdout(io.StringIO()),
+            self.assertRaises(SystemExit),
+        ):
+            CT.cmd_run(self._args(no_prune=True))
+
+        self.assertTrue(captured["no_prune"])
+
+    def test_default_no_prune_is_false(self):
+        config = make_config(self)
+        db = make_db(self, config)
+        captured = {}
+
+        def fake_execute(_config, **kwargs):
+            captured.update(kwargs)
+            return self._result(config, db)
+
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            mock.patch.object(CT, "execute", side_effect=fake_execute),
+            redirect_stdout(io.StringIO()),
+            self.assertRaises(SystemExit),
+        ):
+            CT.cmd_run(self._args())
+
+        self.assertFalse(captured["no_prune"])
+
+    def test_pruned_results_are_reported_with_size_and_keep_runs(self):
+        config = make_config(self)
+        db = make_db(self, config)
+        result = self._result(
+            config, db,
+            pruned=[config.results_dir / "cats-results-OLD.db"], pruned_bytes=4_500_000_000,
+        )
+        out = io.StringIO()
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            mock.patch.object(CT, "execute", return_value=result),
+            redirect_stdout(out),
+            self.assertRaises(SystemExit),
+        ):
+            CT.cmd_run(self._args())
+
+        text = out.getvalue()
+        self.assertIn("Pruned 1 old run database(s)", text)
+        self.assertIn("4.2 GB", text)
+        self.assertIn(f"keep_runs: {config.keep_runs}", text)
+
+    def test_nothing_printed_when_pruning_enabled_but_nothing_removed(self):
+        config = make_config(self)
+        db = make_db(self, config)
+        result = self._result(config, db)  # pruned defaults to []
+        out = io.StringIO()
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            mock.patch.object(CT, "execute", return_value=result),
+            redirect_stdout(out),
+            self.assertRaises(SystemExit),
+        ):
+            CT.cmd_run(self._args())
+
+        self.assertNotIn("Pruned", out.getvalue())
+
+
+class TestCmdPrune(unittest.TestCase):
+    def _args(self, **over):
+        base = {"keep": None, "dry_run": False}
+        base.update(over)
+        return argparse.Namespace(**base)
+
+    def _seed(self, config, count):
+        config.results_dir.mkdir(parents=True, exist_ok=True)
+        ids = [f"202601{i:02d}T000000Z" for i in range(1, count + 1)]
+        for run_id in ids:
+            (config.results_dir / f"cats-results-{run_id}.db").write_text("x")
+        return ids
+
+    def test_prunes_down_to_config_keep_runs_by_default(self):
+        config = make_config(self)
+        self._seed(config, 7)  # config.keep_runs defaults to 5
+
+        out = io.StringIO()
+        with mock.patch.object(CT, "load", return_value=config), redirect_stdout(out):
+            CT.cmd_prune(self._args())
+
+        remaining = list(config.results_dir.glob("cats-results-*.db"))
+        self.assertEqual(len(remaining), config.keep_runs)
+        self.assertIn("Total: 2 database(s)", out.getvalue())
+        self.assertIn(f"keep_runs: {config.keep_runs}", out.getvalue())
+
+    def test_keep_override(self):
+        config = make_config(self)
+        self._seed(config, 3)
+
+        with mock.patch.object(CT, "load", return_value=config), redirect_stdout(io.StringIO()):
+            CT.cmd_prune(self._args(keep=1))
+
+        remaining = list(config.results_dir.glob("cats-results-*.db"))
+        self.assertEqual(len(remaining), 1)
+
+    def test_dry_run_deletes_nothing(self):
+        config = make_config(self)
+        self._seed(config, 3)
+
+        out = io.StringIO()
+        with mock.patch.object(CT, "load", return_value=config), redirect_stdout(out):
+            CT.cmd_prune(self._args(keep=1, dry_run=True))
+
+        self.assertEqual(len(list(config.results_dir.glob("cats-results-*.db"))), 3)
+        self.assertIn("Would delete", out.getvalue())
+
+    def test_latest_target_protected_standalone(self):
+        config = make_config(self)
+        ids = self._seed(config, 3)
+        oldest = f"cats-results-{ids[0]}.db"
+        (config.results_dir / "latest.db").symlink_to(oldest)
+
+        with mock.patch.object(CT, "load", return_value=config), redirect_stdout(io.StringIO()):
+            CT.cmd_prune(self._args(keep=1))
+
+        remaining = {p.name for p in config.results_dir.glob("cats-results-*.db")}
+        self.assertIn(oldest, remaining)
+
+    def test_nothing_to_prune_message(self):
+        config = make_config(self)
+        config.results_dir.mkdir(parents=True, exist_ok=True)
+
+        out = io.StringIO()
+        with mock.patch.object(CT, "load", return_value=config), redirect_stdout(out):
+            CT.cmd_prune(self._args())
+
+        self.assertIn("Nothing to prune", out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

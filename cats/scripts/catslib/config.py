@@ -17,6 +17,7 @@ TOP_LEVEL_KEYS = {
     "version", "spec", "server", "health_url", "results_dir", "false_positives",
     "retain_raw_report", "allow_suppressing_5xx", "identities", "default_identity",
     "auth", "hooks", "cats", "allow_port_forward", "max_connection_error_pct",
+    "keep_runs",
 }
 CATS_KEYS = {
     "http_methods", "max_requests_per_minute", "ref_data", "skip_field_format",
@@ -72,6 +73,7 @@ class Config:
     allow_suppressing_5xx: bool
     allow_port_forward: bool
     max_connection_error_pct: float
+    keep_runs: int
     identities: dict[str, Identity]
     default_identity: str
     auth_header: str
@@ -138,6 +140,19 @@ def _require_pct(value: Any, key: str, path: Path, default: float) -> float:
     if not 0.0 <= pct <= 100.0:
         raise ConfigError(f"{path}: '{key}' must be between 0 and 100, got {pct!r}")
     return pct
+
+
+def _require_nonneg_int(value: Any, key: str, path: Path, default: int) -> int:
+    if value is None:
+        return default
+    # bool is an int subclass in Python (isinstance(True, int) is True), so a
+    # naive isinstance(value, int) check would silently accept `keep_runs: true`
+    # as 1 — reject bools explicitly before the int check.
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"{path}: '{key}' must be a non-negative integer, got {value!r}")
+    if value < 0:
+        raise ConfigError(f"{path}: '{key}' must be a non-negative integer, got {value!r}")
+    return value
 
 
 def _validate_auth_template(template: str, path: Path) -> None:
@@ -293,6 +308,7 @@ def load_config(path: Path) -> Config:
         max_connection_error_pct=_require_pct(
             raw.get("max_connection_error_pct"), "max_connection_error_pct", path, 1.0
         ),
+        keep_runs=_require_nonneg_int(raw.get("keep_runs"), "keep_runs", path, 5),
         identities=identities,
         default_identity=default_identity,
         auth_header=auth.get("header") or "Authorization",
@@ -351,6 +367,14 @@ allow_port_forward: false
 # codes 953/999) before a completed run is considered invalid and latest.db
 # is not updated to point at it.
 max_connection_error_pct: 1.0
+# How many of the most recent per-run databases (cats-results-<run_id>.db) to
+# keep; older ones are deleted after a successful run. Each run's database is
+# roughly 1.4 GB, so the default keeps the results directory near 7 GB while
+# still allowing run-over-run comparison across a normal fix-verify cycle.
+# Set to 0 to disable pruning entirely. `latest.db`'s target is always kept
+# regardless of this setting. Only a successful, uncontaminated run prunes —
+# see `run --no-prune` to skip pruning for a single invocation.
+keep_runs: 5
 
 identities:
   default:
