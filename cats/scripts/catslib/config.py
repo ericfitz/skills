@@ -256,3 +256,73 @@ def load_config(path: Path) -> Config:
         hooks=hooks,
         cats=cats_opts,
     )
+
+
+INITIAL_RULES_YAML = """# CATS false-positive rules.
+#
+# Rules are evaluated in file order; the FIRST match wins and its id is recorded
+# on the test row. Only 'error' and 'warn' results are classified.
+#
+# Fields: result, response_code, fuzzer, path, contract_path, method, url, scenario,
+#         result_reason, result_details, any_text (reason + details), response_body,
+#         response_content_type, request_body, json_body.<dotted.path>,
+#         request_header.<name>
+# Operators: equals (bare scalar), in, not_equals, contains, contains_any,
+#            contains_all, starts_with, starts_with_any, ends_with, matches, exists
+# equals/in/not_equals are case-sensitive; the rest are case-insensitive.
+version: 1
+rules:
+  - id: RATE_LIMIT_429
+    why: Rate limiting is infrastructure protection, not API behavior under test.
+    when: {response_code: 429}
+
+  - id: CONNECTION_ERROR_999
+    why: CATS reports 999 for transport/connection failures, not API defects.
+    when: {response_code: 999}
+"""
+
+
+def render_init_config(*, spec: str, server: str, health_url: str,
+                       results_dir: str, rules: str) -> str:
+    return f"""# CATS tooling configuration (machine-local; not committed).
+version: 1
+
+spec: {spec}
+server: {server}
+health_url: {health_url}
+results_dir: {results_dir}
+false_positives: {rules}
+
+# Delete the raw CATS report after a successful parse (it is large and redundant
+# once results are in SQLite). Set to true to keep it.
+retain_raw_report: false
+# Refuse any rule that would suppress a 5xx response.
+allow_suppressing_5xx: false
+
+identities:
+  default:
+    # Command printing a bearer token on stdout. Nothing else may go to stdout.
+    token_cmd: "echo REPLACE_ME"
+default_identity: default
+auth:
+  header: Authorization
+  template: "Bearer {{token}}"
+
+# Shell commands run at pipeline stages. Any language or toolchain.
+# Each receives CATS_SERVER, CATS_SPEC, CATS_RESULTS_DIR, CATS_REPORT_DIR,
+# CATS_RUN_ID and CATS_IDENTITY; post_run also gets CATS_DB and CATS_EXIT_CODE.
+hooks:
+  seed: ""
+  pre_run: ""
+  post_run: ""
+
+cats:
+  http_methods: [POST, PUT, GET, DELETE, PATCH]
+  max_requests_per_minute: 3000
+  # ref_data: test/results/cats/cats-test-data.yml
+  skip_field_format: []
+  skip_field: []
+  skip_fuzzers: []
+  skip_fuzzers_for_extension: []
+  extra_args: ["--printExecutionStatistics"]
+"""

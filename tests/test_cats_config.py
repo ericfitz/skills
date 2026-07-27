@@ -200,5 +200,35 @@ cats:
         self.assertIn("retain_raw_report", str(ctx.exception))
 
 
+class TestInitTemplate(unittest.TestCase):
+    def test_rendered_config_round_trips(self):
+        text = cfg.render_init_config(
+            spec="api/openapi.json", server="http://localhost:3000",
+            health_url="http://localhost:3000/health", results_dir="test/results/cats",
+            rules="test/cats/false-positives.yaml")
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local" / "cats").mkdir(parents=True)
+            p = root / ".local" / "cats" / "config.yaml"
+            p.write_text(text)
+            c = cfg.load_config(p)
+        self.assertEqual(c.server, "http://localhost:3000")
+        self.assertEqual(c.health_url, "http://localhost:3000/health")
+
+    def test_template_documents_hooks(self):
+        text = cfg.render_init_config(
+            spec="s", server="http://h", health_url="http://h",
+            results_dir="r", rules="f.yaml")
+        for key in ("seed:", "pre_run:", "post_run:", "token_cmd:"):
+            self.assertIn(key, text)
+
+    def test_starter_rules_are_stack_agnostic(self):
+        from catslib import rules as R
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
+            fh.write(cfg.INITIAL_RULES_YAML)
+        loaded = R.load_rules(Path(fh.name))
+        self.assertEqual([r.id for r in loaded], ["RATE_LIMIT_429", "CONNECTION_ERROR_999"])
+
+
 if __name__ == "__main__":
     unittest.main()
