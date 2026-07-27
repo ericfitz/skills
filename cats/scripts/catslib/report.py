@@ -12,6 +12,7 @@ a file.
 from __future__ import annotations
 
 import html
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -43,7 +44,7 @@ def summary(db_path: Path) -> dict[str, Any]:
     """Aggregate a classified run's provenance, counts, and true positives.
 
     Keys: run_meta, by_result, false_positive_total, by_rule, zero_match_rules,
-    true_positives_by_path, true_positives.
+    true_positives_by_path, true_positives_by_path_total, true_positives.
     """
     conn = _connect(db_path)
     try:
@@ -84,6 +85,12 @@ def summary(db_path: Path) -> dict[str, Any]:
             )
         ]
 
+        # Denominator for "Top 25 of N affected paths" — without it a reader can't
+        # tell 25-of-26 (basically everything) from 25-of-400 (a small slice).
+        true_positives_by_path_total = conn.execute(
+            "SELECT COUNT(DISTINCT path) FROM true_positives_view"
+        ).fetchone()[0]
+
         true_positives = [
             dict(row)
             for row in conn.execute(
@@ -103,28 +110,51 @@ def summary(db_path: Path) -> dict[str, Any]:
         "by_rule": by_rule,
         "zero_match_rules": zero_match_rules,
         "true_positives_by_path": true_positives_by_path,
+        "true_positives_by_path_total": true_positives_by_path_total,
         "true_positives": true_positives,
     }
+
+
+# C0 controls other than \t and \n, plus the Unicode bidi-override/embedding
+# (U+202A-202E) and bidi-isolate (U+2066-2069) characters. html.escape only
+# touches `& < > " '` — it does nothing about these, and CATS genuinely sends
+# them (e.g. a scenario containing U+202E RIGHT-TO-LEFT OVERRIDE). They can't
+# execute, so this isn't the same class of bug as unescaped markup, but a bidi
+# override left as-is visually reorders the text around it, which is a spoofing
+# risk in a report a human uses to judge whether a finding is real.
+_DANGEROUS_CHARS_RE = re.compile("[\x00-\x08\x0b-\x1f\u202a-\u202e\u2066-\u2069]")
+
+
+def _defang(text: str) -> str:
+    return _DANGEROUS_CHARS_RE.sub(lambda m: f"&#x{ord(m.group()):x};", text)
 
 
 def _esc(value: Any) -> str:
     if value is None:
         return ""
-    return html.escape(str(value))
+    # html.escape first, then defang: _defang's own output ("&#x...;") must not be
+    # re-escaped, so the "&" it introduces has to land after html.escape has run.
+    return _defang(html.escape(str(value)))
 
 
-def _table(headers: list[str], rows: list[tuple[Any, ...]]) -> str:
+def _table(headers: list[str], rows: list[tuple[Any, ...]], *, max_height: str | None = None) -> str:
     """Render a table, escaped, wrapped in a horizontally scrollable container so
     a wide row (long scenario strings, response reasons, ...) never forces the
-    whole page to scroll sideways."""
+    whole page to scroll sideways. `max_height` additionally bounds the container
+    vertically (with its own scrollbar) so the CSS `th { position: sticky }` rule
+    has a scrolling ancestor to stick within — without a bounded height it's a
+    no-op, since horizontal-only overflow never triggers sticky positioning."""
     if not rows:
         return '<p class="empty">(none)</p>'
     head = "".join(f"<th>{_esc(h)}</th>" for h in headers)
     body = "".join(
         "<tr>" + "".join(f"<td>{_esc(v)}</td>" for v in row) + "</tr>" for row in rows
     )
+    style = "overflow-x:auto"
+    if max_height is not None:
+        style += f";overflow-y:auto;max-height:{max_height}"
     return (
-        '<div style="overflow-x:auto">'
+        f'<div style="{style}">'
         f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
         "</div>"
     )
@@ -231,10 +261,15 @@ def render_html(db_path: Path) -> str:
     else:
         sections.append('<p class="empty">(none)</p>')
 
+    path_total = data["true_positives_by_path_total"]
     sections.append("<h2>True positives by path</h2>")
-    sections.append(
-        f'<p class="note">Top {TRUE_POSITIVE_PATH_CAP} paths by true-positive count.</p>'
-    )
+    if path_total > len(data["true_positives_by_path"]):
+        sections.append(
+            f'<p class="note">Top {TRUE_POSITIVE_PATH_CAP} of {path_total} '
+            "affected paths, by true-positive count.</p>"
+        )
+    else:
+        sections.append(f'<p class="note">{path_total} affected path(s).</p>')
     sections.append(
         _table(
             ["Path", "Count", "Fuzzers"],
@@ -262,6 +297,7 @@ def render_html(db_path: Path) -> str:
                 )
                 for tp in true_positives
             ],
+            max_height="600px",
         )
     )
 

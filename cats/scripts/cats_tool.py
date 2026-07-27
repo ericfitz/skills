@@ -278,29 +278,27 @@ def _print_run_summary(result: RunResult) -> None:
     print(f"parsed: {result.parse_stats.processed} processed, "
           f"{result.parse_stats.skipped} skipped, {result.parse_stats.errors} errors")
 
-    conn = open_results_db(result.db_path)
-    try:
-        print("\nResults by type:")
-        rows = conn.execute(
-            "SELECT rt.name AS result, COUNT(*) AS count FROM tests t "
-            "JOIN result_types rt ON t.result_type_id = rt.id "
-            "GROUP BY rt.name ORDER BY count DESC"
-        ).fetchall()
-        print_table(["result", "count"], [(r["result"], r["count"]) for r in rows])
+    # Derived from reporting.summary() rather than its own queries so the printed
+    # summary and the HTML report can't drift on the same numbers (they briefly
+    # did: this used to run a top-10, no-fuzzer-column path query while report.py
+    # ran a top-25 query with GROUP_CONCAT(DISTINCT fuzzer)). Trimmed to the
+    # summary's top 10 paths here, dropping the fuzzer column, purely for
+    # terminal width — the underlying data is the one true_positives_by_path list.
+    data = reporting.summary(result.db_path)
 
-        fp_total = conn.execute(
-            "SELECT COUNT(*) FROM tests WHERE is_false_positive = 1"
-        ).fetchone()[0]
-        print(f"\nFalse positives: {fp_total}")
+    print("\nResults by type:")
+    print_table(
+        ["result", "count"],
+        sorted(data["by_result"].items(), key=lambda kv: kv[1], reverse=True),
+    )
 
-        print("\nTop 10 true-positive paths:")
-        rows = conn.execute(
-            "SELECT path, COUNT(*) AS count FROM true_positives_view "
-            "GROUP BY path ORDER BY count DESC LIMIT 10"
-        ).fetchall()
-        print_table(["path", "count"], [(r["path"], r["count"]) for r in rows])
-    finally:
-        conn.close()
+    print(f"\nFalse positives: {data['false_positive_total']}")
+
+    print("\nTop 10 true-positive paths:")
+    print_table(
+        ["path", "count"],
+        [(r["path"], r["count"]) for r in data["true_positives_by_path"][:10]],
+    )
 
 
 def cmd_run(args: argparse.Namespace) -> None:
@@ -492,21 +490,32 @@ def cmd_query(args: argparse.Namespace) -> None:
 def cmd_report(args: argparse.Namespace) -> None:
     config = load()
     db_path = resolve_db(config, args.db)
+
+    # open_results_db validates the DB and exits 2 with a clean message on a bad
+    # one; reporting.render_html can't do that itself (it's a library, not a CLI
+    # command, so it never calls sys.exit) — without this, a malformed --db would
+    # surface as a raw sqlite3 traceback instead. Also doubles as the source for
+    # the default output filename below, so the DB is only opened once here.
+    conn = open_results_db(db_path)
+    try:
+        run_id_row = conn.execute("SELECT run_id FROM run_meta").fetchone()
+    finally:
+        conn.close()
+
     html = reporting.render_html(db_path)
 
     if args.out:
         out = Path(args.out)
     else:
-        conn = open_results_db(db_path)
-        try:
-            row = conn.execute("SELECT run_id FROM run_meta").fetchone()
-        finally:
-            conn.close()
-        run_id = row[0] if row and row[0] else "unknown"
+        run_id = run_id_row[0] if run_id_row and run_id_row[0] else "unknown"
         out = config.results_dir / f"report-{run_id}.html"
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html)
+    # Explicit encoding: the document declares <meta charset="utf-8">, and without
+    # this, write_text falls back to the locale's encoding — under a non-UTF-8
+    # locale a fuzzer payload with exotic Unicode would either raise
+    # UnicodeEncodeError or write bytes that contradict the declared charset.
+    out.write_text(html, encoding="utf-8")
     print(f"report: {out}")
 
     if args.open:
