@@ -26,3 +26,6 @@ writing/skills/boring/dist/
 # Machine-local, non-tracked config and cache (per the .local/ convention):
 # e.g. sem-scope.json, sem.db, project caches, and SDD progress/reports.
 .local/
+
+# subagent-driven-development scratch workspace
+.superpowers/
