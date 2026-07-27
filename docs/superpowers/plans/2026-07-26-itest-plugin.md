@@ -16,7 +16,7 @@
 - **Python: stdlib only.** `jsonschema` is not installed. Contract tests use `tests/schema_check.py` built in the `profile` plan (Task 8).
 - **Test style:** `unittest.TestCase`, matching `tests/test_dedupe.py`. Every test module starts with `sys.dont_write_bytecode = True`.
 - **Test command:** `python3 -m unittest discover -s tests -t .` from the repo root. Single module: `python3 -m unittest tests.<module> -v`.
-- **Lint command:** `ruff check itest/ tests/` — scoped deliberately; `ruff check .` reports pre-existing errors elsewhere.
+- **Lint command:** `ruff check tests/test_itest_*.py` — scoped to the files this plan creates. `itest/` ships no Python. Whole-directory linting fails on pre-existing errors that are out of scope. The root `ruff.toml` created by the profile plan (Task 1) governs the rules.
 - **Branch:** create `feat/itest-plugin` before Task 1. Do not commit to `main`.
 - **`itest` never invokes `profile_inventory.py`.** Inventory data arrives only inside the `stack` contract. This is the coupling rule that justifies the two-plugin split; a test enforces it.
 - **`${CLAUDE_PLUGIN_ROOT}` never crosses a plugin boundary.** Cross-plugin work happens by invoking skills by name.
@@ -1326,7 +1326,7 @@ Expected: `OK`
 
 - [ ] **Step 4: Lint**
 
-Run: `ruff check itest/ tests/`
+Run: `ruff check tests/test_itest_*.py`
 Expected: `All checks passed!`
 
 - [ ] **Step 5: Verify both plugins are registered and structurally sound**
@@ -1348,7 +1348,7 @@ git commit -m "feat(itest): marketplace registration and README"
 `itest` is done when:
 
 - `python3 -m unittest discover -s tests -t .` reports `OK`
-- `ruff check itest/ tests/` passes
+- `ruff check tests/test_itest_*.py` passes
 - All four `itest` contracts have validating examples, including a scenario example demonstrating both a composed and an injected precondition
 - `tests/test_itest_coupling.py` passes, proving `itest` never reaches into `profile` by path and `profile` never mentions `itest`
 - Both plugins appear in `.claude-plugin/marketplace.json` and `README.md`

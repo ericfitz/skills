@@ -15,8 +15,9 @@
 - **Python: stdlib only.** No third-party imports in shipped code or tests. `jsonschema` is NOT installed; contract tests use the hand-rolled checker built in Task 8.
 - **Test style:** `unittest.TestCase` classes, matching `tests/test_dedupe.py`. Every test module starts with `sys.dont_write_bytecode = True` and a `sys.path.insert` pointing at `profile/scripts`.
 - **Test command:** `python3 -m unittest discover -s tests -t .` from the repo root. Single module: `python3 -m unittest tests.<module> -v`.
-- **Lint command:** `ruff check profile/ tests/` — scoped deliberately. `ruff check .` reports 61 pre-existing errors elsewhere in the repo; do not fix those here.
-- **Repo has no `pyproject.toml`, no pytest, no CI.** Do not add any.
+- **Lint command:** `ruff check profile/ tests/test_profile_*.py tests/repobuilder.py tests/schema_check.py tests/test_plugin_structure.py` — scoped to files this plan creates. Whole-directory linting fails on pre-existing errors (13 in `tests/`, 8 in `dev/` and `logseq/`) that are out of scope. Do not fix those here.
+- **No `pyproject.toml` for these plugins.** Repo convention is that packaging follows dependencies: `dev` and `logseq` are stdlib-only and ship no manifest, invoked by path as `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/…`; `writing/skills/boring` has a `pyproject.toml` and `uv.lock` because it depends on spacy, textstat, and proselint. `profile` is stdlib-only, so it follows the former. **If a script here ever takes a third-party dependency, that is the trigger to add a `pyproject.toml` + `uv.lock` in that plugin directory, matching boring's shape.** Adding one before then would describe a build nothing runs, and would make `profile_inventory.py` report this repo as a two-package monorepo while `dev` and `logseq` stay invisible.
+- **Repo has no pytest and no CI.** Do not add either.
 - **Branch:** create `feat/profile-plugin` before Task 1. Do not commit to `main`.
 - **Paths in JSON output are always repo-relative POSIX strings**, sorted, never absolute — except the top-level `root` key.
 - **The script classifies what it recognizes and explicitly lists what it does not.** No silent guessing. This is the property the model fallback depends on.
@@ -25,6 +26,8 @@
 ## File Structure
 
 ```
+ruff.toml                             # NEW: repo-wide lint config (Task 1)
+
 profile/
   .claude-plugin/plugin.json          # plugin manifest
   scripts/
@@ -73,6 +76,7 @@ tests/
 ### Task 1: Repo file listing
 
 **Files:**
+- Create: `ruff.toml` (repo root)
 - Create: `profile/scripts/inventorylib/__init__.py`
 - Create: `profile/scripts/inventorylib/walk.py`
 - Create: `tests/repobuilder.py`
@@ -246,16 +250,48 @@ def walk_repo(root):
 Run: `python3 -m unittest tests.test_profile_walk -v`
 Expected: PASS, 4 tests
 
-- [ ] **Step 6: Lint**
+- [ ] **Step 6: Add the repo-wide lint config**
+
+This repo has no ruff configuration, so results currently depend on the developer's global ruff settings — running `ruff check` here today surfaces rules (`RUF100`, `UP006`, `SIM115`, `DTZ005`) that are not ruff defaults. Pin it so lint is deterministic for everyone. Create `ruff.toml` at the repo root:
+
+```toml
+target-version = "py311"
+line-length = 110
+exclude = ["**/.venv", "writing/skills/boring/dist"]
+
+[lint]
+select = ["E", "F", "I", "BLE"]
+
+[lint.isort]
+known-first-party = ["inventorylib"]
+
+[lint.per-file-ignores]
+# Test modules must mutate sys.path before importing plugin scripts, which
+# are invoked by path and are not installed packages.
+"tests/*.py" = ["E402", "I001"]
+```
+
+This is config only — no `[project]` table, no build system. It deliberately does not make the repo look like a Python package, and `profile_inventory.py` correctly continues to report this repo as having no manifests.
+
+Verify the per-file-ignores take effect:
+
+Run: `ruff check tests/test_profile_walk.py tests/repobuilder.py`
+Expected: `All checks passed!` — in particular no `E402` from the `sys.path.insert` pattern.
+
+- [ ] **Step 7: Lint the new code**
 
 Run: `ruff check profile/ tests/test_profile_walk.py tests/repobuilder.py`
 Expected: `All checks passed!`
 
-- [ ] **Step 7: Commit**
+Do not run `ruff check tests/` — 13 pre-existing errors in other test modules are out of scope for this plan.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add profile/scripts/inventorylib tests/test_profile_walk.py tests/repobuilder.py
-git commit -m "feat(profile): git-aware repo file listing for inventory"
+git add ruff.toml profile/scripts/inventorylib tests/test_profile_walk.py tests/repobuilder.py
+git commit -m "feat(profile): git-aware repo file listing for inventory
+
+Adds a root ruff.toml so lint results no longer depend on global config."
 ```
 
 ---
@@ -2206,7 +2242,7 @@ Expected: prints a confidence value and a non-zero test-file count. If confidenc
 - [ ] **Step 8: Lint and commit**
 
 ```bash
-ruff check profile/ tests/
+ruff check profile/ tests/test_profile_*.py tests/repobuilder.py tests/schema_check.py tests/test_plugin_structure.py
 git add profile/.claude-plugin tests/test_plugin_structure.py .claude-plugin/marketplace.json README.md
 git commit -m "feat(profile): plugin manifest, structural tests, marketplace registration"
 ```
@@ -2218,7 +2254,7 @@ git commit -m "feat(profile): plugin manifest, structural tests, marketplace reg
 `profile` is done when:
 
 - `python3 -m unittest discover -s tests -t .` reports `OK`
-- `ruff check profile/ tests/` passes
+- `ruff check profile/ tests/test_profile_*.py tests/repobuilder.py tests/schema_check.py tests/test_plugin_structure.py` passes
 - `python3 profile/scripts/profile_inventory.py .` emits valid JSON at exit 0
 - All three contracts have validating examples
 - `profile` appears in `.claude-plugin/marketplace.json` and `README.md`
