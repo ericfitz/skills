@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
+import yaml
+
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
 
@@ -75,6 +77,17 @@ class TestResolveToken(unittest.TestCase):
             run.resolve_token(c.identities["admin"], c.repo_root, {})
         self.assertIn("exit 3", str(ctx.exception))
 
+    def test_stderr_tail_included_in_failure_message(self):
+        # stdout is the token channel; stderr is the diagnostic channel — a
+        # failing token_cmd's stderr is safe to surface and makes the error
+        # actionable instead of a bare exit code.
+        c = make_config(CONFIG.replace(
+            'printf secret-token', 'echo boom-diagnostic >&2; exit 3'
+        ))
+        with self.assertRaises(run.HookError) as ctx:
+            run.resolve_token(c.identities["admin"], c.repo_root, {})
+        self.assertIn("boom-diagnostic", str(ctx.exception))
+
 
 class TestRunHook(unittest.TestCase):
     def test_success_is_silent(self):
@@ -99,6 +112,24 @@ class TestHeadersFile(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(p.stat().st_mode), 0o600)
             self.assertIn("Authorization: Bearer tok", p.read_text())
             self.assertIn("all:", p.read_text())
+
+    def test_special_characters_in_value_round_trip(self):
+        # A value starting with a YAML-special character, or containing ": ",
+        # must still produce a file CATS (a YAML parser) can read correctly —
+        # an f-string would have broken on input like this.
+        with tempfile.TemporaryDirectory() as d:
+            value = '*starts-with-star and has: a colon-space'
+            p = run.write_headers_file(Path(d), "Authorization", value)
+            parsed = yaml.safe_load(p.read_text())
+            self.assertEqual(parsed, {"all": {"Authorization": value}})
+
+    def test_write_failure_removes_the_partial_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")), \
+                    self.assertRaises(OSError):
+                run.write_headers_file(Path(d), "Authorization", "Bearer tok")
+            # mkstemp's file must not survive a chmod/write failure.
+            self.assertEqual(list(Path(d).glob("cats-headers-*")), [])
 
 
 class TestBuildArgv(unittest.TestCase):
@@ -139,6 +170,12 @@ class TestBuildArgv(unittest.TestCase):
     def test_rate_override_wins_over_config(self):
         self.assertIn("--maxRequestsPerMinute=99", self._argv(rate=99))
 
+    def test_rate_zero_is_respected(self):
+        # `rate or opts.max_requests_per_minute` would treat 0 as falsy/unset
+        # and silently fall back to the config default — 0 is a legitimate
+        # (if extreme) override and must survive.
+        self.assertIn("--maxRequestsPerMinute=0", self._argv(rate=0))
+
 
 class TestRunId(unittest.TestCase):
     def test_format(self):
@@ -159,11 +196,20 @@ class _OKHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+class _NotFoundHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(404)
+        self.end_headers()
+
+    def log_message(self, fmt, *args):  # silence per-request stderr logging
+        pass
+
+
 class _LiveServer:
     """A throwaway HTTP server for preflight/execute health checks."""
 
-    def __init__(self):
-        self.httpd = http.server.HTTPServer(("127.0.0.1", 0), _OKHandler)
+    def __init__(self, handler_cls=_OKHandler):
+        self.httpd = http.server.HTTPServer(("127.0.0.1", 0), handler_cls)
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
 
@@ -227,6 +273,19 @@ class TestPreflight(unittest.TestCase):
         with self.assertRaises(run.PreflightError) as ctx:
             run.preflight(c)
         self.assertIn(c.health_url, str(ctx.exception))
+
+    def test_server_error_response_raises_with_distinct_message(self):
+        # HTTPError subclasses URLError — a server that IS running but answers
+        # health_url with 404/401/500 must not be reported as "not running".
+        self.server.stop()
+        error_server = _LiveServer(_NotFoundHandler)
+        self.addCleanup(error_server.stop)
+        c = make_config(CONFIG.replace("http://localhost:8080", error_server.url))
+        with self.assertRaises(run.PreflightError) as ctx:
+            run.preflight(c)
+        message = str(ctx.exception)
+        self.assertIn("404", message)
+        self.assertNotIn("not running", message)
 
     def test_all_checks_pass_is_silent(self):
         c = self._config()
@@ -342,6 +401,12 @@ class TestExecute(unittest.TestCase):
             conn.close()
         self.assertIsNone(row[0])
 
+        # The headers file must not survive even a failed run — pins the
+        # `finally` ordering so a future refactor that moves the try below
+        # write_headers_file (or drops the finally) fails a test, not just
+        # a review.
+        self.assertEqual(list(c.results_dir.glob("cats-headers-*")), [])
+
     def test_seed_hook_failure_aborts_before_any_db_is_written(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         c = self._config(CONFIG.replace(
@@ -384,6 +449,25 @@ class TestExecute(unittest.TestCase):
         result = run.execute(c)
         self.assertEqual(result.cats_exit_code, 2)
         self.assertIsNotNone(result.parse_stats)
+
+    def test_token_never_appears_in_hook_environment(self):
+        # The token is a local variable inside execute(); it is never added to
+        # hook_env, so a hook that dumps its own environment must not see it —
+        # even post_run, which runs after the token has been resolved.
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        with tempfile.TemporaryDirectory() as d:
+            env_dump = Path(d) / "post_run_env.txt"
+            c = self._config(CONFIG.replace(
+                "identities:", f'hooks:\n  post_run: "env > {env_dump}"\nidentities:'
+            ))
+            run.execute(c)
+            self.assertTrue(env_dump.exists())
+            self.assertNotIn("secret-token", env_dump.read_text())
+
+    def test_naive_now_is_rejected(self):
+        c = self._config()
+        with self.assertRaises(ValueError):
+            run.execute(c, now=datetime(2026, 7, 26, 22, 2, 0))  # noqa: DTZ001 (naive on purpose)
 
 
 if __name__ == "__main__":

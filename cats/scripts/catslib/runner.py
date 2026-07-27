@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
+
 from .classify import ClassifyResult, classify_db
 from .config import Config, Identity
 from .parse import ParseStats, parse_report
@@ -79,9 +81,15 @@ def resolve_token(identity: Identity, cwd: Path, env: dict[str, str]) -> str:
         capture_output=True, text=True, check=False,
     )
     if proc.returncode != 0:
+        # By convention stdout is the token channel and stderr is the
+        # diagnostic channel, so a well-behaved token_cmd never puts the
+        # token itself on stderr — including a bounded tail here is safe.
+        # Do not add stdout to this message.
+        stderr_tail = (proc.stderr or "").strip()[-500:]
+        detail = f" — stderr: {stderr_tail}" if stderr_tail else ""
         raise HookError(
             f"token_cmd for identity {identity.name!r} failed "
-            f"(exit {proc.returncode}): {identity.token_cmd}"
+            f"(exit {proc.returncode}): {identity.token_cmd}{detail}"
         )
     token = (proc.stdout or "").strip()
     if not token:
@@ -95,10 +103,22 @@ def write_headers_file(directory: Path, header: str, value: str) -> Path:
     """Write a CATS headers file readable only by the owner."""
     fd, name = tempfile.mkstemp(prefix="cats-headers-", suffix=".yml", dir=str(directory))
     os.close(fd)
-    path = Path(name)
-    path.chmod(0o600)
-    path.write_text(f"all:\n  {header}: {value}\n")
-    return path
+    try:
+        path = Path(name)
+        path.chmod(0o600)
+        # yaml.safe_dump, not an f-string: a header value starting with a
+        # YAML-special character (*, &, {, [, !, %, @, backtick) or containing
+        # ": " would otherwise produce a malformed headers file that CATS
+        # fails on with an opaque error.
+        path.write_text(yaml.safe_dump({"all": {header: value}}))
+        return path
+    except BaseException:
+        # mkstemp already created the file on disk; a chmod/write failure
+        # here (ENOSPC, EIO, ...) must not leave a token-bearing file behind
+        # permanently — nothing else will ever clean up a path this function
+        # never returned.
+        os.unlink(name)
+        raise
 
 
 def build_cats_argv(config: Config, *, headers_file: Path, report_dir: Path,
@@ -111,7 +131,7 @@ def build_cats_argv(config: Config, *, headers_file: Path, report_dir: Path,
         f"--server={config.server}",
         f"--headers={headers_file}",
         f"--output={report_dir}",
-        f"--maxRequestsPerMinute={rate or opts.max_requests_per_minute}",
+        f"--maxRequestsPerMinute={rate if rate is not None else opts.max_requests_per_minute}",
     ]
     if blackbox:
         argv.append("-b")
@@ -154,7 +174,17 @@ def preflight(config: Config) -> None:
         raise PreflightError(f"invalid false-positive rules ({config.false_positives}): {exc}") from exc
 
     try:
-        urllib.request.urlopen(config.health_url, timeout=5)
+        with urllib.request.urlopen(config.health_url, timeout=5):
+            pass
+    except urllib.error.HTTPError as exc:
+        # HTTPError subclasses URLError, so it must be caught first: the
+        # server IS running and answering — 404/401/500 at health_url is a
+        # misconfiguration, not a down server, and deserves its own message
+        # rather than the misleading "server is not running."
+        raise PreflightError(
+            f"server at {config.health_url} responded with HTTP {exc.code}; "
+            f"check that health_url points at a working endpoint"
+        ) from exc
     except (urllib.error.URLError, OSError) as exc:
         raise PreflightError(
             f"server is not running at {config.health_url}; start it first ({exc})"
@@ -200,7 +230,7 @@ def _hook_env(config: Config, *, report_dir: Path, run_id: str, identity: Identi
     }
 
 
-def _stamp_finished_at(db_path: Path) -> None:
+def _stamp_finished_at(db_path: Path, run_id: str) -> None:
     """Mark a run_meta row complete only after parse AND classify have both succeeded.
 
     A NULL finished_at is how a killed or interrupted run is told apart from a
@@ -210,9 +240,11 @@ def _stamp_finished_at(db_path: Path) -> None:
     """
     conn = sqlite3.connect(db_path)
     try:
+        # WHERE run_id makes this correct on its own terms rather than relying
+        # on parse_report's "exactly one row" invariant, owned by another module.
         conn.execute(
-            "UPDATE run_meta SET finished_at = ?",
-            (datetime.now(timezone.utc).isoformat(),),
+            "UPDATE run_meta SET finished_at = ? WHERE run_id = ?",
+            (datetime.now(timezone.utc).isoformat(), run_id),
         )
         conn.commit()
     finally:
@@ -241,6 +273,13 @@ def execute(
     point, `report_dir` (the raw CATS report) is deliberately left in place —
     it's the evidence needed to debug why parsing or classification failed.
     """
+    if now is not None and now.tzinfo is None:
+        # A naive `now` would be silently reinterpreted as local time by
+        # run_id_for's .astimezone(), shifting both run_id and started_at by
+        # the local UTC offset without any error — reject it instead.
+        raise ValueError(
+            "execute(): `now` must be timezone-aware, e.g. datetime.now(timezone.utc)"
+        )
     started_at = now or datetime.now(timezone.utc)
     run_id = run_id_for(started_at)
     report_dir = config.results_dir / f"report-{run_id}"
@@ -293,7 +332,7 @@ def execute(
                 db_path, load_rules(config.false_positives), allow_5xx=config.allow_suppressing_5xx
             )
             # Only reached once both parse and classify have returned successfully.
-            _stamp_finished_at(db_path)
+            _stamp_finished_at(db_path, run_id)
     finally:
         if headers_file is not None:
             headers_file.unlink(missing_ok=True)
