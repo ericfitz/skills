@@ -42,7 +42,7 @@ def create_schema(conn: sqlite3.Connection) -> None:
 
 
 def extract_test_number(test_id: str) -> int:
-    match = _TEST_NUM.search(test_id or "")
+    match = _TEST_NUM.search(test_id if isinstance(test_id, str) else "")
     return int(match.group(1)) if match else 0
 
 
@@ -117,7 +117,7 @@ class _Loader:
         self.result_type_cache: dict[str, int] = {}
         self.fuzzer_cache: dict[str, int] = {}
         self.server_cache: dict[str, int] = {}
-        self.path_cache: dict[tuple[str, str], int] = {}
+        self.path_cache: dict[str, int] = {}
         self.method_cache: dict[str, int] = {}
         self._load_caches()
 
@@ -129,8 +129,7 @@ class _Loader:
         self.fuzzer_cache = {row[1]: row[0] for row in c.execute("SELECT id, name FROM fuzzers")}
         self.server_cache = {row[1]: row[0] for row in c.execute("SELECT id, base_url FROM servers")}
         self.path_cache = {
-            (row[1], row[2] or ""): row[0]
-            for row in c.execute("SELECT id, path, contract_path FROM paths")
+            row[1]: row[0] for row in c.execute("SELECT id, path FROM paths")
         }
         self.method_cache = {row[1]: row[0] for row in c.execute("SELECT id, method FROM http_methods")}
 
@@ -143,18 +142,22 @@ class _Loader:
         return row[0]
 
     def _get_or_create_path(self, path: str, contract_path: str) -> int:
-        key = (path, contract_path or "")
-        if key in self.path_cache:
-            return self.path_cache[key]
+        # `paths.path` alone is UNIQUE (schema.sql), so the cache and the lookup
+        # must key on `path` alone too — keying on (path, contract_path) let two
+        # files with the same path but different contract_path race the INSERT OR
+        # IGNORE into a no-op followed by a SELECT that could return no row. The
+        # first contract_path seen for a given path wins; later ones are ignored,
+        # same as the constraint enforces.
+        if path in self.path_cache:
+            return self.path_cache[path]
         self.conn.execute(
             "INSERT OR IGNORE INTO paths (path, contract_path) VALUES (?, ?)",
             (path, contract_path or None),
         )
         row = self.conn.execute(
-            "SELECT id FROM paths WHERE path = ? AND (contract_path = ? OR (contract_path IS NULL AND ? IS NULL))",
-            (path, contract_path or None, contract_path or None),
+            "SELECT id FROM paths WHERE path = ?", (path,)
         ).fetchone()
-        self.path_cache[key] = row[0]
+        self.path_cache[path] = row[0]
         return row[0]
 
     def insert(self, data: dict[str, Any], source_file: str) -> None:
@@ -316,7 +319,12 @@ def parse_report(
                         conn.execute("SAVEPOINT file_insert")
                         try:
                             loader.insert(data, file_path.name)
-                        except sqlite3.Error:
+                        except (sqlite3.Error, TypeError, ValueError, KeyError):
+                            # Broadened beyond sqlite3.Error: a single malformed
+                            # file (e.g. a non-string testId reaching
+                            # extract_test_number, or any other shape surprise in
+                            # record_from_json/insert) must count as one file
+                            # error, not escape the savepoint and abort the run.
                             conn.execute("ROLLBACK TO SAVEPOINT file_insert")
                             conn.execute("RELEASE SAVEPOINT file_insert")
                             batch_errors += 1
