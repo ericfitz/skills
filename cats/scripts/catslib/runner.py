@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -155,23 +156,41 @@ def build_cats_argv(config: Config, *, headers_file: Path, report_dir: Path,
     return argv
 
 
-def preflight(config: Config) -> None:
-    """Verify the environment is ready to run CATS; raise PreflightError with an
-    actionable message naming what's wrong and how to fix it."""
-    if not config.spec.exists():
-        raise PreflightError(f"OpenAPI spec not found: {config.spec}")
+def checks(config: Config) -> list[tuple[str, bool, str]]:
+    """Run every "ready to fuzz" check independently and report all of them.
 
-    if shutil.which("cats") is None:
-        raise PreflightError(
-            "cats binary not found on PATH. Install CATS "
-            "(https://github.com/Endava/cats) — e.g. `brew install cats` — "
-            "and make sure it is on PATH."
-        )
+    This is the single source of truth for what "ready" means: `preflight` raises
+    on the first failing entry (fail-fast, for `run`), and `cats_tool.py doctor`
+    prints every entry (full report, for a human). Keeping one function means the
+    two callers can't drift apart on wording or on what counts as a check — they
+    did exactly that before this was extracted (doctor and preflight independently
+    hand-wrote near-identical checks with slightly different messages).
+    """
+    results: list[tuple[str, bool, str]] = []
+
+    if config.spec.exists():
+        results.append(("spec", True, str(config.spec)))
+    else:
+        results.append(("spec", False, f"OpenAPI spec not found: {config.spec}"))
+
+    cats_path = shutil.which("cats")
+    if cats_path is None:
+        detail = ("cats binary not found on PATH. Install CATS "
+                  "(https://github.com/Endava/cats) — e.g. `brew install cats` — "
+                  "and make sure it is on PATH.")
+        results.append(("cats binary", False, detail))
+    else:
+        version = _cats_version()
+        results.append(("cats binary", True, version or f"found at {cats_path} (version unknown)"))
 
     try:
-        load_rules(config.false_positives)
+        rules = load_rules(config.false_positives)
     except RuleError as exc:
-        raise PreflightError(f"invalid false-positive rules ({config.false_positives}): {exc}") from exc
+        results.append((
+            "rules", False, f"invalid false-positive rules ({config.false_positives}): {exc}",
+        ))
+    else:
+        results.append(("rules", True, f"{len(rules)} rule(s) in {config.false_positives}"))
 
     try:
         with urllib.request.urlopen(config.health_url, timeout=5):
@@ -181,14 +200,27 @@ def preflight(config: Config) -> None:
         # server IS running and answering — 404/401/500 at health_url is a
         # misconfiguration, not a down server, and deserves its own message
         # rather than the misleading "server is not running."
-        raise PreflightError(
-            f"server at {config.health_url} responded with HTTP {exc.code}; "
-            f"check that health_url points at a working endpoint"
-        ) from exc
+        detail = (f"server at {config.health_url} responded with HTTP {exc.code}; "
+                  "check that health_url points at a working endpoint")
+        results.append(("server health", False, detail))
     except (urllib.error.URLError, OSError) as exc:
-        raise PreflightError(
-            f"server is not running at {config.health_url}; start it first ({exc})"
-        ) from exc
+        results.append((
+            "server health", False,
+            f"server is not running at {config.health_url}; start it first ({exc})",
+        ))
+    else:
+        results.append(("server health", True, config.health_url))
+
+    return results
+
+
+def preflight(config: Config) -> None:
+    """Verify the environment is ready to run CATS; raise PreflightError with an
+    actionable message naming what's wrong and how to fix it, on the first failing
+    check from `checks()` (spec, then cats binary, then rules, then server health)."""
+    for _name, ok, detail in checks(config):
+        if not ok:
+            raise PreflightError(detail)
 
 
 def _git_sha(repo_root: Path) -> str | None:
@@ -204,19 +236,30 @@ def _git_sha(repo_root: Path) -> str | None:
     return sha or None
 
 
+_VERSION_NUMBER = re.compile(r"\d+\.\d+\.\d+")
+
+
 def _cats_version() -> str | None:
-    """Best-effort `cats --version` first line; None if cats is unavailable."""
+    """Best-effort summary of `cats --version`; None if cats is unavailable.
+
+    The real CATS binary prints a decorative ASCII banner before the actual
+    version line, so "the first non-empty line" (naively) returns banner noise
+    (`# # # # ...`) instead of a version — this was verified against the real
+    binary, not assumed. Prefer a line that looks like it contains a semver
+    number; fall back to the first non-empty line for --version output that
+    doesn't follow that shape at all.
+    """
     try:
         proc = subprocess.run(
             ["cats", "--version"], capture_output=True, text=True, check=True,
         )
     except (OSError, subprocess.CalledProcessError):
         return None
-    for line in (proc.stdout or "").splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return None
+    lines = [line.strip() for line in (proc.stdout or "").splitlines() if line.strip()]
+    for line in lines:
+        if _VERSION_NUMBER.search(line):
+            return line
+    return lines[0] if lines else None
 
 
 def _hook_env(config: Config, *, report_dir: Path, run_id: str, identity: Identity) -> dict[str, str]:

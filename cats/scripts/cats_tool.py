@@ -10,15 +10,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
 import sqlite3
-import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 import webbrowser
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,7 +32,14 @@ from catslib.config import (
 )
 from catslib.parse import parse_report
 from catslib.rules import RuleError, load_rules
-from catslib.runner import HookError, PreflightError, execute, run_id_for
+from catslib.runner import (
+    HookError,
+    PreflightError,
+    RunResult,
+    checks,
+    execute,
+    run_id_for,
+)
 
 DEFAULT_SERVER = "http://localhost:8080"
 DEFAULT_RESULTS_DIR = "test/results/cats"
@@ -59,7 +63,7 @@ SPEC_GLOB_PATTERNS = (
 DELTA_CAP = 20
 
 
-def print_table(headers: list[str], rows: list) -> None:
+def print_table(headers: list[str], rows: Sequence[Sequence[object]]) -> None:
     """Print rows as a column-aligned table with header and separator."""
     if not rows:
         print("  (no results)")
@@ -119,6 +123,40 @@ def resolve_db(config: Config, value: str | None) -> Path:
     return path
 
 
+def open_results_db(path: Path) -> sqlite3.Connection:
+    """Open a CATS results database read-only, or exit 2 with a clean message.
+
+    `resolve_db` only checks that *some* file exists at the path — a stale,
+    truncated, or plain-wrong `--db` still reaches here. Without this guard, the
+    first query against it (in `query`, `report`, or the post-`run` summary) would
+    surface as a raw sqlite3 traceback instead of an actionable message; read-only
+    mode additionally means a destructive `--sql` (e.g. `DROP TABLE tests`) fails
+    the same clean way instead of corrupting a database — possibly the shared
+    `latest.db` — that other commands depend on.
+    """
+    try:
+        # Path.as_uri() percent-encodes reserved characters (spaces, '?', '#', ...)
+        # that a raw f-string would pass through unescaped and sqlite3's URI parser
+        # would then misinterpret as query-string syntax.
+        uri = path.resolve().as_uri() + "?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        conn.row_factory = sqlite3.Row
+        tables = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+    except sqlite3.Error as exc:
+        print(f"{path}: not a valid CATS results database ({exc})", file=sys.stderr)
+        sys.exit(2)
+    if "run_meta" not in tables:
+        conn.close()
+        print(
+            f"{path}: no run_meta table — not created by catslib.parse.create_schema",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return conn
+
+
 # ---------------------------------------------------------------------------
 # init
 # ---------------------------------------------------------------------------
@@ -143,14 +181,19 @@ def _discover_spec(repo_root: Path, *, non_interactive: bool) -> str:
         )
         sys.exit(2)
 
-    spec = input(
+    prompt = (
         f"No OpenAPI spec found automatically (tried: {tried}).\n"
         "Enter the path to your spec, relative to the repo root: "
-    ).strip()
-    if not spec:
-        print("No spec path entered.", file=sys.stderr)
-        sys.exit(2)
-    return spec
+    )
+    while True:
+        spec = input(prompt).strip()
+        if not spec:
+            print("No spec path entered.", file=sys.stderr)
+            sys.exit(2)
+        if (repo_root / spec).exists():
+            return spec
+        print(f"{repo_root / spec} does not exist. Try again, or Ctrl-C to cancel.", file=sys.stderr)
+        prompt = "Enter the path to your spec, relative to the repo root: "
 
 
 def cmd_init(args: argparse.Namespace) -> None:
@@ -158,7 +201,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     config_path = repo_root / ".local" / "cats" / "config.yaml"
 
     if config_path.exists() and not args.force:
-        print(config_path)
+        print(f"{config_path} already exists; pass --force to overwrite.")
         sys.exit(0)
 
     spec = args.spec or _discover_spec(repo_root, non_interactive=args.non_interactive)
@@ -202,69 +245,16 @@ def cmd_init(args: argparse.Namespace) -> None:
 # doctor
 # ---------------------------------------------------------------------------
 
-_VERSION_NUMBER = re.compile(r"\d+\.\d+\.\d+")
-
-
-def _cats_version() -> str | None:
-    """Best-effort summary of `cats --version`; None if cats is unavailable.
-
-    The real CATS binary prints a decorative ASCII banner before the actual
-    version line, so "the first non-empty line" (naively) returns banner noise
-    instead of a version. Prefer a line that looks like it contains a semver
-    number; fall back to the first non-empty line for --version output that
-    doesn't follow that shape at all.
-    """
-    try:
-        proc = subprocess.run(["cats", "--version"], capture_output=True, text=True, check=True)
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    lines = [line.strip() for line in (proc.stdout or "").splitlines() if line.strip()]
-    for line in lines:
-        if _VERSION_NUMBER.search(line):
-            return line
-    return lines[0] if lines else None
-
-
 def cmd_doctor(args: argparse.Namespace) -> None:
+    """Print every environment check runner.checks() knows about, ✓ or ✗, and
+    exit 1 if any failed. Deliberately does NOT call runner.preflight() — that
+    function is fail-fast (raises on the first failing check) by design for
+    `run`, so it physically cannot produce a full report. Both this and
+    `preflight` are built from the same `runner.checks()` so they can't drift on
+    wording or on what counts as "ready"."""
     config = load()
-    checks: list[tuple[str, bool, str]] = []
-
-    if config.spec.exists():
-        checks.append(("spec", True, str(config.spec)))
-    else:
-        checks.append(("spec", False, f"not found: {config.spec}"))
-
-    cats_path = shutil.which("cats")
-    if cats_path is None:
-        checks.append((
-            "cats binary", False,
-            "not found on PATH; install CATS (https://github.com/Endava/cats)",
-        ))
-    else:
-        version = _cats_version()
-        checks.append(("cats binary", True, version or f"found at {cats_path} (version unknown)"))
-
-    try:
-        rules = load_rules(config.false_positives)
-    except RuleError as exc:
-        checks.append(("rules", False, str(exc)))
-    else:
-        checks.append(("rules", True, f"{len(rules)} rule(s) in {config.false_positives}"))
-
-    try:
-        with urllib.request.urlopen(config.health_url, timeout=5):
-            pass
-    except urllib.error.HTTPError as exc:
-        detail = (f"{config.health_url} responded with HTTP {exc.code}; "
-                  "check that health_url points at a working endpoint")
-        checks.append(("server health", False, detail))
-    except (urllib.error.URLError, OSError) as exc:
-        checks.append(("server health", False, f"server is not running at {config.health_url} ({exc})"))
-    else:
-        checks.append(("server health", True, config.health_url))
-
     all_ok = True
-    for name, passed, detail in checks:
+    for name, passed, detail in checks(config):
         mark = "✓" if passed else "✗"
         print(f"{mark} {name}: {detail}")
         all_ok = all_ok and passed
@@ -276,7 +266,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 # run
 # ---------------------------------------------------------------------------
 
-def _print_run_summary(result) -> None:
+def _print_run_summary(result: RunResult) -> None:
     print(f"run_id: {result.run_id}")
     print(f"db: {result.db_path}")
 
@@ -287,8 +277,7 @@ def _print_run_summary(result) -> None:
     print(f"parsed: {result.parse_stats.processed} processed, "
           f"{result.parse_stats.skipped} skipped, {result.parse_stats.errors} errors")
 
-    conn = sqlite3.connect(result.db_path)
-    conn.row_factory = sqlite3.Row
+    conn = open_results_db(result.db_path)
     try:
         print("\nResults by type:")
         rows = conn.execute(
@@ -469,10 +458,13 @@ def _query_canned(conn: sqlite3.Connection) -> None:
 
 
 def cmd_query(args: argparse.Namespace) -> None:
+    if args.json and not args.sql:
+        print("--json requires --sql (the canned summaries are text-table only).", file=sys.stderr)
+        sys.exit(2)
+
     config = load()
     db_path = resolve_db(config, args.db)
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = open_results_db(db_path)
     try:
         if args.sql:
             try:
@@ -514,7 +506,7 @@ def cmd_report(args: argparse.Namespace) -> None:
     if args.out:
         out = Path(args.out)
     else:
-        conn = sqlite3.connect(db_path)
+        conn = open_results_db(db_path)
         try:
             row = conn.execute("SELECT run_id FROM run_meta").fetchone()
         finally:
@@ -599,4 +591,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        # main() already turns the five typed library errors into a clean message;
+        # this catches only a truncated pipe (e.g. `cats_tool.py query | head`), so
+        # that doesn't end in a traceback on stdout write. Python flushes stdout at
+        # exit, so the closed pipe has to be replaced before exiting or the flush
+        # itself re-raises the same error.
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        sys.exit(1)

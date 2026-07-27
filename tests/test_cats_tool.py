@@ -2,6 +2,7 @@ import argparse
 import io
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -45,14 +46,16 @@ CATS_JSON = {
 }
 
 
-def _tmp_dir() -> Path:
+def _tmp_dir(case: unittest.TestCase) -> Path:
+    """A TemporaryDirectory cleaned up when `case` tears down, not at module end —
+    so temp dirs don't pile up for the whole file's run."""
     d = tempfile.TemporaryDirectory()
-    unittest.addModuleCleanup(d.cleanup)
+    case.addCleanup(d.cleanup)
     return Path(d.name)
 
 
-def make_config(body=CONFIG):
-    root = _tmp_dir()
+def make_config(case: unittest.TestCase, body: str = CONFIG):
+    root = _tmp_dir(case)
     (root / ".local" / "cats").mkdir(parents=True)
     p = root / ".local" / "cats" / "config.yaml"
     p.write_text(body)
@@ -61,9 +64,9 @@ def make_config(body=CONFIG):
     return cfg.load_config(p)
 
 
-def make_db(config) -> Path:
+def make_db(case: unittest.TestCase, config) -> Path:
     """Parse one Test*.json into a real database under config.results_dir."""
-    report = _tmp_dir()
+    report = _tmp_dir(case)
     (report / "Test1.json").write_text(json.dumps(CATS_JSON))
     db = config.results_dir / "cats-results-R1.db"
     config.results_dir.mkdir(parents=True, exist_ok=True)
@@ -73,35 +76,73 @@ def make_db(config) -> Path:
 
 class TestResolveDb(unittest.TestCase):
     def test_missing_latest_exits_2(self):
-        config = make_config()
+        config = make_config(self)
         config.results_dir.mkdir(parents=True, exist_ok=True)
         with self.assertRaises(SystemExit) as ctx:
             CT.resolve_db(config, None)
         self.assertEqual(ctx.exception.code, 2)
 
     def test_latest_resolves_through_symlink(self):
-        config = make_config()
-        db = make_db(config)
+        config = make_config(self)
+        db = make_db(self, config)
         (config.results_dir / "latest.db").symlink_to(db.name)
         resolved = CT.resolve_db(config, "latest")
         self.assertEqual(resolved, db.resolve())
 
     def test_explicit_missing_path_exits_2(self):
-        config = make_config()
+        config = make_config(self)
         with self.assertRaises(SystemExit) as ctx:
             CT.resolve_db(config, str(config.results_dir / "nope.db"))
         self.assertEqual(ctx.exception.code, 2)
 
     def test_explicit_existing_path_returned(self):
-        config = make_config()
-        db = make_db(config)
+        config = make_config(self)
+        db = make_db(self, config)
         self.assertEqual(CT.resolve_db(config, str(db)), db)
+
+
+class TestOpenResultsDb(unittest.TestCase):
+    """Critical fix: resolve_db only checks that *some* file exists — a stale,
+    truncated, or plain-wrong --db must not reach a raw sqlite3 traceback the
+    first time a query touches it."""
+
+    def test_non_sqlite_file_fails_cleanly(self):
+        garbage = _tmp_dir(self) / "garbage.db"
+        garbage.write_text("this is not a sqlite database")
+        err = io.StringIO()
+        with redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+            CT.open_results_db(garbage)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("not a valid CATS results database", err.getvalue())
+
+    def test_sqlite_db_without_run_meta_fails_cleanly(self):
+        bogus = _tmp_dir(self) / "bogus.db"
+        conn = sqlite3.connect(bogus)
+        conn.execute("CREATE TABLE foo (x int)")
+        conn.commit()
+        conn.close()
+        err = io.StringIO()
+        with redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+            CT.open_results_db(bogus)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("no run_meta table", err.getvalue())
+
+    def test_valid_db_opens_read_only(self):
+        config = make_config(self)
+        db = make_db(self, config)
+        conn = CT.open_results_db(db)
+        try:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tests").fetchone()[0], 1)
+            with self.assertRaises(sqlite3.OperationalError):
+                conn.execute("DROP TABLE tests")
+        finally:
+            conn.close()
 
 
 class TestClassifyDryRun(unittest.TestCase):
     def test_original_db_untouched(self):
-        config = make_config()
-        db = make_db(config)
+        config = make_config(self)
+        db = make_db(self, config)
         before = db.read_bytes()
 
         args = argparse.Namespace(db=str(db), dry_run=True)
@@ -111,12 +152,12 @@ class TestClassifyDryRun(unittest.TestCase):
         self.assertEqual(db.read_bytes(), before, "dry-run classify must not mutate the real database")
 
     def test_dry_run_still_reports_flagged_count(self):
-        config = make_config()
+        config = make_config(self)
         root = config.repo_root
         (root / "fp.yaml").write_text(
             "version: 1\nrules:\n  - id: R1\n    why: test\n    when: {response_code: 400}\n"
         )
-        db = make_db(config)
+        db = make_db(self, config)
 
         args = argparse.Namespace(db=str(db), dry_run=True)
         out = io.StringIO()
@@ -125,12 +166,12 @@ class TestClassifyDryRun(unittest.TestCase):
         self.assertIn("flagged: 1 / 1", out.getvalue())
 
     def test_non_dry_run_mutates_db(self):
-        config = make_config()
+        config = make_config(self)
         root = config.repo_root
         (root / "fp.yaml").write_text(
             "version: 1\nrules:\n  - id: R1\n    why: test\n    when: {response_code: 400}\n"
         )
-        db = make_db(config)
+        db = make_db(self, config)
         before = db.read_bytes()
 
         args = argparse.Namespace(db=str(db), dry_run=False)
@@ -162,8 +203,8 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
         self.assertIn("boom config", err)
 
     def test_rule_error(self):
-        config = make_config()
-        db = make_db(config)
+        config = make_config(self)
+        db = make_db(self, config)
         with (
             mock.patch.object(CT, "load", return_value=config),
             mock.patch.object(CT, "load_rules", side_effect=RuleError("boom rules")),
@@ -173,8 +214,8 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
         self.assertIn("boom rules", err)
 
     def test_classify_error(self):
-        config = make_config()
-        db = make_db(config)
+        config = make_config(self)
+        db = make_db(self, config)
         with (
             mock.patch.object(CT, "load", return_value=config),
             mock.patch.object(CT, "classify_db", side_effect=ClassifyError("boom classify")),
@@ -184,7 +225,7 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
         self.assertIn("boom classify", err)
 
     def test_hook_error(self):
-        config = make_config()
+        config = make_config(self)
         with (
             mock.patch.object(CT, "load", return_value=config),
             mock.patch.object(CT, "execute", side_effect=run.HookError("boom hook")),
@@ -194,7 +235,7 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
         self.assertIn("boom hook", err)
 
     def test_preflight_error(self):
-        config = make_config()
+        config = make_config(self)
         with (
             mock.patch.object(CT, "load", return_value=config),
             mock.patch.object(CT, "execute", side_effect=run.PreflightError("boom preflight")),
@@ -204,62 +245,152 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
         self.assertIn("boom preflight", err)
 
 
-def _with_fake_cats(bindir: Path, version_script: str) -> None:
-    """Create a fake `cats` executable on a directory, for PATH injection."""
-    script = bindir / "cats"
-    script.write_text(f"#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then {version_script}; fi\n")
-    script.chmod(0o755)
+class TestQueryCleanErrors(unittest.TestCase):
+    """The `query` default (canned-summary) branch is the path a stale or
+    mistyped --db actually hits; the --sql branch was already guarded."""
+
+    def test_query_on_non_sqlite_db_exits_2_cleanly(self):
+        config = make_config(self)
+        config.results_dir.mkdir(parents=True, exist_ok=True)
+        garbage = config.results_dir / "garbage.db"
+        garbage.write_text("nope")
+
+        args = argparse.Namespace(db=str(garbage), sql=None, json=False)
+        err = io.StringIO()
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            redirect_stdout(io.StringIO()),
+            redirect_stderr(err),
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            CT.cmd_query(args)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("not a valid CATS results database", err.getvalue())
+
+    def test_query_on_non_catslib_db_exits_2_cleanly(self):
+        config = make_config(self)
+        config.results_dir.mkdir(parents=True, exist_ok=True)
+        bogus = config.results_dir / "bogus.db"
+        conn = sqlite3.connect(bogus)
+        conn.execute("CREATE TABLE foo (x int)")
+        conn.commit()
+        conn.close()
+
+        args = argparse.Namespace(db=str(bogus), sql=None, json=False)
+        err = io.StringIO()
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            redirect_stdout(io.StringIO()),
+            redirect_stderr(err),
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            CT.cmd_query(args)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("no run_meta table", err.getvalue())
+
+    def test_destructive_sql_fails_cleanly_and_db_is_unmodified(self):
+        config = make_config(self)
+        db = make_db(self, config)
+        before = db.read_bytes()
+
+        args = argparse.Namespace(db=str(db), sql="DROP TABLE tests", json=False)
+        err = io.StringIO()
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            redirect_stdout(io.StringIO()),
+            redirect_stderr(err),
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            CT.cmd_query(args)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("SQL error", err.getvalue())
+        self.assertEqual(db.read_bytes(), before, "query must open the database read-only")
+
+    def test_json_without_sql_rejected(self):
+        args = argparse.Namespace(db=None, sql=None, json=True)
+        err = io.StringIO()
+        with redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+            CT.cmd_query(args)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("--json requires --sql", err.getvalue())
+
+    def test_json_with_sql_still_works(self):
+        config = make_config(self)
+        db = make_db(self, config)
+        args = argparse.Namespace(db=str(db), sql="SELECT COUNT(*) AS n FROM tests", json=True)
+        out = io.StringIO()
+        with mock.patch.object(CT, "load", return_value=config), redirect_stdout(out):
+            CT.cmd_query(args)
+        self.assertEqual(json.loads(out.getvalue()), [{"n": 1}])
 
 
-class TestCatsVersion(unittest.TestCase):
-    def test_absent_binary_returns_none(self):
-        with mock.patch.object(CT.subprocess, "run", side_effect=FileNotFoundError):
-            self.assertIsNone(CT._cats_version())
+class TestDoctorUsesSharedChecks(unittest.TestCase):
+    """doctor must be a thin printer over runner.checks(), not an independent
+    reimplementation — otherwise the two silently drift, as they had before."""
 
-    def test_plain_output_uses_first_line(self):
-        bindir = _tmp_dir()
-        _with_fake_cats(bindir, 'echo "CATS 11.0.0-fake"')
-        with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}):
-            self.assertEqual(CT._cats_version(), "CATS 11.0.0-fake")
+    def test_prints_every_check_and_exits_1_on_any_failure(self):
+        config = make_config(self)
+        fake_checks = [("a", True, "ok"), ("b", False, "bad detail")]
+        out = io.StringIO()
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            mock.patch.object(CT, "checks", return_value=fake_checks),
+            redirect_stdout(out),
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            CT.cmd_doctor(argparse.Namespace())
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertIn("✓ a: ok", out.getvalue())
+        self.assertIn("✗ b: bad detail", out.getvalue())
 
-    def test_banner_output_skips_decoration(self):
-        # Reproduces the real CATS binary: an ASCII-art banner precedes the
-        # actual "CATS version X.Y.Z" line — naively taking the first
-        # non-empty line returns banner noise instead of a version.
-        bindir = _tmp_dir()
-        _with_fake_cats(
-            bindir,
-            'printf "# # # # #\\n#  CATS  #\\n# # # # #\\n\\nCATS version 13.8.0\\n"',
-        )
-        with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}):
-            self.assertEqual(CT._cats_version(), "CATS version 13.8.0")
+    def test_exits_0_when_all_pass(self):
+        config = make_config(self)
+        fake_checks = [("a", True, "ok")]
+        with (
+            mock.patch.object(CT, "load", return_value=config),
+            mock.patch.object(CT, "checks", return_value=fake_checks),
+            redirect_stdout(io.StringIO()),
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            CT.cmd_doctor(argparse.Namespace())
+        self.assertEqual(ctx.exception.code, 0)
 
 
 class TestDiscoverSpec(unittest.TestCase):
     def test_single_match_used(self):
-        root = _tmp_dir()
+        root = _tmp_dir(self)
         (root / "openapi.json").write_text("{}")
         self.assertEqual(CT._discover_spec(root, non_interactive=True), "openapi.json")
 
     def test_multiple_matches_exit_2(self):
-        root = _tmp_dir()
-        (root / "api-schema").mkdir()
-        (root / "api-schema" / "a.json").write_text("{}")
-        (root / "api-schema" / "b.json").write_text("{}")
-        with self.assertRaises(SystemExit) as ctx:
+        root = _tmp_dir(self)
+        (root / "docs").mkdir()
+        (root / "docs" / "openapi.json").write_text("{}")
+        (root / "docs" / "openapi-v2.json").write_text("{}")
+        err = io.StringIO()
+        with redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
             CT._discover_spec(root, non_interactive=True)
         self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("Multiple OpenAPI spec candidates", err.getvalue())
 
     def test_no_matches_non_interactive_exits_2(self):
-        root = _tmp_dir()
+        root = _tmp_dir(self)
         with self.assertRaises(SystemExit) as ctx:
             CT._discover_spec(root, non_interactive=True)
         self.assertEqual(ctx.exception.code, 2)
 
-    def test_no_matches_interactive_prompts(self):
-        root = _tmp_dir()
+    def test_interactive_prompt_accepts_existing_path(self):
+        root = _tmp_dir(self)
+        (root / "my").mkdir()
+        (root / "my" / "spec.json").write_text("{}")
         with mock.patch("builtins.input", return_value="my/spec.json"):
             self.assertEqual(CT._discover_spec(root, non_interactive=False), "my/spec.json")
+
+    def test_interactive_reprompts_on_nonexistent_path(self):
+        root = _tmp_dir(self)
+        (root / "real.json").write_text("{}")
+        with mock.patch("builtins.input", side_effect=["missing.json", "real.json"]):
+            self.assertEqual(CT._discover_spec(root, non_interactive=False), "real.json")
 
 
 class TestCmdInit(unittest.TestCase):
@@ -278,7 +409,7 @@ class TestCmdInit(unittest.TestCase):
         return argparse.Namespace(**base)
 
     def test_writes_config_rules_and_results_dir(self):
-        root = _tmp_dir()
+        root = _tmp_dir(self)
         (root / "openapi.json").write_text("{}")
         self._chdir(root)
 
@@ -295,20 +426,23 @@ class TestCmdInit(unittest.TestCase):
         self.assertTrue((root / CT.DEFAULT_RESULTS_DIR).is_dir())
 
     def test_existing_config_without_force_exits_0_and_leaves_it(self):
-        root = _tmp_dir()
+        root = _tmp_dir(self)
         (root / "openapi.json").write_text("{}")
         self._chdir(root)
         config_path = root / ".local" / "cats" / "config.yaml"
         config_path.parent.mkdir(parents=True)
         config_path.write_text("sentinel")
 
-        with redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as ctx:
+        out = io.StringIO()
+        with redirect_stdout(out), self.assertRaises(SystemExit) as ctx:
             CT.cmd_init(self._args())
         self.assertEqual(ctx.exception.code, 0)
         self.assertEqual(config_path.read_text(), "sentinel")
+        self.assertIn("already exists", out.getvalue())
+        self.assertIn("--force", out.getvalue())
 
     def test_no_spec_non_interactive_exits_2(self):
-        root = _tmp_dir()
+        root = _tmp_dir(self)
         self._chdir(root)
         with (
             redirect_stdout(io.StringIO()),

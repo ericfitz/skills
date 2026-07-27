@@ -224,16 +224,68 @@ class _LiveServer:
         self.thread.join(timeout=5)
 
 
-def _with_fake_cats(bindir: Path, extra_script: str = "") -> Path:
+def _with_fake_cats(
+    bindir: Path, extra_script: str = "", version_output: str = 'echo "CATS 11.0.0-fake"'
+) -> Path:
     """Create a fake `cats` executable on a directory, for PATH injection."""
     script = bindir / "cats"
     script.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = "--version" ]; then echo "CATS 11.0.0-fake"; exit 0; fi\n'
+        f'if [ "$1" = "--version" ]; then {version_output}; exit 0; fi\n'
         + extra_script
     )
     script.chmod(0o755)
     return script
+
+
+class TestCatsVersion(unittest.TestCase):
+    def test_absent_binary_returns_none(self):
+        with mock.patch.object(run.subprocess, "run", side_effect=FileNotFoundError):
+            self.assertIsNone(run._cats_version())
+
+    def test_plain_output_without_digits_uses_first_line(self):
+        with tempfile.TemporaryDirectory() as bindir:
+            _with_fake_cats(Path(bindir), version_output='echo "cats (dev build)"')
+            with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}):
+                self.assertEqual(run._cats_version(), "cats (dev build)")
+
+    def test_banner_output_skips_decoration(self):
+        # Reproduces the real CATS binary (verified against the actual `cats`
+        # binary, not assumed): an ASCII-art banner precedes the actual
+        # "CATS version X.Y.Z" line — naively taking the first non-empty line
+        # returns banner noise instead of a version.
+        with tempfile.TemporaryDirectory() as bindir:
+            _with_fake_cats(
+                Path(bindir),
+                version_output='printf "# # # # #\\n#  CATS  #\\n# # # # #\\n\\nCATS version 13.8.0\\n"',
+            )
+            with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}):
+                self.assertEqual(run._cats_version(), "CATS version 13.8.0")
+
+
+class TestChecksAndPreflightAgree(unittest.TestCase):
+    """`checks()` (full report, used by `doctor`) and `preflight()` (fail-fast,
+    used by `run`) are built from the same per-check logic on purpose — this
+    guards against the two silently drifting in wording the way the hand-written
+    duplicates they replaced already had (doctor said "server is not running at
+    {url} ({exc})", preflight said "...; start it first ({exc})")."""
+
+    def test_first_failing_check_message_matches_preflight_exactly(self):
+        server = _LiveServer()
+        self.addCleanup(server.stop)
+        c = make_config(CONFIG.replace("http://localhost:8080", server.url))
+        c.spec.unlink()
+
+        with tempfile.TemporaryDirectory() as bindir:
+            _with_fake_cats(Path(bindir))
+            with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}):
+                results = run.checks(c)
+                failing_details = [detail for _name, ok, detail in results if not ok]
+                self.assertEqual(failing_details, [f"OpenAPI spec not found: {c.spec}"])
+
+                with self.assertRaises(run.PreflightError) as ctx:
+                    run.preflight(c)
+                self.assertEqual(str(ctx.exception), failing_details[0])
 
 
 class TestPreflight(unittest.TestCase):
