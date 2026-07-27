@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from catslib import report as reporting
 from catslib.classify import ClassifyError, classify_db
 from catslib.config import (
     INITIAL_RULES_YAML,
@@ -489,16 +490,6 @@ def cmd_query(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 def cmd_report(args: argparse.Namespace) -> None:
-    try:
-        from catslib import report as reporting
-    except ImportError as exc:
-        print(
-            "cats_tool.py report requires catslib.report, which isn't available yet "
-            f"in this checkout ({exc}).",
-            file=sys.stderr,
-        )
-        sys.exit(2)
-
     config = load()
     db_path = resolve_db(config, args.db)
     html = reporting.render_html(db_path)
