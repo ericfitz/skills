@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+import string
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -44,14 +45,18 @@ class Hooks:
 
 @dataclass(frozen=True)
 class CatsOptions:
-    http_methods: list[str] = field(default_factory=lambda: ["POST", "PUT", "GET", "DELETE", "PATCH"])
-    max_requests_per_minute: int = 3000
-    ref_data: Path | None = None
-    skip_field_format: list[str] = field(default_factory=list)
-    skip_field: list[str] = field(default_factory=list)
-    skip_fuzzers: list[str] = field(default_factory=list)
-    skip_fuzzers_for_extension: list[dict[str, Any]] = field(default_factory=list)
-    extra_args: list[str] = field(default_factory=list)
+    # No field defaults here: `load_config` is the sole constructor and always
+    # passes every field explicitly, applying its own defaults (mirrored in
+    # render_init_config) for absent config keys. Defaults on both sides had
+    # nothing keeping them in sync — editing this dataclass had no effect.
+    http_methods: list[str]
+    max_requests_per_minute: int
+    ref_data: Path | None
+    skip_field_format: list[str]
+    skip_field: list[str]
+    skip_fuzzers: list[str]
+    skip_fuzzers_for_extension: list[dict[str, Any]]
+    extra_args: list[str]
 
 
 @dataclass(frozen=True)
@@ -121,11 +126,25 @@ def _require_bool(value: Any, key: str, path: Path, default: bool) -> bool:
     return value
 
 
+def _validate_auth_template(template: str, path: Path) -> None:
+    """Reject any replacement field other than 'token' before it ever reaches
+    `.format(token=token)` at call time — an unknown field name raises an
+    uncaught KeyError there, and a bare `{}` raises IndexError."""
+    for _literal, field_name, _spec, _conversion in string.Formatter().parse(template):
+        if field_name is not None and field_name != "token":
+            raise ConfigError(
+                f"{path}: 'auth.template' has unsupported placeholder {{{field_name}}}; "
+                "only {token} is allowed"
+            )
+
+
 def load_config(path: Path) -> Config:
     try:
         raw = yaml.safe_load(path.read_text()) or {}
     except OSError as exc:
         raise ConfigError(f"{path}: cannot read config: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"{path}: not valid UTF-8: {exc}") from exc
     except yaml.YAMLError as exc:
         raise ConfigError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(raw, dict):
@@ -150,11 +169,12 @@ def load_config(path: Path) -> Config:
     false_positives_raw = _require_str(raw["false_positives"], "false_positives", path)
 
     health_url_value = raw.get("health_url")
-    health_url_raw = (
-        _require_str(health_url_value, "health_url", path)
-        if health_url_value is not None
-        else server_raw
-    )
+    if health_url_value is not None:
+        health_url_raw = _require_str(health_url_value, "health_url", path)
+        if not health_url_raw:
+            raise ConfigError(f"{path}: 'health_url' must not be empty; omit it to default to 'server'")
+    else:
+        health_url_raw = server_raw
 
     identities_raw = raw["identities"]
     if not isinstance(identities_raw, dict) or not identities_raw:
@@ -174,6 +194,8 @@ def load_config(path: Path) -> Config:
 
     auth = raw.get("auth") or {}
     _reject_unknown(auth, {"header", "template"}, "auth", path)
+    auth_template = auth.get("template") or "Bearer {token}"
+    _validate_auth_template(auth_template, path)
 
     hooks_raw = raw.get("hooks") or {}
     _reject_unknown(hooks_raw, HOOK_KEYS, "hooks", path)
@@ -202,11 +224,13 @@ def load_config(path: Path) -> Config:
         ) from exc
 
     ref_data_value = cats_raw.get("ref_data")
-    ref_data = (
-        repo_root / _require_str(ref_data_value, "cats.ref_data", path)
-        if ref_data_value is not None
-        else None
-    )
+    if ref_data_value is not None:
+        ref_data_str = _require_str(ref_data_value, "cats.ref_data", path)
+        if not ref_data_str:
+            raise ConfigError(f"{path}: 'cats.ref_data' must not be empty; omit it to leave unset")
+        ref_data = repo_root / ref_data_str
+    else:
+        ref_data = None
 
     skip_field_format = _require_list(
         cats_raw.get("skip_field_format", []), "cats.skip_field_format", path
@@ -252,7 +276,7 @@ def load_config(path: Path) -> Config:
         identities=identities,
         default_identity=default_identity,
         auth_header=auth.get("header") or "Authorization",
-        auth_template=auth.get("template") or "Bearer {token}",
+        auth_template=auth_template,
         hooks=hooks,
         cats=cats_opts,
     )
