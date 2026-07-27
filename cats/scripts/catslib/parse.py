@@ -46,6 +46,13 @@ def extract_test_number(test_id: str) -> int:
     return int(match.group(1)) if match else 0
 
 
+def _coerce_str(value: Any) -> str:
+    """Normalize a JSON scalar (or anything else) to a string; None becomes ''."""
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else str(value)
+
+
 def _headers_dict(headers: Any) -> dict[str, str]:
     result: dict[str, str] = {}
     for h in headers or []:
@@ -54,8 +61,7 @@ def _headers_dict(headers: Any) -> dict[str, str]:
         key = h.get("key")
         if not isinstance(key, str) or not key:
             continue
-        value = h.get("value")
-        result[key.lower()] = value if isinstance(value, str) else ("" if value is None else str(value))
+        result[key.lower()] = _coerce_str(h.get("value"))
     return result
 
 
@@ -69,8 +75,9 @@ def record_from_json(data: dict[str, Any]) -> dict[str, Any]:
         response_code = int(response.get("responseCode") or 0)
     except (TypeError, ValueError):
         response_code = 0
+    result_raw = data.get("result")
     return {
-        "result": (data.get("result") or "").lower() if isinstance(data.get("result"), str) else "",
+        "result": result_raw.lower() if isinstance(result_raw, str) else "",
         "response_code": response_code,
         "fuzzer": data.get("fuzzer") or "",
         "path": data.get("path") or "",
@@ -169,9 +176,9 @@ class _Loader:
             (
                 data["testId"],
                 extract_test_number(data["testId"]),
-                data["traceId"],
-                data["scenario"],
-                data["expectedResult"],
+                data.get("traceId") or "",
+                record["scenario"],
+                data.get("expectedResult") or "",
                 result_type_id,
                 fuzzer_id,
                 server_id,
@@ -181,7 +188,7 @@ class _Loader:
                 source_file,
             ),
         )
-        test_id = cursor.lastrowid
+        test_row_id = cursor.lastrowid
 
         store_body = record["result"] in ("error", "warn")
 
@@ -193,7 +200,7 @@ class _Loader:
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                test_id,
+                test_row_id,
                 method_id,
                 record["url"],
                 request.get("timestamp") or "",
@@ -214,7 +221,7 @@ class _Loader:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                test_id,
+                test_row_id,
                 resp_method_id,
                 record["response_code"],
                 _safe_int(response.get("responseTimeInMs")),
@@ -228,7 +235,7 @@ class _Loader:
         response_row_id = cursor.lastrowid
 
         req_headers = [
-            (request_row_id, h.get("key"), h.get("value") if h.get("value") is not None else "", idx)
+            (request_row_id, h.get("key"), _coerce_str(h.get("value")), idx)
             for idx, h in enumerate(request.get("headers") or [])
             if isinstance(h, dict) and isinstance(h.get("key"), str)
         ]
@@ -240,7 +247,7 @@ class _Loader:
             )
 
         resp_headers = [
-            (response_row_id, h.get("key"), h.get("value") if h.get("value") is not None else "", idx)
+            (response_row_id, h.get("key"), _coerce_str(h.get("value")), idx)
             for idx, h in enumerate(response.get("headers") or [])
             if isinstance(h, dict) and isinstance(h.get("key"), str)
         ]
@@ -290,23 +297,46 @@ def parse_report(
         for i, path in enumerate(files, 1):
             batch.append(path)
             if len(batch) >= batch_size or i == len(files):
+                batch_processed = 0
+                batch_skipped = 0
+                batch_errors = 0
                 conn.execute("BEGIN")
                 try:
                     for file_path in batch:
                         try:
                             data = _load_json_file(file_path)
                         except _SkipFile:
-                            stats.skipped += 1
+                            batch_skipped += 1
                             continue
+                        # A savepoint isolates one file's five inserts (tests, requests,
+                        # responses, both header tables) from the rest of the batch: a
+                        # failure partway through must not leave an orphan `tests` row
+                        # (or a headerless-but-committed request/response) behind for a
+                        # file that's ultimately being counted as an error.
+                        conn.execute("SAVEPOINT file_insert")
                         try:
                             loader.insert(data, file_path.name)
-                            stats.processed += 1
                         except sqlite3.Error:
-                            stats.errors += 1
+                            conn.execute("ROLLBACK TO SAVEPOINT file_insert")
+                            conn.execute("RELEASE SAVEPOINT file_insert")
+                            batch_errors += 1
+                        else:
+                            conn.execute("RELEASE SAVEPOINT file_insert")
+                            batch_processed += 1
                     conn.commit()
                 except sqlite3.Error:
                     conn.rollback()
-                    stats.errors += len(batch)
+                    # The commit itself failed: every insert in this batch (including
+                    # ones that individually succeeded above) was rolled back, so none
+                    # of them are actually processed. Files that were skipped before
+                    # ever touching the transaction are unaffected by this failure.
+                    stats.skipped += batch_skipped
+                    stats.errors += batch_errors + batch_processed
+                    batch = []
+                    continue
+                stats.processed += batch_processed
+                stats.skipped += batch_skipped
+                stats.errors += batch_errors
                 batch = []
     finally:
         conn.close()
