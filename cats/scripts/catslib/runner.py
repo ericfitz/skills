@@ -308,7 +308,8 @@ def execute(
 ) -> RunResult:
     """Run one full CATS campaign: preflight, hooks, fuzz, parse, classify.
 
-    `post_run` runs only after parse and classify have both succeeded — a
+    `post_run` runs after the pipeline completes (after parse and classify
+    when they ran; also under `--skip-parse`, when they did not) — a
     half-written database gives the hook no way to tell "complete" from
     "interrupted," so it's better not to run it at all than to hand it that
     ambiguity. Its own failure is a warning, not a fatal error, because by the
