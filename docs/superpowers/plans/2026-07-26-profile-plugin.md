@@ -16,7 +16,9 @@
 - **Test style:** `unittest.TestCase` classes, matching `tests/test_dedupe.py`. Every test module starts with `sys.dont_write_bytecode = True` and a `sys.path.insert` pointing at `profile/scripts`.
 - **Test command:** `python3 -m unittest discover -s tests -t .` from the repo root. Single module: `python3 -m unittest tests.<module> -v`.
 - **Lint command:** `ruff check profile/ tests/test_profile_*.py tests/repobuilder.py tests/schema_check.py tests/test_plugin_structure.py` — scoped to files this plan creates. Whole-directory linting fails on pre-existing errors (13 in `tests/`, 8 in `dev/` and `logseq/`) that are out of scope. Do not fix those here.
-- **No `pyproject.toml` for these plugins.** Repo convention is that packaging follows dependencies: `dev` and `logseq` are stdlib-only and ship no manifest, invoked by path as `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/…`; `writing/skills/boring` has a `pyproject.toml` and `uv.lock` because it depends on spacy, textstat, and proselint. `profile` is stdlib-only, so it follows the former. **If a script here ever takes a third-party dependency, that is the trigger to add a `pyproject.toml` + `uv.lock` in that plugin directory, matching boring's shape.** Adding one before then would describe a build nothing runs, and would make `profile_inventory.py` report this repo as a two-package monorepo while `dev` and `logseq` stay invisible.
+- **Script invocation is `uv run --script`, never bare `uv run`.** Skills invoke `uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/profile_inventory.py <path>`. The `--script` flag is load-bearing, not stylistic: this tool runs against arbitrary user repos, and bare `uv run` resolves project context from the current directory — verified failing outright inside a repo whose `pyproject.toml` has an unresolvable dependency, which is common with private indexes and unpublished packages. `--script` treats the file as a PEP 723 script and ignores the surrounding project entirely. Measured warm overhead is lower than the system `python3` (0.02–0.06s vs 0.21s).
+- **Every script carries a PEP 723 header** declaring `requires-python`, and `dependencies` when it has any. Today it has none, so `python3 <script>` remains a documented fallback that works. When a dependency is eventually added, the header is the only change needed — uv resolves and caches it per-script, isolated, on first run.
+- **No `pyproject.toml` for these plugins.** Repo convention is that packaging follows dependencies: `dev` and `logseq` are stdlib-only and ship no manifest; `writing/skills/boring` has a `pyproject.toml` and `uv.lock` because it depends on spacy, textstat, and proselint. `profile` is stdlib-only, and PEP 723 covers the single-script case without a manifest. A `pyproject.toml` here would describe a build nothing runs, and would make `profile_inventory.py` report this repo as a two-package monorepo while `dev` and `logseq` stay invisible. Reach for one only if a plugin grows a multi-module package with shared third-party dependencies.
 - **Repo has no pytest and no CI.** Do not add either.
 - **Branch:** create `feat/profile-plugin` before Task 1. Do not commit to `main`.
 - **Paths in JSON output are always repo-relative POSIX strings**, sorted, never absolute — except the top-level `root` key.
@@ -1323,11 +1325,16 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'profile_inventory'`
 - [ ] **Step 3: Write the implementation**
 
 ```python
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Emit a deterministic JSON inventory of a repository.
 
 Usage:
-    profile_inventory.py [PATH] [--json] [--indent N]
+    uv run --script profile_inventory.py [PATH] [--json] [--indent N]
+    python3 profile_inventory.py [PATH] [--json] [--indent N]   # fallback; no deps
 
 Exit codes:
     0  inventory emitted (possibly partial; see coverage_confidence)
@@ -1376,7 +1383,7 @@ Expected: PASS, 5 tests
 
 - [ ] **Step 5: Verify it runs against this repo**
 
-Run: `python3 profile/scripts/profile_inventory.py . --indent 2 | head -30`
+Run: `uv run --script profile/scripts/profile_inventory.py . --indent 2 | head -30`
 Expected: JSON with `"languages"` containing `python`, and `coverage_confidence` present.
 
 - [ ] **Step 6: Lint and commit**
@@ -1880,7 +1887,14 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/stack.example.json
 
 1. Run the inventory script:
 
-       python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile_inventory.py <path>
+       uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/profile_inventory.py <path>
+
+   `--script` is required: it isolates the run from the target repo's own project
+   config, which would otherwise be resolved and can fail on repos with private
+   indexes or unpublished dependencies.
+
+   If `uv` is not installed, run the same path under `python3` — this script
+   declares no dependencies — and mention the fallback in your summary.
 
    Exit 2 means the path is unusable — stop and report that.
 
@@ -2236,7 +2250,7 @@ Expected: `OK`
 
 - [ ] **Step 7: Verify the plugin against itself**
 
-Run: `python3 profile/scripts/profile_inventory.py . --indent 0 | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['coverage_confidence'], len(d['test_files']))"`
+Run: `uv run --script profile/scripts/profile_inventory.py . --indent 0 | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['coverage_confidence'], len(d['test_files']))"`
 Expected: prints a confidence value and a non-zero test-file count. If confidence is `low`, investigate — this repo has no root manifest, so `low` is the correct answer here and demonstrates the no-silent-guessing rule working.
 
 - [ ] **Step 8: Lint and commit**
@@ -2255,7 +2269,7 @@ git commit -m "feat(profile): plugin manifest, structural tests, marketplace reg
 
 - `python3 -m unittest discover -s tests -t .` reports `OK`
 - `ruff check profile/ tests/test_profile_*.py tests/repobuilder.py tests/schema_check.py tests/test_plugin_structure.py` passes
-- `python3 profile/scripts/profile_inventory.py .` emits valid JSON at exit 0
+- `uv run --script profile/scripts/profile_inventory.py .` emits valid JSON at exit 0, and so does the `python3` fallback
 - All three contracts have validating examples
 - `profile` appears in `.claude-plugin/marketplace.json` and `README.md`
 
