@@ -12,6 +12,29 @@ OpenAPI spec, or a false-positive candidate — and never guess. Every
 disposition must be backed by evidence from the spec or the response, not by
 how the finding "seems."
 
+## 0. Check run validity first
+
+A run can complete and still be worthless to analyze: if a large fraction of
+its tests never reached the API (e.g. an unreachable server, or a throttled
+kubectl port-forward silently dropping requests under load), the true/false
+positive counts reflect connection failures, not API behavior. Before
+clustering anything, check the connection-error rate:
+
+```
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql "
+  SELECT (SELECT COUNT(*) FROM responses WHERE response_code IN (953, 999)) AS connection_errors,
+         (SELECT COUNT(*) FROM tests) AS total_tests
+"
+```
+
+If `connection_errors / total_tests` exceeds ~1%, **stop** — do not draw
+per-rule or per-path conclusions from this database. `run` itself already
+gates this (a contaminated run exits 3 and never becomes `latest.db`), so
+seeing it here on `--db latest` most likely means an explicit `--db <file>`
+pointed at an older, invalid run, or the gate's threshold doesn't match this
+analysis's bar. Report the contamination percentage to the user and ask
+whether to re-run instead of proceeding.
+
 ## 1. Resolve the database and the spec
 
 ```

@@ -24,25 +24,54 @@ full CATS fuzzer against every configured path and typically takes
 why nothing has returned yet.
 
 Pass through any flags the user asked for (identity, path filter, rate limit,
-blackbox mode, skip-seed, skip-parse); the agent only forwards flags it's
-explicitly given, so be specific.
+blackbox mode, skip-seed, skip-parse, allow-port-forward); the agent only
+forwards flags it's explicitly given, so be specific.
+
+## Server path check
+
+Before ever touching the network, `checks()` inspects the process table for a
+`kubectl port-forward` bound to the configured `server:`'s local port
+(loopback URLs only). A userspace forward silently drops requests under load
+(observed ~46% loss as connection-error codes 953/999 in a real campaign
+against this repo), and those errors get absorbed by the `CONNECTION_ERROR_999`
+false-positive rule — so the run *looks* clean while most of the API was
+never actually reached. If a forward is detected and not explicitly allowed,
+`run` fails this check before fuzzing starts, naming the forward's command
+line and the fix: point `server:` at a directly reachable endpoint (e.g. a
+NodePort), or pass `--allow-port-forward` / set `allow_port_forward: true` in
+`config.yaml` if the forward is genuinely fine for this repo.
 
 ## On completion
 
 **Don't key off exit code 2 alone** — `run` exits with CATS's own exit code
 verbatim on a completed campaign, and CATS is free to use 2 for its own
-reasons. Use what actually printed to tell the two apart:
+reasons. Exit code **3** is different: it means the campaign ran to
+completion but is **invalid** (see "Validity gate" below), not that CATS
+itself failed. Use what actually printed to tell these apart:
 
 - **A library error** (missing config, a failed preflight check — spec not
-  found, `cats` not on PATH, invalid rules file, server not reachable — or a
-  failed `seed`/`pre_run` hook) prints a single message to **stderr** and
-  prints **no run summary at all** (no `run_id:`/`db:`/"Results by type"
-  block). Report that message **verbatim** and stop. Do not guess at a fix,
-  do not retry, do not edit the user's hook to paper over the failure — the
-  message already says what's wrong and (for config issues) points at
-  `/cats:init`.
+  found, `cats` not on PATH, invalid rules file, server not reachable, a
+  disallowed kubectl port-forward — or a failed `seed`/`pre_run` hook) prints
+  a single message to **stderr** and prints **no run summary at all** (no
+  `run_id:`/`db:`/"Results by type" block). Report that message **verbatim**
+  and stop. Do not guess at a fix, do not retry, do not edit the user's hook
+  to paper over the failure — the message already says what's wrong and (for
+  config issues) points at `/cats:init`.
 - **A completed campaign** always prints the full run summary first,
   regardless of what exit code CATS itself returns. If the agent's report
   includes run_id/db/counts, the campaign ran to completion — report that
   summary, then point the user at `/cats:analyze` to triage the true
-  positives it found.
+  positives it found (unless the run is invalid — see below).
+
+## Validity gate
+
+After a completed campaign, `run` checks what fraction of tests failed with a
+connection error (CATS pseudo-codes 953/999) against `max_connection_error_pct`
+(default 1.0%). If that threshold is exceeded, the run is **contaminated**:
+its per-rule and per-path conclusions are meaningless, since most requests
+never reached the API. `run` prints the connection-error count/percentage,
+then a `RUN INVALID` block to stderr, and exits **3** — `latest.db` is
+**not** updated to point at this run, so a later `/cats:analyze` (which
+defaults to `--db latest`) can't accidentally analyze it. Report the invalid
+run to the user with the likely cause CATS printed (unreachable server, or a
+throttled port-forward) rather than treating it as a normal completed run.

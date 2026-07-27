@@ -311,8 +311,29 @@ def cmd_run(args: argparse.Namespace) -> None:
         blackbox=args.blackbox,
         skip_seed=args.skip_seed,
         skip_parse=args.skip_parse,
+        allow_port_forward=args.allow_port_forward,
     )
     _print_run_summary(result)
+
+    if result.connection_errors is not None and result.total_tests:
+        pct = 100.0 * result.connection_errors / result.total_tests
+        print(
+            f"\nConnection errors (code 953/999): {result.connection_errors} / "
+            f"{result.total_tests} ({pct:.2f}%)"
+        )
+
+    if result.contaminated:
+        print(
+            "\nRUN INVALID: connection-error rate exceeds "
+            f"{result.max_connection_error_pct}% — per-rule and per-path conclusions "
+            "from this run are meaningless, since most requests never reached the "
+            f"API. {result.db_path} was NOT made latest.db. Likely cause: an "
+            "unreachable server, or a throttled userspace kubectl port-forward "
+            "silently dropping requests under load. Fix the server path and re-run.",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
     sys.exit(result.cats_exit_code)
 
 
@@ -555,6 +576,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--blackbox", action="store_true")
     p_run.add_argument("--skip-seed", action="store_true")
     p_run.add_argument("--skip-parse", action="store_true")
+    p_run.add_argument(
+        "--allow-port-forward", action="store_true",
+        help="Permit fuzzing through a kubectl port-forward (normally a fatal preflight error)",
+    )
     p_run.set_defaults(func=cmd_run)
 
     p_parse = sub.add_parser("parse", help="Parse a CATS report directory into SQLite")

@@ -20,8 +20,9 @@ not touch any file other than the command's own output.
    ```
 
    Pass through only the flags the prompt tells you to: `--identity NAME`,
-   `--path PATTERN`, `--rate N`, `--blackbox`, `--skip-seed`, `--skip-parse`.
-   Do not invent flags, do not add `--db`, do not pipe or redirect the output.
+   `--path PATTERN`, `--rate N`, `--blackbox`, `--skip-seed`, `--skip-parse`,
+   `--allow-port-forward`. Do not invent flags, do not add `--db`, do not
+   pipe or redirect the output.
 
 2. Let it run to completion. A real campaign takes 30-40 minutes; do not treat
    a long-running command as stuck.
@@ -51,7 +52,13 @@ Reply with ONLY this, populated from the command's printed summary:
 - **counts by result** (e.g. success / warn / error, as printed)
 - **false positive total**
 - **top true-positive paths** (the printed top-10 list, path + count)
+- **connection-error count/percentage**, if printed
 - **exit code**, and if nonzero, the tool's own error message verbatim
+
+**If exit code is 3**, the campaign completed but is invalid (connection-error
+rate over threshold) — report the printed `RUN INVALID` block verbatim in
+addition to the counts above; do not treat this the same as a clean exit 0/1
+from CATS itself, and do not tell the caller `latest.db` was updated.
 
 **If `--skip-parse` was passed**, the tool only ever prints `run_id`, `db`,
 and the line `(parse skipped; no result summary available)` — there is no

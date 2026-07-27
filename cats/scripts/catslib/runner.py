@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -26,6 +27,38 @@ from .rules import RuleError, load_rules
 TOOL_VERSION = "0.1.0"
 
 logger = logging.getLogger(__name__)
+
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+# CATS pseudo-codes for connection refused / transport failure — not real HTTP
+# status codes, but rows CATS itself emits when a request never got a response.
+CONNECTION_ERROR_CODES = (953, 999)
+
+
+def detect_port_forward(server_url: str, ps_output: str | None = None) -> str | None:
+    """Return the command line of a kubectl port-forward bound to the server's
+    local port, or None. Only meaningful for loopback URLs. Reads the process
+    table, never a pidfile — pidfiles for these forwards are demonstrably stale
+    (TMI #580). (pure given ps_output)"""
+    parts = urllib.parse.urlsplit(server_url)
+    if (parts.hostname or "").lower() not in _LOOPBACK_HOSTS:
+        return None
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    if ps_output is None:
+        try:
+            proc = subprocess.run(
+                ["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=False
+            )
+        except OSError:
+            return None
+        if proc.returncode != 0:
+            return None
+        ps_output = proc.stdout
+    pat = re.compile(rf"(?:^|\s){port}(?::\d+)?(?:\s|$)")
+    for line in ps_output.splitlines():
+        cmd = line.strip()
+        if "kubectl" in cmd and "port-forward" in cmd and pat.search(cmd.split("port-forward", 1)[1]):
+            return cmd
+    return None
 
 
 class HookError(Exception):
@@ -44,6 +77,19 @@ class RunResult:
     cats_exit_code: int
     parse_stats: ParseStats | None
     classify_result: ClassifyResult | None
+    connection_errors: int | None = None
+    total_tests: int | None = None
+    max_connection_error_pct: float = 1.0
+
+    @property
+    def contaminated(self) -> bool:
+        """True if connection errors (CATS codes 953/999) exceed the configured
+        threshold — such a run's per-rule and per-path conclusions are meaningless
+        because most requests never reached the API. False when no stats are
+        available (e.g. --skip-parse) or the run had zero tests."""
+        if self.connection_errors is None or not self.total_tests:
+            return False
+        return 100.0 * self.connection_errors / self.total_tests > self.max_connection_error_pct
 
 
 def redact(text: str, token: str) -> str:
@@ -156,7 +202,9 @@ def build_cats_argv(config: Config, *, headers_file: Path, report_dir: Path,
     return argv
 
 
-def checks(config: Config) -> list[tuple[str, bool, str]]:
+def checks(
+    config: Config, *, allow_port_forward: bool | None = None
+) -> list[tuple[str, bool, str]]:
     """Run every "ready to fuzz" check independently and report all of them.
 
     This is the single source of truth for what "ready" means: `preflight` raises
@@ -166,12 +214,39 @@ def checks(config: Config) -> list[tuple[str, bool, str]]:
     did exactly that before this was extracted (doctor and preflight independently
     hand-wrote near-identical checks with slightly different messages).
     """
+    if allow_port_forward is None:
+        allow_port_forward = config.allow_port_forward
+
     results: list[tuple[str, bool, str]] = []
 
     if config.spec.exists():
         results.append(("spec", True, str(config.spec)))
     else:
         results.append(("spec", False, f"OpenAPI spec not found: {config.spec}"))
+
+    # Server path check runs before the health probe below: a kubectl port-forward
+    # makes that probe succeed misleadingly (the health endpoint answers fine even
+    # while the forward is silently dropping most fuzz traffic under load).
+    forward_cmd = detect_port_forward(config.server)
+    if forward_cmd is None:
+        results.append(("server path", True, f"direct connection: {config.server}"))
+    elif allow_port_forward:
+        results.append((
+            "server path", True,
+            f"kubectl port-forward on the server port EXPLICITLY ALLOWED: {forward_cmd}",
+        ))
+    else:
+        detail = (
+            f"server {config.server!r} is reached through a kubectl port-forward: "
+            f"{forward_cmd!r}. A userspace port-forward silently drops requests under "
+            "load (~46% observed as connection-error codes 953/999 in a real campaign), "
+            "and those get absorbed by the CONNECTION_ERROR_999 false-positive rule, so "
+            "the run *looks* clean while most of the API was never actually reached. "
+            "Point `server:` at a directly reachable endpoint (e.g. a NodePort) instead, "
+            "or if you truly need to fuzz through this forward, pass `run "
+            "--allow-port-forward` or set `allow_port_forward: true` in config.yaml."
+        )
+        results.append(("server path", False, detail))
 
     cats_path = shutil.which("cats")
     if cats_path is None:
@@ -214,11 +289,12 @@ def checks(config: Config) -> list[tuple[str, bool, str]]:
     return results
 
 
-def preflight(config: Config) -> None:
+def preflight(config: Config, *, allow_port_forward: bool | None = None) -> None:
     """Verify the environment is ready to run CATS; raise PreflightError with an
     actionable message naming what's wrong and how to fix it, on the first failing
-    check from `checks()` (spec, then cats binary, then rules, then server health)."""
-    for _name, ok, detail in checks(config):
+    check from `checks()` (spec, then server path, then cats binary, then rules,
+    then server health)."""
+    for _name, ok, detail in checks(config, allow_port_forward=allow_port_forward):
         if not ok:
             raise PreflightError(detail)
 
@@ -301,10 +377,29 @@ def _update_latest_symlink(results_dir: Path, db_path: Path) -> None:
     latest.symlink_to(db_path.name)
 
 
+def _connection_error_stats(db_path: Path) -> tuple[int, int]:
+    """Return (connection_errors, total_tests) for a parsed results database.
+
+    Schema per catslib/schema.sql: responses.response_code carries CATS's
+    pseudo-codes for transport failures (953/999); tests is one row per fuzz test.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        placeholders = ", ".join("?" for _ in CONNECTION_ERROR_CODES)
+        connection_errors = conn.execute(
+            f"SELECT COUNT(*) FROM responses WHERE response_code IN ({placeholders})",
+            CONNECTION_ERROR_CODES,
+        ).fetchone()[0]
+        total_tests = conn.execute("SELECT COUNT(*) FROM tests").fetchone()[0]
+        return connection_errors, total_tests
+    finally:
+        conn.close()
+
+
 def execute(
     config: Config, *, identity_name: str | None = None, path_filter: str | None = None,
     rate: int | None = None, blackbox: bool = False, skip_seed: bool = False,
-    skip_parse: bool = False, now: datetime | None = None,
+    skip_parse: bool = False, allow_port_forward: bool = False, now: datetime | None = None,
 ) -> RunResult:
     """Run one full CATS campaign: preflight, hooks, fuzz, parse, classify.
 
@@ -330,7 +425,7 @@ def execute(
     db_path = config.results_dir / f"cats-results-{run_id}.db"
     config.results_dir.mkdir(parents=True, exist_ok=True)
 
-    preflight(config)
+    preflight(config, allow_port_forward=allow_port_forward or config.allow_port_forward)
 
     identity = config.identity(identity_name)
     hook_env = _hook_env(config, report_dir=report_dir, run_id=run_id, identity=identity)
@@ -342,6 +437,8 @@ def execute(
 
     parse_stats: ParseStats | None = None
     classify_result: ClassifyResult | None = None
+    connection_errors: int | None = None
+    total_tests: int | None = None
     headers_file: Path | None = None
     try:
         token = resolve_token(identity, config.repo_root, hook_env)
@@ -377,11 +474,22 @@ def execute(
             )
             # Only reached once both parse and classify have returned successfully.
             _stamp_finished_at(db_path, run_id)
+            connection_errors, total_tests = _connection_error_stats(db_path)
     finally:
         if headers_file is not None:
             headers_file.unlink(missing_ok=True)
 
-    if db_path.exists():
+    contaminated = bool(
+        connection_errors is not None and total_tests
+        and 100.0 * connection_errors / total_tests > config.max_connection_error_pct
+    )
+
+    # A contaminated run's per-rule and per-path conclusions are meaningless (most
+    # requests never reached the API), so it must never become latest.db — a caller
+    # querying "the latest run" would otherwise silently draw conclusions from a
+    # run that was never actually valid. The --skip-parse path has no stats
+    # available (parse_stats is None) and keeps its prior unconditional behavior.
+    if db_path.exists() and parse_stats is not None and not contaminated:
         _update_latest_symlink(config.results_dir, db_path)
 
     if config.hooks.post_run:
@@ -404,4 +512,7 @@ def execute(
         cats_exit_code=cats_exit_code,
         parse_stats=parse_stats,
         classify_result=classify_result,
+        connection_errors=connection_errors,
+        total_tests=total_tests,
+        max_connection_error_pct=config.max_connection_error_pct,
     )

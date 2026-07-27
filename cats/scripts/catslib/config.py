@@ -16,7 +16,7 @@ SUPPORTED_VERSIONS = {1}
 TOP_LEVEL_KEYS = {
     "version", "spec", "server", "health_url", "results_dir", "false_positives",
     "retain_raw_report", "allow_suppressing_5xx", "identities", "default_identity",
-    "auth", "hooks", "cats",
+    "auth", "hooks", "cats", "allow_port_forward", "max_connection_error_pct",
 }
 CATS_KEYS = {
     "http_methods", "max_requests_per_minute", "ref_data", "skip_field_format",
@@ -70,6 +70,8 @@ class Config:
     false_positives: Path
     retain_raw_report: bool
     allow_suppressing_5xx: bool
+    allow_port_forward: bool
+    max_connection_error_pct: float
     identities: dict[str, Identity]
     default_identity: str
     auth_header: str
@@ -124,6 +126,18 @@ def _require_bool(value: Any, key: str, path: Path, default: bool) -> bool:
     if not isinstance(value, bool):
         raise ConfigError(f"{path}: '{key}' must be a boolean, got {type(value).__name__}")
     return value
+
+
+def _require_pct(value: Any, key: str, path: Path, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        pct = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{path}: '{key}' must be a number, got {value!r}") from exc
+    if not 0.0 <= pct <= 100.0:
+        raise ConfigError(f"{path}: '{key}' must be between 0 and 100, got {pct!r}")
+    return pct
 
 
 def _validate_auth_template(template: str, path: Path) -> None:
@@ -273,6 +287,12 @@ def load_config(path: Path) -> Config:
         allow_suppressing_5xx=_require_bool(
             raw.get("allow_suppressing_5xx"), "allow_suppressing_5xx", path, False
         ),
+        allow_port_forward=_require_bool(
+            raw.get("allow_port_forward"), "allow_port_forward", path, False
+        ),
+        max_connection_error_pct=_require_pct(
+            raw.get("max_connection_error_pct"), "max_connection_error_pct", path, 1.0
+        ),
         identities=identities,
         default_identity=default_identity,
         auth_header=auth.get("header") or "Authorization",
@@ -322,6 +342,15 @@ false_positives: {rules}
 retain_raw_report: false
 # Refuse any rule that would suppress a 5xx response.
 allow_suppressing_5xx: false
+# Refuse to fuzz through a kubectl port-forward bound to `server`'s port — a
+# userspace forward silently drops requests under load, producing a run that
+# looks clean but never reached most of the API. Set to true only if you
+# understand and accept that risk (or use `run --allow-port-forward`).
+allow_port_forward: false
+# Maximum percentage of tests that may fail with a connection error (CATS
+# codes 953/999) before a completed run is considered invalid and latest.db
+# is not updated to point at it.
+max_connection_error_pct: 1.0
 
 identities:
   default:
