@@ -53,4 +53,11 @@ Reply with ONLY this, populated from the command's printed summary:
 - **top true-positive paths** (the printed top-10 list, path + count)
 - **exit code**, and if nonzero, the tool's own error message verbatim
 
+**If `--skip-parse` was passed**, the tool only ever prints `run_id`, `db`,
+and the line `(parse skipped; no result summary available)` — there is no
+counts/FP-total/top-paths section to report because none ran. In that case,
+report exactly: run_id, db path, exit code, and the literal note "parse
+skipped; no result summary available." Do not report the other fields as
+empty or zero — say they don't exist for this run.
+
 No prose beyond that, no fences, no recommendations.

@@ -43,8 +43,9 @@ directory. It never overwrites an existing rules file.
 
 ## 2. Walk the user through what init cannot infer
 
-`init` writes a config with three placeholders that must be filled in by hand
-before anything will work. Ask the user for each, then edit
+`init` writes a config with one placeholder that must be filled in by hand
+before anything will work (`token_cmd`), plus two empty hooks worth asking
+about now while you have the user's attention. Ask about each, then edit
 `.local/cats/config.yaml` directly:
 
 **`identities.default.token_cmd`** — a shell command that prints a bearer token
@@ -56,6 +57,12 @@ token, and the fuzz run's HTTP calls will look correctly unauthenticated or
 malformed. Ask how this repo issues bearer tokens for automated testing before
 guessing.
 
+`identities` is a map, not a single entry — `init` only ever writes `default`,
+but if the user needs to fuzz as more than one identity (e.g. an admin and a
+regular user), add more entries under `identities:` with their own
+`token_cmd`, and select among them with `default_identity:` or per-run via
+`cats_tool.py run --identity NAME`.
+
 **`hooks.seed`** — a shell command to seed the database or environment with
 fixture data before fuzzing starts (e.g. so paths like `GET /widgets/{id}`
 have an id to fuzz against). Runs once per `cats_tool.py run`, unless the user
@@ -65,10 +72,12 @@ passes `--skip-seed`. Empty by default — ask whether this repo needs one.
 invoked (e.g. start a server, wait for a health check, reset rate limits).
 Runs on every `run` with no way to skip it. Empty by default.
 
-There is also `hooks.post_run`, which runs after parse and classify both
-succeed (e.g. to send a notification or clean up); its failure only logs a
-warning, since the database is already written by that point. Mention it
-exists, but it's lower priority than the three above.
+There is also `hooks.post_run` (e.g. to send a notification or clean up
+after a run); its failure only logs a warning, never fails the run. It runs
+after the run's pipeline finishes without an unhandled exception — which
+includes a `--skip-parse` run, where neither parse nor classify ever
+happened, not only the normal case where both succeeded. Mention it exists,
+but it's lower priority than the three above.
 
 Every hook and `token_cmd` receives these environment variables:
 `CATS_SERVER`, `CATS_SPEC`, `CATS_RESULTS_DIR`, `CATS_REPORT_DIR`,

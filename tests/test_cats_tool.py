@@ -145,7 +145,7 @@ class TestClassifyDryRun(unittest.TestCase):
         db = make_db(self, config)
         before = db.read_bytes()
 
-        args = argparse.Namespace(db=str(db), dry_run=True)
+        args = argparse.Namespace(db=str(db), dry_run=True, rules=None)
         with mock.patch.object(CT, "load", return_value=config), redirect_stdout(io.StringIO()):
             CT.cmd_classify(args)
 
@@ -159,7 +159,7 @@ class TestClassifyDryRun(unittest.TestCase):
         )
         db = make_db(self, config)
 
-        args = argparse.Namespace(db=str(db), dry_run=True)
+        args = argparse.Namespace(db=str(db), dry_run=True, rules=None)
         out = io.StringIO()
         with mock.patch.object(CT, "load", return_value=config), redirect_stdout(out):
             CT.cmd_classify(args)
@@ -174,11 +174,40 @@ class TestClassifyDryRun(unittest.TestCase):
         db = make_db(self, config)
         before = db.read_bytes()
 
-        args = argparse.Namespace(db=str(db), dry_run=False)
+        args = argparse.Namespace(db=str(db), dry_run=False, rules=None)
         with mock.patch.object(CT, "load", return_value=config), redirect_stdout(io.StringIO()):
             CT.cmd_classify(args)
 
         self.assertNotEqual(db.read_bytes(), before)
+
+    def test_dry_run_with_rules_override_touches_neither_db_nor_configured_rules(self):
+        """--rules lets a caller classify against a draft rules file — e.g. one rule
+        not yet added anywhere — without writing to config.false_positives (fp.yaml)
+        or the real database, even in a real (non-dry-run) sense for the rules file:
+        classify never writes rules files at all, only --db does the dry-run copy."""
+        config = make_config(self)
+        root = config.repo_root
+        db = make_db(self, config)
+        before_db = db.read_bytes()
+        before_configured_rules = (root / "fp.yaml").read_text()
+
+        draft = root / "draft-rules.yaml"
+        draft.write_text(
+            "version: 1\nrules:\n  - id: DRAFT\n    why: test\n    when: {response_code: 400}\n"
+        )
+
+        args = argparse.Namespace(db=str(db), dry_run=True, rules=str(draft))
+        out = io.StringIO()
+        with mock.patch.object(CT, "load", return_value=config), redirect_stdout(out):
+            CT.cmd_classify(args)
+
+        self.assertIn("flagged: 1 / 1", out.getvalue())
+        self.assertIn("DRAFT", out.getvalue())
+        self.assertEqual(db.read_bytes(), before_db, "dry-run must not mutate the real database")
+        self.assertEqual(
+            (root / "fp.yaml").read_text(), before_configured_rules,
+            "--rules must not modify the configured rules file",
+        )
 
 
 class TestTypedErrorsReachExit2(unittest.TestCase):
@@ -212,6 +241,19 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
             code, err = self._run_main(["classify", "--db", str(db)])
         self.assertEqual(code, 2)
         self.assertIn("boom rules", err)
+
+    def test_rule_error_from_rules_override_names_the_override_file(self):
+        """A malformed --rules file must exit 2 through load_rules' real (unmocked)
+        validation, naming the override path — not the configured false_positives
+        path — since that's the file the caller actually pointed at."""
+        config = make_config(self)
+        db = make_db(self, config)
+        bad_rules = config.repo_root / "bad-draft.yaml"
+        bad_rules.write_text("version: 1\nrules:\n  - id: BAD\n    why: test\n")  # no when/any_of
+        with mock.patch.object(CT, "load", return_value=config):
+            code, err = self._run_main(["classify", "--db", str(db), "--rules", str(bad_rules)])
+        self.assertEqual(code, 2)
+        self.assertIn(str(bad_rules), err)
 
     def test_classify_error(self):
         config = make_config(self)

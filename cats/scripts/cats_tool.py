@@ -349,7 +349,12 @@ def cmd_parse(args: argparse.Namespace) -> None:
 def cmd_classify(args: argparse.Namespace) -> None:
     config = load()
     db_path = resolve_db(config, args.db)
-    rules = load_rules(config.false_positives)
+    # --rules overrides the configured false-positives file for this invocation only —
+    # config.false_positives (and the file on disk) is never written to. This is what
+    # lets a caller dry-run a draft rule before it's ever added to the committed rules
+    # file: point --rules at a scratch copy, and nothing here touches the real one.
+    rules_path = Path(args.rules) if args.rules else config.false_positives
+    rules = load_rules(rules_path)
 
     target = db_path
     tmp_path: Path | None = None
@@ -559,6 +564,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_classify = sub.add_parser("classify", help="Apply false-positive rules to a database")
     p_classify.add_argument("--db")
+    p_classify.add_argument(
+        "--rules",
+        help="Classify against this rules file instead of the one in config.yaml "
+             "(does not modify config.yaml or the configured rules file)",
+    )
     p_classify.add_argument("--dry-run", action="store_true")
     p_classify.set_defaults(func=cmd_classify)
 

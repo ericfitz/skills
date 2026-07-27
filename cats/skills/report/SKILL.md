@@ -111,8 +111,6 @@ classification, rewritten wholesale on every `classify` pass (not a history).
 
 ### Views
 
-All seven views read-only; none of them are updatable.
-
 | View | Purpose |
 |---|---|
 | `test_results_view` | Every test, fully denormalized (all the lookup names already joined in) — every result type, including `success`. Start here for anything not covered by a more specific view. |
@@ -121,7 +119,7 @@ All seven views read-only; none of them are updatable.
 | `fp_rule_stats_view` | Per matched `fp_rule`: count, `pct_of_total` (of all tests), `pct_of_fps` (of all suppressed tests). Only rows with `is_false_positive = 1`. |
 | `fuzzer_stats_view` | Per (fuzzer, result): count, percentage within that fuzzer, average response time. Covers all results, not just true positives. |
 | `path_error_analysis_view` | Per (path, http_method): total tests, error/warning/success counts, and an error rate percentage. |
-| `response_code_stats_view` | Per (response_code, result): count, avg/min/max response time. Not filtered by path — join to `tests`/`paths` yourself if you need one path's distribution (see query 6 below). |
+| `response_code_stats_view` | Per (response_code, result): count, avg/min/max response time. Not filtered by path — use `test_results_view` filtered by `path` instead if you need one path's distribution (see query 6 below). |
 
 ### Join shape
 
@@ -145,9 +143,10 @@ Run any of these with:
 uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --sql "<SQL>"
 ```
 
-Add `--json` for machine-readable output. Omitting `--sql` entirely prints a
-canned summary (results by type, false-positive count, top errors/warnings by
-path) instead of running arbitrary SQL.
+Add `--json` for machine-readable output — `--json` requires `--sql` (it
+exits 2 otherwise; the canned summary below is text-table only). Omitting
+`--sql` entirely prints that canned summary (results by type, false-positive
+count, top errors/warnings by path) instead of running arbitrary SQL.
 
 **1. True positives by path** — where are the real findings concentrated?
 

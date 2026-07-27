@@ -30,8 +30,10 @@ A rule is:
   tags: [optional, list]
 ```
 
-Exactly one of `when` / `any_of` is required. `when`/`any_of` blocks are
-never applied — a rule with neither is rejected when the file is loaded.
+At least one of `when` / `any_of` is required — a rule with neither is
+rejected when the file is loaded, as is an empty `when` or an empty block
+inside `any_of`. Both may be given together, and are ANDed: the rule only
+matches a record that satisfies `when` **and** at least one `any_of` block.
 
 **Fields:**
 
@@ -47,9 +49,12 @@ never applied — a rule with neither is rejected when the file is loaded.
 | `scenario` | CATS's scenario description |
 | `result_reason`, `result_details` | CATS's classification reason/detail |
 | `any_text` | `result_reason` + `result_details` concatenated with a space — convenient when you don't care which one matched |
-| `response_body`, `response_content_type`, `request_body` | raw text |
+| `request_body` | the raw request payload, as sent |
+| `response_body` | the response's **JSON body, re-serialized** — empty (`""`) when the response wasn't JSON, so a condition on this field can never match a plain-text or HTML error page. Use `response_content_type` or `any_text` for those. |
+| `response_content_type` | raw text, e.g. `application/json` |
 | `json_body.<dotted.path>` | a value inside the parsed response JSON body, e.g. `json_body.error.code` |
 | `request_header.<name>` | a request header value, matched case-insensitively by name |
+| `json_body`, `request_headers` | the whole parsed JSON body / whole headers map, bare (no dotted path) — rarely useful directly, but valid with `exists` to check whether the response had *any* JSON body, or the request had *any* headers, at all |
 
 **Operators** (used as `{field: {operator: value}}`; a bare
 `{field: value}` is shorthand for `equals`):
@@ -73,53 +78,71 @@ it can never match; use `{path: {in: [a, b]}}`.
 
 ## `add` — draft, validate, then write
 
+`classify --rules PATH` classifies against a rules file other than the
+configured one, for that invocation only — it never reads or writes
+`.local/cats/config.yaml`'s `false_positives:` file. That's what makes it
+possible to fully validate a draft rule with **zero writes to the committed
+rules file** until it has actually passed: no revert-on-failure branch to get
+wrong, because nothing was ever written there to revert.
+
 1. **Draft the rule.** Write the YAML block above, with a real `why`.
 
-2. **Append it to the rules file** (the path in `.local/cats/config.yaml`'s
-   `false_positives:` key) — this is required for the next step, since
-   `classify` only reads rules from that file; there is no way to test a
-   rule that isn't in it yet. Treat this as a *draft* edit, not a finished
-   one — it gets reverted in step 4 if validation fails.
+2. **Build a scratch rules file.** Copy the configured rules file's contents
+   (the path in `.local/cats/config.yaml`'s `false_positives:` key) to a
+   temporary file, and append the draft rule to its `rules:` list — same
+   position it would occupy if added for real (the end of the file). This
+   scratch file, not the committed one, is what gets tested; delete it when
+   this workflow ends, on every branch (success, refusal, or decline).
 
-3. **Dry-run it:**
+3. **Dry-run against the scratch file:**
 
    ```
-   uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py classify --db latest --dry-run
+   uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py classify --db latest --dry-run --rules <scratch-file>
    ```
 
-   This classifies a throwaway copy of the database — the real database and
-   `latest.db` are untouched either way. Read the output:
-   - **"By rule"** — the new rule's own match count.
+   This classifies a throwaway copy of the database against the scratch
+   rules — the real database, `latest.db`, and the committed rules file are
+   all untouched regardless of outcome. Read the output:
+   - **"By rule"** — the new rule's own match count. This is always
+     populated when the rule matched anything, and is the number to trust.
    - **"Newly suppressed"** — the exact test ids it would newly mark as
-     false positive. Show these to the user; this is the whole point of
-     the dry run.
+     false positive. Show these to the user; this is the whole point of the
+     dry run. **This list is empty on a database that has never been
+     classified before** (fresh `--db` pointing at a raw parse), even if the
+     rule matched — that's expected, not a sign the rule did nothing; check
+     "By rule" instead. (`--db latest` is normally already classified once,
+     since a run classifies before `latest.db` is updated — see
+     `/cats:report`.)
    - **"N rule match(es) refused for hitting a 5xx response"** (exit code 1)
      — if the new rule's id appears here, it matched at least one 5xx.
 
 4. **Refuse on any 5xx match, unconditionally.** If step 3's violations
-   list names this rule, remove the draft from the rules file and stop —
-   do not ask the user to override this one; a 5xx is always a real bug (see
+   list names this rule, delete the scratch file and stop — the committed
+   rules file was never touched, so there is nothing to revert. Do not ask
+   the user to override this one; a 5xx is always a real bug (see
    `/cats:report`, query 3, and `/cats:analyze`, which enforces the same
    rule). If the rule matched cleanly, keep going.
 
 5. **Warn if it suppresses more than 5% of remaining true positives.**
    Compare the new rule's match count (from "By rule") against the current
    true-positive total (`SELECT COUNT(*) FROM true_positives_view` on the
-   *original*, not-yet-touched database — see `/cats:report` for query
+   *real* database, unaffected by the dry run — see `/cats:report` for query
    syntax). If the ratio exceeds 5%, tell the user explicitly and get
    confirmation before continuing — a rule that broad is more often an
-   overly generic condition than a genuinely narrow class of noise.
+   overly generic condition than a genuinely narrow class of noise. If the
+   user declines, delete the scratch file and stop; the committed file is
+   still untouched.
 
-6. **Only now finalize.** If the rule is already in the file from step 2 and
-   passed steps 4-5 (or was confirmed despite the 5% warning), leave it in
-   place and reclassify for real:
+6. **Only now write it.** Append the same draft rule to the *committed*
+   rules file — the first and only write to it in this workflow — then
+   reclassify the real database for real:
 
    ```
    uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py classify --db latest
    ```
 
    Report the "Newly suppressed" delta this produces (should match the dry
-   run) as confirmation the rule is now live.
+   run) as confirmation the rule is now live. Delete the scratch file.
 
 ## `review` — find zero-match and over-broad rules
 
@@ -132,9 +155,10 @@ uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --sql "
 "
 ```
 
-**Over-broad** — rules suppressing a large share of what would otherwise be
-true positives (same 5% threshold as `add`'s warning, applied after the
-fact):
+**Over-broad** — every enabled rule with at least one match, ranked by the
+share of what would otherwise be true positives it suppresses (`pct`); apply
+the same 5% judgment call `add` uses when deciding which ones are worth a
+closer look — the query itself doesn't filter, it just ranks:
 
 ```
 uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --sql "

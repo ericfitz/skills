@@ -37,14 +37,25 @@ uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql
 
 Cluster by `(path, fuzzer, response_code)` — this is the unit of triage, not
 the individual test. For each cluster, pull the example test's
-`result_reason`, `result_details`, and (if useful) request/response bodies
-for closer inspection:
+`result_reason`, `result_details`, and request/response bodies for closer
+inspection. `test_results_view` doesn't carry `result_details` or either
+body — those live on `tests`/`requests`/`responses` — so join them explicitly
+rather than selecting `*` from the view:
 
 ```
 uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql "
-  SELECT * FROM test_results_view WHERE test_id = '<example_test_id>'
+  SELECT t.test_id, t.scenario, t.result_reason, t.result_details,
+         req.request_body, resp.response_body, resp.response_content_type
+  FROM tests t
+  JOIN requests req ON req.test_id = t.id
+  JOIN responses resp ON resp.test_id = t.id
+  WHERE t.test_id = '<example_test_id>'
 "
 ```
+
+Note `response_body` is the response's JSON body, re-serialized — empty when
+the response wasn't JSON (see `/cats:fp`'s field vocabulary for the same
+caveat, since it applies equally to a rule condition on this field).
 
 (See `/cats:report` for the full schema and more query patterns.)
 
