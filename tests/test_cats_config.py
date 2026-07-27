@@ -35,6 +35,26 @@ class TestFindConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self.assertIsNone(cfg.find_config(Path(d)))
 
+    def test_dotdot_does_not_escape_to_a_non_ancestor(self):
+        # Config lives only under <root>/sub. A start path whose lexical ".."
+        # navigation lands back at <root> must NOT find it, because <root>/sub
+        # is not an ancestor of <root>.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "sub" / ".local" / "cats").mkdir(parents=True)
+            (root / "sub" / ".local" / "cats" / "config.yaml").write_text(MINIMAL)
+            start = root / "sub" / "decoy" / ".." / ".."
+            self.assertIsNone(cfg.find_config(start))
+
+    def test_dotdot_normalizes_to_a_real_ancestor(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".local" / "cats").mkdir(parents=True)
+            target = root / ".local" / "cats" / "config.yaml"
+            target.write_text(MINIMAL)
+            start = root / "a" / "b" / ".." / ".."
+            self.assertEqual(cfg.find_config(start), target)
+
 
 class TestLoadConfig(unittest.TestCase):
     def _write(self, body):
@@ -84,7 +104,7 @@ class TestLoadConfig(unittest.TestCase):
             cfg.load_config(self._write(body))
         self.assertIn("nobody", str(ctx.exception))
 
-    def test_skip_fuzzers_for_extension_shape_validated(self):
+    def test_skip_fuzzers_for_extension_entry_parsed(self):
         body = MINIMAL + """
 cats:
   skip_fuzzers_for_extension:
@@ -94,10 +114,90 @@ cats:
         self.assertEqual(c.cats.skip_fuzzers_for_extension[0]["fuzzers"],
                          ["BypassAuthentication"])
 
+    def test_skip_fuzzers_for_extension_missing_fuzzers_rejected(self):
+        body = MINIMAL + """
+cats:
+  skip_fuzzers_for_extension:
+    - {extension: x-public-endpoint, value: "true"}
+"""
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("skip_fuzzers_for_extension", str(ctx.exception))
+
     def test_unsupported_version_rejected(self):
         body = MINIMAL.replace("version: 1", "version: 99")
         with self.assertRaises(cfg.ConfigError):
             cfg.load_config(self._write(body))
+
+    def test_missing_config_file_raises_config_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / ".local" / "cats" / "config.yaml"
+            with self.assertRaises(cfg.ConfigError) as ctx:
+                cfg.load_config(missing)
+            self.assertIn(str(missing), str(ctx.exception))
+
+    def test_wrong_type_server_rejected(self):
+        body = MINIMAL.replace("server: http://localhost:8080", "server: 8080")
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("server", str(ctx.exception))
+
+    def test_wrong_type_spec_rejected(self):
+        body = MINIMAL.replace("spec: openapi.json", "spec: 1")
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("spec", str(ctx.exception))
+
+    def test_wrong_type_results_dir_rejected(self):
+        body = MINIMAL.replace("results_dir: test/results/cats", "results_dir: [a, b]")
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("results_dir", str(ctx.exception))
+
+    def test_wrong_type_max_requests_per_minute_rejected(self):
+        body = MINIMAL + "\ncats:\n  max_requests_per_minute: fast\n"
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("max_requests_per_minute", str(ctx.exception))
+
+    def test_wrong_type_http_methods_rejected(self):
+        body = MINIMAL + "\ncats:\n  http_methods: GET\n"
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("http_methods", str(ctx.exception))
+
+    def test_wrong_type_token_cmd_rejected(self):
+        body = MINIMAL.replace(
+            'admin: {token_cmd: "echo tok"}', "admin: {token_cmd: 5}"
+        )
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("token_cmd", str(ctx.exception))
+
+    def test_non_mapping_auth_rejected(self):
+        body = MINIMAL + "\nauth: bearer\n"
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("auth", str(ctx.exception))
+
+    def test_non_mapping_hooks_rejected(self):
+        body = MINIMAL + "\nhooks: [seed]\n"
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("hooks", str(ctx.exception))
+
+    def test_non_mapping_cats_rejected(self):
+        body = MINIMAL + "\ncats: none\n"
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("cats", str(ctx.exception))
+
+    def test_retain_raw_report_wrong_type_rejected(self):
+        # A quoted "false" must not silently coerce to True via bool(str).
+        body = MINIMAL + '\nretain_raw_report: "false"\n'
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(body))
+        self.assertIn("retain_raw_report", str(ctx.exception))
 
 
 if __name__ == "__main__":

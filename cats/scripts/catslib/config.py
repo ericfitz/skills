@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -75,14 +76,16 @@ class Config:
         key = name or self.default_identity
         if key not in self.identities:
             raise ConfigError(
-                f"unknown identity {key!r}; configured: {sorted(self.identities)}"
+                f"{self.config_path}: unknown identity {key!r}; configured: {sorted(self.identities)}"
             )
         return self.identities[key]
 
 
 def find_config(start: Path) -> Path | None:
     """Walk up from *start* looking for .local/cats/config.yaml."""
-    current = start.absolute()
+    # os.path.abspath normalizes ".." lexically without touching symlinks, so a
+    # symlinked checkout still resolves against its logical (not physical) ancestors.
+    current = Path(os.path.abspath(start))
     for directory in [current, *current.parents]:
         candidate = directory / CONFIG_RELPATH
         if candidate.is_file():
@@ -90,15 +93,39 @@ def find_config(start: Path) -> Path | None:
     return None
 
 
-def _reject_unknown(keys, allowed, where: str) -> None:
-    unknown = sorted(set(keys) - allowed)
+def _reject_unknown(section: Any, allowed: set[str], where: str, path: Path) -> None:
+    if not isinstance(section, dict):
+        raise ConfigError(f"{path}: '{where}' must be a mapping")
+    unknown = sorted(set(section) - allowed)
     if unknown:
-        raise ConfigError(f"unknown key(s) in {where}: {', '.join(unknown)}")
+        raise ConfigError(f"{path}: unknown key(s) in {where}: {', '.join(unknown)}")
+
+
+def _require_str(value: Any, key: str, path: Path) -> str:
+    if not isinstance(value, str):
+        raise ConfigError(f"{path}: '{key}' must be a string, got {type(value).__name__}")
+    return value
+
+
+def _require_list(value: Any, key: str, path: Path) -> list:
+    if not isinstance(value, list):
+        raise ConfigError(f"{path}: '{key}' must be a list, got {type(value).__name__}")
+    return value
+
+
+def _require_bool(value: Any, key: str, path: Path, default: bool) -> bool:
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise ConfigError(f"{path}: '{key}' must be a boolean, got {type(value).__name__}")
+    return value
 
 
 def load_config(path: Path) -> Config:
     try:
         raw = yaml.safe_load(path.read_text()) or {}
+    except OSError as exc:
+        raise ConfigError(f"{path}: cannot read config: {exc}") from exc
     except yaml.YAMLError as exc:
         raise ConfigError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(raw, dict):
@@ -109,13 +136,25 @@ def load_config(path: Path) -> Config:
         raise ConfigError(
             f"{path}: unsupported version {version!r}; supported: {sorted(SUPPORTED_VERSIONS)}"
         )
-    _reject_unknown(raw, TOP_LEVEL_KEYS, str(path))
+    _reject_unknown(raw, TOP_LEVEL_KEYS, "top level", path)
     for key in REQUIRED:
         if not raw.get(key):
             raise ConfigError(f"{path}: missing required key {key!r}")
 
     # repo_root is the directory containing .local/
     repo_root = path.parents[2]
+
+    spec_raw = _require_str(raw["spec"], "spec", path)
+    server_raw = _require_str(raw["server"], "server", path)
+    results_dir_raw = _require_str(raw["results_dir"], "results_dir", path)
+    false_positives_raw = _require_str(raw["false_positives"], "false_positives", path)
+
+    health_url_value = raw.get("health_url")
+    health_url_raw = (
+        _require_str(health_url_value, "health_url", path)
+        if health_url_value is not None
+        else server_raw
+    )
 
     identities_raw = raw["identities"]
     if not isinstance(identities_raw, dict) or not identities_raw:
@@ -124,7 +163,8 @@ def load_config(path: Path) -> Config:
     for name, spec in identities_raw.items():
         if not isinstance(spec, dict) or not spec.get("token_cmd"):
             raise ConfigError(f"{path}: identity {name!r} needs a 'token_cmd'")
-        identities[name] = Identity(name=name, token_cmd=spec["token_cmd"])
+        token_cmd = _require_str(spec["token_cmd"], f"identities.{name}.token_cmd", path)
+        identities[name] = Identity(name=name, token_cmd=token_cmd)
 
     default_identity = raw.get("default_identity") or next(iter(identities))
     if default_identity not in identities:
@@ -133,10 +173,10 @@ def load_config(path: Path) -> Config:
         )
 
     auth = raw.get("auth") or {}
-    _reject_unknown(auth, {"header", "template"}, "auth")
+    _reject_unknown(auth, {"header", "template"}, "auth", path)
 
     hooks_raw = raw.get("hooks") or {}
-    _reject_unknown(hooks_raw, HOOK_KEYS, "hooks")
+    _reject_unknown(hooks_raw, HOOK_KEYS, "hooks", path)
     hooks = Hooks(
         seed=hooks_raw.get("seed") or None,
         pre_run=hooks_raw.get("pre_run") or None,
@@ -144,34 +184,71 @@ def load_config(path: Path) -> Config:
     )
 
     cats_raw = raw.get("cats") or {}
-    _reject_unknown(cats_raw, CATS_KEYS, "cats")
-    for entry in cats_raw.get("skip_fuzzers_for_extension", []):
+    _reject_unknown(cats_raw, CATS_KEYS, "cats", path)
+
+    http_methods_value = cats_raw.get("http_methods")
+    http_methods = (
+        _require_list(http_methods_value, "cats.http_methods", path)
+        if http_methods_value is not None
+        else ["POST", "PUT", "GET", "DELETE", "PATCH"]
+    )
+
+    mrpm_raw = cats_raw.get("max_requests_per_minute", 3000)
+    try:
+        max_requests_per_minute = int(mrpm_raw)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(
+            f"{path}: 'cats.max_requests_per_minute' must be an integer, got {mrpm_raw!r}"
+        ) from exc
+
+    ref_data_value = cats_raw.get("ref_data")
+    ref_data = (
+        repo_root / _require_str(ref_data_value, "cats.ref_data", path)
+        if ref_data_value is not None
+        else None
+    )
+
+    skip_field_format = _require_list(
+        cats_raw.get("skip_field_format", []), "cats.skip_field_format", path
+    )
+    skip_field = _require_list(cats_raw.get("skip_field", []), "cats.skip_field", path)
+    skip_fuzzers = _require_list(cats_raw.get("skip_fuzzers", []), "cats.skip_fuzzers", path)
+    skip_fuzzers_for_extension = _require_list(
+        cats_raw.get("skip_fuzzers_for_extension", []), "cats.skip_fuzzers_for_extension", path
+    )
+    extra_args = _require_list(cats_raw.get("extra_args", []), "cats.extra_args", path)
+
+    for entry in skip_fuzzers_for_extension:
         if not isinstance(entry, dict) or not {"extension", "fuzzers"} <= set(entry):
             raise ConfigError(
                 f"{path}: each skip_fuzzers_for_extension entry needs 'extension' and 'fuzzers'"
             )
-    ref_data = cats_raw.get("ref_data")
+
     cats_opts = CatsOptions(
-        http_methods=cats_raw.get("http_methods") or ["POST", "PUT", "GET", "DELETE", "PATCH"],
-        max_requests_per_minute=int(cats_raw.get("max_requests_per_minute", 3000)),
-        ref_data=(repo_root / ref_data) if ref_data else None,
-        skip_field_format=cats_raw.get("skip_field_format") or [],
-        skip_field=cats_raw.get("skip_field") or [],
-        skip_fuzzers=cats_raw.get("skip_fuzzers") or [],
-        skip_fuzzers_for_extension=cats_raw.get("skip_fuzzers_for_extension") or [],
-        extra_args=cats_raw.get("extra_args") or [],
+        http_methods=http_methods,
+        max_requests_per_minute=max_requests_per_minute,
+        ref_data=ref_data,
+        skip_field_format=skip_field_format,
+        skip_field=skip_field,
+        skip_fuzzers=skip_fuzzers,
+        skip_fuzzers_for_extension=skip_fuzzers_for_extension,
+        extra_args=extra_args,
     )
 
     return Config(
         repo_root=repo_root,
         config_path=path,
-        spec=repo_root / raw["spec"],
-        server=raw["server"].rstrip("/"),
-        health_url=(raw.get("health_url") or raw["server"]).rstrip("/"),
-        results_dir=repo_root / raw["results_dir"],
-        false_positives=repo_root / raw["false_positives"],
-        retain_raw_report=bool(raw.get("retain_raw_report", False)),
-        allow_suppressing_5xx=bool(raw.get("allow_suppressing_5xx", False)),
+        spec=repo_root / spec_raw,
+        server=server_raw.rstrip("/"),
+        health_url=health_url_raw.rstrip("/"),
+        results_dir=repo_root / results_dir_raw,
+        false_positives=repo_root / false_positives_raw,
+        retain_raw_report=_require_bool(
+            raw.get("retain_raw_report"), "retain_raw_report", path, False
+        ),
+        allow_suppressing_5xx=_require_bool(
+            raw.get("allow_suppressing_5xx"), "allow_suppressing_5xx", path, False
+        ),
         identities=identities,
         default_identity=default_identity,
         auth_header=auth.get("header") or "Authorization",
