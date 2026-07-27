@@ -231,7 +231,16 @@ def execute(
     rate: int | None = None, blackbox: bool = False, skip_seed: bool = False,
     skip_parse: bool = False, now: datetime | None = None,
 ) -> RunResult:
-    """Run one full CATS campaign: preflight, hooks, fuzz, parse, classify."""
+    """Run one full CATS campaign: preflight, hooks, fuzz, parse, classify.
+
+    `post_run` runs only after parse and classify have both succeeded — a
+    half-written database gives the hook no way to tell "complete" from
+    "interrupted," so it's better not to run it at all than to hand it that
+    ambiguity. Its own failure is a warning, not a fatal error, because by the
+    time it runs the database is already written. On any failure before that
+    point, `report_dir` (the raw CATS report) is deliberately left in place —
+    it's the evidence needed to debug why parsing or classification failed.
+    """
     started_at = now or datetime.now(timezone.utc)
     run_id = run_id_for(started_at)
     report_dir = config.results_dir / f"report-{run_id}"
