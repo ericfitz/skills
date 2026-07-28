@@ -196,18 +196,28 @@ def resolve_token(identity: Identity, cwd: Path, env: dict[str, str]) -> str:
     return token
 
 
-def write_headers_file(directory: Path, header: str, value: str) -> Path:
-    """Write a CATS headers file readable only by the owner."""
+def write_headers_file(
+    directory: Path, header: str, value: str, extra: dict[str, str] | None = None
+) -> Path:
+    """Write a CATS headers file readable only by the owner.
+
+    *extra* is merged into the same `all:` block as the auth header. Config
+    validation already rejects an extra header named the same as the auth
+    header, so the auth entry is written last here only as a belt-and-braces
+    guarantee that a token can never be displaced by a config edit.
+    """
     fd, name = tempfile.mkstemp(prefix="cats-headers-", suffix=".yml", dir=str(directory))
     os.close(fd)
     try:
         path = Path(name)
         path.chmod(0o600)
+        headers = dict(extra or {})
+        headers[header] = value
         # yaml.safe_dump, not an f-string: a header value starting with a
         # YAML-special character (*, &, {, [, !, %, @, backtick) or containing
         # ": " would otherwise produce a malformed headers file that CATS
         # fails on with an opaque error.
-        path.write_text(yaml.safe_dump({"all": {header: value}}))
+        path.write_text(yaml.safe_dump({"all": headers}))
         return path
     except BaseException:
         # mkstemp already created the file on disk; a chmod/write failure
@@ -451,6 +461,14 @@ def prune_run_dbs(
     too (callers pass the run just written, which may not be `latest.db` yet
     for a contaminated run).
 
+    Each surviving database's companion report artifacts are left alone; each
+    deleted one takes its `report-<run_id>` directory and `report-<run_id>.*`
+    files with it (#600). Companions are keyed off the run_id already parsed
+    out of the database filename — never off a directory listing pattern — so
+    the deletion surface stays exactly "artifacts of a run we just decided to
+    drop." A companion is removed only after its database is successfully
+    unlinked, so a failed unlink can never orphan the evidence.
+
     Returns the list of database paths removed (or, under `dry_run=True`,
     that would be removed) — callers can stat them beforehand to report bytes
     reclaimed. Never raises: an individual unlink failure is logged and
@@ -499,8 +517,38 @@ def prune_run_dbs(
                 sidecar.unlink(missing_ok=True)
             except OSError as exc:
                 logger.warning("prune_run_dbs: failed to delete %s, continuing: %s", sidecar, exc)
+        _prune_report_companions(results_dir, _RUN_DB_RE.fullmatch(db_path.name).group(1))
 
     return deleted
+
+
+def _prune_report_companions(results_dir: Path, run_id: str) -> None:
+    """Delete the raw CATS report artifacts belonging to one run_id.
+
+    Matches `report-<run_id>` exactly and `report-<run_id>.<ext>` — not a
+    `report-<run_id>*` glob, which would also sweep up a
+    `report-20260727T204514Z-annotated` a human deliberately kept. Never
+    raises: pruning must not fail an otherwise-successful run.
+    """
+    prefix = f"report-{run_id}"
+    try:
+        candidates = [
+            p for p in results_dir.iterdir()
+            if p.name == prefix or (p.name.startswith(prefix + ".") and p.is_file())
+        ]
+    except OSError as exc:
+        logger.warning("prune_run_dbs: could not list %s for companions: %s", results_dir, exc)
+        return
+    for companion in candidates:
+        try:
+            if companion.is_dir():
+                shutil.rmtree(companion)
+            else:
+                companion.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning(
+                "prune_run_dbs: failed to delete companion %s, continuing: %s", companion, exc
+            )
 
 
 def _validity_stats(db_path: Path) -> tuple[int, int, int]:
@@ -587,7 +635,8 @@ def execute(
     try:
         token = resolve_token(identity, config.repo_root, hook_env)
         headers_file = write_headers_file(
-            config.results_dir, config.auth_header, config.auth_template.format(token=token)
+            config.results_dir, config.auth_header, config.auth_template.format(token=token),
+            config.cats.headers,
         )
         argv = build_cats_argv(
             config, headers_file=headers_file, report_dir=report_dir,

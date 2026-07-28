@@ -88,6 +88,36 @@ class TestLoadConfig(unittest.TestCase):
             cfg.load_config(self._write(MINIMAL + "\ncats:\n  skip_paths: /me/logout\n"))
         self.assertIn("cats.skip_paths", str(ctx.exception))
 
+    def test_headers_parsed(self):
+        c = cfg.load_config(self._write(MINIMAL + '\ncats:\n  headers: {If-Match: "*"}\n'))
+        self.assertEqual(c.cats.headers, {"If-Match": "*"})
+
+    def test_headers_rejects_the_auth_header_name(self):
+        # Letting this through produces a fully unauthenticated campaign that
+        # still completes and looks normal.
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + '\ncats:\n  headers: {Authorization: "Bearer x"}\n'))
+        self.assertIn("auth.header", str(ctx.exception))
+
+    def test_headers_auth_header_check_is_case_insensitive(self):
+        with self.assertRaises(cfg.ConfigError):
+            cfg.load_config(self._write(MINIMAL + '\ncats:\n  headers: {authorization: "Bearer x"}\n'))
+
+    def test_headers_respects_a_custom_auth_header_name(self):
+        body = MINIMAL + '\nauth:\n  header: X-Api-Key\ncats:\n  headers: {Authorization: "Bearer x"}\n'
+        c = cfg.load_config(self._write(body))
+        self.assertEqual(c.cats.headers, {"Authorization": "Bearer x"})
+
+    def test_headers_rejects_non_string_value(self):
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + "\ncats:\n  headers: {If-Match: 5}\n"))
+        self.assertIn("cats.headers.If-Match", str(ctx.exception))
+
+    def test_headers_rejects_a_list(self):
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + "\ncats:\n  headers: [a, b]\n"))
+        self.assertIn("cats.headers", str(ctx.exception))
+
     def test_max_unauthenticated_pct_custom_value_applied(self):
         c = cfg.load_config(self._write(MINIMAL + "\nmax_unauthenticated_pct: 0.5\n"))
         self.assertEqual(c.max_unauthenticated_pct, 0.5)

@@ -108,7 +108,9 @@ grow without bound. After a **successful, valid** run (same gate as the
 `latest.db` update above: parsed, classified, and not contaminated), `run`
 prunes old run databases down to the `keep_runs` most recent
 (`config.yaml`'s `keep_runs`, default 5), always keeping whichever one
-`latest.db` points at. A failed, skipped-parse, or contaminated run never
+`latest.db` points at. Each pruned database takes its raw report artifacts
+(`report-<run_id>/` and `report-<run_id>.*`) with it; a surviving run keeps
+its own. A failed, skipped-parse, or contaminated run never
 prunes — only a run that was itself trustworthy is allowed to delete history.
 
 If anything was pruned, the summary includes a line like:

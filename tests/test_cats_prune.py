@@ -90,9 +90,13 @@ class TestPruneRunDbs(unittest.TestCase):
         self.assertEqual(len(deleted), 2)
 
     def test_non_matching_filenames_are_never_candidates(self):
+        # The report file here belongs to RUN_IDS[2], the run that survives
+        # `keep=1` below. Since #600, a report whose run_id IS pruned is
+        # deleted with it — see TestPruneReportCompanions — so this case has
+        # to name a surviving run to still be testing what it says it tests.
         untouched = [
             "cats-test-data.yml",
-            "report-20260101T000000Z.html",
+            "report-20260103T000000Z.html",
             "cats-results-junk.db",
         ]
         for name in untouched:
@@ -166,3 +170,84 @@ class TestPruneRunDbs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPruneReportCompanions(unittest.TestCase):
+    """Issue #600: a pruned run must take its raw report artifacts with it,
+    and a surviving run must keep its own."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+
+    def _mk_report(self, run_id: str):
+        d = self.root / f"report-{run_id}"
+        d.mkdir()
+        (d / "Test1.json").write_text("{}")
+        (self.root / f"report-{run_id}.html").write_text("<html>")
+        return d
+
+    def test_companions_of_pruned_runs_are_removed(self):
+        for i in RUN_IDS:
+            _mk_db(self.root, i)
+            self._mk_report(i)
+
+        run.prune_run_dbs(self.root, keep=2)
+
+        for i in RUN_IDS[:3]:
+            self.assertFalse((self.root / f"report-{i}").exists(), i)
+            self.assertFalse((self.root / f"report-{i}.html").exists(), i)
+        for i in RUN_IDS[-2:]:
+            self.assertTrue((self.root / f"report-{i}").is_dir(), i)
+            self.assertTrue((self.root / f"report-{i}.html").is_file(), i)
+
+    def test_dry_run_leaves_companions_alone(self):
+        for i in RUN_IDS:
+            _mk_db(self.root, i)
+            self._mk_report(i)
+
+        run.prune_run_dbs(self.root, keep=2, dry_run=True)
+
+        for i in RUN_IDS:
+            self.assertTrue((self.root / f"report-{i}").is_dir(), i)
+
+    def test_suffixed_sibling_directory_is_not_swept_up(self):
+        # A `report-<run_id>*` glob would delete a deliberately-kept annotated
+        # copy; only the exact name and `report-<run_id>.<ext>` files may go.
+        _mk_db(self.root, RUN_IDS[0])
+        _mk_db(self.root, RUN_IDS[-1])
+        self._mk_report(RUN_IDS[0])
+        keep_me = self.root / f"report-{RUN_IDS[0]}-annotated"
+        keep_me.mkdir()
+
+        run.prune_run_dbs(self.root, keep=1)
+
+        self.assertFalse((self.root / f"report-{RUN_IDS[0]}").exists())
+        self.assertTrue(keep_me.is_dir())
+
+    def test_missing_companions_are_not_an_error(self):
+        self._seeded = [_mk_db(self.root, i) for i in RUN_IDS]
+        deleted = run.prune_run_dbs(self.root, keep=2)
+        self.assertEqual(len(deleted), 3)
+
+    def test_failed_db_unlink_leaves_its_companions_alone(self):
+        # The companion is the evidence for a run; it must not be destroyed
+        # when the database it belongs to survived the prune by accident.
+        for i in RUN_IDS:
+            _mk_db(self.root, i)
+            self._mk_report(i)
+
+        real_unlink = Path.unlink
+        doomed = f"cats-results-{RUN_IDS[0]}.db"
+
+        def flaky(self, *a, **kw):
+            if self.name == doomed:
+                raise OSError("EPERM")
+            return real_unlink(self, *a, **kw)
+
+        with mock.patch.object(Path, "unlink", flaky):
+            run.prune_run_dbs(self.root, keep=2)
+
+        self.assertTrue((self.root / f"report-{RUN_IDS[0]}").is_dir())
+        self.assertFalse((self.root / f"report-{RUN_IDS[1]}").exists())

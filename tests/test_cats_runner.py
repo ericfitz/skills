@@ -94,6 +94,28 @@ class TestHeadersFile(unittest.TestCase):
             parsed = yaml.safe_load(p.read_text())
             self.assertEqual(parsed, {"all": {"Authorization": value}})
 
+    def test_extra_headers_merge_into_the_same_all_block(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = run.write_headers_file(
+                Path(d), "Authorization", "Bearer tok", {"If-Match": "*", "X-Trace": "on"}
+            )
+            self.assertEqual(
+                yaml.safe_load(p.read_text()),
+                {"all": {"Authorization": "Bearer tok", "If-Match": "*", "X-Trace": "on"}},
+            )
+
+    def test_auth_header_wins_over_a_colliding_extra(self):
+        # Config validation rejects this, so it should be unreachable; the
+        # write order is the second line of defence, because the failure mode
+        # is a silently unauthenticated campaign rather than an error.
+        with tempfile.TemporaryDirectory() as d:
+            p = run.write_headers_file(
+                Path(d), "Authorization", "Bearer tok", {"Authorization": "Bearer WRONG"}
+            )
+            self.assertEqual(
+                yaml.safe_load(p.read_text())["all"]["Authorization"], "Bearer tok"
+            )
+
     def test_write_failure_removes_the_partial_file(self):
         with tempfile.TemporaryDirectory() as d:
             with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")), \

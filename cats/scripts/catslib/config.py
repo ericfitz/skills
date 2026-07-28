@@ -22,7 +22,7 @@ TOP_LEVEL_KEYS = {
 CATS_KEYS = {
     "http_methods", "max_requests_per_minute", "ref_data", "skip_field_format",
     "skip_field", "skip_fuzzers", "skip_fuzzers_for_extension", "skip_paths",
-    "extra_args",
+    "headers", "extra_args",
 }
 HOOK_KEYS = {"seed", "pre_run", "post_run"}
 REQUIRED = ("spec", "server", "results_dir", "false_positives", "identities")
@@ -59,6 +59,7 @@ class CatsOptions:
     skip_fuzzers: list[str]
     skip_fuzzers_for_extension: list[dict[str, Any]]
     skip_paths: list[str]
+    headers: dict[str, str]
     extra_args: list[str]
 
 
@@ -226,6 +227,7 @@ def load_config(path: Path) -> Config:
 
     auth = raw.get("auth") or {}
     _reject_unknown(auth, {"header", "template"}, "auth", path)
+    auth_header = auth.get("header") or "Authorization"
     auth_template = auth.get("template") or "Bearer {token}"
     _validate_auth_template(auth_template, path)
 
@@ -275,6 +277,26 @@ def load_config(path: Path) -> Config:
     skip_paths = _require_list(cats_raw.get("skip_paths", []), "cats.skip_paths", path)
     extra_args = _require_list(cats_raw.get("extra_args", []), "cats.extra_args", path)
 
+    headers_raw = cats_raw.get("headers") or {}
+    if not isinstance(headers_raw, dict):
+        raise ConfigError(
+            f"{path}: 'cats.headers' must be a mapping of header name to value, "
+            f"got {type(headers_raw).__name__}"
+        )
+    headers: dict[str, str] = {}
+    for name, value in headers_raw.items():
+        if not isinstance(name, str):
+            raise ConfigError(f"{path}: 'cats.headers' keys must be strings, got {name!r}")
+        # These headers share one file with the auth header, so a name collision
+        # would silently overwrite the bearer token and produce an entirely
+        # unauthenticated campaign that still looks like it ran.
+        if name.lower() == auth_header.lower():
+            raise ConfigError(
+                f"{path}: 'cats.headers' may not set {name!r} — that is 'auth.header', "
+                "which the tool populates with the resolved bearer token"
+            )
+        headers[name] = _require_str(value, f"cats.headers.{name}", path)
+
     for entry in skip_fuzzers_for_extension:
         if not isinstance(entry, dict) or not {"extension", "fuzzers"} <= set(entry):
             raise ConfigError(
@@ -290,6 +312,7 @@ def load_config(path: Path) -> Config:
         skip_fuzzers=skip_fuzzers,
         skip_fuzzers_for_extension=skip_fuzzers_for_extension,
         skip_paths=skip_paths,
+        headers=headers,
         extra_args=extra_args,
     )
 
@@ -319,7 +342,7 @@ def load_config(path: Path) -> Config:
         keep_runs=_require_nonneg_int(raw.get("keep_runs"), "keep_runs", path, 5),
         identities=identities,
         default_identity=default_identity,
-        auth_header=auth.get("header") or "Authorization",
+        auth_header=auth_header,
         auth_template=auth_template,
         hooks=hooks,
         cats=cats_opts,
@@ -426,5 +449,10 @@ cats:
   # `cats_tool.py run --path /me/logout`, where losing the token at the end
   # costs nothing.
   skip_paths: []
+  # Extra request headers sent on every fuzz request, merged into the same
+  # generated headers file as the bearer token. Use this rather than a -H in
+  # extra_args. A header named the same as `auth.header` is rejected, so the
+  # token can never be silently displaced.
+  headers: {{}}
   extra_args: ["--printExecutionStatistics"]
 """
