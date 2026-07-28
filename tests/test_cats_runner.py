@@ -94,6 +94,28 @@ class TestHeadersFile(unittest.TestCase):
             parsed = yaml.safe_load(p.read_text())
             self.assertEqual(parsed, {"all": {"Authorization": value}})
 
+    def test_extra_headers_merge_into_the_same_all_block(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = run.write_headers_file(
+                Path(d), "Authorization", "Bearer tok", {"If-Match": "*", "X-Trace": "on"}
+            )
+            self.assertEqual(
+                yaml.safe_load(p.read_text()),
+                {"all": {"Authorization": "Bearer tok", "If-Match": "*", "X-Trace": "on"}},
+            )
+
+    def test_auth_header_wins_over_a_colliding_extra(self):
+        # Config validation rejects this, so it should be unreachable; the
+        # write order is the second line of defence, because the failure mode
+        # is a silently unauthenticated campaign rather than an error.
+        with tempfile.TemporaryDirectory() as d:
+            p = run.write_headers_file(
+                Path(d), "Authorization", "Bearer tok", {"Authorization": "Bearer WRONG"}
+            )
+            self.assertEqual(
+                yaml.safe_load(p.read_text())["all"]["Authorization"], "Bearer tok"
+            )
+
     def test_write_failure_removes_the_partial_file(self):
         with tempfile.TemporaryDirectory() as d:
             with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")), \
@@ -146,6 +168,71 @@ class TestBuildArgv(unittest.TestCase):
         # and silently fall back to the config default — 0 is a legitimate
         # (if extreme) override and must survive.
         self.assertIn("--maxRequestsPerMinute=0", self._argv(rate=0))
+
+    def test_skip_paths_absent_when_unset(self):
+        self.assertNotIn("--skipPaths", " ".join(self._argv()))
+
+    def test_skip_paths_rendered_as_one_comma_list(self):
+        body = CONFIG.replace(
+            "  extra_args:", "  skip_paths: [/me/logout, /me/nuke]\n  extra_args:"
+        )
+        c = make_config(self, body)
+        argv = run.build_cats_argv(
+            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
+            path_filter=None, rate=None, blackbox=False)
+        self.assertIn("--skipPaths=/me/logout,/me/nuke", argv)
+
+    def test_explicit_path_filter_overrides_skip_paths(self):
+        # `run --path /me/logout` exists precisely so a skipped path can be
+        # fuzzed on its own; emitting both flags would make CATS test nothing.
+        body = CONFIG.replace("  extra_args:", "  skip_paths: [/me/logout]\n  extra_args:")
+        c = make_config(self, body)
+        argv = run.build_cats_argv(
+            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
+            path_filter="/me/logout", rate=None, blackbox=False)
+        self.assertIn("--paths=/me/logout", argv)
+        self.assertNotIn("--skipPaths", " ".join(argv))
+
+
+class TestValidityGates(unittest.TestCase):
+    """RunResult.contamination_reasons is the single source of truth for
+    "is this run worth drawing conclusions from" (TMI #578 transport, #591 auth)."""
+
+    def _result(self, **kw):
+        return run.RunResult(
+            run_id="R", db_path=Path("/tmp/x.db"), report_dir=Path("/tmp/r"),
+            cats_exit_code=0, parse_stats=None, classify_result=None, **kw)
+
+    def test_clean_run_has_no_reasons(self):
+        r = self._result(connection_errors=6, unauthenticated=356, total_tests=10000)
+        self.assertEqual(r.contamination_reasons, [])
+        self.assertFalse(r.contaminated)
+
+    def test_connection_errors_over_threshold(self):
+        r = self._result(connection_errors=4600, unauthenticated=0, total_tests=10000)
+        self.assertTrue(r.contaminated)
+        self.assertIn("connection-error rate", r.contamination_reasons[0])
+
+    def test_lost_credential_over_threshold(self):
+        # The shape of TMI #591: a completed 118k-test campaign that silently
+        # ran ~44% of itself unauthenticated after fuzzing /me/logout.
+        r = self._result(connection_errors=70, unauthenticated=52340, total_tests=118448)
+        self.assertTrue(r.contaminated)
+        self.assertIn("unauthenticated rate", r.contamination_reasons[0])
+        self.assertIn("skip_paths", r.contamination_reasons[0])
+
+    def test_both_gates_reported_together(self):
+        r = self._result(connection_errors=5000, unauthenticated=5000, total_tests=10000)
+        self.assertEqual(len(r.contamination_reasons), 2)
+
+    def test_no_stats_is_not_contaminated(self):
+        # --skip-parse leaves every count None; absence of evidence must not
+        # read as evidence of contamination.
+        self.assertFalse(self._result().contaminated)
+
+    def test_zero_test_run_is_not_contaminated(self):
+        r = self._result(connection_errors=0, unauthenticated=0, total_tests=0)
+        self.assertFalse(r.contaminated)
 
 
 class TestRunId(unittest.TestCase):
@@ -492,6 +579,108 @@ class TestExecute(unittest.TestCase):
         with self.assertRaises(ValueError):
             run.execute(c, now=datetime(2026, 7, 26, 22, 2, 0))  # noqa: DTZ001 (naive on purpose)
 
+    def test_successful_run_prunes_old_dbs_down_to_keep_runs(self):
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 2\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+
+        for minute in range(3):
+            result = run.execute(c, now=base.replace(minute=minute))
+
+        # only the third (most recent) run should have pruned anything, since
+        # keep_runs=2 first gets exceeded on that call
+        self.assertEqual(len(result.pruned), 1)
+        self.assertEqual(result.pruned[0].name, "cats-results-20260726T220000Z.db")
+        remaining = {p.name for p in c.results_dir.glob("cats-results-*.db")}
+        self.assertEqual(
+            remaining,
+            {"cats-results-20260726T220100Z.db", "cats-results-20260726T220200Z.db"},
+        )
+
+    def test_no_prune_flag_skips_pruning_for_this_invocation(self):
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 1\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        run.execute(c, now=base)
+
+        result = run.execute(c, now=base.replace(minute=1), no_prune=True)
+
+        self.assertEqual(result.pruned, [])
+        self.assertEqual(len(list(c.results_dir.glob("cats-results-*.db"))), 2)
+
+    def test_keep_runs_zero_disables_pruning(self):
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 0\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        for minute in range(3):
+            result = run.execute(c, now=base.replace(minute=minute))
+
+        self.assertEqual(result.pruned, [])
+        self.assertEqual(len(list(c.results_dir.glob("cats-results-*.db"))), 3)
+
+    def test_contaminated_run_does_not_prune(self):
+        # A single connection-error (999) test with no other tests puts the
+        # connection-error rate at 100%, over the default 1% threshold.
+        _fake_contaminated = """
+OUTPUT=""
+for arg in "$@"; do
+  case "$arg" in
+    --output=*) OUTPUT="${arg#--output=}" ;;
+  esac
+done
+mkdir -p "$OUTPUT"
+cat > "$OUTPUT/Test1.json" <<'EOF'
+{"testId":"Test 1","traceId":"t1","scenario":"s1","expectedResult":"2XX","result":"error",
+ "fuzzer":"FakeFuzzer","path":"/x","server":"http://x","request":{"httpMethod":"GET","url":"http://x/x","headers":[]},
+ "response":{"httpMethod":"GET","responseCode":999,"headers":[]}}
+EOF
+"""
+        c = self._config(CONFIG.replace("identities:", "keep_runs: 1\nidentities:"))
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+
+        _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
+        run.execute(c, now=base)
+
+        _with_fake_cats(Path(self.bindir), _fake_contaminated)
+        result = run.execute(c, now=base.replace(minute=1))
+
+        self.assertTrue(result.contaminated)
+        self.assertEqual(result.pruned, [])
+        # the earlier clean run must survive — a contaminated run must never
+        # delete history that might be needed to debug what went wrong
+        self.assertEqual(len(list(c.results_dir.glob("cats-results-*.db"))), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHookOrder(unittest.TestCase):
+    """pre_run must run before seed (#595): pre_run is where a repo clears what
+    the previous campaign left behind, and seeding is itself a burst of API
+    calls that should not run against exhausted state."""
+
+    def _order(self, body_extra, **kw):
+        calls = []
+        c = make_config(self, CONFIG.replace("identities:", body_extra + "identities:"))
+        with mock.patch.object(run, "run_hook", side_effect=lambda n, *a, **k: calls.append(n)), \
+                mock.patch.object(run, "preflight"), \
+                mock.patch.object(run, "resolve_token", return_value="tok"), \
+                mock.patch.object(run, "subprocess") as sp:
+            sp.run.return_value = mock.Mock(returncode=0)
+            run.execute(c, skip_parse=True, **kw)
+        return calls
+
+    HOOKS = 'hooks:\n  seed: "true"\n  pre_run: "true"\n  post_run: "true"\n'
+
+    def test_pre_run_precedes_seed(self):
+        calls = self._order(self.HOOKS)
+        self.assertEqual(calls[:2], ["pre_run", "seed"])
+
+    def test_post_run_still_last(self):
+        self.assertEqual(self._order(self.HOOKS)[-1], "post_run")
+
+    def test_skip_seed_still_runs_pre_run(self):
+        calls = self._order(self.HOOKS, skip_seed=True)
+        self.assertIn("pre_run", calls)
+        self.assertNotIn("seed", calls)

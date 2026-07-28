@@ -12,6 +12,65 @@ OpenAPI spec, or a false-positive candidate — and never guess. Every
 disposition must be backed by evidence from the spec or the response, not by
 how the finding "seems."
 
+## 0. Check run validity first
+
+A run can complete and still be worthless to analyze, in two distinct ways:
+
+- **Transport.** A large fraction of tests never reached the API (an
+  unreachable server, or a throttled kubectl port-forward silently dropping
+  requests under load), so the true/false positive counts reflect connection
+  failures rather than API behavior.
+- **Credential.** The campaign lost its bearer token partway through — most
+  often by fuzzing an endpoint that revokes the caller's own token — and
+  every test after that point exercised only the unauthenticated path.
+
+Check both before clustering anything:
+
+```
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql "
+  SELECT (SELECT COUNT(*) FROM responses WHERE response_code IN (953, 999)) AS connection_errors,
+         (SELECT COUNT(*) FROM tests t JOIN responses r ON r.test_id = t.id
+           WHERE r.response_code = 401 AND t.is_false_positive = 0)        AS unauthenticated,
+         (SELECT COUNT(*) FROM tests) AS total_tests
+"
+```
+
+If `connection_errors / total_tests` exceeds ~1%, or
+`unauthenticated / total_tests` exceeds ~5%, **stop** — do not draw per-rule
+or per-path conclusions from this database. `run` itself already gates both (a
+contaminated run exits 3 and never becomes `latest.db`), so seeing it here on
+`--db latest` most likely means an explicit `--db <file>` pointed at an older,
+invalid run, or the gate's threshold doesn't match this analysis's bar. Report
+the contamination percentage to the user and ask whether to re-run instead of
+proceeding.
+
+To identify the culprit, find where the 401s start (the cliff, not the first
+401 — isolated early 401s are normal), then read the successful mutations
+immediately before it:
+
+```sql
+-- 1. the cliff: the bucket where the 401 rate jumps
+SELECT (t.test_number / 1000) * 1000 AS bucket,
+       SUM(CASE WHEN r.response_code = 401 THEN 1 ELSE 0 END) AS unauth,
+       COUNT(*) AS total
+FROM tests t JOIN responses r ON r.test_id = t.id
+GROUP BY bucket ORDER BY bucket;
+
+-- 2. every 2xx mutation before it; one of them revoked the token
+SELECT t.test_number, m.method, p.path, r.response_code
+FROM tests t
+JOIN paths p ON p.id = t.path_id
+JOIN requests rq ON rq.test_id = t.id
+JOIN http_methods m ON m.id = rq.http_method_id
+JOIN responses r ON r.test_id = t.id
+WHERE r.response_code BETWEEN 200 AND 299
+  AND m.method IN ('POST', 'PUT', 'PATCH', 'DELETE')
+  AND t.test_number < :cliff
+ORDER BY t.test_number DESC LIMIT 20;
+```
+
+Add whatever that turns up to `cats.skip_paths` and re-run.
+
 ## 1. Resolve the database and the spec
 
 ```

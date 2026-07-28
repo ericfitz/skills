@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -53,7 +54,41 @@ def _coerce_str(value: Any) -> str:
     return value if isinstance(value, str) else str(value)
 
 
-def _headers_dict(headers: Any) -> dict[str, str]:
+# Header names whose value is a credential. Redacted on the way into the
+# database and into the record the false-positive rules see. The auth header
+# from config is added to this at call time; `cookie` is here because a
+# session cookie is just as much a credential and no config key names it.
+DEFAULT_SECRET_HEADERS = frozenset({"authorization", "cookie", "proxy-authorization"})
+
+_SCHEME_RE = re.compile(r"^(\S+)\s+(\S.*)$", re.DOTALL)
+
+
+def redact_secret_header(value: str) -> str:
+    """Replace a credential with a stable digest, keeping its auth scheme.
+
+    A blanket "[REDACTED]" would destroy real diagnostics: establishing that a
+    campaign used exactly one token — `SELECT COUNT(DISTINCT header_value)` —
+    is how token expiry was ruled out in TMI #591, and the unauthenticated-rate
+    gate exists precisely to catch a campaign losing its credential. A digest
+    keeps distinct-count and change-detection working while removing the
+    secret. 12 hex chars is 48 bits: ample to distinguish the handful of tokens
+    a campaign uses, far too little to attack the preimage of a JWT.
+    """
+    if not value:
+        return value
+    match = _SCHEME_RE.match(value)
+    if match:
+        scheme, credential = match.group(1), match.group(2)
+        return f"{scheme} sha256:{hashlib.sha256(credential.encode()).hexdigest()[:12]}"
+    return f"sha256:{hashlib.sha256(value.encode()).hexdigest()[:12]}"
+
+
+def _header_value(key: str, value: Any, secret_headers: frozenset[str]) -> str:
+    text = _coerce_str(value)
+    return redact_secret_header(text) if key.lower() in secret_headers else text
+
+
+def _headers_dict(headers: Any, secret_headers: frozenset[str] = DEFAULT_SECRET_HEADERS) -> dict[str, str]:
     result: dict[str, str] = {}
     for h in headers or []:
         if not isinstance(h, dict):
@@ -61,11 +96,13 @@ def _headers_dict(headers: Any) -> dict[str, str]:
         key = h.get("key")
         if not isinstance(key, str) or not key:
             continue
-        result[key.lower()] = _coerce_str(h.get("value"))
+        result[key.lower()] = _header_value(key, h.get("value"), secret_headers)
     return result
 
 
-def record_from_json(data: dict[str, Any]) -> dict[str, Any]:
+def record_from_json(
+    data: dict[str, Any], secret_headers: frozenset[str] = DEFAULT_SECRET_HEADERS
+) -> dict[str, Any]:
     request = data.get("request")
     request = request if isinstance(request, dict) else {}
     response = data.get("response")
@@ -91,7 +128,7 @@ def record_from_json(data: dict[str, Any]) -> dict[str, Any]:
         "response_content_type": response.get("responseContentType") or "",
         "request_body": request.get("payload") or "",
         "json_body": json_body,
-        "request_headers": _headers_dict(request.get("headers")),
+        "request_headers": _headers_dict(request.get("headers"), secret_headers),
     }
 
 
@@ -112,7 +149,11 @@ def _load_json_file(path: Path) -> dict[str, Any]:
 class _Loader:
     """Holds the open connection, lookup caches, and per-run insert logic."""
 
-    def __init__(self, conn: sqlite3.Connection) -> None:
+    def __init__(
+        self, conn: sqlite3.Connection,
+        secret_headers: frozenset[str] = DEFAULT_SECRET_HEADERS,
+    ) -> None:
+        self.secret_headers = secret_headers
         self.conn = conn
         self.result_type_cache: dict[str, int] = {}
         self.fuzzer_cache: dict[str, int] = {}
@@ -161,7 +202,7 @@ class _Loader:
         return row[0]
 
     def insert(self, data: dict[str, Any], source_file: str) -> None:
-        record = record_from_json(data)
+        record = record_from_json(data, self.secret_headers)
 
         result_type_id = self._get_or_create(self.result_type_cache, "result_types", "name", record["result"])
         fuzzer_id = self._get_or_create(self.fuzzer_cache, "fuzzers", "name", record["fuzzer"])
@@ -238,7 +279,8 @@ class _Loader:
         response_row_id = cursor.lastrowid
 
         req_headers = [
-            (request_row_id, h.get("key"), _coerce_str(h.get("value")), idx)
+            (request_row_id, h.get("key"),
+             _header_value(h["key"], h.get("value"), self.secret_headers), idx)
             for idx, h in enumerate(request.get("headers") or [])
             if isinstance(h, dict) and isinstance(h.get("key"), str)
         ]
@@ -250,7 +292,8 @@ class _Loader:
             )
 
         resp_headers = [
-            (response_row_id, h.get("key"), _coerce_str(h.get("value")), idx)
+            (response_row_id, h.get("key"),
+             _header_value(h["key"], h.get("value"), self.secret_headers), idx)
             for idx, h in enumerate(response.get("headers") or [])
             if isinstance(h, dict) and isinstance(h.get("key"), str)
         ]
@@ -270,7 +313,8 @@ def _safe_int(value: Any) -> int:
 
 
 def parse_report(
-    report_dir: Path, db_path: Path, run_meta: dict[str, Any], *, batch_size: int = 500
+    report_dir: Path, db_path: Path, run_meta: dict[str, Any], *, batch_size: int = 500,
+    secret_headers: frozenset[str] = DEFAULT_SECRET_HEADERS,
 ) -> ParseStats:
     """Load every Test*.json file in report_dir into a fresh SQLite database at db_path."""
     stats = ParseStats()
@@ -292,7 +336,7 @@ def parse_report(
         )
         conn.commit()
 
-        loader = _Loader(conn)
+        loader = _Loader(conn, secret_headers)
 
         files = sorted(report_dir.glob("Test*.json"), key=lambda p: extract_test_number(p.stem))
 

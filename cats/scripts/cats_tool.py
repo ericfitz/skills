@@ -39,6 +39,7 @@ from catslib.runner import (
     RunResult,
     checks,
     execute,
+    prune_run_dbs,
     run_id_for,
 )
 
@@ -80,6 +81,18 @@ def print_table(headers: list[str], rows: Sequence[Sequence[object]]) -> None:
     print(fmt.format(*["-" * w for w in widths]))
     for row in str_rows:
         print(fmt.format(*row))
+
+
+def _human_bytes(n: int) -> str:
+    """Format a byte count as e.g. '4.2 GB' (binary units, one decimal place)."""
+    if n < 1024:
+        return f"{n} B"
+    size = float(n)
+    for unit in ("KB", "MB", "GB", "TB"):
+        size /= 1024
+        if size < 1024 or unit == "TB":
+            return f"{size:.1f} {unit}"
+    return f"{size:.1f} TB"  # unreachable, satisfies static analysis
 
 
 def _print_capped(label: str, items: list[str], cap: int = DELTA_CAP) -> None:
@@ -311,9 +324,83 @@ def cmd_run(args: argparse.Namespace) -> None:
         blackbox=args.blackbox,
         skip_seed=args.skip_seed,
         skip_parse=args.skip_parse,
+        allow_port_forward=args.allow_port_forward,
+        no_prune=args.no_prune,
     )
     _print_run_summary(result)
+
+    if result.connection_errors is not None and result.total_tests:
+        pct = 100.0 * result.connection_errors / result.total_tests
+        print(
+            f"\nConnection errors (code 953/999): {result.connection_errors} / "
+            f"{result.total_tests} ({pct:.2f}%)"
+        )
+
+    if result.unauthenticated is not None and result.total_tests:
+        pct = 100.0 * result.unauthenticated / result.total_tests
+        print(
+            f"Unauthenticated (non-false-positive 401): {result.unauthenticated} / "
+            f"{result.total_tests} ({pct:.2f}%)"
+        )
+
+    if result.pruned:
+        print(
+            f"\nPruned {len(result.pruned)} old run database(s), reclaimed "
+            f"{_human_bytes(result.pruned_bytes)} (keep_runs: {config.keep_runs})"
+        )
+
+    reasons = result.contamination_reasons
+    if reasons:
+        detail = "\n".join(f"  - {reason}" for reason in reasons)
+        print(
+            f"\nRUN INVALID:\n{detail}\n"
+            "Per-rule and per-path conclusions from this run are meaningless. "
+            f"{result.db_path} was NOT made latest.db. Fix the cause and re-run.",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
     sys.exit(result.cats_exit_code)
+
+
+# ---------------------------------------------------------------------------
+# prune
+# ---------------------------------------------------------------------------
+
+def cmd_prune(args: argparse.Namespace) -> None:
+    """Standalone pruning of old per-run databases, outside a `run` invocation.
+
+    Uses the same candidate regex and latest.db-target protection as the
+    pruning `run` does automatically after a successful campaign (see
+    `runner.prune_run_dbs`) — this is just a manually-triggered pass over
+    whatever `results_dir` already holds.
+    """
+    config = load()
+    keep = args.keep if args.keep is not None else config.keep_runs
+
+    # Always preview first (dry_run=True never deletes) so file sizes can be
+    # stat'd while the candidates still exist — once the real pass unlinks
+    # them there is nothing left to stat.
+    candidates = prune_run_dbs(config.results_dir, keep, dry_run=True)
+    sizes: dict[Path, int] = {}
+    for p in candidates:
+        try:
+            sizes[p] = p.stat().st_size
+        except OSError:
+            sizes[p] = 0
+    total_bytes = sum(sizes.values())
+
+    if not candidates:
+        print(f"Nothing to prune (keep_runs: {keep}).")
+        return
+
+    verb = "Would delete" if args.dry_run else "Deleted"
+    if not args.dry_run:
+        prune_run_dbs(config.results_dir, keep)
+
+    for p in candidates:
+        print(f"{verb} {p.name} ({_human_bytes(sizes[p])})")
+    print(f"\nTotal: {len(candidates)} database(s), {_human_bytes(total_bytes)} (keep_runs: {keep})")
 
 
 # ---------------------------------------------------------------------------
@@ -555,6 +642,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--blackbox", action="store_true")
     p_run.add_argument("--skip-seed", action="store_true")
     p_run.add_argument("--skip-parse", action="store_true")
+    p_run.add_argument(
+        "--allow-port-forward", action="store_true",
+        help="Permit fuzzing through a kubectl port-forward (normally a fatal preflight error)",
+    )
+    p_run.add_argument(
+        "--no-prune", action="store_true",
+        help="Skip pruning old run databases for this invocation, regardless of keep_runs",
+    )
     p_run.set_defaults(func=cmd_run)
 
     p_parse = sub.add_parser("parse", help="Parse a CATS report directory into SQLite")
@@ -586,6 +681,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_doctor = sub.add_parser("doctor", help="Check the environment is ready to fuzz")
     p_doctor.set_defaults(func=cmd_doctor)
+
+    p_prune = sub.add_parser("prune", help="Delete old run databases beyond keep_runs")
+    p_prune.add_argument("--keep", type=int, help="Override config.yaml's keep_runs for this run")
+    p_prune.add_argument("--dry-run", action="store_true")
+    p_prune.set_defaults(func=cmd_prune)
 
     return parser
 

@@ -16,11 +16,13 @@ SUPPORTED_VERSIONS = {1}
 TOP_LEVEL_KEYS = {
     "version", "spec", "server", "health_url", "results_dir", "false_positives",
     "retain_raw_report", "allow_suppressing_5xx", "identities", "default_identity",
-    "auth", "hooks", "cats",
+    "auth", "hooks", "cats", "allow_port_forward", "max_connection_error_pct",
+    "max_unauthenticated_pct", "keep_runs",
 }
 CATS_KEYS = {
     "http_methods", "max_requests_per_minute", "ref_data", "skip_field_format",
-    "skip_field", "skip_fuzzers", "skip_fuzzers_for_extension", "extra_args",
+    "skip_field", "skip_fuzzers", "skip_fuzzers_for_extension", "skip_paths",
+    "headers", "extra_args",
 }
 HOOK_KEYS = {"seed", "pre_run", "post_run"}
 REQUIRED = ("spec", "server", "results_dir", "false_positives", "identities")
@@ -56,6 +58,8 @@ class CatsOptions:
     skip_field: list[str]
     skip_fuzzers: list[str]
     skip_fuzzers_for_extension: list[dict[str, Any]]
+    skip_paths: list[str]
+    headers: dict[str, str]
     extra_args: list[str]
 
 
@@ -70,6 +74,10 @@ class Config:
     false_positives: Path
     retain_raw_report: bool
     allow_suppressing_5xx: bool
+    allow_port_forward: bool
+    max_connection_error_pct: float
+    max_unauthenticated_pct: float
+    keep_runs: int
     identities: dict[str, Identity]
     default_identity: str
     auth_header: str
@@ -123,6 +131,31 @@ def _require_bool(value: Any, key: str, path: Path, default: bool) -> bool:
         return default
     if not isinstance(value, bool):
         raise ConfigError(f"{path}: '{key}' must be a boolean, got {type(value).__name__}")
+    return value
+
+
+def _require_pct(value: Any, key: str, path: Path, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        pct = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{path}: '{key}' must be a number, got {value!r}") from exc
+    if not 0.0 <= pct <= 100.0:
+        raise ConfigError(f"{path}: '{key}' must be between 0 and 100, got {pct!r}")
+    return pct
+
+
+def _require_nonneg_int(value: Any, key: str, path: Path, default: int) -> int:
+    if value is None:
+        return default
+    # bool is an int subclass in Python (isinstance(True, int) is True), so a
+    # naive isinstance(value, int) check would silently accept `keep_runs: true`
+    # as 1 — reject bools explicitly before the int check.
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"{path}: '{key}' must be a non-negative integer, got {value!r}")
+    if value < 0:
+        raise ConfigError(f"{path}: '{key}' must be a non-negative integer, got {value!r}")
     return value
 
 
@@ -194,6 +227,7 @@ def load_config(path: Path) -> Config:
 
     auth = raw.get("auth") or {}
     _reject_unknown(auth, {"header", "template"}, "auth", path)
+    auth_header = auth.get("header") or "Authorization"
     auth_template = auth.get("template") or "Bearer {token}"
     _validate_auth_template(auth_template, path)
 
@@ -240,7 +274,28 @@ def load_config(path: Path) -> Config:
     skip_fuzzers_for_extension = _require_list(
         cats_raw.get("skip_fuzzers_for_extension", []), "cats.skip_fuzzers_for_extension", path
     )
+    skip_paths = _require_list(cats_raw.get("skip_paths", []), "cats.skip_paths", path)
     extra_args = _require_list(cats_raw.get("extra_args", []), "cats.extra_args", path)
+
+    headers_raw = cats_raw.get("headers") or {}
+    if not isinstance(headers_raw, dict):
+        raise ConfigError(
+            f"{path}: 'cats.headers' must be a mapping of header name to value, "
+            f"got {type(headers_raw).__name__}"
+        )
+    headers: dict[str, str] = {}
+    for name, value in headers_raw.items():
+        if not isinstance(name, str):
+            raise ConfigError(f"{path}: 'cats.headers' keys must be strings, got {name!r}")
+        # These headers share one file with the auth header, so a name collision
+        # would silently overwrite the bearer token and produce an entirely
+        # unauthenticated campaign that still looks like it ran.
+        if name.lower() == auth_header.lower():
+            raise ConfigError(
+                f"{path}: 'cats.headers' may not set {name!r} — that is 'auth.header', "
+                "which the tool populates with the resolved bearer token"
+            )
+        headers[name] = _require_str(value, f"cats.headers.{name}", path)
 
     for entry in skip_fuzzers_for_extension:
         if not isinstance(entry, dict) or not {"extension", "fuzzers"} <= set(entry):
@@ -256,6 +311,8 @@ def load_config(path: Path) -> Config:
         skip_field=skip_field,
         skip_fuzzers=skip_fuzzers,
         skip_fuzzers_for_extension=skip_fuzzers_for_extension,
+        skip_paths=skip_paths,
+        headers=headers,
         extra_args=extra_args,
     )
 
@@ -273,9 +330,19 @@ def load_config(path: Path) -> Config:
         allow_suppressing_5xx=_require_bool(
             raw.get("allow_suppressing_5xx"), "allow_suppressing_5xx", path, False
         ),
+        allow_port_forward=_require_bool(
+            raw.get("allow_port_forward"), "allow_port_forward", path, False
+        ),
+        max_connection_error_pct=_require_pct(
+            raw.get("max_connection_error_pct"), "max_connection_error_pct", path, 1.0
+        ),
+        max_unauthenticated_pct=_require_pct(
+            raw.get("max_unauthenticated_pct"), "max_unauthenticated_pct", path, 5.0
+        ),
+        keep_runs=_require_nonneg_int(raw.get("keep_runs"), "keep_runs", path, 5),
         identities=identities,
         default_identity=default_identity,
-        auth_header=auth.get("header") or "Authorization",
+        auth_header=auth_header,
         auth_template=auth_template,
         hooks=hooks,
         cats=cats_opts,
@@ -322,6 +389,32 @@ false_positives: {rules}
 retain_raw_report: false
 # Refuse any rule that would suppress a 5xx response.
 allow_suppressing_5xx: false
+# Refuse to fuzz through a kubectl port-forward bound to `server`'s port — a
+# userspace forward silently drops requests under load, producing a run that
+# looks clean but never reached most of the API. Set to true only if you
+# understand and accept that risk (or use `run --allow-port-forward`).
+allow_port_forward: false
+# Maximum percentage of tests that may fail with a connection error (CATS
+# codes 953/999) before a completed run is considered invalid and latest.db
+# is not updated to point at it.
+max_connection_error_pct: 1.0
+# Maximum percentage of tests that may return a non-false-positive 401 before
+# a completed run is considered invalid. A campaign that loses its credential
+# partway through keeps making requests and keeps recording results, but every
+# one of them exercises the unauthenticated path -- the run looks complete and
+# is worthless. Some 401s are expected (BypassAuthentication and friends fuzz
+# the auth header on purpose), hence a threshold rather than zero. See
+# `cats.skip_paths` for the usual cause: an endpoint that revokes the caller's
+# own token.
+max_unauthenticated_pct: 5.0
+# How many of the most recent per-run databases (cats-results-<run_id>.db) to
+# keep; older ones are deleted after a successful run. Each run's database is
+# roughly 1.4 GB, so the default keeps the results directory near 7 GB while
+# still allowing run-over-run comparison across a normal fix-verify cycle.
+# Set to 0 to disable pruning entirely. `latest.db`'s target is always kept
+# regardless of this setting. Only a successful, uncontaminated run prunes —
+# see `run --no-prune` to skip pruning for a single invocation.
+keep_runs: 5
 
 identities:
   default:
@@ -332,7 +425,10 @@ auth:
   header: Authorization
   template: "Bearer {{token}}"
 
-# Shell commands run at pipeline stages. Any language or toolchain.
+# Shell commands run at pipeline stages, in the order pre_run -> seed -> fuzz
+# -> post_run. pre_run comes FIRST so a repo can reset whatever the previous
+# campaign left behind (cleared rate-limit keys, most obviously) before the
+# seed's own burst of API calls, not after it.
 # Each receives CATS_SERVER, CATS_SPEC, CATS_RESULTS_DIR, CATS_REPORT_DIR,
 # CATS_RUN_ID and CATS_IDENTITY; post_run also gets CATS_DB and CATS_EXIT_CODE.
 hooks:
@@ -348,5 +444,18 @@ cats:
   skip_field: []
   skip_fuzzers: []
   skip_fuzzers_for_extension: []
+  # Paths excluded from the campaign entirely. Reserve this for endpoints that
+  # destroy the campaign's own ability to keep testing -- above all anything
+  # that revokes the caller's credential (a self-logout endpoint will happily
+  # blacklist the bearer token CATS is fuzzing with, and every request after
+  # that point runs unauthenticated). Fuzz those on their own instead:
+  # `cats_tool.py run --path /me/logout`, where losing the token at the end
+  # costs nothing.
+  skip_paths: []
+  # Extra request headers sent on every fuzz request, merged into the same
+  # generated headers file as the bearer token. Use this rather than a -H in
+  # extra_args. A header named the same as `auth.header` is rejected, so the
+  # token can never be silently displaced.
+  headers: {{}}
   extra_args: ["--printExecutionStatistics"]
 """

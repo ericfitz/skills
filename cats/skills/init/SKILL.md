@@ -68,9 +68,13 @@ fixture data before fuzzing starts (e.g. so paths like `GET /widgets/{id}`
 have an id to fuzz against). Runs once per `cats_tool.py run`, unless the user
 passes `--skip-seed`. Empty by default — ask whether this repo needs one.
 
-**`hooks.pre_run`** — a shell command to run immediately before CATS is
-invoked (e.g. start a server, wait for a health check, reset rate limits).
-Runs on every `run` with no way to skip it. Empty by default.
+**`hooks.pre_run`** — a shell command to run before anything else (e.g. start
+a server, wait for a health check, reset rate limits). Runs on every `run`
+with no way to skip it. Empty by default.
+
+The order is **pre_run -> seed -> fuzz -> post_run**. pre_run comes first so a
+repo can clear what the previous campaign left behind before the seed's own
+burst of API calls, rather than seeding into exhausted state (#595).
 
 There is also `hooks.post_run` (e.g. to send a notification or clean up
 after a run); its failure only logs a warning, never fails the run. It runs
