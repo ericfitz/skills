@@ -425,7 +425,10 @@ auth:
   header: Authorization
   template: "Bearer {{token}}"
 
-# Shell commands run at pipeline stages. Any language or toolchain.
+# Shell commands run at pipeline stages, in the order pre_run -> seed -> fuzz
+# -> post_run. pre_run comes FIRST so a repo can reset whatever the previous
+# campaign left behind (cleared rate-limit keys, most obviously) before the
+# seed's own burst of API calls, not after it.
 # Each receives CATS_SERVER, CATS_SPEC, CATS_RESULTS_DIR, CATS_REPORT_DIR,
 # CATS_RUN_ID and CATS_IDENTITY; post_run also gets CATS_DB and CATS_EXIT_CODE.
 hooks:

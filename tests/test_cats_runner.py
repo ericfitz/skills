@@ -653,3 +653,34 @@ EOF
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHookOrder(unittest.TestCase):
+    """pre_run must run before seed (#595): pre_run is where a repo clears what
+    the previous campaign left behind, and seeding is itself a burst of API
+    calls that should not run against exhausted state."""
+
+    def _order(self, body_extra, **kw):
+        calls = []
+        c = make_config(self, CONFIG.replace("identities:", body_extra + "identities:"))
+        with mock.patch.object(run, "run_hook", side_effect=lambda n, *a, **k: calls.append(n)), \
+                mock.patch.object(run, "preflight"), \
+                mock.patch.object(run, "resolve_token", return_value="tok"), \
+                mock.patch.object(run, "subprocess") as sp:
+            sp.run.return_value = mock.Mock(returncode=0)
+            run.execute(c, skip_parse=True, **kw)
+        return calls
+
+    HOOKS = 'hooks:\n  seed: "true"\n  pre_run: "true"\n  post_run: "true"\n'
+
+    def test_pre_run_precedes_seed(self):
+        calls = self._order(self.HOOKS)
+        self.assertEqual(calls[:2], ["pre_run", "seed"])
+
+    def test_post_run_still_last(self):
+        self.assertEqual(self._order(self.HOOKS)[-1], "post_run")
+
+    def test_skip_seed_still_runs_pre_run(self):
+        calls = self._order(self.HOOKS, skip_seed=True)
+        self.assertIn("pre_run", calls)
+        self.assertNotIn("seed", calls)

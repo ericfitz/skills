@@ -621,10 +621,16 @@ def execute(
     identity = config.identity(identity_name)
     hook_env = _hook_env(config, report_dir=report_dir, run_id=run_id, identity=identity)
 
-    if config.hooks.seed and not skip_seed:
-        run_hook("seed", config.hooks.seed, config.repo_root, hook_env)
+    # pre_run before seed, not after (#595). pre_run is where a repo resets
+    # whatever a previous campaign left behind — cleared rate-limit keys, most
+    # obviously — and seeding is itself a burst of API calls, so running it
+    # against state the previous campaign exhausted is the wrong way round. A
+    # seed is a few dozen requests; whatever budget it consumes after the reset
+    # is negligible next to the campaign that follows.
     if config.hooks.pre_run:
         run_hook("pre_run", config.hooks.pre_run, config.repo_root, hook_env)
+    if config.hooks.seed and not skip_seed:
+        run_hook("seed", config.hooks.seed, config.repo_root, hook_env)
 
     parse_stats: ParseStats | None = None
     classify_result: ClassifyResult | None = None
