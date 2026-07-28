@@ -53,11 +53,13 @@ Reply with ONLY this, populated from the command's printed summary:
 - **false positive total**
 - **top true-positive paths** (the printed top-10 list, path + count)
 - **connection-error count/percentage**, if printed
+- **unauthenticated (non-false-positive 401) count/percentage**, if printed
 - **exit code**, and if nonzero, the tool's own error message verbatim
 
-**If exit code is 3**, the campaign completed but is invalid (connection-error
-rate over threshold) — report the printed `RUN INVALID` block verbatim in
-addition to the counts above; do not treat this the same as a clean exit 0/1
+**If exit code is 3**, the campaign completed but is invalid — either its
+connection-error rate or its unauthenticated rate is over threshold (the
+`RUN INVALID` block names which, and may name both) — report that block
+verbatim in addition to the counts above; do not treat this the same as a clean exit 0/1
 from CATS itself, and do not tell the caller `latest.db` was updated. A
 contaminated or otherwise failed run also never prunes old run databases —
 only a successful, valid run does both.

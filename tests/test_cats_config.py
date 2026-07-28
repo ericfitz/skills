@@ -76,6 +76,26 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(c.cats.http_methods, ["POST", "PUT", "GET", "DELETE", "PATCH"])
         self.assertIsNone(c.hooks.seed)
         self.assertEqual(c.keep_runs, 5)
+        self.assertEqual(c.cats.skip_paths, [])
+        self.assertEqual(c.max_unauthenticated_pct, 5.0)
+
+    def test_skip_paths_parsed(self):
+        c = cfg.load_config(self._write(MINIMAL + "\ncats:\n  skip_paths: [/me/logout]\n"))
+        self.assertEqual(c.cats.skip_paths, ["/me/logout"])
+
+    def test_skip_paths_rejects_scalar(self):
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + "\ncats:\n  skip_paths: /me/logout\n"))
+        self.assertIn("cats.skip_paths", str(ctx.exception))
+
+    def test_max_unauthenticated_pct_custom_value_applied(self):
+        c = cfg.load_config(self._write(MINIMAL + "\nmax_unauthenticated_pct: 0.5\n"))
+        self.assertEqual(c.max_unauthenticated_pct, 0.5)
+
+    def test_max_unauthenticated_pct_rejects_out_of_range(self):
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.load_config(self._write(MINIMAL + "\nmax_unauthenticated_pct: 101\n"))
+        self.assertIn("max_unauthenticated_pct", str(ctx.exception))
 
     def test_keep_runs_custom_value_applied(self):
         c = cfg.load_config(self._write(MINIMAL + "\nkeep_runs: 10\n"))
@@ -247,6 +267,16 @@ class TestInitTemplate(unittest.TestCase):
             spec="s", server="http://h", health_url="http://h",
             results_dir="r", rules="f.yaml")
         self.assertIn("keep_runs:", text)
+
+    def test_template_documents_validity_gates(self):
+        # Both gates are only discoverable from the generated config; a project
+        # that never learns `skip_paths` exists is the one that ships a campaign
+        # which logs itself out (TMI #591).
+        text = cfg.render_init_config(
+            spec="s", server="http://h", health_url="http://h",
+            results_dir="r", rules="f.yaml")
+        for key in ("max_connection_error_pct:", "max_unauthenticated_pct:", "skip_paths:"):
+            self.assertIn(key, text)
 
     def test_template_documents_hooks(self):
         text = cfg.render_init_config(

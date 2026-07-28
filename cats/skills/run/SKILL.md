@@ -63,18 +63,42 @@ itself failed. Use what actually printed to tell these apart:
   summary, then point the user at `/cats:analyze` to triage the true
   positives it found (unless the run is invalid — see below).
 
-## Validity gate
+## Validity gates
 
-After a completed campaign, `run` checks what fraction of tests failed with a
-connection error (CATS pseudo-codes 953/999) against `max_connection_error_pct`
-(default 1.0%). If that threshold is exceeded, the run is **contaminated**:
-its per-rule and per-path conclusions are meaningless, since most requests
-never reached the API. `run` prints the connection-error count/percentage,
-then a `RUN INVALID` block to stderr, and exits **3** — `latest.db` is
-**not** updated to point at this run, so a later `/cats:analyze` (which
-defaults to `--db latest`) can't accidentally analyze it. Report the invalid
-run to the user with the likely cause CATS printed (unreachable server, or a
-throttled port-forward) rather than treating it as a normal completed run.
+A campaign can run to completion and still be worthless. There are two ways
+that happens, and `run` checks for both after every completed campaign:
+
+| gate | config key (default) | what it means |
+|---|---|---|
+| **transport** | `max_connection_error_pct` (1.0%) | tests failing with a connection error (CATS pseudo-codes 953/999) — the requests never reached the API |
+| **credential** | `max_unauthenticated_pct` (5.0%) | tests getting a **non-false-positive** 401 — the campaign lost its bearer token partway through and the rest of the run only exercised the unauthenticated path |
+
+Some 401s are expected (`BypassAuthentication` and the header-mangling
+fuzzers provoke them deliberately), which is why the credential gate counts
+only 401s that survived false-positive classification, and why it is a
+threshold rather than zero.
+
+If either threshold is exceeded the run is **contaminated**: its per-rule and
+per-path conclusions are meaningless. `run` prints both counts/percentages,
+then a `RUN INVALID` block to stderr naming every gate that failed, and exits
+**3** — `latest.db` is **not** updated to point at this run, so a later
+`/cats:analyze` (which defaults to `--db latest`) can't accidentally analyze
+it. Report the invalid run with the cause the tool printed rather than
+treating it as a normal completed run.
+
+The usual cause of a credential failure is fuzzing an endpoint that revokes
+the caller's own token — a self-logout endpoint will happily blacklist the
+very bearer token the campaign is authenticating with. Put those in
+`cats.skip_paths` (rendered as CATS's `--skipPaths`) and fuzz them on their
+own instead:
+
+```
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py run --path /me/logout
+```
+
+An explicit `--path` wins over `skip_paths`, precisely so a skipped path can
+still be tested — at the end of its own short campaign, losing the token
+costs nothing.
 
 ## Retention
 

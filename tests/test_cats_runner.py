@@ -147,6 +147,71 @@ class TestBuildArgv(unittest.TestCase):
         # (if extreme) override and must survive.
         self.assertIn("--maxRequestsPerMinute=0", self._argv(rate=0))
 
+    def test_skip_paths_absent_when_unset(self):
+        self.assertNotIn("--skipPaths", " ".join(self._argv()))
+
+    def test_skip_paths_rendered_as_one_comma_list(self):
+        body = CONFIG.replace(
+            "  extra_args:", "  skip_paths: [/me/logout, /me/nuke]\n  extra_args:"
+        )
+        c = make_config(self, body)
+        argv = run.build_cats_argv(
+            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
+            path_filter=None, rate=None, blackbox=False)
+        self.assertIn("--skipPaths=/me/logout,/me/nuke", argv)
+
+    def test_explicit_path_filter_overrides_skip_paths(self):
+        # `run --path /me/logout` exists precisely so a skipped path can be
+        # fuzzed on its own; emitting both flags would make CATS test nothing.
+        body = CONFIG.replace("  extra_args:", "  skip_paths: [/me/logout]\n  extra_args:")
+        c = make_config(self, body)
+        argv = run.build_cats_argv(
+            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
+            path_filter="/me/logout", rate=None, blackbox=False)
+        self.assertIn("--paths=/me/logout", argv)
+        self.assertNotIn("--skipPaths", " ".join(argv))
+
+
+class TestValidityGates(unittest.TestCase):
+    """RunResult.contamination_reasons is the single source of truth for
+    "is this run worth drawing conclusions from" (TMI #578 transport, #591 auth)."""
+
+    def _result(self, **kw):
+        return run.RunResult(
+            run_id="R", db_path=Path("/tmp/x.db"), report_dir=Path("/tmp/r"),
+            cats_exit_code=0, parse_stats=None, classify_result=None, **kw)
+
+    def test_clean_run_has_no_reasons(self):
+        r = self._result(connection_errors=6, unauthenticated=356, total_tests=10000)
+        self.assertEqual(r.contamination_reasons, [])
+        self.assertFalse(r.contaminated)
+
+    def test_connection_errors_over_threshold(self):
+        r = self._result(connection_errors=4600, unauthenticated=0, total_tests=10000)
+        self.assertTrue(r.contaminated)
+        self.assertIn("connection-error rate", r.contamination_reasons[0])
+
+    def test_lost_credential_over_threshold(self):
+        # The shape of TMI #591: a completed 118k-test campaign that silently
+        # ran ~44% of itself unauthenticated after fuzzing /me/logout.
+        r = self._result(connection_errors=70, unauthenticated=52340, total_tests=118448)
+        self.assertTrue(r.contaminated)
+        self.assertIn("unauthenticated rate", r.contamination_reasons[0])
+        self.assertIn("skip_paths", r.contamination_reasons[0])
+
+    def test_both_gates_reported_together(self):
+        r = self._result(connection_errors=5000, unauthenticated=5000, total_tests=10000)
+        self.assertEqual(len(r.contamination_reasons), 2)
+
+    def test_no_stats_is_not_contaminated(self):
+        # --skip-parse leaves every count None; absence of evidence must not
+        # read as evidence of contamination.
+        self.assertFalse(self._result().contaminated)
+
+    def test_zero_test_run_is_not_contaminated(self):
+        r = self._result(connection_errors=0, unauthenticated=0, total_tests=0)
+        self.assertFalse(r.contaminated)
+
 
 class TestRunId(unittest.TestCase):
     def test_format(self):

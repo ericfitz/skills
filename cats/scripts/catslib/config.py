@@ -17,11 +17,12 @@ TOP_LEVEL_KEYS = {
     "version", "spec", "server", "health_url", "results_dir", "false_positives",
     "retain_raw_report", "allow_suppressing_5xx", "identities", "default_identity",
     "auth", "hooks", "cats", "allow_port_forward", "max_connection_error_pct",
-    "keep_runs",
+    "max_unauthenticated_pct", "keep_runs",
 }
 CATS_KEYS = {
     "http_methods", "max_requests_per_minute", "ref_data", "skip_field_format",
-    "skip_field", "skip_fuzzers", "skip_fuzzers_for_extension", "extra_args",
+    "skip_field", "skip_fuzzers", "skip_fuzzers_for_extension", "skip_paths",
+    "extra_args",
 }
 HOOK_KEYS = {"seed", "pre_run", "post_run"}
 REQUIRED = ("spec", "server", "results_dir", "false_positives", "identities")
@@ -57,6 +58,7 @@ class CatsOptions:
     skip_field: list[str]
     skip_fuzzers: list[str]
     skip_fuzzers_for_extension: list[dict[str, Any]]
+    skip_paths: list[str]
     extra_args: list[str]
 
 
@@ -73,6 +75,7 @@ class Config:
     allow_suppressing_5xx: bool
     allow_port_forward: bool
     max_connection_error_pct: float
+    max_unauthenticated_pct: float
     keep_runs: int
     identities: dict[str, Identity]
     default_identity: str
@@ -269,6 +272,7 @@ def load_config(path: Path) -> Config:
     skip_fuzzers_for_extension = _require_list(
         cats_raw.get("skip_fuzzers_for_extension", []), "cats.skip_fuzzers_for_extension", path
     )
+    skip_paths = _require_list(cats_raw.get("skip_paths", []), "cats.skip_paths", path)
     extra_args = _require_list(cats_raw.get("extra_args", []), "cats.extra_args", path)
 
     for entry in skip_fuzzers_for_extension:
@@ -285,6 +289,7 @@ def load_config(path: Path) -> Config:
         skip_field=skip_field,
         skip_fuzzers=skip_fuzzers,
         skip_fuzzers_for_extension=skip_fuzzers_for_extension,
+        skip_paths=skip_paths,
         extra_args=extra_args,
     )
 
@@ -307,6 +312,9 @@ def load_config(path: Path) -> Config:
         ),
         max_connection_error_pct=_require_pct(
             raw.get("max_connection_error_pct"), "max_connection_error_pct", path, 1.0
+        ),
+        max_unauthenticated_pct=_require_pct(
+            raw.get("max_unauthenticated_pct"), "max_unauthenticated_pct", path, 5.0
         ),
         keep_runs=_require_nonneg_int(raw.get("keep_runs"), "keep_runs", path, 5),
         identities=identities,
@@ -367,6 +375,15 @@ allow_port_forward: false
 # codes 953/999) before a completed run is considered invalid and latest.db
 # is not updated to point at it.
 max_connection_error_pct: 1.0
+# Maximum percentage of tests that may return a non-false-positive 401 before
+# a completed run is considered invalid. A campaign that loses its credential
+# partway through keeps making requests and keeps recording results, but every
+# one of them exercises the unauthenticated path -- the run looks complete and
+# is worthless. Some 401s are expected (BypassAuthentication and friends fuzz
+# the auth header on purpose), hence a threshold rather than zero. See
+# `cats.skip_paths` for the usual cause: an endpoint that revokes the caller's
+# own token.
+max_unauthenticated_pct: 5.0
 # How many of the most recent per-run databases (cats-results-<run_id>.db) to
 # keep; older ones are deleted after a successful run. Each run's database is
 # roughly 1.4 GB, so the default keeps the results directory near 7 GB while
@@ -401,5 +418,13 @@ cats:
   skip_field: []
   skip_fuzzers: []
   skip_fuzzers_for_extension: []
+  # Paths excluded from the campaign entirely. Reserve this for endpoints that
+  # destroy the campaign's own ability to keep testing -- above all anything
+  # that revokes the caller's credential (a self-logout endpoint will happily
+  # blacklist the bearer token CATS is fuzzing with, and every request after
+  # that point runs unauthenticated). Fuzz those on their own instead:
+  # `cats_tool.py run --path /me/logout`, where losing the token at the end
+  # costs nothing.
+  skip_paths: []
   extra_args: ["--printExecutionStatistics"]
 """

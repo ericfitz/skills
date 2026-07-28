@@ -84,20 +84,62 @@ class RunResult:
     parse_stats: ParseStats | None
     classify_result: ClassifyResult | None
     connection_errors: int | None = None
+    unauthenticated: int | None = None
     total_tests: int | None = None
     max_connection_error_pct: float = 1.0
+    max_unauthenticated_pct: float = 5.0
     pruned: list[Path] = field(default_factory=list)
     pruned_bytes: int = 0
 
     @property
+    def contamination_reasons(self) -> list[str]:
+        """Every run-validity gate this run failed, as human-readable sentences.
+
+        Two distinct ways a completed campaign can be worthless, both of which
+        have actually happened and neither of which shows up as a failure
+        anywhere else:
+
+        - transport: connection errors (CATS codes 953/999) mean most requests
+          never reached the API at all (TMI #463/#578, a throttled port-forward).
+        - credential: a high non-false-positive 401 rate means the campaign lost
+          its bearer token partway through and everything after that point
+          exercised only the unauthenticated path (TMI #591, a fuzzed
+          self-logout endpoint).
+
+        Empty when no stats are available (e.g. --skip-parse) or the run had
+        zero tests.
+        """
+        if not self.total_tests:
+            return []
+        reasons: list[str] = []
+        if self.connection_errors is not None:
+            pct = 100.0 * self.connection_errors / self.total_tests
+            if pct > self.max_connection_error_pct:
+                reasons.append(
+                    f"connection-error rate {pct:.2f}% exceeds max_connection_error_pct "
+                    f"({self.max_connection_error_pct}%) — {self.connection_errors} of "
+                    f"{self.total_tests} requests never reached the API. Likely cause: an "
+                    "unreachable server, or a throttled userspace kubectl port-forward "
+                    "silently dropping requests under load."
+                )
+        if self.unauthenticated is not None:
+            pct = 100.0 * self.unauthenticated / self.total_tests
+            if pct > self.max_unauthenticated_pct:
+                reasons.append(
+                    f"unauthenticated rate {pct:.2f}% exceeds max_unauthenticated_pct "
+                    f"({self.max_unauthenticated_pct}%) — {self.unauthenticated} of "
+                    f"{self.total_tests} tests got a non-false-positive 401, so the "
+                    "campaign lost its credential partway through and the rest of the "
+                    "run only exercised the unauthenticated path. Likely cause: a fuzzed "
+                    "endpoint that revokes the caller's own token; add it to "
+                    "`cats.skip_paths` and fuzz it on its own with `run --path`."
+                )
+        return reasons
+
+    @property
     def contaminated(self) -> bool:
-        """True if connection errors (CATS codes 953/999) exceed the configured
-        threshold — such a run's per-rule and per-path conclusions are meaningless
-        because most requests never reached the API. False when no stats are
-        available (e.g. --skip-parse) or the run had zero tests."""
-        if self.connection_errors is None or not self.total_tests:
-            return False
-        return 100.0 * self.connection_errors / self.total_tests > self.max_connection_error_pct
+        """True if the run failed any validity gate — see contamination_reasons."""
+        return bool(self.contamination_reasons)
 
 
 def redact(text: str, token: str) -> str:
@@ -204,6 +246,11 @@ def build_cats_argv(config: Config, *, headers_file: Path, report_dir: Path,
         value = entry.get("value", "true")
         fuzzers = ",".join(entry["fuzzers"])
         argv.append(f"--skipFuzzersForExtension={entry['extension']}={value}:{fuzzers}")
+    # An explicit --path/--paths filter is a deliberate narrowing by the caller
+    # (usually to fuzz one of the skipped paths on its own), so it wins over the
+    # configured skip list rather than being silently subtracted from.
+    if opts.skip_paths and not path_filter:
+        argv.append(f"--skipPaths={','.join(opts.skip_paths)}")
     if path_filter:
         argv.append(f"--paths={path_filter}")
     argv.extend(opts.extra_args)
@@ -456,11 +503,17 @@ def prune_run_dbs(
     return deleted
 
 
-def _connection_error_stats(db_path: Path) -> tuple[int, int]:
-    """Return (connection_errors, total_tests) for a parsed results database.
+def _validity_stats(db_path: Path) -> tuple[int, int, int]:
+    """Return (connection_errors, unauthenticated, total_tests) for a parsed database.
 
     Schema per catslib/schema.sql: responses.response_code carries CATS's
     pseudo-codes for transport failures (953/999); tests is one row per fuzz test.
+
+    `unauthenticated` counts 401s that survived false-positive classification.
+    The is_false_positive filter matters: several fuzzers (BypassAuthentication
+    and the header-mangling family) provoke 401s deliberately and are already
+    ruled false positives, so counting raw 401s would put a healthy run over any
+    useful threshold.
     """
     conn = sqlite3.connect(db_path)
     try:
@@ -469,8 +522,12 @@ def _connection_error_stats(db_path: Path) -> tuple[int, int]:
             f"SELECT COUNT(*) FROM responses WHERE response_code IN ({placeholders})",
             CONNECTION_ERROR_CODES,
         ).fetchone()[0]
+        unauthenticated = conn.execute(
+            "SELECT COUNT(*) FROM tests t JOIN responses r ON r.test_id = t.id "
+            "WHERE r.response_code = 401 AND t.is_false_positive = 0"
+        ).fetchone()[0]
         total_tests = conn.execute("SELECT COUNT(*) FROM tests").fetchone()[0]
-        return connection_errors, total_tests
+        return connection_errors, unauthenticated, total_tests
     finally:
         conn.close()
 
@@ -524,6 +581,7 @@ def execute(
     parse_stats: ParseStats | None = None
     classify_result: ClassifyResult | None = None
     connection_errors: int | None = None
+    unauthenticated: int | None = None
     total_tests: int | None = None
     headers_file: Path | None = None
     try:
@@ -560,21 +618,34 @@ def execute(
             )
             # Only reached once both parse and classify have returned successfully.
             _stamp_finished_at(db_path, run_id)
-            connection_errors, total_tests = _connection_error_stats(db_path)
+            connection_errors, unauthenticated, total_tests = _validity_stats(db_path)
     finally:
         if headers_file is not None:
             headers_file.unlink(missing_ok=True)
 
-    contaminated = bool(
-        connection_errors is not None and total_tests
-        and 100.0 * connection_errors / total_tests > config.max_connection_error_pct
+    # Build the result up front so the validity gates live in exactly one place
+    # (RunResult.contamination_reasons) rather than being restated here.
+    result = RunResult(
+        run_id=run_id,
+        db_path=db_path,
+        report_dir=report_dir,
+        cats_exit_code=cats_exit_code,
+        parse_stats=parse_stats,
+        classify_result=classify_result,
+        connection_errors=connection_errors,
+        unauthenticated=unauthenticated,
+        total_tests=total_tests,
+        max_connection_error_pct=config.max_connection_error_pct,
+        max_unauthenticated_pct=config.max_unauthenticated_pct,
     )
+    contaminated = result.contaminated
 
     # A contaminated run's per-rule and per-path conclusions are meaningless (most
-    # requests never reached the API), so it must never become latest.db — a caller
-    # querying "the latest run" would otherwise silently draw conclusions from a
-    # run that was never actually valid. The --skip-parse path has no stats
-    # available (parse_stats is None) and keeps its prior unconditional behavior.
+    # requests either never reached the API or never carried a credential), so it
+    # must never become latest.db — a caller querying "the latest run" would
+    # otherwise silently draw conclusions from a run that was never actually valid.
+    # The --skip-parse path has no stats available (parse_stats is None) and keeps
+    # its prior unconditional behavior.
     if db_path.exists() and parse_stats is not None and not contaminated:
         _update_latest_symlink(config.results_dir, db_path)
 
@@ -595,8 +666,6 @@ def execute(
     # pruning-specific opt-outs: a failed, skipped-parse, or contaminated run
     # must never delete history that might be the only evidence of what went
     # wrong. keep_runs == 0 means pruning is disabled entirely.
-    pruned: list[Path] = []
-    pruned_bytes = 0
     if (
         db_path.exists() and parse_stats is not None and not contaminated
         and config.keep_runs > 0 and not no_prune
@@ -606,19 +675,7 @@ def execute(
         # unlinks a file there is nothing left to stat, so this is the only
         # point at which "bytes reclaimed" can be computed for the caller.
         candidates = prune_run_dbs(config.results_dir, config.keep_runs, protect=protect, dry_run=True)
-        pruned_bytes = sum(p.stat().st_size for p in candidates if p.exists())
-        pruned = prune_run_dbs(config.results_dir, config.keep_runs, protect=protect)
+        result.pruned_bytes = sum(p.stat().st_size for p in candidates if p.exists())
+        result.pruned = prune_run_dbs(config.results_dir, config.keep_runs, protect=protect)
 
-    return RunResult(
-        run_id=run_id,
-        db_path=db_path,
-        report_dir=report_dir,
-        cats_exit_code=cats_exit_code,
-        parse_stats=parse_stats,
-        classify_result=classify_result,
-        connection_errors=connection_errors,
-        total_tests=total_tests,
-        max_connection_error_pct=config.max_connection_error_pct,
-        pruned=pruned,
-        pruned_bytes=pruned_bytes,
-    )
+    return result

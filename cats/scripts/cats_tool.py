@@ -336,20 +336,26 @@ def cmd_run(args: argparse.Namespace) -> None:
             f"{result.total_tests} ({pct:.2f}%)"
         )
 
+    if result.unauthenticated is not None and result.total_tests:
+        pct = 100.0 * result.unauthenticated / result.total_tests
+        print(
+            f"Unauthenticated (non-false-positive 401): {result.unauthenticated} / "
+            f"{result.total_tests} ({pct:.2f}%)"
+        )
+
     if result.pruned:
         print(
             f"\nPruned {len(result.pruned)} old run database(s), reclaimed "
             f"{_human_bytes(result.pruned_bytes)} (keep_runs: {config.keep_runs})"
         )
 
-    if result.contaminated:
+    reasons = result.contamination_reasons
+    if reasons:
+        detail = "\n".join(f"  - {reason}" for reason in reasons)
         print(
-            "\nRUN INVALID: connection-error rate exceeds "
-            f"{result.max_connection_error_pct}% — per-rule and per-path conclusions "
-            "from this run are meaningless, since most requests never reached the "
-            f"API. {result.db_path} was NOT made latest.db. Likely cause: an "
-            "unreachable server, or a throttled userspace kubectl port-forward "
-            "silently dropping requests under load. Fix the server path and re-run.",
+            f"\nRUN INVALID:\n{detail}\n"
+            "Per-rule and per-path conclusions from this run are meaningless. "
+            f"{result.db_path} was NOT made latest.db. Fix the cause and re-run.",
             file=sys.stderr,
         )
         sys.exit(3)
