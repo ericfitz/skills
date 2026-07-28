@@ -1,12 +1,7 @@
 import json
 import sqlite3
-import sys
 import unittest
 from pathlib import Path
-
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cats_fixtures import _tmp_dir, cats_json
 from catslib import parse as P

@@ -32,9 +32,9 @@ def _ensure_registered() -> None:
     global _registered
     if _registered:
         return
-    from proselint.checks import __register__ as built_checks  # type: ignore
-    from proselint.registry import (  # ty:ignore[unresolved-import] # type: ignore
-        CheckRegistry,  # type: ignore # ty:ignore[unresolved-import]
+    from proselint.checks import __register__ as built_checks  # ty:ignore[unresolved-import]
+    from proselint.registry import (  # ty:ignore[unresolved-import]
+        CheckRegistry,  # ty:ignore[unresolved-import]
     )
 
     reg = CheckRegistry()
@@ -69,7 +69,7 @@ def lint_text(text: str) -> list[ProselintHit]:
     out. Hits are returned in document order.
     """
     _ensure_registered()
-    from proselint.tools import (  # type: ignore # ty:ignore[unresolved-import]
+    from proselint.tools import (  # ty:ignore[unresolved-import]
         DEFAULT,
         LintFile,
     )

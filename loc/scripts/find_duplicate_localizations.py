@@ -68,7 +68,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-import yaml  # type: ignore[import-not-found]
+import yaml
 
 CONFIG_FILENAME = ".claude/i18n.config.json"
 

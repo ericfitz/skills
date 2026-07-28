@@ -3,15 +3,12 @@ import contextlib
 import importlib.util
 import io
 import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "logseq" / "scripts"))
 
 spec = importlib.util.spec_from_file_location(
     "logseq_cli", ROOT / "logseq" / "scripts" / "logseq-cli.py")

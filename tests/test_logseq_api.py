@@ -1,12 +1,8 @@
 # tests/test_logseq_api.py
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
-
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "logseq" / "scripts"))
 
 from logseqlib import api
 from logseqlib import config as cfg

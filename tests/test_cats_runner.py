@@ -2,7 +2,6 @@ import http.server
 import os
 import sqlite3
 import stat
-import sys
 import tempfile
 import threading
 import unittest
@@ -11,11 +10,6 @@ from pathlib import Path
 from unittest import mock
 
 import yaml
-
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 from cats_fixtures import CONFIG, make_config
 from catslib import runner as run
 from catslib.classify import ClassifyError

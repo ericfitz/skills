@@ -1,13 +1,10 @@
 import os
-import sys
 import tempfile
 import unittest
-from pathlib import Path
 
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dev" / "scripts"))
-
+import sem_annotate as sa
 import sem_db as db
+import sem_scope
 
 
 class TestSchemaMeta(unittest.TestCase):
@@ -41,9 +38,6 @@ class TestSchemaMeta(unittest.TestCase):
             self.assertEqual(db.get_meta(conn, "schema_version"), db.SCHEMA_VERSION)
             self.assertIsNotNone(db.get_meta(conn, "updated_at"))
             conn.close()
-
-
-import sem_annotate as sa
 
 
 class TestIndexFiles(unittest.TestCase):
@@ -136,9 +130,6 @@ class TestBuildDropsOrphans(unittest.TestCase):
             conn.close()
             self.assertEqual(cnt, 0,
                 "full build must delete orphan rows for files no longer in scope")
-
-
-import sem_scope
 
 
 class TestAutoUpdateIncludeFilter(unittest.TestCase):

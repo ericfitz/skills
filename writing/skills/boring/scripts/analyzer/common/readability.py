@@ -17,7 +17,7 @@ def compute_readability(
     doc: Document, top_n_long_paragraphs: int = 5
 ) -> dict[str, Any]:
     """Compute document-level and per-long-paragraph readability scores."""
-    import textstat  # type: ignore
+    import textstat  # ty:ignore[unresolved-import]
 
     text = doc.extracted_text
 

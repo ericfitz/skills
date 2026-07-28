@@ -1,16 +1,9 @@
 import sqlite3
-import sys
 import unittest
-from pathlib import Path
 
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
-
+from cats_fixtures import build_db, cats_json, write_rules
 from catslib import classify as C
 from catslib import report as Rep
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from cats_fixtures import build_db, cats_json, write_rules
 
 
 def _set_run_meta(db, **columns):

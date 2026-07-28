@@ -6,9 +6,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dev" / "scripts"))
-
 import sem_annotate as sa
 
 

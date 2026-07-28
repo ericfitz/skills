@@ -190,7 +190,7 @@ def _resolve_spacy_versions(model_name: str) -> tuple[str | None, str | None]:
         # Model wasn't installed via pip (common with spaCy `download` flow).
         # Fall back to loading the model and reading its meta.
         try:
-            import spacy  # type: ignore # ty:ignore[unresolved-import]
+            import spacy  # ty:ignore[unresolved-import]
 
             nlp = spacy.load(model_name)
             model_v = nlp.meta.get("version")

@@ -9,10 +9,6 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cats" / "scripts"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 import cats_tool as CT
 from cats_fixtures import _tmp_dir, cats_json, make_config
 from catslib import config as cfg

@@ -34,7 +34,7 @@ def _get_nlp(model_name: str = "en_core_web_sm") -> Any:
     """Lazy-load spaCy. Cache at module level."""
     global _nlp
     if _nlp is None:
-        import spacy  # type: ignore # imported here so checks that don't need it stay fast  # ty:ignore[unresolved-import]
+        import spacy  # imported here so checks that don't need it stay fast  # ty:ignore[unresolved-import]
 
         _nlp = spacy.load(model_name)
     return _nlp
@@ -282,8 +282,8 @@ def _parse_docx(path: Path) -> tuple[str, list[Heading]]:
     Note: char_start/line_start in returned Headings refer to the
     *extracted* text, not the .docx archive.
     """
-    from docx import (  # ty:ignore[unresolved-import] # type: ignore
-        Document as DocxDocument,  # type: ignore # python-docx  # ty:ignore[unresolved-import]
+    from docx import (  # ty:ignore[unresolved-import]
+        Document as DocxDocument,  # python-docx  # ty:ignore[unresolved-import]
     )
 
     doc = DocxDocument(str(path))
@@ -333,7 +333,7 @@ def _parse_pdf(path: Path) -> tuple[str, list[Heading], list[tuple[int, int, int
     Raises ValueError if the PDF contains no extractable text (e.g., a
     scanned/image-only PDF). OCR is not supported.
     """
-    from pypdf import PdfReader  # type: ignore # ty:ignore[unresolved-import]
+    from pypdf import PdfReader  # ty:ignore[unresolved-import]
 
     reader = PdfReader(str(path))
     page_texts: list[str] = []

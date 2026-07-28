@@ -48,13 +48,38 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-# E402: test modules insert the per-tool script dirs onto sys.path before
-#   importing them, which necessarily puts imports below code. Once those
-#   preambles are dropped in favour of pythonpath below, this can go.
 # E501: fixtures embed YAML/JSON documents as single-line "a\nb\n" literals
 #   and stub callables as one-line lambdas. Wrapping them hides the data being
 #   asserted on. Production code is still held to line-length above.
-"tests/**" = ["E402", "E501"]
+"tests/**" = ["E501"]
+
+[tool.ty.environment]
+# ty is the project's type checker (mypy is not installed). Same per-tool
+# script dirs that pytest gets via pythonpath and that tests/__init__.py puts
+# on sys.path -- without these, every catslib/bumplib/... import is unresolved.
+extra-paths = [
+    "cats/scripts",
+    "deps/scripts",
+    "logseq/scripts",
+    "dev/scripts",
+    "tests",
+]
+
+[[tool.ty.overrides]]
+# The suites monkeypatch module-level functions with lambdas
+# (`sa.sem_blame = lambda ...`) to stub out the `sem`/`gh` CLIs. ty flags each
+# as an invalid assignment because the lambda's signature is not the declared
+# function type. That is the intended idiom here, not a defect.
+include = ["tests/**"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+
+[tool.ty.src]
+# writing/skills/boring depends on the optional `boring` extra (spaCy et al),
+# which a default `uv sync` does not install, so its imports are unresolvable
+# in the default environment. Check it with: uv run --extra boring ty check
+exclude = ["writing/skills/boring"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
