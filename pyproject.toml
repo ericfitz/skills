@@ -1,0 +1,51 @@
+[project]
+name = "skills"
+version = "0.0.0"
+description = "Claude Code skills monorepo: per-tool script trees plus a shared test suite."
+requires-python = ">=3.11"
+
+# Runtime deps needed by the tool trees that the test suite exercises.
+# PyYAML: cats/scripts/catslib/{config,rules,runner}.py, loc/scripts/find_duplicate_localizations.py
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Heavy NLP stack used only by writing/skills/boring. Not needed to run the
+# test suite; install with `uv sync --extra boring` when working on that tree.
+boring = [
+    "spacy>=3.7",
+    "proselint>=0.14",
+    "textstat>=0.7",
+    "pypdf>=4.0",
+    "python-docx>=1.1",
+    # The en_core_web_sm model is not on PyPI. Pinning it here keeps the
+    # model and spaCy in lockstep, which is the drift SKILL.md warns about.
+    "en-core-web-sm",
+]
+
+[tool.uv.sources]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+# This repo is a collection of standalone script trees, not an installable
+# library. Tell uv not to try to build/install it as a package.
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Makes the per-tool libs importable without the sys.path.insert() preamble
+# each test file currently carries. Existing preambles keep working; this
+# lets them be removed incrementally.
+pythonpath = [
+    "cats/scripts",
+    "deps/scripts",
+    "logseq/scripts",
+    "dev/scripts",
+    "tests",
+]
