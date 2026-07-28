@@ -21,7 +21,7 @@ import yaml
 
 from .classify import ClassifyResult, classify_db
 from .config import Config, Identity
-from .parse import ParseStats, parse_report
+from .parse import DEFAULT_SECRET_HEADERS, ParseStats, parse_report
 from .rules import RuleError, load_rules
 
 TOOL_VERSION = "0.1.0"
@@ -667,7 +667,14 @@ def execute(
                 "server": config.server,
                 "tool_version": TOOL_VERSION,
             }
-            parse_stats = parse_report(report_dir, db_path, run_meta)
+            # The configured auth header is a credential by construction, so
+            # add it to the names whose value is digested rather than stored
+            # (#606). DEFAULT_SECRET_HEADERS already covers the usual suspects;
+            # this catches a repo that authenticates with, say, X-Api-Key.
+            parse_stats = parse_report(
+                report_dir, db_path, run_meta,
+                secret_headers=DEFAULT_SECRET_HEADERS | {config.auth_header.lower()},
+            )
             classify_result = classify_db(
                 db_path, load_rules(config.false_positives), allow_5xx=config.allow_suppressing_5xx
             )

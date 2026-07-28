@@ -292,3 +292,74 @@ class TestParseReport(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSecretHeaderRedaction(unittest.TestCase):
+    """Issue #606: the campaign's bearer token was stored in full, once per
+    request. It must not be, but a blanket placeholder would destroy the
+    distinct-count diagnostic that ruled out token expiry in TMI #591."""
+
+    def test_scheme_is_kept_and_credential_digested(self):
+        out = P.redact_secret_header("Bearer eyJhbGciOiJIUzI1NiJ9.abc.def")
+        self.assertTrue(out.startswith("Bearer sha256:"))
+        self.assertNotIn("eyJhbGciOiJIUzI1NiJ9", out)
+
+    def test_digest_is_stable_and_distinguishes_tokens(self):
+        a1 = P.redact_secret_header("Bearer token-a")
+        a2 = P.redact_secret_header("Bearer token-a")
+        b = P.redact_secret_header("Bearer token-b")
+        self.assertEqual(a1, a2, "same token must digest identically or DISTINCT counts break")
+        self.assertNotEqual(a1, b, "different tokens must stay distinguishable")
+
+    def test_schemeless_value_is_digested_whole(self):
+        out = P.redact_secret_header("opaque-api-key")
+        self.assertTrue(out.startswith("sha256:"))
+        self.assertNotIn("opaque-api-key", out)
+
+    def test_empty_value_is_left_alone(self):
+        self.assertEqual(P.redact_secret_header(""), "")
+
+    def test_default_secret_headers_cover_the_usual_credentials(self):
+        self.assertEqual(
+            P.DEFAULT_SECRET_HEADERS,
+            frozenset({"authorization", "cookie", "proxy-authorization"}),
+        )
+
+    def test_non_secret_headers_are_stored_verbatim(self):
+        record = P.record_from_json(cats_json(request={
+            "headers": [
+                {"key": "Content-Type", "value": "application/json"},
+                {"key": "Authorization", "value": "Bearer secret-value"},
+            ],
+        }))
+        headers = record["request_headers"]
+        self.assertEqual(headers["content-type"], "application/json")
+        self.assertNotIn("secret-value", headers["authorization"])
+
+    def test_token_never_reaches_the_database(self):
+        report = _tmp_dir(self)
+        (report / "Test1.json").write_text(json.dumps(cats_json(request={
+            "httpMethod": "POST", "url": "http://h/things",
+            "headers": [{"key": "Authorization", "value": "Bearer super-secret-jwt"}],
+        })))
+        db = _tmp_dir(self) / "r.db"
+        P.parse_report(report, db, {"run_id": "R1"})
+        conn = sqlite3.connect(db)
+        try:
+            rows = conn.execute(
+                "SELECT header_value FROM request_headers WHERE lower(header_key)='authorization'"
+            ).fetchall()
+        finally:
+            conn.close()
+        self.assertTrue(rows)
+        for (value,) in rows:
+            self.assertNotIn("super-secret-jwt", value)
+            self.assertTrue(value.startswith("Bearer sha256:"))
+
+    def test_custom_secret_header_set_is_honoured(self):
+        # A repo authenticating with X-Api-Key gets it added from auth.header.
+        record = P.record_from_json(
+            cats_json(request={"headers": [{"key": "X-Api-Key", "value": "k-12345"}]}),
+            frozenset({"x-api-key"}),
+        )
+        self.assertNotIn("k-12345", record["request_headers"]["x-api-key"])

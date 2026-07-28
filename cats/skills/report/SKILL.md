@@ -114,6 +114,14 @@ off `requests.id` / `responses.id` respectively (`ON DELETE CASCADE`).
 | `header_value` | TEXT NOT NULL |
 | `header_order` | INTEGER NOT NULL — original header order; a duplicate key resolves last-wins in this order |
 
+Credential headers (`authorization`, `cookie`, `proxy-authorization`, plus
+whatever `auth.header` names) are stored **digested**, not verbatim: the auth
+scheme is kept and the credential replaced with `sha256:<12 hex>`, e.g.
+`Bearer sha256:9b8da19aa39f`. Distinct-count and change-detection still work —
+`SELECT COUNT(DISTINCT header_value) FROM request_headers WHERE
+header_key='Authorization'` is how you tell "one token throughout" from "the
+token changed mid-run" — but the token itself is not in the database.
+
 **`run_meta`** — exactly one row, the provenance record for this database.
 
 | Column | Type | Notes |
