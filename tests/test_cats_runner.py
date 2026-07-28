@@ -244,7 +244,7 @@ class _OKHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
-    def log_message(self, fmt, *args):  # silence per-request stderr logging
+    def log_message(self, format, *args):  # param name matches the base class
         pass
 
 
@@ -253,7 +253,7 @@ class _NotFoundHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(404)
         self.end_headers()
 
-    def log_message(self, fmt, *args):  # silence per-request stderr logging
+    def log_message(self, format, *args):  # param name matches the base class
         pass
 
 
@@ -453,6 +453,7 @@ class TestExecute(unittest.TestCase):
         self.assertEqual(result.run_id, "20260726T220200Z")
         self.assertEqual(result.cats_exit_code, 0)
         self.assertIsNotNone(result.parse_stats)
+        assert result.parse_stats is not None  # narrows for ty
         self.assertEqual(result.parse_stats.processed, 2)
         self.assertIsNotNone(result.classify_result)
         self.assertTrue(result.db_path.exists())

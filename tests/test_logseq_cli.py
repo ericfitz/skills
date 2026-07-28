@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 spec = importlib.util.spec_from_file_location(
     "logseq_cli", ROOT / "logseq" / "scripts" / "logseq-cli.py")
+assert spec is not None and spec.loader is not None, "could not load logseq-cli.py"
 cli = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cli)
 

@@ -109,7 +109,7 @@ def find_config(start: Path) -> Path | None:
 def _reject_unknown(section: Any, allowed: set[str], where: str, path: Path) -> None:
     if not isinstance(section, dict):
         raise ConfigError(f"{path}: '{where}' must be a mapping")
-    unknown = sorted(set(section) - allowed)
+    unknown = sorted(str(k) for k in set(section) - allowed)
     if unknown:
         raise ConfigError(f"{path}: unknown key(s) in {where}: {', '.join(unknown)}")
 

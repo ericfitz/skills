@@ -486,8 +486,12 @@ def prune_run_dbs(
         protected.add(latest.readlink().name)
 
     try:
+        # Capture the run_id alongside the path: it is needed again below for
+        # the report companions, and matching once keeps the two in step.
         candidates = [
-            p for p in results_dir.iterdir() if p.is_file() and _RUN_DB_RE.fullmatch(p.name)
+            (m.group(1), p)
+            for p in results_dir.iterdir()
+            if p.is_file() and (m := _RUN_DB_RE.fullmatch(p.name))
         ]
     except OSError as exc:
         logger.warning("prune_run_dbs: could not list %s, skipping: %s", results_dir, exc)
@@ -495,15 +499,15 @@ def prune_run_dbs(
 
     # The regex's captured group is exactly run_id_for's output format
     # (YYYYMMDDTHHMMSSZ), which sorts lexicographically = chronologically.
-    candidates.sort(key=lambda p: _RUN_DB_RE.fullmatch(p.name).group(1), reverse=True)
+    candidates.sort(key=lambda pair: pair[0], reverse=True)
 
-    to_delete = [p for p in candidates[keep:] if p.name not in protected]
+    to_delete = [(run_id, p) for run_id, p in candidates[keep:] if p.name not in protected]
 
     if dry_run:
-        return to_delete
+        return [p for _, p in to_delete]
 
     deleted: list[Path] = []
-    for db_path in to_delete:
+    for run_id, db_path in to_delete:
         try:
             db_path.unlink(missing_ok=True)
         except OSError as exc:
@@ -516,7 +520,7 @@ def prune_run_dbs(
                 sidecar.unlink(missing_ok=True)
             except OSError as exc:
                 logger.warning("prune_run_dbs: failed to delete %s, continuing: %s", sidecar, exc)
-        _prune_report_companions(results_dir, _RUN_DB_RE.fullmatch(db_path.name).group(1))
+        _prune_report_companions(results_dir, run_id)
 
     return deleted
 

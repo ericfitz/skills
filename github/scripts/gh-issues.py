@@ -229,7 +229,11 @@ def main():
 
     # Apply client-side status filter
     if args.status:
-        results = [r for r in results if r["status"] and r["status"].lower() == args.status.lower()]
+        want = args.status.lower()
+        results = [
+            r for r in results
+            if isinstance(r["status"], str) and r["status"].lower() == want
+        ]
 
     print(json.dumps(results, indent=2))
 

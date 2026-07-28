@@ -236,7 +236,8 @@ class _Loader:
 
         store_body = record["result"] in ("error", "warn")
 
-        request = data.get("request") if isinstance(data.get("request"), dict) else {}
+        _request = data.get("request")
+        request = _request if isinstance(_request, dict) else {}
         method_id = self._get_or_create(self.method_cache, "http_methods", "method", record["method"])
         cursor = self.conn.execute(
             """
@@ -253,7 +254,8 @@ class _Loader:
         )
         request_row_id = cursor.lastrowid
 
-        response = data.get("response") if isinstance(data.get("response"), dict) else {}
+        _response = data.get("response")
+        response = _response if isinstance(_response, dict) else {}
         resp_method_id = self._get_or_create(
             self.method_cache, "http_methods", "method", response.get("httpMethod") or ""
         )

@@ -7,6 +7,7 @@ import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 import cats_tool as CT
@@ -489,7 +490,9 @@ class TestCmdRunPruning(unittest.TestCase):
         return argparse.Namespace(**base)
 
     def _result(self, config, db, **over):
-        base = {
+        # Annotated because callers splat arbitrary overrides in via **over;
+        # without it each **base kwarg is checked against the union of values.
+        base: dict[str, Any] = {
             "run_id": "R1", "db_path": db, "report_dir": config.results_dir,
             "cats_exit_code": 0, "parse_stats": P.ParseStats(processed=1), "classify_result": None,
         }

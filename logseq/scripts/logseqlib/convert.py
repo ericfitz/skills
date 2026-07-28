@@ -125,8 +125,7 @@ def convert_note(text: str, title: str) -> ConvertResult:
             continue
         lm = LIST_RE.match(line)
         if lm:
-            while i < len(lines) and LIST_RE.match(lines[i]):
-                m2 = LIST_RE.match(lines[i])
+            while i < len(lines) and (m2 := LIST_RE.match(lines[i])):
                 ind = m2.group("ind").replace("\t", "  ")
                 depth = len(ind) // 2
                 if m2.group("mark") not in ("-", "*") and not numbered_warned:

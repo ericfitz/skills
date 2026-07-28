@@ -166,7 +166,10 @@ def classify_db(db_path: Path, rules: list[Rule], *, allow_5xx: bool) -> Classif
                     result.newly_surfaced.append(row["test_id"])
             if is_fp:
                 result.flagged += 1
-                counts[rule_id] = counts.get(rule_id, 0) + 1
+                # classify_record only reports a match with the id of the rule
+                # that matched; the guard keeps a None from creating a bogus key.
+                if rule_id is not None:
+                    counts[rule_id] = counts.get(rule_id, 0) + 1
             updates.append((1 if is_fp else 0, rule_id, row["id"]))
 
         with conn:

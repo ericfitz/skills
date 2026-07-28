@@ -2,6 +2,7 @@
 """Graph resolution: config file first, Logseq's own recent-graphs list as fallback."""
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -75,16 +76,20 @@ def _validate_config_shape(data, config_path: Path) -> None:
         )
 
 
-def _from_config(data: dict, graph: str | None, env: dict) -> Resolved | None:
+def _from_config(data: dict, graph: str | None, env: Mapping[str, str]) -> Resolved | None:
     graphs = data.get("graphs", {})
     name = graph or data.get("default_graph")
+    if not name:
+        return None
     entry = graphs.get(name)
     if not entry:
         return None
     path = Path(entry.get("path", ""))
     if not is_graph_dir(path):
         return None  # stale — caller falls back to discovery
-    api = data.get("api", {})
+    # `or {}` rather than a .get default: an explicit "api": null in the
+    # config yields None, which the default would not replace.
+    api = data.get("api") or {}
     token_env = api.get("token_env", DEFAULT_TOKEN_ENV)
     vault = data.get("obsidian_vault")
     return Resolved(
@@ -98,7 +103,8 @@ def _from_config(data: dict, graph: str | None, env: dict) -> Resolved | None:
 
 
 def resolve(graph: str | None = None, config_path: Path = CONFIG_PATH,
-            graphs_dir: Path | None = None, env: dict | None = None) -> Resolved:
+            graphs_dir: Path | None = None,
+            env: Mapping[str, str] | None = None) -> Resolved:
     env = os.environ if env is None else env
     graphs_dir = LOGSEQ_GRAPHS_DIR if graphs_dir is None else graphs_dir
 
@@ -121,7 +127,7 @@ def resolve(graph: str | None = None, config_path: Path = CONFIG_PATH,
 
     candidates = discover_graphs(graphs_dir)
     if len(candidates) == 1:
-        api = data.get("api", {})
+        api = data.get("api") or {}
         token_env = api.get("token_env", DEFAULT_TOKEN_ENV)
         vault = data.get("obsidian_vault")
         return Resolved(

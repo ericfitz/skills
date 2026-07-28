@@ -3,11 +3,13 @@
 These functions spawn no subprocesses; they only merge already-gathered data
 (config exclusions/holds from disk + inputs passed in) and run the categorizer.
 """
+from pathlib import Path
+
 from . import categorize, config
 from . import contracts as c
 
 
-def categorize_payload(payload: dict, root=".") -> c.Categories:
+def categorize_payload(payload: dict, root: Path | str = ".") -> c.Categories:
     """Categorize a gathered payload of updates + advisories.
 
     payload keys:
@@ -22,7 +24,7 @@ def categorize_payload(payload: dict, root=".") -> c.Categories:
     """
     updates = c.load_records(payload.get("updates", []))
     advisories = c.load_advisories(payload.get("advisories", []))
-    disk_excl, disk_holds = config.merged_exclusions(root)
+    disk_excl, disk_holds = config.merged_exclusions(Path(root))
     exclude = list(disk_excl) + list(payload.get("exclude", []))
     holds = {**disk_holds, **payload.get("holds", {})}
     replace_targets = set(payload.get("replaceTargets", []))

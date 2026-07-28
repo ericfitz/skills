@@ -58,7 +58,7 @@ def _validate_field(name: str, where: str) -> None:
 def _validate_condition(name: str, spec: Any, where: str) -> None:
     _validate_field(name, where)
     if isinstance(spec, dict):
-        unknown = sorted(set(spec) - OPERATORS)
+        unknown = sorted(str(k) for k in set(spec) - OPERATORS)
         if unknown:
             raise RuleError(f"{where}: unknown operator(s) {', '.join(unknown)} on field {name!r}")
         if not spec:
@@ -84,11 +84,13 @@ def _validate_condition(name: str, spec: Any, where: str) -> None:
         )
 
 
-def _validate_condition_block(block: Any, where: str) -> None:
+def _validate_condition_block(block: Any, where: str) -> dict[str, Any]:
+    """Validate a condition block and return it, narrowed to a dict."""
     if not isinstance(block, dict) or not block:
         raise RuleError(f"{where}: condition blocks must be non-empty mappings")
     for name, spec in block.items():
         _validate_condition(name, spec, where)
+    return block
 
 
 def load_rules(path: Path) -> list[Rule]:
@@ -119,7 +121,7 @@ def load_rules(path: Path) -> list[Rule]:
         where = f"{path}: rule #{index + 1}"
         if not isinstance(entry, dict):
             raise RuleError(f"{where}: must be a mapping, got {type(entry).__name__}")
-        unknown = sorted(set(entry) - RULE_KEYS)
+        unknown = sorted(str(k) for k in set(entry) - RULE_KEYS)
         if unknown:
             raise RuleError(f"{where}: unknown key(s) {', '.join(unknown)}")
         rule_id = entry.get("id")
@@ -137,6 +139,14 @@ def load_rules(path: Path) -> list[Rule]:
             raise RuleError(
                 f"{where} ({rule_id}): 'tags' must be a list, got {type(tags_raw).__name__}"
             )
+        tags: list[str] = []
+        for tag in tags_raw or []:
+            if not isinstance(tag, str):
+                raise RuleError(
+                    f"{where} ({rule_id}): 'tags' entries must be strings, "
+                    f"got {type(tag).__name__}"
+                )
+            tags.append(tag)
 
         if "enabled" in entry:
             enabled_raw = entry.get("enabled")
@@ -155,21 +165,24 @@ def load_rules(path: Path) -> list[Rule]:
         if when is None and any_of is None:
             raise RuleError(f"{where} ({rule_id}): needs 'when' or 'any_of'")
 
+        when_block = None
         if when is not None:
-            _validate_condition_block(when, f"{where} ({rule_id})")
+            when_block = _validate_condition_block(when, f"{where} ({rule_id})")
+        any_of_blocks = None
         if any_of is not None:
             if not isinstance(any_of, list) or not any_of:
                 raise RuleError(f"{where} ({rule_id}): 'any_of' must be a non-empty list")
-            for block in any_of:
-                _validate_condition_block(block, f"{where} ({rule_id})")
+            any_of_blocks = [
+                _validate_condition_block(block, f"{where} ({rule_id})") for block in any_of
+            ]
 
         rules.append(Rule(
             id=rule_id,
             why=why,
-            when=when,
-            any_of=any_of,
+            when=when_block,
+            any_of=any_of_blocks,
             enabled=enabled_raw,
-            tags=list(tags_raw or []),
+            tags=tags,
             order_index=index,
         ))
     return rules
