@@ -8,7 +8,7 @@ BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE / "deps" / "scripts"))
 FIX = BASE / "tests" / "fixtures" / "bump"
 
-from bumplib.ecosystems import python as py  # noqa: E402
+from bumplib.ecosystems import python as py
 
 
 class TestPython(unittest.TestCase):
@@ -23,21 +23,21 @@ class TestPython(unittest.TestCase):
 
     def test_audit_missing_binary_uv(self):
         """Regression test: audit verb should return [] when uv binary is missing (uv manager)."""
-        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None):
-            # Mock detect to return uv manager
-            with mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
-                mock_detect.return_value = {"packageManager": "uv"}
-                result = py.handle("audit", [])
-                self.assertEqual(result, [])
+        # Mock detect to return uv manager
+        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None), \
+                mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
+            mock_detect.return_value = {"packageManager": "uv"}
+            result = py.handle("audit", [])
+            self.assertEqual(result, [])
 
     def test_audit_missing_binary_pip(self):
         """Regression test: audit verb should return [] when pip-audit binary is missing (pip manager)."""
-        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None):
-            # Mock detect to return pip manager
-            with mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
-                mock_detect.return_value = {"packageManager": "pip"}
-                result = py.handle("audit", [])
-                self.assertEqual(result, [])
+        # Mock detect to return pip manager
+        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None), \
+                mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
+            mock_detect.return_value = {"packageManager": "pip"}
+            result = py.handle("audit", [])
+            self.assertEqual(result, [])
 
 
 if __name__ == "__main__":

@@ -8,7 +8,8 @@ from unittest import mock
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "logseq" / "scripts"))
 
-from logseqlib import api, config as cfg  # noqa: E402
+from logseqlib import api
+from logseqlib import config as cfg
 
 
 def resolved(graph: Path) -> cfg.Resolved:
@@ -33,9 +34,8 @@ class TestApiPath(unittest.TestCase):
             calls.append((method, args))
             return {"ok": True}
 
-        with tempfile.TemporaryDirectory() as td:
-            with mock.patch.object(api, "_post", fake_post):
-                out = api.append_to_page(resolved(make_graph(td)), "Inbox", "hi")
+        with tempfile.TemporaryDirectory() as td, mock.patch.object(api, "_post", fake_post):
+            out = api.append_to_page(resolved(make_graph(td)), "Inbox", "hi")
         self.assertEqual(out["via"], "api")
         self.assertIn(("logseq.Editor.appendBlockInPage", ["Inbox", "hi"]),
                       calls)
@@ -47,10 +47,9 @@ class TestApiPath(unittest.TestCase):
                 return [[{"block/name": "jul 17th, 2026"}]]
             return {"ok": True}
 
-        with tempfile.TemporaryDirectory() as td:
-            with mock.patch.object(api, "_post", fake_post):
-                out = api.append_to_journal(resolved(make_graph(td)), "note",
-                                            "2026-07-17")
+        with tempfile.TemporaryDirectory() as td, mock.patch.object(api, "_post", fake_post):
+            out = api.append_to_journal(resolved(make_graph(td)), "note",
+                                        "2026-07-17")
         self.assertEqual(out["via"], "api")
         self.assertEqual(out["target"], "jul 17th, 2026")
 
@@ -79,9 +78,8 @@ class TestFileFallback(unittest.TestCase):
                              "- old\n- new\n")
 
     def test_probe_false_when_down(self):
-        with tempfile.TemporaryDirectory() as td:
-            with mock.patch.object(api, "_post", self._down):
-                self.assertFalse(api.probe(resolved(make_graph(td))))
+        with tempfile.TemporaryDirectory() as td, mock.patch.object(api, "_post", self._down):
+            self.assertFalse(api.probe(resolved(make_graph(td))))
 
 
 class TestCreatePage(unittest.TestCase):

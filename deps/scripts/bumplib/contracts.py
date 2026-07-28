@@ -4,7 +4,7 @@ Every adapter verb emits one of these shapes; the categorizer and orchestrator
 consume them without knowing which provider produced the data.
 """
 import json
-from dataclasses import dataclass, field, is_dataclass, asdict
+from dataclasses import asdict, dataclass, field, is_dataclass
 
 BUMP_MAJOR = "major"
 BUMP_MINOR = "minor"

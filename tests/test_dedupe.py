@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dev" / "scripts"))
@@ -52,7 +53,7 @@ class TestClassifiers(unittest.TestCase):
 
 
 class TestFilterGraph(unittest.TestCase):
-    GRAPH = {
+    GRAPH: ClassVar[dict] = {
         "entities": [
             {"id": "api/h.go::function::handle", "name": "handle",
              "entityType": "function", "filePath": "api/h.go",
@@ -299,7 +300,10 @@ class TestRunSemGraphJSON(unittest.TestCase):
 
 class TestReportFilename(unittest.TestCase):
     def test_report_filename_is_timestamped(self):
-        import io, json, re, tempfile, os as _os
+        import io
+        import json
+        import os as _os
+        import tempfile
         with tempfile.TemporaryDirectory() as d:
             db = _os.path.join(d, "dedupe.db")
             # initialize the db so the report subcommand can connect/query

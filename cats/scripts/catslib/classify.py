@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -185,7 +185,7 @@ def classify_db(db_path: Path, rules: list[Rule], *, allow_5xx: bool) -> Classif
             # rather than fabricating one — _is_first_pass's docstring covers why.
             conn.execute(
                 "UPDATE run_meta SET classified_at = ?",
-                (datetime.now(timezone.utc).isoformat(),),
+                (datetime.now(UTC).isoformat(),),
             )
         result.by_rule = {k: v for k, v in counts.items() if v}
     finally:

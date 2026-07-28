@@ -8,7 +8,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "logseq" / "scripts"))
 
-from logseqlib import config as cfg  # noqa: E402
+from logseqlib import config as cfg
 
 
 def make_graph(root: Path, name: str = "notes") -> Path:

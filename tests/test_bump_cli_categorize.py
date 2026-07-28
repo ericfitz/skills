@@ -7,7 +7,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deps" / "scripts"))
 
-from bumplib import orchestrate  # noqa: E402
+from bumplib import orchestrate
 
 
 def _rec(name, current, latest, bump, **kw):
@@ -95,10 +95,10 @@ class TestCategorizePayload(unittest.TestCase):
             self.assertEqual(len(out.safe), 0)
 
     def test_cli_categorize_dispatch(self):
+        import importlib
         import io
         import json
         from unittest import mock
-        import importlib
         bump_cli = importlib.import_module("bump")
         payload = io.StringIO(json.dumps({"updates": [], "advisories": []}))
         buf = io.StringIO()

@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import sys
 import tempfile
 import unittest
@@ -189,9 +188,10 @@ class TestAutoAndStatus(unittest.TestCase):
             conn.close()
             called = {"build": 0}
             orig = db.build
-            db.build = lambda cwd=None, paths=None: called.__setitem__("build", 1) or {"files": 0, "entities": 0, "mode": "full"}
+            db.build = lambda cwd=None, paths=None: called.__setitem__("build", 1) or {
+                "files": 0, "entities": 0, "mode": "full"}
             try:
-                res = db.auto_update(cwd=d)
+                db.auto_update(cwd=d)
                 self.assertEqual(called["build"], 1)
             finally:
                 db.build = orig

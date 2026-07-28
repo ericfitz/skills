@@ -78,7 +78,8 @@ def parse_vuln(json_text: str) -> list:
             seen.add(osv["id"])
             affected = osv.get("affected") or [{}]
             pkg = affected[0].get("package", {}).get("name", "") if affected else ""
-            advs.append(c.Advisory(package=pkg, ecosystem="go", severity=osv.get("database_specific", {}).get("severity", ""),
+            severity = osv.get("database_specific", {}).get("severity", "")
+            advs.append(c.Advisory(package=pkg, ecosystem="go", severity=severity,
                                    current="", fixed="", ids=[osv["id"]],
                                    summary=osv.get("summary", ""), source="govulncheck"))
     return advs

@@ -7,6 +7,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+
 import sem_scope
 
 CODE_TYPES = {"function", "method", "type", "constant"}
@@ -95,13 +96,13 @@ def run_sem_graph(exts, cwd=None):
     try:
         r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
     except FileNotFoundError:
-        raise SemError("'sem' CLI not found on PATH")
+        raise SemError("'sem' CLI not found on PATH") from None
     except subprocess.CalledProcessError as e:
-        raise SemError(f"sem graph failed: {e.stderr.strip()}")
+        raise SemError(f"sem graph failed: {e.stderr.strip()}") from e
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError as e:
-        raise SemError(f"sem graph returned invalid JSON: {e}")
+        raise SemError(f"sem graph returned invalid JSON: {e}") from e
 
 
 def _in_scope(path, scope_paths, exts, exclude=None):
@@ -109,9 +110,7 @@ def _in_scope(path, scope_paths, exts, exclude=None):
         return False
     if exclude and sem_scope.is_excluded(path, {"exclude": exclude}):
         return False
-    if exts and not any(path.endswith(x) for x in exts):
-        return False
-    return True
+    return not exts or any(path.endswith(x) for x in exts)
 
 
 def _filter_graph(graph, scope_paths, exts, exclude=None):
@@ -232,7 +231,7 @@ _SEM_MARKER_RE = re.compile(
 
 
 def _read_lines(path):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return f.read().splitlines()
 
 
@@ -325,7 +324,7 @@ def record_finding(conn, kind, verdict, entity_id=None, cluster_id=None,
 def _ranked(conn, kind, verdicts):
     rows = [dict(zip(
         ["finding_id", "entity_id", "cluster_id", "impact", "risk", "effort",
-         "recommendation", "notes", "behavior_diff"], r))
+         "recommendation", "notes", "behavior_diff"], r, strict=False))
         for r in conn.execute(
             """SELECT finding_id,entity_id,cluster_id,impact,risk,effort,
                       recommendation,notes,behavior_diff
@@ -410,7 +409,7 @@ def main(argv=None):
     if ns.cmd == "candidates":
         conn = _connect(ns.db)
         dead = [dict(zip(["entity_id", "name", "file_path", "start_line",
-                          "end_line", "description", "is_exported"], r))
+                          "end_line", "description", "is_exported"], r, strict=False))
                 for r in conn.execute(
             """SELECT e.id,e.name,e.file_path,e.start_line,e.end_line,
                       e.description,e.is_exported

@@ -89,7 +89,8 @@ def handle(verb, argv):
             _run(["uv", "sync"])
         else:
             _run(["pip", "install", *argv])
-        return {"applied": argv, "filesModified": ["pyproject.toml", "uv.lock"] if mgr == "uv" else ["requirements.txt"]}
+        modified = ["pyproject.toml", "uv.lock"] if mgr == "uv" else ["requirements.txt"]
+        return {"applied": argv, "filesModified": modified}
     if verb == "validate":
         results = {}
         cmds = (("test", "uv run pytest" if mgr == "uv" else "pytest"),

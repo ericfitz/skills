@@ -58,13 +58,11 @@ import sys
 import tempfile
 from collections import OrderedDict
 from pathlib import Path
-from typing import Optional
-
 
 CONFIG_FILENAME = ".claude/i18n.config.json"
 
 
-def find_i18n_config(start: Optional[Path] = None, override: Optional[str] = None):
+def find_i18n_config(start: Path | None = None, override: str | None = None):
     """Locate an i18n config file by walking up the directory tree.
 
     Args:
@@ -87,7 +85,7 @@ def find_i18n_config(start: Optional[Path] = None, override: Optional[str] = Non
 
 def load_i18n_config(config_path: Path):
     """Load and minimally validate an i18n config file."""
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         config = json.load(f)
     for required in ("locales_dir", "master_locale"):
         if required not in config:
@@ -120,7 +118,7 @@ def sort_json(obj):
 def load_and_sort_json(file_path):
     """Load a JSON file and sort its keys."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
         return sort_json(data)
     except FileNotFoundError:
@@ -193,7 +191,7 @@ def load_allowlist(main_file_path):
     allowlist_path = os.path.join(os.path.dirname(main_file_path), "i18n-allowlist.json")
     if os.path.exists(allowlist_path):
         try:
-            with open(allowlist_path, "r", encoding="utf-8") as f:
+            with open(allowlist_path, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             print(f"Warning: Failed to load allowlist from {allowlist_path}: {e}")

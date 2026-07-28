@@ -37,6 +37,25 @@ dev = [
 [tool.uv]
 package = false
 
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Ruff is the sole linter here: E/W/F cover pycodestyle+pyflakes (flake8),
+# I covers import sorting (isort). black/isort/flake8 are intentionally not
+# installed. UP/B/SIM/C4/RUF add modernization and correctness checks.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# E402: test modules insert the per-tool script dirs onto sys.path before
+#   importing them, which necessarily puts imports below code. Once those
+#   preambles are dropped in favour of pythonpath below, this can go.
+# E501: fixtures embed YAML/JSON documents as single-line "a\nb\n" literals
+#   and stub callables as one-line lambdas. Wrapping them hides the data being
+#   asserted on. Production code is still held to line-length above.
+"tests/**" = ["E402", "E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Makes the per-tool libs importable without the sys.path.insert() preamble

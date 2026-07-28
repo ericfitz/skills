@@ -267,9 +267,7 @@ def match_rule(rule: Rule, record: dict[str, Any]) -> bool:
         return False
     if rule.when is not None and not _match_block(rule.when, record):
         return False
-    if rule.any_of is not None and not any(_match_block(b, record) for b in rule.any_of):
-        return False
-    return True
+    return rule.any_of is None or any(_match_block(b, record) for b in rule.any_of)
 
 
 def classify_record(

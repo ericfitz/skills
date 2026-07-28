@@ -76,7 +76,7 @@ class TestLoadScope(unittest.TestCase):
             os.makedirs(os.path.join(d, ".local"))
             with open(os.path.join(d, ".local", "sem-scope.json"), "w") as f:
                 f.write("{not json")
-            with self.assertRaises(Exception):
+            with self.assertRaises(ValueError):
                 ss.load_scope(d)
 
     def test_wrong_type_raises(self):

@@ -20,7 +20,7 @@ def run_gh(args: list[str]) -> str:
     """Run a gh CLI command and return stdout. Exit on failure."""
     try:
         result = subprocess.run(
-            ["gh"] + args,
+            ["gh", *args],
             capture_output=True,
             text=True,
             check=True,
@@ -209,7 +209,7 @@ def main():
         status = proj_data.get("status")
         priority = proj_data.get("priority")
 
-        labels = [l["name"] for l in issue.get("labels", [])]
+        labels = [lbl["name"] for lbl in issue.get("labels", [])]
         comments = [
             {"author": c.get("author", {}).get("login"), "body": c.get("body")}
             for c in issue.get("comments", [])

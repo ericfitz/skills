@@ -16,7 +16,7 @@ import sys
 import tempfile
 import webbrowser
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -414,7 +414,7 @@ def cmd_parse(args: argparse.Namespace) -> None:
         print(f"Report directory not found: {report_dir}", file=sys.stderr)
         sys.exit(2)
 
-    run_id = run_id_for(datetime.now(timezone.utc))
+    run_id = run_id_for(datetime.now(UTC))
     if args.db:
         db_path = Path(args.db)
         db_path.parent.mkdir(parents=True, exist_ok=True)

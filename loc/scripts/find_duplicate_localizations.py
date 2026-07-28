@@ -66,15 +66,14 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-import yaml  # type: ignore[import-not-found]  # noqa: F401 - managed by uv
-
+import yaml  # type: ignore[import-not-found]
 
 CONFIG_FILENAME = ".claude/i18n.config.json"
 
 
-def find_i18n_config(start: Optional[Path] = None, override: Optional[str] = None):
+def find_i18n_config(start: Path | None = None, override: str | None = None):
     """Locate an i18n config file by walking up the directory tree."""
     if override:
         path = Path(override).expanduser()
@@ -87,9 +86,9 @@ def find_i18n_config(start: Optional[Path] = None, override: Optional[str] = Non
     return None
 
 
-def load_i18n_config(config_path: Path) -> Dict[str, Any]:
+def load_i18n_config(config_path: Path) -> dict[str, Any]:
     """Load and minimally validate an i18n config file."""
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         config = json.load(f)
     for required in ("locales_dir", "master_locale"):
         if required not in config:
@@ -100,7 +99,7 @@ def load_i18n_config(config_path: Path) -> Dict[str, Any]:
     return config
 
 
-def derive_master_from_config(config_path: Path, config: Dict[str, Any]) -> str:
+def derive_master_from_config(config_path: Path, config: dict[str, Any]) -> str:
     """Return the master locale file path from a config + its directory."""
     base = config_path.parent.parent  # parent of .claude/
     locales_dir = (base / config["locales_dir"]).resolve()
@@ -114,13 +113,13 @@ class LocalizationDeDuplicator:
         self.locale_file_path = Path(locale_file_path)
         self.skip_policy = skip_policy
         self.reference_mode = reference_mode
-        self.localization_data: Dict[str, Any] = {}
-        self.key_value_map: Dict[str, Any] = {}        # full path key -> value
-        self.value_to_keys: Dict[Any, List[str]] = defaultdict(list)  # value -> [keys]
-        self.dedup_plan: List[Dict[str, Any]] = []
+        self.localization_data: dict[str, Any] = {}
+        self.key_value_map: dict[str, Any] = {}        # full path key -> value
+        self.value_to_keys: dict[Any, list[str]] = defaultdict(list)  # value -> [keys]
+        self.dedup_plan: list[dict[str, Any]] = []
 
     def load_localization_file(self):
-        with open(self.locale_file_path, "r", encoding="utf-8") as f:
+        with open(self.locale_file_path, encoding="utf-8") as f:
             self.localization_data = json.load(f)
 
     def should_skip_key(self, key: str) -> bool:
@@ -140,7 +139,7 @@ class LocalizationDeDuplicator:
         """Return True if the value is purely a key reference like ``"{{section.keyname}}"``."""
         return bool(re.fullmatch(r"\{\{[\w.]+\}\}", value))
 
-    def extract_key_value_pairs(self, data: Dict[str, Any], prefix: str = "") -> None:
+    def extract_key_value_pairs(self, data: dict[str, Any], prefix: str = "") -> None:
         """Recursively flatten key-value pairs while skipping references and excluded sections."""
         for key, value in data.items():
             full_key = f"{prefix}.{key}" if prefix else key
@@ -154,7 +153,7 @@ class LocalizationDeDuplicator:
                 self.key_value_map[full_key] = value
                 self.value_to_keys[value].append(full_key)
 
-    def score_key(self, key: str) -> Tuple[int, int, int]:
+    def score_key(self, key: str) -> tuple[int, int, int]:
         """Lower score = better keeper candidate. Tuple: (section, casing, length)."""
         parts = key.split(".")
         # Prefer keys already in the shared ``common`` section.
@@ -164,15 +163,16 @@ class LocalizationDeDuplicator:
         casing_score = 0
         if last_part and last_part[0].isupper():
             casing_score = 1
-        if any(c.isupper() for c in last_part[1:]):
-            # Mixed/inconsistent casing within the tail is worse than pure lower/camel.
-            if not all(c.isupper() or not c.isalpha() for c in last_part[1:]):
-                casing_score += 1
+        # Mixed/inconsistent casing within the tail is worse than pure lower/camel.
+        if any(c.isupper() for c in last_part[1:]) and not all(
+            c.isupper() or not c.isalpha() for c in last_part[1:]
+        ):
+            casing_score += 1
 
         length_score = len(".".join(parts))
         return (section_score, casing_score, length_score)
 
-    def choose_keeper(self, keys: List[str]) -> str:
+    def choose_keeper(self, keys: list[str]) -> str:
         return sorted((self.score_key(k), k) for k in keys)[0][1]
 
     def make_target_key(self, keeper_key: str, value: str) -> str:
@@ -202,10 +202,10 @@ class LocalizationDeDuplicator:
             last_part = "".join(result)
 
         if parts[0] == "common":
-            return ".".join(parts[:-1] + [last_part])
+            return ".".join([*parts[:-1], last_part])
 
         all_keys = self.value_to_keys[value]
-        sections = set(k.split(".")[0] for k in all_keys)
+        sections = {k.split(".")[0] for k in all_keys}
 
         if len(all_keys) >= 3 or len(sections) > 1:
             if "objectTypes" in keeper_key:
@@ -217,7 +217,7 @@ class LocalizationDeDuplicator:
             else:
                 return f"common.{last_part}"
 
-        return ".".join(parts[:-1] + [last_part])
+        return ".".join([*parts[:-1], last_part])
 
     def create_dedup_plan(self):
         for value, keys in self.value_to_keys.items():
@@ -227,7 +227,7 @@ class LocalizationDeDuplicator:
             keeper = self.choose_keeper(keys)
             target_key = self.make_target_key(keeper, value)
 
-            plan_entry: Dict[str, Any] = {"value": value, "keys": []}
+            plan_entry: dict[str, Any] = {"value": value, "keys": []}
 
             if self.reference_mode:
                 # Reference mode: keep keeper key path intact, rewrite others to {{keeper}}.
@@ -267,7 +267,7 @@ class LocalizationDeDuplicator:
         if output_format == "yaml":
             yaml_data = []
             for entry in self.dedup_plan:
-                yaml_entry: Dict[str, Any] = {"value": entry["value"], "duplicates": []}
+                yaml_entry: dict[str, Any] = {"value": entry["value"], "duplicates": []}
                 for key_info in entry["keys"]:
                     entry_data = {"instruction": key_info["instruction"]}
                     if "refactor" in key_info:

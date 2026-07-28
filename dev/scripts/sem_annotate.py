@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+
 import sem_scope
 
 COMMENT_BY_EXT = {
@@ -114,23 +115,23 @@ def _is_revspec_not_found(stderr):
 
 
 def _read_text(path):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return f.read()
 
 
 def run_sem(args, cwd=None):
     if not args:
         raise SemError("run_sem called with empty args")
-    cmd = ["sem", args[0], "--json"] + list(args[1:])
+    cmd = ["sem", args[0], "--json", *args[1:]]
     try:
         r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
     except FileNotFoundError:
-        raise SemError("'sem' CLI not found on PATH")
+        raise SemError("'sem' CLI not found on PATH") from None
     except subprocess.CalledProcessError as e:
         msg = f"sem {' '.join(args)} failed: {e.stderr.strip()}"
         if _is_revspec_not_found(e.stderr):
-            raise InvalidRevError(msg)
-        raise SemError(msg)
+            raise InvalidRevError(msg) from e
+        raise SemError(msg) from e
     return r.stdout
 
 
@@ -351,7 +352,7 @@ def main(argv=None):
         return 0
     if ns.cmd == "write":
         descriptions = json.load(sys.stdin)
-        with open(ns.worklist, "r", encoding="utf-8") as wf:
+        with open(ns.worklist, encoding="utf-8") as wf:
             worklist = json.load(wf)
         res = write(descriptions, worklist, cwd=ns.cwd)
         print(json.dumps(res))

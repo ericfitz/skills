@@ -8,7 +8,7 @@ BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE / "deps" / "scripts"))
 FIX = BASE / "tests" / "fixtures" / "bump"
 
-from bumplib.trackers import github as tr  # noqa: E402
+from bumplib.trackers import github as tr
 
 
 class TestGitHubTracker(unittest.TestCase):

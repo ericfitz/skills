@@ -21,7 +21,7 @@ def load_scope(cwd=None):
     path = os.path.join(base, SCOPE_REL)
     if not os.path.exists(path):
         return None
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, dict):
         raise ValueError(f"{SCOPE_REL}: expected a JSON object")
@@ -82,10 +82,7 @@ def is_excluded(relpath, scope):
     """True if relpath matches any pattern in scope['exclude']."""
     if not scope:
         return False
-    for pat in scope.get("exclude") or []:
-        if glob_match(relpath, pat):
-            return True
-    return False
+    return any(glob_match(relpath, pat) for pat in scope.get("exclude") or [])
 
 
 def include_paths(scope):

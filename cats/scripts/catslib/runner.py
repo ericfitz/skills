@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import os
@@ -14,7 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -149,7 +150,7 @@ def redact(text: str, token: str) -> str:
 
 def run_id_for(now: datetime) -> str:
     """Format a UTC timestamp as a filesystem-safe run identifier (pure)."""
-    return now.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return now.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 def run_hook(name: str, command: str, cwd: Path, env: dict[str, str]) -> None:
@@ -428,7 +429,7 @@ def _stamp_finished_at(db_path: Path, run_id: str) -> None:
         # on parse_report's "exactly one row" invariant, owned by another module.
         conn.execute(
             "UPDATE run_meta SET finished_at = ? WHERE run_id = ?",
-            (datetime.now(timezone.utc).isoformat(), run_id),
+            (datetime.now(UTC).isoformat(), run_id),
         )
         conn.commit()
     finally:
@@ -479,12 +480,10 @@ def prune_run_dbs(
 
     protected = set(protect)
     latest = results_dir / "latest.db"
-    try:
+    # No latest.db, not a symlink, or some other race — nothing to protect
+    # from this source; caller-supplied `protect` still applies.
+    with contextlib.suppress(OSError):
         protected.add(latest.readlink().name)
-    except OSError:
-        # No latest.db, not a symlink, or some other race — nothing to protect
-        # from this source; caller-supplied `protect` still applies.
-        pass
 
     try:
         candidates = [
@@ -610,7 +609,7 @@ def execute(
         raise ValueError(
             "execute(): `now` must be timezone-aware, e.g. datetime.now(timezone.utc)"
         )
-    started_at = now or datetime.now(timezone.utc)
+    started_at = now or datetime.now(UTC)
     run_id = run_id_for(started_at)
     report_dir = config.results_dir / f"report-{run_id}"
     db_path = config.results_dir / f"cats-results-{run_id}.db"

@@ -5,8 +5,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deps" / "scripts"))
 
-from bumplib import contracts as c  # noqa: E402
-from bumplib import categorize as cat  # noqa: E402
+from bumplib import categorize as cat
+from bumplib import contracts as c
 
 
 def rec(name, current, latest, **kw):

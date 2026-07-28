@@ -8,7 +8,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deps" / "scripts"))
 
-from bumplib import config as cfg  # noqa: E402
+from bumplib import config as cfg
 
 
 class TestClaudeExclusions(unittest.TestCase):

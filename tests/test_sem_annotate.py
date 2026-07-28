@@ -343,7 +343,7 @@ class TestWrite(unittest.TestCase):
             self.assertEqual(res["files_written"], 1)
             self.assertEqual(res["markers"], 2)
             self.assertEqual(res["skipped"], 0)
-            out = open(p).read().splitlines()
+            out = Path(p).read_text().splitlines()
             self.assertEqual(out[1], "// SEM@aaa1111: build A")
             self.assertEqual(out[3], "// SEM@bbb2222: build B")
 
@@ -362,7 +362,8 @@ class TestWrite(unittest.TestCase):
     def test_write_unsupported_file_type_counts_in_skipped(self):
         """FIX 3: a description for README.md (comment_prefix None) that matches the
         worklist key must be counted in skipped, not silently dropped."""
-        import tempfile, os
+        import os
+        import tempfile
         with tempfile.TemporaryDirectory() as d:
             # README.md is an unsupported type (comment_prefix returns None)
             readme = os.path.join(d, "README.md")
@@ -377,7 +378,7 @@ class TestWrite(unittest.TestCase):
             self.assertEqual(res["markers"], 0)
             self.assertEqual(res["files_written"], 0)
             # no file should be written/modified for README.md
-            self.assertEqual(open(readme).read(), "# Title\nSome section\n")
+            self.assertEqual(Path(readme).read_text(), "# Title\nSome section\n")
 
     def test_write_blank_anchor_falls_back_to_head(self):
         orig = sa.head_sha
@@ -389,7 +390,7 @@ class TestWrite(unittest.TestCase):
                     f.write("package p\nfunc A() {}\n")
                 sa.write([{"file": p, "name": "A", "start_line": 2, "desc": "x"}],
                          [{"file": p, "name": "A", "start_line": 2, "anchor_sha": ""}])
-                self.assertEqual(open(p).read().splitlines()[1], "// SEM@headfff: x")
+                self.assertEqual(Path(p).read_text().splitlines()[1], "// SEM@headfff: x")
         finally:
             sa.head_sha = orig
 
@@ -464,7 +465,8 @@ class TestArgs(unittest.TestCase):
             with open(p, "w") as f:
                 f.write("package p\nfunc A() {}\n")
             wl = os.path.join(d, "wl.json")
-            json.dump([{"file": "x.go", "name": "A", "start_line": 2, "anchor_sha": "aaa1111"}], open(wl, "w"))
+            with open(wl, "w") as f:
+                json.dump([{"file": "x.go", "name": "A", "start_line": 2, "anchor_sha": "aaa1111"}], f)
             stdin = io.StringIO(json.dumps([{"file": "x.go", "name": "A", "start_line": 2, "desc": "build A"}]))
             _orig = sys.stdin
             sys.stdin = stdin
@@ -473,7 +475,7 @@ class TestArgs(unittest.TestCase):
             finally:
                 sys.stdin = _orig
             self.assertEqual(rc, 0)
-            self.assertEqual(open(p).read().splitlines()[1], "// SEM@aaa1111: build A")
+            self.assertEqual(Path(p).read_text().splitlines()[1], "// SEM@aaa1111: build A")
 
 
 class TestScanScope(unittest.TestCase):

@@ -340,9 +340,8 @@ class TestLoadValidationMalformedShapes(unittest.TestCase):
         self.assertEqual(rs[0].id, "A")
 
     def test_directory_path_rejected_without_crashing(self):
-        with tempfile.TemporaryDirectory() as d:
-            with self.assertRaises(R.RuleError):
-                R.load_rules(Path(d))
+        with tempfile.TemporaryDirectory() as d, self.assertRaises(R.RuleError):
+            R.load_rules(Path(d))
 
 
 if __name__ == "__main__":

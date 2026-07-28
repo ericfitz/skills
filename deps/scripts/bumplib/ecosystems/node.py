@@ -12,7 +12,7 @@ def detect(root: Path) -> dict:
     root = Path(root)
     if not (root / "package.json").exists():
         return {"present": False, "ecosystem": "node"}
-    mgr = "pnpm" if (root / "pnpm-lock.yaml").exists() else ("npm" if (root / "package-lock.json").exists() else "npm")
+    mgr = "pnpm" if (root / "pnpm-lock.yaml").exists() else "npm"
     return {"present": True, "ecosystem": "node", "packageManager": mgr}
 
 

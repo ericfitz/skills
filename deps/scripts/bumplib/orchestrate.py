@@ -3,7 +3,8 @@
 These functions spawn no subprocesses; they only merge already-gathered data
 (config exclusions/holds from disk + inputs passed in) and run the categorizer.
 """
-from . import contracts as c, config, categorize
+from . import categorize, config
+from . import contracts as c
 
 
 def categorize_payload(payload: dict, root=".") -> c.Categories:

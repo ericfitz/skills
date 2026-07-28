@@ -8,12 +8,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from logseqlib import api, apply as ap, config as cfg  # noqa: E402
-from logseqlib import convert as cv, page as pg, refactor, scan  # noqa: E402
+from logseqlib import api, refactor, scan
+from logseqlib import apply as ap
+from logseqlib import config as cfg
+from logseqlib import convert as cv
+from logseqlib import page as pg
 
 
 def _stamp():
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
+    return datetime.datetime.now(datetime.UTC).strftime(
         "%Y%m%dT%H%M%SZ")
 
 

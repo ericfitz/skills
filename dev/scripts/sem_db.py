@@ -137,7 +137,6 @@ def index_files(conn, files, cwd=None):
 
 def _scope_files(cwd, paths):
     """Resolve the file list to index from explicit paths or the scope file."""
-    import sem_annotate as sa
     import sem_scope
     scope = None
     if paths:

@@ -6,7 +6,7 @@ import sys
 import tempfile
 import threading
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest import mock
 
@@ -238,7 +238,7 @@ class TestValidityGates(unittest.TestCase):
 class TestRunId(unittest.TestCase):
     def test_format(self):
         self.assertEqual(
-            run.run_id_for(datetime(2026, 7, 26, 22, 2, 0, tzinfo=timezone.utc)),
+            run.run_id_for(datetime(2026, 7, 26, 22, 2, 0, tzinfo=UTC)),
             "20260726T220200Z")
 
 
@@ -452,7 +452,7 @@ class TestExecute(unittest.TestCase):
     def test_successful_run_parses_classifies_and_stamps_finished_at(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         c = self._config()
-        now = datetime(2026, 7, 26, 22, 2, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 7, 26, 22, 2, 0, tzinfo=UTC)
 
         result = run.execute(c, now=now)
 
@@ -577,12 +577,12 @@ class TestExecute(unittest.TestCase):
     def test_naive_now_is_rejected(self):
         c = self._config()
         with self.assertRaises(ValueError):
-            run.execute(c, now=datetime(2026, 7, 26, 22, 2, 0))  # noqa: DTZ001 (naive on purpose)
+            run.execute(c, now=datetime(2026, 7, 26, 22, 2, 0))
 
     def test_successful_run_prunes_old_dbs_down_to_keep_runs(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         c = self._config(CONFIG.replace("identities:", "keep_runs: 2\nidentities:"))
-        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=UTC)
 
         for minute in range(3):
             result = run.execute(c, now=base.replace(minute=minute))
@@ -600,7 +600,7 @@ class TestExecute(unittest.TestCase):
     def test_no_prune_flag_skips_pruning_for_this_invocation(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         c = self._config(CONFIG.replace("identities:", "keep_runs: 1\nidentities:"))
-        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=UTC)
         run.execute(c, now=base)
 
         result = run.execute(c, now=base.replace(minute=1), no_prune=True)
@@ -611,7 +611,7 @@ class TestExecute(unittest.TestCase):
     def test_keep_runs_zero_disables_pruning(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         c = self._config(CONFIG.replace("identities:", "keep_runs: 0\nidentities:"))
-        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=UTC)
         for minute in range(3):
             result = run.execute(c, now=base.replace(minute=minute))
 
@@ -636,7 +636,7 @@ cat > "$OUTPUT/Test1.json" <<'EOF'
 EOF
 """
         c = self._config(CONFIG.replace("identities:", "keep_runs: 1\nidentities:"))
-        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=timezone.utc)
+        base = datetime(2026, 7, 26, 22, 0, 0, tzinfo=UTC)
 
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         run.execute(c, now=base)
