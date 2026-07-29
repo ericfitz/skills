@@ -1905,6 +1905,16 @@ class TestCli(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("coverage_confidence", json.loads(out))
 
+    def test_output_is_deterministic_with_sorted_keys(self):
+        """The determinism contract: sorted keys, byte-stable across runs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"go.mod": "module x\n"})
+            _, first, _ = run([str(root)])
+            _, second, _ = run([str(root)])
+        self.assertEqual(first, second)
+        self.assertEqual(
+            first, json.dumps(json.loads(first), indent=2, sort_keys=True) + "\n")
+
     def test_indent_flag_changes_formatting(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"go.mod": "module x\n"})
@@ -1991,7 +2001,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_cli -v`
-Expected: PASS, 5 tests
+Expected: PASS, 6 tests
 
 - [ ] **Step 5: Verify it runs against this repo**
 
