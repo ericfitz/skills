@@ -1296,6 +1296,14 @@ class TestGuessDocType(unittest.TestCase):
         """'api' in 'capital' is true; token matching must not be fooled."""
         self.assertEqual(guess_doc_type("docs/capital.md"), "unknown")
 
+    def test_filename_tokens_outrank_directory_tokens(self):
+        """docs/design/setup-tutorial.md is a tutorial filed under design/."""
+        self.assertEqual(guess_doc_type("docs/design/setup-tutorial.md"), "tutorial")
+        self.assertEqual(guess_doc_type("docs/specs/deployment-runbook.md"), "runbook")
+
+    def test_nearest_directory_wins_when_the_filename_says_nothing(self):
+        self.assertEqual(guess_doc_type("docs/design/api/orders.md"), "api_reference")
+
     def test_every_guess_is_in_the_fixed_vocabulary(self):
         for path in ("README.md", "docs/x.md", "docs/adr/1-y.md", "CHANGELOG.md"):
             with self.subTest(path=path):
@@ -1452,19 +1460,40 @@ def _tokens(path):
     return {token for token in _TOKENS.split(path.lower()) if token}
 
 
-def guess_doc_type(path):
-    """Return one of DOC_TYPES for path, based on its tokens. Never guesses wildly."""
-    parsed = PurePosixPath(path)
-    stem_type = STEM_TYPES.get(parsed.stem.lower())
-    if stem_type:
-        return stem_type
-    tokens = _tokens(path)
+def _match_tokens(tokens):
+    """Return a doc type for one path segment's tokens, or None."""
     if {"getting", "started"} <= tokens or {"get", "started"} <= tokens:
         return "tutorial"
     for names, doc_type in TOKEN_TYPES:
         if tokens & names:
             return doc_type
+    return None
+
+
+def guess_doc_type(path):
+    """Return one of DOC_TYPES for path. Nearer path segments outrank farther ones.
+
+    A file's own name is the strongest signal: docs/design/setup-tutorial.md
+    is a tutorial that happens to live under design/, not a design doc. When
+    the filename says nothing, the nearest ancestor directory that says
+    something wins: docs/design/api/orders.md is API reference filed under
+    design/. Amended after review found pooled whole-path tokens let an
+    ancestor directory confidently override an explicit filename.
+    """
+    parsed = PurePosixPath(path)
+    stem_type = STEM_TYPES.get(parsed.stem.lower())
+    if stem_type:
+        return stem_type
+    for part in reversed(parsed.parts):
+        doc_type = _match_tokens(_tokens(part))
+        if doc_type:
+            return doc_type
     return "unknown"
+
+
+def _in_doc_dir(path):
+    """True when any ancestor directory is a recognized documentation directory."""
+    return any(part.lower() in DOC_DIRS for part in PurePosixPath(path).parts[:-1])
 
 
 def _is_doc(path):
@@ -1473,7 +1502,19 @@ def _is_doc(path):
         return True
     if parsed.suffix.lower() not in DOC_EXTS:
         return False
-    return any(part.lower() in DOC_DIRS for part in parsed.parts[:-1])
+    return _in_doc_dir(path)
+
+
+def _git_available(root):
+    """One probe so a non-git tree does not pay one doomed subprocess per doc."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
 
 
 def _git_last_modified(root, path):
@@ -1502,7 +1543,7 @@ def _doc_sites(paths):
         parsed = PurePosixPath(path)
         generator = DOC_SITE_FILES.get(parsed.name)
         if generator is None and parsed.name == SPHINX_CONF:
-            if any(part.lower() in DOC_DIRS for part in parsed.parts[:-1]):
+            if _in_doc_dir(path):
                 generator = "sphinx"
         if generator:
             sites.append({"path": path, "generator": generator})
@@ -1514,13 +1555,15 @@ def detect_docs(root, paths, max_git_lookups=500):
 
     Git lookups are capped: beyond max_git_lookups, last_modified is None. A
     thousand-page docs site should not turn the census into a thousand
-    subprocess calls.
+    subprocess calls, and a non-git tree pays one probe rather than one
+    failed subprocess per document.
     """
     root = Path(root)
     docs = []
     lookups = 0
+    use_git = _git_available(root)
     for path in sorted(p for p in paths if _is_doc(p)):
-        if lookups < max_git_lookups:
+        if use_git and lookups < max_git_lookups:
             last_modified = _git_last_modified(root, path)
             lookups += 1
         else:
@@ -1537,7 +1580,7 @@ def detect_docs(root, paths, max_git_lookups=500):
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_docs -v`
-Expected: PASS, 15 tests
+Expected: PASS, 17 tests
 
 - [ ] **Step 6: Lint and commit**
 
@@ -1560,6 +1603,12 @@ git commit -m "feat(profile): documentation census with fixed doc-type vocabular
 - Produces: `build_inventory(root: Path) -> dict` (the full inventory object) and `coverage_confidence(languages, manifests, unclassified, total_files) -> str`.
 
 **Confidence rules (binding):** `low` when there are no recognized languages **or** no manifests. Otherwise `high` when unclassified paths are at most 5% of all files, else `partial`. `unclassified` is truncated to 200 entries; when truncation occurs the count is preserved in `unclassified_total`.
+
+**Docs truncation (binding, amended after Task 5b review):** `docs` receives the same
+treatment as `unclassified` — truncated to `DOCS_LIMIT = 200` records with the full count
+preserved in `docs_total`. Without this, a 3k-page docs site embeds hundreds of KB of
+census records verbatim in the `stack` contract handed to every downstream phase. The
+census itself stays complete inside `detect_docs`; only the assembled inventory truncates.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1618,7 +1667,7 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(set(found), {
             "root", "listing_method", "languages", "manifests", "test_files",
             "test_dirs", "test_config", "ci", "containers", "iac",
-            "entrypoints", "docs", "docs_sites", "unclassified",
+            "entrypoints", "docs", "docs_total", "docs_sites", "unclassified",
             "unclassified_total", "coverage_confidence", "inventory_version",
         })
 
@@ -1640,7 +1689,14 @@ class TestBuildInventory(unittest.TestCase):
         found = inventory(PY_REPO)
         self.assertEqual([d["path"] for d in found["docs"]], ["README.md"])
         self.assertEqual(found["docs"][0]["doc_type_guess"], "readme")
+        self.assertEqual(found["docs_total"], 1)
         self.assertEqual(found["docs_sites"], [])
+
+    def test_docs_are_truncated_with_total_preserved(self):
+        files = {"docs/d%03d.md" % i: "# x\n" for i in range(250)}
+        found = inventory(files)
+        self.assertEqual(len(found["docs"]), 200)
+        self.assertEqual(found["docs_total"], 250)
 
     def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
         found = inventory({"main.zig": "pub fn main() void {}\n",
@@ -1683,6 +1739,7 @@ from inventorylib.testfiles import classify_test_files, test_dirs
 from inventorylib.walk import walk_repo
 
 UNCLASSIFIED_LIMIT = 200
+DOCS_LIMIT = 200
 HIGH_CONFIDENCE_MAX_UNCLASSIFIED_SHARE = 0.05
 
 
@@ -1719,7 +1776,8 @@ def build_inventory(root):
         "containers": infra["containers"],
         "iac": infra["iac"],
         "entrypoints": infra["entrypoints"],
-        "docs": docs["docs"],
+        "docs": docs["docs"][:DOCS_LIMIT],
+        "docs_total": len(docs["docs"]),
         "docs_sites": docs["docs_sites"],
         "unclassified": sorted(unclassified)[:UNCLASSIFIED_LIMIT],
         "unclassified_total": len(unclassified),
@@ -1731,7 +1789,7 @@ def build_inventory(root):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_report -v`
-Expected: PASS, 10 tests
+Expected: PASS, 11 tests
 
 - [ ] **Step 5: Lint and commit**
 
