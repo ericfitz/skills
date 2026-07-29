@@ -3243,7 +3243,9 @@ PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)")
 
 
 def plugin_dirs():
-    return sorted(p.parent for p in REPO.glob("*/.claude-plugin/plugin.json"))
+    # parents[1], not parent: the match is <plugin>/.claude-plugin/plugin.json,
+    # so one level up is .claude-plugin and two levels up is the plugin dir.
+    return sorted(p.parents[1] for p in REPO.glob("*/.claude-plugin/plugin.json"))
 
 
 def skill_files():
