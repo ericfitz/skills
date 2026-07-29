@@ -645,6 +645,14 @@ integration file in full. The extension guard is deliberately chosen over trimmi
 Pact-style contract tests), and over requiring a filename-pattern match, which would lose
 Jest's `__tests__/foo.js` where the directory is the only signal.
 
+**Known residual:** the gate excludes non-source files only. A *source* file in an
+ambiguously-named directory — `src/it/messages.py` in an i18n project, where `it` is the
+Italian locale code rather than Maven's integration-test directory — still classifies as
+`integration`. No extension gate can separate those two meanings of `it`; only removing
+`it` from `TEST_DIR_NAMES` would, at the cost of missing real Maven integration tests. The
+`signals[]` audit trail keeps the call inspectable (`['dir:it']` alone is visibly weak
+evidence), and downstream consumers are expected to weigh it. Accepted, not overlooked.
+
 - [ ] **Step 1: Write the failing test**
 
 ```python
