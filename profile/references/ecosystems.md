@@ -42,11 +42,11 @@ did.
 | `uv.lock` | python | uv | `uv sync` |
 | `poetry.lock` | python | poetry | `poetry install` |
 | `pdm.lock` | python | pdm | `pdm install` |
-| `Pipfile.lock` | python | pipenv | `pipenv install` |
+| `Pipfile.lock` | python | pipenv | `pipenv sync` |
 | `package-lock.json` | node | npm | `npm ci` |
 | `yarn.lock` | node | yarn | `yarn install --frozen-lockfile` |
 | `pnpm-lock.yaml` | node | pnpm | `pnpm install --frozen-lockfile` |
-| `bun.lockb` | node | bun | `bun install` |
+| `bun.lockb` | node | bun | `bun install --frozen-lockfile` |
 
 Two lockfiles of the same ecosystem in one directory (e.g. `package-lock.json` and
 `yarn.lock` both present) resolve to whichever manager sorts first alphabetically — this
@@ -57,6 +57,9 @@ the census rather than contradicting it.
 
 `coverage_confidence` measures the whole tree, assets included — a repo can be `high`
 while one niche source directory is opaque. Read `unclassified[]` too, not just the label.
+`docs` and `unclassified` are both truncated at 200 entries in the script's output, with
+`docs_total` and `unclassified_total` preserving the real counts — compare `len(list)`
+against the `_total` field and treat a truncated list as a sample, not the population.
 
 When confidence is `partial` or `low`, read in this order and stop as soon as the
 ecosystem is clear:
@@ -94,7 +97,7 @@ workflow supplies a more specific one:
 | php | `composer install --no-dev` |
 | elixir | `mix compile` |
 | swift | `swift build` |
-| dart | `dart build` |
+| dart | `dart compile exe` (or `flutter build` for a Flutter repo) |
 
 A command actually present in the repo's own Makefile, justfile, or CI workflow always
 takes precedence over this table.
