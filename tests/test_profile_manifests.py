@@ -43,6 +43,20 @@ class TestDetectManifests(unittest.TestCase):
     def test_non_manifest_files_ignored(self):
         self.assertEqual(detect_manifests(["src/app.py", "README.md"]), [])
 
+    def test_lockfile_from_another_ecosystem_never_overrides_a_default(self):
+        """A Go module beside a package-lock.json is not npm-managed."""
+        found = detect_manifests(["go.mod", "package-lock.json"])
+        self.assertEqual(found[0]["package_manager"], "go")
+
+    def test_foreign_lockfile_does_not_invent_a_manager(self):
+        found = detect_manifests(["pyproject.toml", "yarn.lock"])
+        self.assertIsNone(found[0]["package_manager"])
+
+    def test_competing_lockfiles_resolve_alphabetically(self):
+        """Arbitrary but deterministic; pinned so it cannot drift silently."""
+        found = detect_manifests(["package.json", "package-lock.json", "yarn.lock"])
+        self.assertEqual(found[0]["package_manager"], "npm")
+
 
 if __name__ == "__main__":
     unittest.main()
