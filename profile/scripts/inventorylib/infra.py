@@ -1,5 +1,5 @@
 # profile/scripts/inventorylib/infra.py
-"""Detect CI, container, IaC, test-config, entrypoint, and doc artifacts."""
+"""Detect CI, container, IaC, test-config, and entrypoint artifacts."""
 
 import json
 from pathlib import Path, PurePosixPath
@@ -25,12 +25,17 @@ CONTAINER_FILES = {
 IAC_FILES = {
     "cdk.json": "cdk",
     "serverless.yml": "serverless",
-    "template.yaml": "sam",
-    "template.yml": "sam",
     "Chart.yaml": "helm",
     "kustomization.yaml": "kustomize",
     "Pulumi.yaml": "pulumi",
 }
+
+# template.yaml is not in IAC_FILES: the name alone proves nothing. A GitHub
+# issue form, a Backstage software template, and a SAM stack all ship as
+# template.yaml. The file's own content decides — see _template_kind.
+TEMPLATE_NAMES = {"template.yaml", "template.yml"}
+SAM_TRANSFORM = "AWS::Serverless-2016-10-31"
+CFN_MARKER = "AWSTemplateFormatVersion"
 
 IAC_EXTS = {".tf": "terraform", ".tfvars": "terraform", ".bicep": "bicep"}
 
@@ -48,9 +53,14 @@ TEST_CONFIG_FILES = {
 
 ENTRYPOINT_NAMES = {
     "main.py", "__main__.py", "manage.py", "app.py", "wsgi.py", "asgi.py",
-    "main.go", "main.rs", "Program.cs", "index.ts", "main.ts",
-    "index.js", "server.js",
+    "main.go", "main.rs", "Program.cs", "main.ts", "server.js",
 }
+
+# index.* is an entrypoint only at the repo root, where it is npm's default
+# main. Nested index.ts/index.js files are barrel re-exports by convention:
+# on a measured Angular repo, 14 of 16 name-based entrypoint hits were
+# barrels. Root-only keeps the true positive and drops the flood.
+ROOT_ONLY_ENTRYPOINTS = {"index.ts", "index.js"}
 
 # ordered: first substring found in the command wins
 TEST_COMMAND_FRAMEWORKS = (
@@ -65,6 +75,24 @@ def _framework_from_command(command):
     for needle, framework in TEST_COMMAND_FRAMEWORKS:
         if needle in lowered:
             return framework
+    return None
+
+
+def _template_kind(root, path):
+    """Classify a template.yaml by content, or return None to stay silent.
+
+    SAM templates carry the serverless Transform; plain CloudFormation
+    carries AWSTemplateFormatVersion. Anything else named template.yaml —
+    issue forms, Backstage templates — is not IaC and must not be labeled.
+    """
+    try:
+        text = (Path(root) / path).read_text(encoding="utf-8", errors="replace")[:4096]
+    except OSError:
+        return None
+    if SAM_TRANSFORM in text:
+        return "sam"
+    if CFN_MARKER in text:
+        return "cloudformation"
     return None
 
 
@@ -108,6 +136,10 @@ def detect_infra(root, paths):
 
         if name in IAC_FILES:
             iac.append({"path": path, "kind": IAC_FILES[name]})
+        elif name in TEMPLATE_NAMES:
+            kind = _template_kind(root, path)
+            if kind:
+                iac.append({"path": path, "kind": kind})
         elif parsed.suffix in IAC_EXTS:
             iac.append({"path": path, "kind": IAC_EXTS[parsed.suffix]})
 
@@ -122,7 +154,9 @@ def detect_infra(root, paths):
             if entry:
                 test_config.append(entry)
 
-        if name in ENTRYPOINT_NAMES:
+        if name in ENTRYPOINT_NAMES or (
+            name in ROOT_ONLY_ENTRYPOINTS and parsed.parent.as_posix() == "."
+        ):
             entrypoints.append({"path": path, "language_hint": parsed.suffix})
 
     return {

@@ -58,6 +58,27 @@ class TestDetectInfra(unittest.TestCase):
         paths = {entry["path"] for entry in found["entrypoints"]}
         self.assertEqual(paths, {"cmd/server/main.go", "manage.py"})
 
+    def test_nested_index_is_a_barrel_not_an_entrypoint(self):
+        found = infra({"index.js": "run()\n",
+                       "src/components/Button/index.ts": "export * from './Button'\n"})
+        paths = {entry["path"] for entry in found["entrypoints"]}
+        self.assertEqual(paths, {"index.js"})
+
+    def test_sam_template_detected_by_transform(self):
+        found = infra({"template.yaml":
+                       "Transform: AWS::Serverless-2016-10-31\nResources: {}\n"})
+        self.assertEqual(found["iac"][0]["kind"], "sam")
+
+    def test_plain_cloudformation_is_not_called_sam(self):
+        found = infra({"infra/template.yaml":
+                       "AWSTemplateFormatVersion: '2010-09-09'\nResources: {}\n"})
+        self.assertEqual(found["iac"][0]["kind"], "cloudformation")
+
+    def test_issue_form_template_is_not_iac(self):
+        found = infra({".github/ISSUE_TEMPLATE/template.yml":
+                       "name: Bug report\nbody: []\n"})
+        self.assertEqual(found["iac"], [])
+
     def test_documentation_is_not_this_modules_job(self):
         """Docs are censused by inventorylib.docs (Task 5b), not here."""
         found = infra({"README.md": "# x\n"})
