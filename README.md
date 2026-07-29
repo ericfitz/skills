@@ -35,6 +35,22 @@ project wiki).
 `dedupe` (find and analyze duplicate/overlapping functionality across a
 codebase).
 
+## profile — project discovery
+
+`stack` (languages, runtimes, package managers, build commands) · `docs`
+(requirements, glossary, and domain invariants extracted from PRDs, specs, ADRs,
+and wiki pages) · `topology` (deployment shape, real dependencies, third parties,
+standup difficulty) · `journeys` (ranked candidate user workflows with dependency
+edges).
+
+Read-only inference backed by `scripts/profile_inventory.py`, a deterministic
+repo census. `docs` reaches documentation outside the repo only through
+capabilities already available in the session — an MCP server, a web fetch, a
+local path — and reports anything it cannot reach with a concrete remedy rather
+than working around it. Each skill emits a versioned JSON contract under
+`references/contracts/`; those contracts are the supported interface for other
+plugins.
+
 ## writing
 
 `boring` (evaluate technical business writing for "boringness" across 20
