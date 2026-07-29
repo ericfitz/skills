@@ -450,7 +450,12 @@ git commit -m "feat(profile): language classification with unclassified census"
 
 **Interfaces:**
 - Consumes: `walk_repo` output
-- Produces: `detect_manifests(paths: list[str]) -> list[dict]` with records `{"path": str, "ecosystem": str, "package_manager": str | None}`, sorted by path. `MANIFESTS: dict[str, tuple[str, str | None]]`, `LOCKFILE_PM: dict[str, str]`.
+- Produces: `detect_manifests(paths: list[str]) -> list[dict]` with records `{"path": str, "ecosystem": str, "package_manager": str | None}`, sorted by path. `MANIFESTS: dict[str, tuple[str, str | None]]`, `LOCKFILE_PM: dict[str, tuple[str, str]]`.
+
+**Lockfile scoping rule (binding):** a lockfile resolves a manifest only when it shares
+both the manifest's directory **and** its ecosystem. Amended after review found that
+unscoped resolution reports `go.mod` beside a `package-lock.json` as npm-managed — a
+confident wrong answer, which this module must never produce.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -500,6 +505,20 @@ class TestDetectManifests(unittest.TestCase):
     def test_non_manifest_files_ignored(self):
         self.assertEqual(detect_manifests(["src/app.py", "README.md"]), [])
 
+    def test_lockfile_from_another_ecosystem_never_overrides_a_default(self):
+        """A Go module beside a package-lock.json is not npm-managed."""
+        found = detect_manifests(["go.mod", "package-lock.json"])
+        self.assertEqual(found[0]["package_manager"], "go")
+
+    def test_foreign_lockfile_does_not_invent_a_manager(self):
+        found = detect_manifests(["pyproject.toml", "yarn.lock"])
+        self.assertIsNone(found[0]["package_manager"])
+
+    def test_competing_lockfiles_resolve_alphabetically(self):
+        """Arbitrary but deterministic; pinned so it cannot drift silently."""
+        found = detect_manifests(["package.json", "package-lock.json", "yarn.lock"])
+        self.assertEqual(found[0]["package_manager"], "npm")
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -537,26 +556,37 @@ MANIFESTS = {
     "pubspec.yaml": ("dart", "pub"),
 }
 
+# filename -> (ecosystem, package manager)
 LOCKFILE_PM = {
-    "uv.lock": "uv",
-    "poetry.lock": "poetry",
-    "pdm.lock": "pdm",
-    "Pipfile.lock": "pipenv",
-    "package-lock.json": "npm",
-    "yarn.lock": "yarn",
-    "pnpm-lock.yaml": "pnpm",
-    "bun.lockb": "bun",
+    "uv.lock": ("python", "uv"),
+    "poetry.lock": ("python", "poetry"),
+    "pdm.lock": ("python", "pdm"),
+    "Pipfile.lock": ("python", "pipenv"),
+    "package-lock.json": ("node", "npm"),
+    "yarn.lock": ("node", "yarn"),
+    "pnpm-lock.yaml": ("node", "pnpm"),
+    "bun.lockb": ("node", "bun"),
 }
 
 
 def detect_manifests(paths):
-    """Return manifest records, resolving package manager from sibling lockfiles."""
+    """Return manifest records, resolving package manager from sibling lockfiles.
+
+    A lockfile resolves a manifest only when it sits in the same directory AND
+    belongs to the same ecosystem. Without the ecosystem check, a Go module
+    beside a package-lock.json reports as npm-managed — a confident wrong
+    answer, which is precisely what this module must never produce.
+
+    Two lockfiles of the same ecosystem in one directory (npm and yarn, say)
+    resolve alphabetically. That tie-break is arbitrary but deterministic, and
+    a test pins it so it cannot drift silently.
+    """
     locks_by_dir = {}
     for path in paths:
         parsed = PurePosixPath(path)
-        manager = LOCKFILE_PM.get(parsed.name)
-        if manager:
-            locks_by_dir.setdefault(parsed.parent.as_posix(), set()).add(manager)
+        entry = LOCKFILE_PM.get(parsed.name)
+        if entry:
+            locks_by_dir.setdefault(parsed.parent.as_posix(), set()).add(entry)
 
     found = []
     for path in sorted(paths):
@@ -565,7 +595,11 @@ def detect_manifests(paths):
         if not entry:
             continue
         ecosystem, default_manager = entry
-        siblings = sorted(locks_by_dir.get(parsed.parent.as_posix(), set()))
+        siblings = sorted(
+            manager
+            for lock_ecosystem, manager in locks_by_dir.get(parsed.parent.as_posix(), set())
+            if lock_ecosystem == ecosystem
+        )
         found.append({
             "path": path,
             "ecosystem": ecosystem,
@@ -577,7 +611,7 @@ def detect_manifests(paths):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_manifests -v`
-Expected: PASS, 7 tests
+Expected: PASS, 10 tests
 
 - [ ] **Step 5: Lint and commit**
 
