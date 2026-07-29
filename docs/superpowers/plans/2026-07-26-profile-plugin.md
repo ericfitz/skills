@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship a `profile` plugin that answers general questions about any codebase — what it is built with, how it deploys, and what users do with it — backed by a deterministic inventory script.
+**Goal:** Ship a `profile` plugin that answers general questions about any codebase — what it is built with, what its documentation says it is supposed to do, how it deploys, and what users do with it — backed by a deterministic inventory script.
 
-**Architecture:** A dependency-free Python package (`inventorylib`) does the mechanical repo census and emits JSON; three skills (`stack`, `topology`, `journeys`) interpret that census with model reasoning guided by reference files. Each skill emits a versioned JSON contract, which is the only thing downstream consumers (including the `itest` plugin) are allowed to depend on.
+**Architecture:** A dependency-free Python package (`inventorylib`) does the mechanical repo census and emits JSON; four skills (`stack`, `docs`, `topology`, `journeys`) interpret that census with model reasoning guided by reference files. Each skill emits a versioned JSON contract, which is the only thing downstream consumers (including the `itest` plugin) are allowed to depend on.
 
 **Tech Stack:** Python 3.13 stdlib only. `unittest` for tests. Markdown skills. No third-party runtime or test dependencies.
 
@@ -23,7 +23,9 @@
 - **Branch:** create `feat/profile-plugin` before Task 1. Do not commit to `main`.
 - **Paths in JSON output are always repo-relative POSIX strings**, sorted, never absolute — except the top-level `root` key.
 - **The script classifies what it recognizes and explicitly lists what it does not.** No silent guessing. This is the property the model fallback depends on.
-- **No testing vocabulary in `topology` or `journeys` outputs.** Binding, per the spec's extraction discipline: `topology` emits `standup_notes`, never test-boundary options; `journeys` emits no test-coverage hints.
+- **No testing vocabulary in `docs`, `topology`, or `journeys` outputs.** Binding, per the spec's extraction discipline: `topology` emits `standup_notes`, never test-boundary options; `journeys` emits no test-coverage hints; `docs` emits requirements, never test ideas.
+- **`profile:docs` never builds a document retrieval mechanism.** Binding, per the spec. It reads in-repo files with Read/Glob/Grep, reaches user-named external sources only through a capability already present in the session (WebFetch, an MCP the user names, a local path), and records anything it cannot reach in `unavailable_sources[]` with a concrete remedy. No scraping, no guessed URLs, no new plumbing.
+- **`profile:docs` never emits journey candidates.** It emits `journey_evidence[]`. Candidate formation and ranking belong to `profile:journeys` alone — one owner per artifact.
 
 ## File Structure
 
@@ -40,20 +42,25 @@ profile/
       languages.py                    # extension -> language, unrecognized census
       manifests.py                    # manifest/lockfile -> ecosystem, package manager
       testfiles.py                    # test-file census + kind classification signals
-      infra.py                        # CI, containers, IaC, test config, entrypoints, docs
+      infra.py                        # CI, containers, IaC, test config, entrypoints
+      docs.py                         # documentation census: doc_type guess, size, mtime, doc sites
       report.py                       # assembly, unclassified, coverage_confidence
   references/
     ecosystems.md                     # manifest/lockfile signatures for model fallback
     deployment-shapes.md              # deployment signatures -> shape + testability
+    doc-sources.md                    # source tiers, doc_type vocabulary, ranking, remedies
     journey-sources.md                # where journeys hide, how to rank
     contracts/stack.schema.json
+    contracts/docs.schema.json
     contracts/topology.schema.json
     contracts/journeys.schema.json
     contracts/examples/stack.example.json
+    contracts/examples/docs.example.json
     contracts/examples/topology.example.json
     contracts/examples/journeys.example.json
   skills/
     stack/SKILL.md
+    docs/SKILL.md
     topology/SKILL.md
     journeys/SKILL.md
 
@@ -65,11 +72,17 @@ tests/
   test_profile_manifests.py
   test_profile_testfiles.py
   test_profile_infra.py
+  test_profile_docs.py
   test_profile_report.py
   test_profile_cli.py
   test_profile_contracts.py
   test_plugin_structure.py
 ```
+
+**Why `docs.py` is its own module rather than more of `infra.py`:** the documentation
+census needs `git log` for last-modified times, a filename-and-path type guess, and
+docs-site config parsing. That is a different job from "is this file a Dockerfile", and
+`infra.py` is already the widest module in the package.
 
 **Deliberate refinement of the spec:** the spec proposed committed fixture repos under `tests/fixtures/profile_inventory/`. This plan builds synthetic repos in temp directories instead (`tests/repobuilder.py`). Committing a tree containing `go.mod`, `package.json`, and `pyproject.toml` into this repo would confuse repo-level tooling and the plugin's own inventory script when run on itself. The test coverage is identical; the fixtures are declarative dicts inside the test modules.
 
@@ -810,7 +823,7 @@ git commit -m "feat(profile): test-file census with kind classification signals"
 
 **Interfaces:**
 - Consumes: `walk_repo` output plus repo root
-- Produces: `detect_infra(root: Path, paths: list[str]) -> dict` with keys `ci`, `containers`, `iac`, `test_config`, `entrypoints`, `docs` — each a sorted list of records containing at least `path`.
+- Produces: `detect_infra(root: Path, paths: list[str]) -> dict` with keys `ci`, `containers`, `iac`, `test_config`, `entrypoints` — each a sorted list of records containing at least `path`. Documentation is **not** here; it is Task 5b.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -875,11 +888,10 @@ class TestDetectInfra(unittest.TestCase):
         paths = {entry["path"] for entry in found["entrypoints"]}
         self.assertEqual(paths, {"cmd/server/main.go", "manage.py"})
 
-    def test_docs_include_readme_and_docs_tree(self):
-        found = infra({"README.md": "# x\n", "docs/guide.md": "# y\n",
-                       "src/notes.md": "# z\n"})
-        paths = [entry["path"] for entry in found["docs"]]
-        self.assertEqual(paths, ["README.md", "docs/guide.md"])
+    def test_documentation_is_not_this_modules_job(self):
+        """Docs are censused by inventorylib.docs (Task 5b), not here."""
+        found = infra({"README.md": "# x\n"})
+        self.assertNotIn("docs", found)
 
 
 if __name__ == "__main__":
@@ -948,13 +960,6 @@ ENTRYPOINT_NAMES = {
     "index.js", "server.js",
 }
 
-DOC_NAMES = {
-    "README.md", "README.rst", "CONTRIBUTING.md", "ARCHITECTURE.md",
-    "CHANGELOG.md",
-}
-
-DOC_PREFIXES = ("docs/", "doc/")
-
 # ordered: first substring found in the command wins
 TEST_COMMAND_FRAMEWORKS = (
     ("vitest", "vitest"), ("jest", "jest"), ("playwright", "playwright"),
@@ -993,7 +998,7 @@ def _package_json_test_config(root, path):
 
 def detect_infra(root, paths):
     """Return infrastructure records grouped by kind, each list sorted by path."""
-    ci, containers, iac, test_config, entrypoints, docs = [], [], [], [], [], []
+    ci, containers, iac, test_config, entrypoints = [], [], [], [], []
 
     for path in sorted(paths):
         parsed = PurePosixPath(path)
@@ -1028,16 +1033,12 @@ def detect_infra(root, paths):
         if name in ENTRYPOINT_NAMES:
             entrypoints.append({"path": path, "language_hint": parsed.suffix})
 
-        if name in DOC_NAMES or path.startswith(DOC_PREFIXES):
-            docs.append({"path": path})
-
     return {
         "ci": ci,
         "containers": containers,
         "iac": iac,
         "test_config": test_config,
         "entrypoints": entrypoints,
-        "docs": docs,
     }
 ```
 
@@ -1056,6 +1057,368 @@ git commit -m "feat(profile): CI, container, IaC, test-config, and entrypoint de
 
 ---
 
+### Task 5b: Documentation census
+
+> Inserted after the original plan was written, when documentation analysis was added
+> to the spec. Numbered `5b` rather than renumbering Tasks 6–12, because the `itest`
+> plan and several steps below reference those numbers by name.
+
+**Files:**
+- Create: `profile/scripts/inventorylib/docs.py`
+- Modify: `tests/repobuilder.py` (add `git_commit_all`)
+- Test: `tests/test_profile_docs.py`
+
+**Interfaces:**
+- Consumes: `walk_repo` output plus the repo root
+- Produces: `detect_docs(root: Path, paths: list[str], max_git_lookups: int = 500) -> dict`
+  with two keys:
+  - `docs` — `[{path, doc_type_guess, size, last_modified}]` sorted by path.
+    `last_modified` is an ISO-8601 committer date string, or `null` when git has no
+    record of the file (uncommitted, or not a git repo).
+  - `docs_sites` — `[{path, generator}]` sorted by path.
+  Also `DOC_TYPES: tuple[str, ...]`, the fixed vocabulary, and
+  `guess_doc_type(path: str) -> str`.
+
+**The vocabulary is fixed and closed** (spec, `profile:docs` section). `doc_type_guess`
+is always one of: `prd`, `requirements`, `spec`, `design`, `architecture`, `adr`,
+`runbook`, `api_reference`, `user_guide`, `tutorial`, `readme`, `changelog`, `unknown`.
+A doc-shaped file that matches nothing is `unknown` — never a confident wrong label.
+
+**Why token matching, not substring matching:** `"api" in "capital"` and
+`"adr" in "quadrant"` are both true. Paths are split into alphanumeric tokens and
+matched by token membership, so `docs/api/orders.md` types as `api_reference` and
+`src/capital.md` does not.
+
+- [ ] **Step 1: Add the commit helper to the test builder**
+
+Append to `tests/repobuilder.py`:
+
+```python
+def git_commit_all(base, message="init"):
+    """Commit everything under base. Requires git_init to have run. Returns base."""
+    base = Path(base)
+    env = {
+        "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.com",
+        "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+        "PATH": os.environ.get("PATH", ""),
+    }
+    subprocess.run(["git", "-C", str(base), "add", "-A"], check=True, env=env)
+    subprocess.run(["git", "-C", str(base), "commit", "-q", "-m", message],
+                   check=True, env=env)
+    return base
+```
+
+Add `import os` to the module's imports.
+
+The `GIT_CONFIG_GLOBAL=/dev/null` line matters: without it the test inherits the
+developer's global git config, including any commit hooks or signing requirements, and
+fails on some machines and not others.
+
+- [ ] **Step 2: Write the failing test**
+
+```python
+# tests/test_profile_docs.py
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from inventorylib.docs import DOC_TYPES, detect_docs, guess_doc_type
+from repobuilder import build_repo, git_commit_all, git_init
+
+
+def census(files, **kwargs):
+    with tempfile.TemporaryDirectory() as tmp:
+        root = build_repo(tmp, files)
+        return detect_docs(root, sorted(files), **kwargs)
+
+
+class TestGuessDocType(unittest.TestCase):
+    def test_readme_and_changelog_by_stem(self):
+        self.assertEqual(guess_doc_type("README.md"), "readme")
+        self.assertEqual(guess_doc_type("CHANGELOG.md"), "changelog")
+
+    def test_type_from_path_tokens(self):
+        cases = {
+            "docs/prd-billing.md": "prd",
+            "docs/requirements/orders.md": "requirements",
+            "docs/adr/0004-use-postgres.md": "adr",
+            "docs/rfcs/0001-events.md": "spec",
+            "docs/architecture.md": "architecture",
+            "docs/runbook-oncall.md": "runbook",
+            "docs/api/orders.md": "api_reference",
+            "docs/getting-started.md": "tutorial",
+            "docs/user-guide.md": "user_guide",
+        }
+        for path, expected in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(guess_doc_type(path), expected)
+
+    def test_untypable_doc_is_unknown_not_a_wrong_guess(self):
+        self.assertEqual(guess_doc_type("docs/notes.md"), "unknown")
+
+    def test_tokens_not_substrings(self):
+        """'api' in 'capital' is true; token matching must not be fooled."""
+        self.assertEqual(guess_doc_type("docs/capital.md"), "unknown")
+
+    def test_every_guess_is_in_the_fixed_vocabulary(self):
+        for path in ("README.md", "docs/x.md", "docs/adr/1-y.md", "CHANGELOG.md"):
+            with self.subTest(path=path):
+                self.assertIn(guess_doc_type(path), DOC_TYPES)
+
+
+class TestDetectDocs(unittest.TestCase):
+    def test_collects_named_docs_and_doc_directories(self):
+        found = census({
+            "README.md": "# x\n",
+            "docs/guide.md": "# y\n",
+            "specs/auth.md": "# z\n",
+            "src/app.py": "x = 1\n",
+        })
+        self.assertEqual([d["path"] for d in found["docs"]],
+                         ["README.md", "docs/guide.md", "specs/auth.md"])
+
+    def test_markdown_beside_code_is_not_documentation(self):
+        found = census({"src/notes.md": "# z\n"})
+        self.assertEqual(found["docs"], [])
+
+    def test_size_is_recorded(self):
+        found = census({"docs/guide.md": "hello\n"})
+        self.assertEqual(found["docs"][0]["size"], 6)
+
+    def test_last_modified_is_null_outside_git(self):
+        found = census({"docs/guide.md": "# y\n"})
+        self.assertIsNone(found["docs"][0]["last_modified"])
+
+    def test_last_modified_comes_from_git_when_committed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"docs/guide.md": "# y\n"})
+            git_init(root)
+            git_commit_all(root)
+            found = detect_docs(root, ["docs/guide.md"])
+        stamp = found["docs"][0]["last_modified"]
+        self.assertIsInstance(stamp, str)
+        self.assertRegex(stamp, r"^\d{4}-\d{2}-\d{2}T")
+
+    def test_git_lookups_are_capped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            files = {"docs/d%02d.md" % i: "# x\n" for i in range(3)}
+            root = build_repo(tmp, files)
+            git_init(root)
+            git_commit_all(root)
+            found = detect_docs(root, sorted(files), max_git_lookups=1)
+        stamps = [d["last_modified"] for d in found["docs"]]
+        self.assertIsInstance(stamps[0], str)
+        self.assertEqual(stamps[1:], [None, None])
+
+    def test_doc_sites_detected(self):
+        found = census({"mkdocs.yml": "site_name: x\n",
+                        "web/docusaurus.config.js": "module.exports = {}\n"})
+        self.assertEqual(
+            [(s["path"], s["generator"]) for s in found["docs_sites"]],
+            [("mkdocs.yml", "mkdocs"), ("web/docusaurus.config.js", "docusaurus")])
+
+    def test_sphinx_conf_counts_only_inside_a_doc_directory(self):
+        found = census({"docs/conf.py": "project = 'x'\n", "src/conf.py": "X = 1\n"})
+        self.assertEqual([s["path"] for s in found["docs_sites"]], ["docs/conf.py"])
+
+    def test_no_documentation_yields_empty_lists_not_guesses(self):
+        found = census({"src/app.py": "x = 1\n"})
+        self.assertEqual(found["docs"], [])
+        self.assertEqual(found["docs_sites"], [])
+
+    def test_missing_file_does_not_raise(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"docs/a.md": "# a\n"})
+            found = detect_docs(root, ["docs/a.md", "docs/gone.md"])
+        self.assertEqual([d["size"] for d in found["docs"]], [4, None])
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+Run: `python3 -m unittest tests.test_profile_docs -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.docs'`
+
+- [ ] **Step 4: Write the implementation**
+
+```python
+# profile/scripts/inventorylib/docs.py
+"""Documentation census: what docs exist, roughly what kind, and how stale.
+
+Classifies by path tokens only. It never reads document content and never
+guesses outside the fixed vocabulary — an untypable doc is 'unknown', which is
+the signal that tells profile:docs to read it rather than trust the label.
+"""
+
+import re
+import subprocess
+from pathlib import Path, PurePosixPath
+
+DOC_TYPES = (
+    "prd", "requirements", "spec", "design", "architecture", "adr",
+    "runbook", "api_reference", "user_guide", "tutorial", "readme",
+    "changelog", "unknown",
+)
+
+DOC_EXTS = {".md", ".rst", ".adoc", ".txt"}
+
+DOC_DIRS = {
+    "docs", "doc", "documentation", "adr", "adrs", "decisions",
+    "rfc", "rfcs", "spec", "specs", "design", "wiki", "notes",
+}
+
+DOC_NAMES = {
+    "README.md", "README.rst", "README.txt",
+    "CONTRIBUTING.md", "ARCHITECTURE.md", "CHANGELOG.md", "CHANGELOG.rst",
+}
+
+STEM_TYPES = {
+    "readme": "readme",
+    "changelog": "changelog",
+    "changes": "changelog",
+    "history": "changelog",
+}
+
+# ordered: the first token that matches wins
+TOKEN_TYPES = (
+    ({"prd", "prds"}, "prd"),
+    ({"requirement", "requirements", "acceptance"}, "requirements"),
+    ({"adr", "adrs", "decision", "decisions"}, "adr"),
+    ({"rfc", "rfcs", "spec", "specs", "specification"}, "spec"),
+    ({"architecture", "architectural"}, "architecture"),
+    ({"design"}, "design"),
+    ({"runbook", "runbooks", "playbook"}, "runbook"),
+    ({"api", "reference"}, "api_reference"),
+    ({"tutorial", "tutorials", "quickstart"}, "tutorial"),
+    ({"guide", "guides", "howto", "contributing"}, "user_guide"),
+)
+
+DOC_SITE_FILES = {
+    "mkdocs.yml": "mkdocs",
+    "mkdocs.yaml": "mkdocs",
+    "docusaurus.config.js": "docusaurus",
+    "docusaurus.config.ts": "docusaurus",
+    "book.toml": "mdbook",
+    "antora.yml": "antora",
+}
+
+# Sphinx's conf.py is only a doc site when it sits inside a doc directory;
+# 'conf.py' is far too common a filename to trust on its own.
+SPHINX_CONF = "conf.py"
+
+_TOKENS = re.compile(r"[^a-z0-9]+")
+
+
+def _tokens(path):
+    return {token for token in _TOKENS.split(path.lower()) if token}
+
+
+def guess_doc_type(path):
+    """Return one of DOC_TYPES for path, based on its tokens. Never guesses wildly."""
+    parsed = PurePosixPath(path)
+    stem_type = STEM_TYPES.get(parsed.stem.lower())
+    if stem_type:
+        return stem_type
+    tokens = _tokens(path)
+    if {"getting", "started"} <= tokens or {"get", "started"} <= tokens:
+        return "tutorial"
+    for names, doc_type in TOKEN_TYPES:
+        if tokens & names:
+            return doc_type
+    return "unknown"
+
+
+def _is_doc(path):
+    parsed = PurePosixPath(path)
+    if parsed.name in DOC_NAMES:
+        return True
+    if parsed.suffix.lower() not in DOC_EXTS:
+        return False
+    return any(part.lower() in DOC_DIRS for part in parsed.parts[:-1])
+
+
+def _git_last_modified(root, path):
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), "log", "-1", "--format=%cI", "--", path],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
+def _size(root, path):
+    try:
+        return (Path(root) / path).stat().st_size
+    except OSError:
+        return None
+
+
+def _doc_sites(paths):
+    sites = []
+    for path in sorted(paths):
+        parsed = PurePosixPath(path)
+        generator = DOC_SITE_FILES.get(parsed.name)
+        if generator is None and parsed.name == SPHINX_CONF:
+            if any(part.lower() in DOC_DIRS for part in parsed.parts[:-1]):
+                generator = "sphinx"
+        if generator:
+            sites.append({"path": path, "generator": generator})
+    return sites
+
+
+def detect_docs(root, paths, max_git_lookups=500):
+    """Return {'docs': [...], 'docs_sites': [...]}, both sorted by path.
+
+    Git lookups are capped: beyond max_git_lookups, last_modified is None. A
+    thousand-page docs site should not turn the census into a thousand
+    subprocess calls.
+    """
+    root = Path(root)
+    docs = []
+    lookups = 0
+    for path in sorted(p for p in paths if _is_doc(p)):
+        if lookups < max_git_lookups:
+            last_modified = _git_last_modified(root, path)
+            lookups += 1
+        else:
+            last_modified = None
+        docs.append({
+            "path": path,
+            "doc_type_guess": guess_doc_type(path),
+            "size": _size(root, path),
+            "last_modified": last_modified,
+        })
+    return {"docs": docs, "docs_sites": _doc_sites(paths)}
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `python3 -m unittest tests.test_profile_docs -v`
+Expected: PASS, 15 tests
+
+- [ ] **Step 6: Lint and commit**
+
+```bash
+ruff check profile/ tests/test_profile_docs.py tests/repobuilder.py
+git add profile/scripts/inventorylib/docs.py tests/test_profile_docs.py tests/repobuilder.py
+git commit -m "feat(profile): documentation census with fixed doc-type vocabulary"
+```
+
+---
+
 ### Task 6: Inventory assembly and confidence
 
 **Files:**
@@ -1063,7 +1426,7 @@ git commit -m "feat(profile): CI, container, IaC, test-config, and entrypoint de
 - Test: `tests/test_profile_report.py`
 
 **Interfaces:**
-- Consumes: `walk_repo`, `classify_languages`, `detect_manifests`, `classify_test_files`, `test_dirs`, `detect_infra`
+- Consumes: `walk_repo`, `classify_languages`, `detect_manifests`, `classify_test_files`, `test_dirs`, `detect_infra`, `detect_docs`
 - Produces: `build_inventory(root: Path) -> dict` (the full inventory object) and `coverage_confidence(languages, manifests, unclassified, total_files) -> str`.
 
 **Confidence rules (binding):** `low` when there are no recognized languages **or** no manifests. Otherwise `high` when unclassified paths are at most 5% of all files, else `partial`. `unclassified` is truncated to 200 entries; when truncation occurs the count is preserved in `unclassified_total`.
@@ -1125,8 +1488,8 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(set(found), {
             "root", "listing_method", "languages", "manifests", "test_files",
             "test_dirs", "test_config", "ci", "containers", "iac",
-            "entrypoints", "docs", "unclassified", "unclassified_total",
-            "coverage_confidence", "inventory_version",
+            "entrypoints", "docs", "docs_sites", "unclassified",
+            "unclassified_total", "coverage_confidence", "inventory_version",
         })
 
     def test_root_is_absolute_and_paths_are_relative(self):
@@ -1142,6 +1505,12 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(found["test_dirs"], ["tests/integration"])
         self.assertEqual(found["containers"][0]["kind"], "compose")
         self.assertEqual(found["coverage_confidence"], "high")
+
+    def test_documentation_census_is_carried_into_the_inventory(self):
+        found = inventory(PY_REPO)
+        self.assertEqual([d["path"] for d in found["docs"]], ["README.md"])
+        self.assertEqual(found["docs"][0]["doc_type_guess"], "readme")
+        self.assertEqual(found["docs_sites"], [])
 
     def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
         found = inventory({"main.zig": "pub fn main() void {}\n",
@@ -1176,6 +1545,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.report'`
 from pathlib import Path
 
 from inventorylib import VERSION
+from inventorylib.docs import detect_docs
 from inventorylib.infra import detect_infra
 from inventorylib.languages import classify_languages
 from inventorylib.manifests import detect_manifests
@@ -1204,6 +1574,7 @@ def build_inventory(root):
     manifests = detect_manifests(paths)
     tests = classify_test_files(root, paths)
     infra = detect_infra(root, paths)
+    docs = detect_docs(root, paths)
 
     return {
         "inventory_version": VERSION,
@@ -1218,7 +1589,8 @@ def build_inventory(root):
         "containers": infra["containers"],
         "iac": infra["iac"],
         "entrypoints": infra["entrypoints"],
-        "docs": infra["docs"],
+        "docs": docs["docs"],
+        "docs_sites": docs["docs_sites"],
         "unclassified": sorted(unclassified)[:UNCLASSIFIED_LIMIT],
         "unclassified_total": len(unclassified),
         "coverage_confidence": coverage_confidence(
@@ -1229,7 +1601,7 @@ def build_inventory(root):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_report -v`
-Expected: PASS, 9 tests
+Expected: PASS, 10 tests
 
 - [ ] **Step 5: Lint and commit**
 
@@ -1402,9 +1774,11 @@ git commit -m "feat(profile): profile_inventory CLI with exit codes"
 **Files:**
 - Create: `tests/schema_check.py`
 - Create: `profile/references/contracts/stack.schema.json`
+- Create: `profile/references/contracts/docs.schema.json`
 - Create: `profile/references/contracts/topology.schema.json`
 - Create: `profile/references/contracts/journeys.schema.json`
 - Create: `profile/references/contracts/examples/stack.example.json`
+- Create: `profile/references/contracts/examples/docs.example.json`
 - Create: `profile/references/contracts/examples/topology.example.json`
 - Create: `profile/references/contracts/examples/journeys.example.json`
 - Test: `tests/test_profile_contracts.py`
@@ -1468,8 +1842,8 @@ class TestProfileContracts(unittest.TestCase):
     def test_every_schema_is_valid_json_and_has_required_metadata(self):
         schemas = sorted(CONTRACTS.glob("*.schema.json"))
         self.assertEqual([p.name for p in schemas],
-                         ["journeys.schema.json", "stack.schema.json",
-                          "topology.schema.json"])
+                         ["docs.schema.json", "journeys.schema.json",
+                          "stack.schema.json", "topology.schema.json"])
         for path in schemas:
             with self.subTest(schema=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))
@@ -1498,6 +1872,25 @@ class TestProfileContracts(unittest.TestCase):
         text = (CONTRACTS / "journeys.schema.json").read_text(encoding="utf-8").lower()
         for banned in ("test", "coverage_hint", "fixture"):
             self.assertNotIn(banned, text, "journeys contract mentions %r" % banned)
+
+    def test_docs_contract_uses_no_testing_vocabulary(self):
+        text = (CONTRACTS / "docs.schema.json").read_text(encoding="utf-8").lower()
+        for banned in ("test", "fixture", "mock", "scenario"):
+            self.assertNotIn(banned, text, "docs contract mentions %r" % banned)
+
+    def test_docs_contract_emits_evidence_not_journey_candidates(self):
+        """Ownership boundary: profile:journeys alone forms and ranks candidates."""
+        schema = json.loads((CONTRACTS / "docs.schema.json").read_text(encoding="utf-8"))
+        properties = schema["properties"]
+        self.assertIn("journey_evidence", properties)
+        self.assertNotIn("candidates", properties)
+
+    def test_docs_requirements_do_not_classify_scope(self):
+        """Cross-cutting-ness is judged against the journey set, which does not
+        exist when docs runs. Deliberately absent; see the spec."""
+        schema = json.loads((CONTRACTS / "docs.schema.json").read_text(encoding="utf-8"))
+        requirement = schema["properties"]["requirements"]["items"]["properties"]
+        self.assertNotIn("scope", requirement)
 
 
 if __name__ == "__main__":
@@ -1562,7 +1955,7 @@ def validate(instance, schema, path="$"):
     return errors
 ```
 
-- [ ] **Step 4: Write the three contract schemas**
+- [ ] **Step 4: Write the four contract schemas**
 
 `profile/references/contracts/stack.schema.json` — the stack contract carries the inventory forward, which is how `itest` phases get it without ever invoking the script:
 
@@ -1601,6 +1994,168 @@ def validate(instance, schema, path="$"):
     "unknowns": { "type": "array", "items": { "type": "string" } },
     "confidence": { "enum": ["high", "partial", "low"] },
     "inventory": { "type": "object" }
+  }
+}
+```
+
+`profile/references/contracts/docs.schema.json` — the documentary record. Note what is
+absent as much as what is present: no `candidates`, because journey candidates belong to
+`profile:journeys`; no `scope` on a requirement, because cross-cutting-ness is judged
+against the journey set, which does not exist yet. Both absences are enforced by tests:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:docs contract",
+  "type": "object",
+  "required": ["contract_version", "sources_available", "unavailable_sources",
+               "corpus", "requirements", "coverage_confidence"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "sources_available": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "locator", "capability_used"],
+        "properties": {
+          "kind": { "enum": ["in-repo", "local-path", "external"] },
+          "locator": { "type": "string" },
+          "capability_used": { "type": "string" }
+        }
+      }
+    },
+    "unavailable_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["locator", "reason", "suggested_remedy"],
+        "properties": {
+          "locator": { "type": "string" },
+          "reason": { "type": "string" },
+          "suggested_remedy": { "type": "string" }
+        }
+      }
+    },
+    "corpus": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "locator", "doc_type", "title", "authority", "read"],
+        "properties": {
+          "id": { "type": "string" },
+          "locator": { "type": "string" },
+          "doc_type": {
+            "enum": ["prd", "requirements", "spec", "design", "architecture",
+                     "adr", "runbook", "api_reference", "user_guide",
+                     "tutorial", "readme", "changelog", "unknown"]
+          },
+          "title": { "type": "string" },
+          "last_modified": { "type": ["string", "null"] },
+          "authority": { "enum": ["normative", "descriptive", "historical", "unknown"] },
+          "read": { "enum": ["full", "skimmed"] }
+        }
+      }
+    },
+    "deferred": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["locator", "doc_type", "rank", "why_deferred"],
+        "properties": {
+          "locator": { "type": "string" },
+          "doc_type": {
+            "enum": ["prd", "requirements", "spec", "design", "architecture",
+                     "adr", "runbook", "api_reference", "user_guide",
+                     "tutorial", "readme", "changelog", "unknown"]
+          },
+          "rank": { "type": "integer" },
+          "why_deferred": { "type": "string" }
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "modality", "source_refs", "confidence"],
+        "properties": {
+          "id": { "type": "string" },
+          "statement": { "type": "string" },
+          "modality": { "enum": ["must", "should", "may"] },
+          "actors": { "type": "array", "items": { "type": "string" } },
+          "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+          "preconditions_stated": { "type": "array", "items": { "type": "string" } },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["corpus_id", "anchor"],
+              "properties": {
+                "corpus_id": { "type": "string" },
+                "anchor": { "type": "string" }
+              }
+            }
+          },
+          "staleness": {
+            "type": "object",
+            "properties": {
+              "last_modified": { "type": ["string", "null"] },
+              "version_refs": { "type": "array", "items": { "type": "string" } },
+              "stated_status": { "type": ["string", "null"] }
+            }
+          },
+          "confidence": { "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "journey_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["narrative", "source_refs"],
+        "properties": {
+          "narrative": { "type": "string" },
+          "actor": { "type": ["string", "null"] },
+          "entry_point_hint": { "type": ["string", "null"] },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["corpus_id", "anchor"],
+              "properties": {
+                "corpus_id": { "type": "string" },
+                "anchor": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["term", "definition"],
+        "properties": {
+          "term": { "type": "string" },
+          "definition": { "type": "string" },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["corpus_id", "anchor"],
+              "properties": {
+                "corpus_id": { "type": "string" },
+                "anchor": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "domain_invariants": { "type": "array", "items": { "type": "string" } },
+    "open_questions": { "type": "array", "items": { "type": "string" } },
+    "coverage_confidence": { "enum": ["high", "partial", "low"] }
   }
 }
 ```
@@ -1726,7 +2281,7 @@ Note on the property name: the concept the spec calls "testability notes" ships 
 }
 ```
 
-- [ ] **Step 5: Write the three examples**
+- [ ] **Step 5: Write the four examples**
 
 Each example must validate against its schema and must be realistic — these double as the worked examples the SKILL.md files point at. Write them describing a small HTTP service with Postgres.
 
@@ -1745,6 +2300,102 @@ Each example must validate against its schema and must be realistic — these do
   "inventory": {}
 }
 ```
+
+```json
+// profile/references/contracts/examples/docs.example.json
+{
+  "contract_version": "1.0.0",
+  "sources_available": [
+    { "kind": "in-repo", "locator": "README.md", "capability_used": "Read" },
+    { "kind": "in-repo", "locator": "docs/prd-cancellations.md", "capability_used": "Read" },
+    { "kind": "external", "locator": "https://wiki.example.com/orders/refund-policy",
+      "capability_used": "WebFetch" }
+  ],
+  "unavailable_sources": [
+    {
+      "locator": "Confluence space ORDERS",
+      "reason": "No Atlassian capability is present in this session.",
+      "suggested_remedy": "Enable the Atlassian MCP server, or export the space to markdown under docs/ and run again."
+    }
+  ],
+  "corpus": [
+    { "id": "D1", "locator": "docs/prd-cancellations.md", "doc_type": "prd",
+      "title": "Order cancellation", "last_modified": "2026-03-11T09:14:02+00:00",
+      "authority": "normative", "read": "full" },
+    { "id": "D2", "locator": "README.md", "doc_type": "readme",
+      "title": "orders service", "last_modified": "2026-07-02T16:40:11+00:00",
+      "authority": "descriptive", "read": "full" },
+    { "id": "D3", "locator": "docs/adr/0004-server-generated-ids.md", "doc_type": "adr",
+      "title": "Server-generated order ids", "last_modified": "2025-11-20T11:02:44+00:00",
+      "authority": "historical", "read": "skimmed" }
+  ],
+  "deferred": [
+    { "locator": "docs/api/orders.md", "doc_type": "api_reference", "rank": 14,
+      "why_deferred": "below the 25-document read budget; generated reference with no normative language" }
+  ],
+  "requirements": [
+    {
+      "id": "R1",
+      "statement": "A customer must be able to cancel an order at any time before it ships.",
+      "modality": "must",
+      "actors": ["authenticated customer"],
+      "acceptance_criteria": [
+        "the order reports status 'cancelled'",
+        "any captured payment is refunded in full"
+      ],
+      "preconditions_stated": ["the order exists and has not shipped"],
+      "source_refs": [{ "corpus_id": "D1", "anchor": "## Cancellation window" }],
+      "staleness": {
+        "last_modified": "2026-03-11T09:14:02+00:00",
+        "version_refs": ["v2 API"],
+        "stated_status": "approved"
+      },
+      "confidence": "high"
+    },
+    {
+      "id": "R2",
+      "statement": "Every response must carry the request id in an X-Request-Id header.",
+      "modality": "must",
+      "actors": [],
+      "acceptance_criteria": ["X-Request-Id is present and non-empty on every response"],
+      "preconditions_stated": [],
+      "source_refs": [{ "corpus_id": "D2", "anchor": "### Observability" }],
+      "staleness": {
+        "last_modified": "2026-07-02T16:40:11+00:00",
+        "version_refs": [],
+        "stated_status": null
+      },
+      "confidence": "medium"
+    }
+  ],
+  "journey_evidence": [
+    {
+      "narrative": "A signed-in customer cancels an order they placed and is refunded.",
+      "actor": "authenticated customer",
+      "entry_point_hint": "POST /orders/{id}/cancel",
+      "source_refs": [{ "corpus_id": "D1", "anchor": "## Cancellation window" }]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "settled order",
+      "definition": "An order whose payment has been captured and which can no longer be cancelled without a refund.",
+      "source_refs": [{ "corpus_id": "D1", "anchor": "## Definitions" }]
+    }
+  ],
+  "domain_invariants": [
+    "An order never leaves the 'cancelled' state.",
+    "A refund total never exceeds the captured total."
+  ],
+  "open_questions": [
+    "The PRD describes a 24-hour free-cancellation window; no document states what happens at exactly 24 hours."
+  ],
+  "coverage_confidence": "partial"
+}
+```
+
+`R2` is deliberately a requirement no single journey owns. It is the worked example of
+the cross-cutting case the `itest` gate has to surface.
 
 ```json
 // profile/references/contracts/examples/topology.example.json
@@ -1825,7 +2476,7 @@ Each example must validate against its schema and must be realistic — these do
 - [ ] **Step 6: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_contracts -v`
-Expected: PASS, 10 tests. If the topology vocabulary test fails, apply the `standup_notes` rename from Step 4 rather than weakening the test.
+Expected: PASS, 13 tests. If the topology vocabulary test fails, apply the `standup_notes` rename from Step 4 rather than weakening the test.
 
 - [ ] **Step 7: Lint and commit**
 
@@ -1941,6 +2592,188 @@ git commit -m "feat(profile): stack skill and ecosystems reference"
 
 ---
 
+### Task 9b: `profile:docs` skill and doc-sources reference
+
+> Inserted after the original plan was written. Numbered `9b` so Tasks 10–12 keep the
+> numbers the `itest` plan and the steps above already reference.
+
+**Files:**
+- Create: `profile/skills/docs/SKILL.md`
+- Create: `profile/references/doc-sources.md`
+
+**Interfaces:**
+- Consumes: the `stack` contract (specifically `inventory.docs` and
+  `inventory.docs_sites`), plus any external doc pointers the caller supplies
+- Produces: the `docs` contract — the second gate. `journeys`, `topology`,
+  `conventions`, and `state` all read from it.
+
+- [ ] **Step 1: Write the doc-sources reference**
+
+`profile/references/doc-sources.md` must contain, at minimum:
+
+**A source-tier table** with three rows, stating for each tier what is in it and which
+capability reads it:
+
+| tier | what | how it is read |
+|---|---|---|
+| in-repo | everything in `inventory.docs`, plus navigation from `inventory.docs_sites` | Read, Glob, Grep |
+| user-named external | URLs, wiki pages, tracker documents, local paths outside the repo, all named by the caller | WebFetch for a URL; an MCP server present in this session for the system it belongs to; Read for a local path |
+| unreachable | a named source with no matching capability | not read — recorded in `unavailable_sources[]` |
+
+**A binding rule, verbatim:** *"Never build a retrieval mechanism. Use a capability that
+already exists in this session, or record the source as unavailable with a remedy. Do not
+scrape, do not construct URLs you were not given, and do not install anything."*
+
+**A remedy table** giving the exact wording to put in `suggested_remedy` for each common
+case: no MCP for the named system ("Enable the *X* MCP server and run again"); a URL that
+fetches but returns a login page ("Export the page to markdown and place it under `docs/`
+or give a local path"); a source named too vaguely to locate ("Give a full URL or file
+path"); a binary format ("Convert to text and place it in the repo").
+
+**A `doc_type` table** — all thirteen values from `inventorylib/docs.py` `DOC_TYPES`,
+each with what it looks like and what it is worth. Note explicitly that the inventory's
+`doc_type_guess` is a *path-based guess* and this phase corrects it after reading.
+
+**An `authority` table** — the four values with how to tell them apart: `normative` (the
+document states obligations the team agreed to: a spec, an approved PRD, a requirements
+document); `descriptive` (explains how things work without binding anyone: most READMEs,
+overviews, tutorials); `historical` (superseded, dated, or explicitly marked as such:
+most ADRs describing past decisions); `unknown`.
+
+**A ranking section** listing the signals in priority order:
+1. `doc_type` — `prd`, `requirements`, `spec` outrank `design`, `architecture`, which
+   outrank `adr`, `user_guide`, `readme`, which outrank `api_reference`, `changelog`
+2. Normative density — count matches per document with
+   `rg -c -i -e '\bMUST\b' -e '\bSHALL\b' -e '\bSHOULD\b' -e 'acceptance criteria' <path>`
+3. Recency — `last_modified` from the census; a document untouched for years describing a
+   system under active development is likely `historical`
+4. Position in a docs-site navigation — a page linked from the top level of `mkdocs.yml`
+   or a Docusaurus sidebar outranks an orphan
+
+**A budget section**, verbatim: *"Deep-read at most 25 documents. Everything below the
+line goes in `deferred[]` with its rank and why. Always state in your summary how many
+documents you read out of how many you found. A cap that is not reported reads as
+complete coverage."*
+
+**A closing rule, verbatim:** *"You are extracting what the documents say, not judging
+whether it is true. Never read source code to check a requirement. A requirement that
+contradicts the code is a finding your caller makes, not one you make."*
+
+- [ ] **Step 2: Write the skill**
+
+```markdown
+---
+name: docs
+version: 1.0.0
+description: Read a project's documentary record — PRDs, requirements documents, specifications, design docs, ADRs, wiki pages — and extract the requirements, user-workflow evidence, domain vocabulary, and invariants it states. Use when profiling an unfamiliar project, gathering requirements, or establishing what a system was supposed to do. Emits the profile:docs contract.
+---
+
+# docs
+
+Read what this project wrote down about itself, and extract what it says the system is
+supposed to do.
+
+This is the second gate phase: `journeys`, `topology`, and other consumers all read from
+the record this phase produces, so they read it once and agree about it.
+
+Reference: `${CLAUDE_PLUGIN_ROOT}/references/doc-sources.md`
+Contract: `${CLAUDE_PLUGIN_ROOT}/references/contracts/docs.schema.json`
+Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/docs.example.json`
+
+## Usage
+
+    /profile:docs [path]
+
+## Input
+
+You are normally handed a `profile:stack` contract; use `inventory.docs` and
+`inventory.docs_sites` as your in-repo census. You may also be handed external
+document pointers — URLs, wiki locations, local paths.
+
+**Standalone invocation:** if you were not handed a `stack` contract, invoke
+`profile:stack` first and use its output. If you were not given external pointers and
+you are running in a conversation with the user, ask once whether any requirements
+documents, PRDs, or specifications live outside the repository, and accept "none".
+
+## Procedure
+
+1. **Resolve sources.** For each in-repo document, the capability is Read. For each
+   external pointer, match it to a capability that is already available in this
+   session per the source-tier table. Record every resolved source in
+   `sources_available[]` with the capability you used.
+
+2. **Record what you cannot reach.** A pointer with no matching capability goes in
+   `unavailable_sources[]` with a reason and a `suggested_remedy` drawn from the remedy
+   table. Then continue — an unreachable source is a reported gap, never a stop.
+
+3. **Census.** For every candidate, record locator, title, headings, and
+   `last_modified`. Correct the inventory's `doc_type_guess`, which is a path-based
+   guess made without reading anything.
+
+4. **Rank** by the signals in the reference, in the order given.
+
+5. **Deep-read** down the ranking to the 25-document budget. Each document read becomes
+   a `corpus[]` entry with `read: full` or `read: skimmed` and an `authority` value.
+   Everything below the line becomes a `deferred[]` entry.
+
+6. **Extract requirements.** A requirement is a statement about what the system must,
+   should, or may do. Give each one an id, its `modality`, the actors it names, any
+   acceptance criteria stated alongside it, any preconditions the document states, and
+   `source_refs` pointing at the document and a heading anchor. A statement with no
+   `source_refs` does not ship.
+
+7. **Record `staleness`** per requirement: the document's `last_modified`, any version
+   or release identifiers the text names, and any status the document states about
+   itself ("draft", "approved", "superseded by X").
+
+8. **Extract `journey_evidence`** — narratives describing what someone does with the
+   system, with an actor and an entry-point hint where the text gives one. These are
+   evidence for a later phase, not conclusions.
+
+9. **Extract `glossary` and `domain_invariants`** — the project's own terms, and the
+   statements that must always hold ("an order never leaves the cancelled state").
+   These are the highest-leverage output for anyone writing precise assertions later.
+
+10. **Record `open_questions`** — things the documentation raises but never settles.
+
+11. Set `coverage_confidence`: `high` when you read the normative documents and nothing
+    important was unreachable; `partial` when the budget or an unavailable source left a
+    real gap; `low` when there is essentially no documentation.
+
+12. Emit the contract, then a short prose summary that states how many documents you
+    read out of how many you found, and names anything you could not reach.
+
+## Rules
+
+- **Never build a retrieval mechanism.** Use a capability that already exists in this
+  session, or record the source as unavailable with a remedy. Do not scrape, do not
+  construct URLs you were not given, and do not install anything.
+- **Never read source code to verify a requirement.** You extract what the documents
+  say. Whether the code agrees is your caller's finding to make, not yours.
+- **Emit `journey_evidence`, never candidates.** Forming and ranking user-workflow
+  candidates belongs to `profile:journeys`. Handing it evidence is the job; handing it
+  conclusions takes its job away.
+- Every requirement, evidence item, and glossary entry carries `source_refs`.
+- Do not describe strategy, coverage, boundaries, or fixtures of any kind. This phase
+  reports what the documents state; consumers decide what to do with it.
+- A repository with no documentation is a legitimate finding: empty arrays and
+  `coverage_confidence: low`, said plainly. Do not pad it with inferences from code.
+```
+
+- [ ] **Step 3: Verify the contract example still validates and paths resolve**
+
+Run: `python3 -m unittest tests.test_profile_contracts -v`
+Expected: PASS, 13 tests
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add profile/skills/docs profile/references/doc-sources.md
+git commit -m "feat(profile): docs skill and doc-sources reference"
+```
+
+---
+
 ### Task 10: `profile:topology` skill and deployment-shapes reference
 
 **Files:**
@@ -2039,14 +2872,17 @@ git commit -m "feat(profile): topology skill and deployment-shapes reference"
 - Create: `profile/references/journey-sources.md`
 
 **Interfaces:**
-- Consumes: the `stack` contract (including its embedded `inventory`)
+- Consumes: the `stack` contract (including its embedded `inventory`) and the `docs`
+  contract (`journey_evidence[]`, `glossary[]`)
 - Produces: the `journeys` contract — ranked `candidates[]` with `depends_on` edges, `sources_read`, `surface_coverage`
 
 - [ ] **Step 1: Write the journey-sources reference**
 
 `profile/references/journey-sources.md` must contain:
 
-- A **source-priority list**, strongest evidence first: README "usage"/"getting started" sections; `docs/` guides and tutorials; OpenAPI or GraphQL schemas; HTTP route registration; CLI subcommand definitions; UI route definitions; integration or e2e test names already present; issue and milestone titles; commit message themes.
+- A **source-priority list**, strongest evidence first: the `docs` contract's
+  `journey_evidence[]` (someone wrote down what users do — nothing beats that); OpenAPI or GraphQL schemas; HTTP route registration; CLI subcommand definitions; UI route definitions; integration or e2e test names already present; issue and milestone titles; commit message themes.
+- A note, stated plainly: **the documentary record is read by `profile:docs`, not here.** If you were handed a `docs` contract, work from its evidence and glossary rather than re-reading the same prose. Re-reading it wastes the run and produces a second, slightly different reading of the same document.
 - A **ranking rubric** defining the four `business_criticality` values: `critical` (the product's reason to exist, or the revenue path), `high` (named in the README or docs as a primary flow), `medium` (a supported flow reachable from the public surface), `low` (administrative, diagnostic, or rarely used).
 - A section **"Finding dependency edges"**: a candidate depends on another when its entry point requires an identifier that only another journey can produce, when documentation describes it as a follow-on step, or when its handler reads an entity another journey creates.
 - A section **"What is not a journey"**: a single endpoint with no user-visible outcome, a health check, an internal cron task with no actor, a pure function, a configuration knob.
@@ -2058,7 +2894,7 @@ git commit -m "feat(profile): topology skill and deployment-shapes reference"
 ---
 name: journeys
 version: 1.0.0
-description: Identify the key workflows users actually perform with a system, mined from documentation, routes, CLI commands, and UI entry points, ranked by business criticality with dependency edges between them. Use when profiling an unfamiliar project for test design, documentation, or product understanding. Emits the profile:journeys contract.
+description: Identify the key workflows users actually perform with a system, mined from documentation evidence, routes, CLI commands, and UI entry points, ranked by business criticality with dependency edges between them. Use when profiling an unfamiliar project for test design, documentation, or product understanding. Emits the profile:journeys contract.
 ---
 
 # journeys
@@ -2076,13 +2912,22 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/journeys.example.j
 
     /profile:journeys [path]
 
-Standalone invocation: if you were not handed a `stack` contract, invoke
-`profile:stack` first and use its output.
+## Input
+
+You are normally handed a `profile:stack` contract and a `profile:docs` contract.
+The `docs` contract's `journey_evidence[]` is your strongest source: it is what the
+project's own documentation says people do with the system, already extracted with
+anchors. Its `glossary[]` gives you the project's vocabulary — name candidates in it.
+
+**Standalone invocation:** if you were not handed them, invoke `profile:stack`, then
+`profile:docs`, and use their output.
 
 ## Procedure
 
-1. Read sources in the priority order given in `references/journey-sources.md`.
-   Record every file you read in `sources_read`.
+1. Start from the `docs` contract's `journey_evidence[]`, then work down the remaining
+   priority order in `references/journey-sources.md`. Record every source you used in
+   `sources_read`, including `corpus_id` references from the `docs` contract. Do not
+   re-read documents `profile:docs` already read.
 2. Draft candidates. Each needs an actor, an intention, and an observable outcome.
    Apply the "What is not a journey" filter.
 3. Attach `evidence` as `file:line` references to every candidate. A candidate with
@@ -2213,7 +3058,7 @@ Expected: FAIL on `test_every_plugin_is_registered_in_the_marketplace` (profile 
 {
   "name": "profile",
   "version": "1.0.0",
-  "description": "Project discovery toolkit: identify what a codebase is built with (stack), how it deploys and what it depends on (topology), and what workflows its users actually perform (journeys). Read-only; emits versioned JSON contracts for downstream consumers.",
+  "description": "Project discovery toolkit: identify what a codebase is built with (stack), what its documentation says it must do (docs), how it deploys and what it depends on (topology), and what workflows its users actually perform (journeys). Read-only; emits versioned JSON contracts for downstream consumers.",
   "author": { "name": "efitz" }
 }
 ```
@@ -2223,7 +3068,7 @@ Expected: FAIL on `test_every_plugin_is_registered_in_the_marketplace` (profile 
 Add to the `plugins` array in `.claude-plugin/marketplace.json`, matching the existing single-line entry style:
 
 ```json
-{ "name": "profile", "description": "Project discovery toolkit: identify what a codebase is built with (stack), how it deploys and what it depends on (topology), and what workflows its users actually perform (journeys). Read-only inference backed by a deterministic inventory script; emits versioned JSON contracts consumed by other plugins.", "source": "./profile", "category": "development" }
+{ "name": "profile", "description": "Project discovery toolkit: identify what a codebase is built with (stack), what its requirements documents, PRDs, specs, and wiki pages say it must do (docs), how it deploys and what it depends on (topology), and what workflows its users actually perform (journeys). Read-only inference backed by a deterministic inventory script; emits versioned JSON contracts consumed by other plugins.", "source": "./profile", "category": "development" }
 ```
 
 - [ ] **Step 5: Add the README section**
@@ -2233,12 +3078,17 @@ Insert after the `## dev` section, matching house style:
 ```markdown
 ## profile — project discovery
 
-`stack` (languages, runtimes, package managers, build commands) · `topology`
-(deployment shape, real dependencies, third parties, standup difficulty) ·
-`journeys` (ranked candidate user workflows with dependency edges).
+`stack` (languages, runtimes, package managers, build commands) · `docs`
+(requirements, glossary, and domain invariants extracted from PRDs, specs, ADRs,
+and wiki pages) · `topology` (deployment shape, real dependencies, third parties,
+standup difficulty) · `journeys` (ranked candidate user workflows with dependency
+edges).
 
 Read-only inference backed by `scripts/profile_inventory.py`, a deterministic
-repo census. Each skill emits a versioned JSON contract under
+repo census. `docs` reaches documentation outside the repo only through
+capabilities already available in the session — an MCP server, a web fetch, a
+local path — and reports anything it cannot reach with a concrete remedy rather
+than working around it. Each skill emits a versioned JSON contract under
 `references/contracts/`; those contracts are the supported interface for other
 plugins.
 ```
@@ -2270,7 +3120,7 @@ git commit -m "feat(profile): plugin manifest, structural tests, marketplace reg
 - `python3 -m unittest discover -s tests -t .` reports `OK`
 - `ruff check profile/ tests/test_profile_*.py tests/repobuilder.py tests/schema_check.py tests/test_plugin_structure.py` passes
 - `uv run --script profile/scripts/profile_inventory.py .` emits valid JSON at exit 0, and so does the `python3` fallback
-- All three contracts have validating examples
+- All four contracts have validating examples
 - `profile` appears in `.claude-plugin/marketplace.json` and `README.md`
 
 Then proceed to `docs/superpowers/plans/2026-07-26-itest-plugin.md`.

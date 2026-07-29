@@ -2,14 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship an `itest` plugin that discovers a project's testing reality (conventions, existing-test quality, state-establishment affordances) and synthesizes an integration test design from it, ending in a scenario set a future build skill can implement.
+**Goal:** Ship an `itest` plugin that discovers a project's testing reality (conventions, existing-test quality, state-establishment affordances) and synthesizes an integration test design from it — grounded in both the code and the project's own requirements documents — ending in a scenario set a future build skill can implement.
 
-**Architecture:** Three discovery skills emit versioned JSON contracts; an orchestrator skill (`/itest:design`) preflights the `profile` plugin, dispatches five discovery subagents in parallel, runs a human confirmation gate on candidate journeys, and synthesizes the plan in the main context. The plan is emitted as markdown and optionally saved.
+**Architecture:** Three discovery skills emit versioned JSON contracts; an orchestrator skill (`/itest:design`) preflights the `profile` plugin, runs two serial gates (`profile:stack`, then `profile:docs`), dispatches five discovery subagents in parallel, maps extracted requirements onto candidate journeys, runs a human confirmation gate on both lists, and synthesizes the plan in the main context. The plan is emitted as markdown, optionally saved, and any conflict found between a document and the code can be turned into a tracking issue or a findings document.
 
 **Tech Stack:** Markdown skills and JSON Schema contracts. Python only for tests. No runtime code ships in this plugin.
 
 **Spec:** `docs/superpowers/specs/2026-07-26-integration-test-design-design.md`
-**Prerequisite:** `docs/superpowers/plans/2026-07-26-profile-plugin.md` must be complete. This plan depends on `tests/schema_check.py`, `tests/test_plugin_structure.py`, and the three `profile` contracts existing.
+**Prerequisite:** `docs/superpowers/plans/2026-07-26-profile-plugin.md` must be complete. This plan depends on `tests/schema_check.py`, `tests/test_plugin_structure.py`, and the four `profile` contracts existing.
 
 ## Global Constraints
 
@@ -22,6 +22,9 @@
 - **`${CLAUDE_PLUGIN_ROOT}` never crosses a plugin boundary.** Cross-plugin work happens by invoking skills by name.
 - **Discovery is read-only.** No skill in this plugin executes builds, tests, containers, or health checks.
 - **Every contract requires `contract_version`** as a required top-level string property, matching the `profile` contracts.
+- **Document/code conflicts are reported, never adjudicated.** Synthesis states the conflict, the document's claim, the code evidence, and both readings. It does not decide which is right.
+- **No new issue-creation mechanism is ever built.** The conflict-disposition step uses a capability already present in the session — the `github:create-issue` skill, an issue-tracking MCP, or `gh` — or it falls back to saving a findings document. Same rule as `profile:docs` and document retrieval.
+- **What the tests do not cover, stated plainly.** The `unittest` suite checks contract shapes, cross-plugin coupling, and plugin structure. Synthesis behavior — boundary selection, requirement-to-journey mapping, conflict detection, gap-map ordering — is model judgment and is exercised by no test here. Do not add an assertion that pretends otherwise.
 
 ## File Structure
 
@@ -623,6 +626,11 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/conventions.exampl
 You are normally handed a `profile:stack` contract. Use its `inventory` for
 `test_files`, `test_dirs`, `test_config`, and `ci`.
 
+You may also be handed a `profile:docs` contract. Its corpus often contains a
+CONTRIBUTING file or a testing guide, which is the most direct statement of house style
+and runner commands available anywhere. Prefer it over inference — then check it against
+what CI actually runs, because guides go stale and CI does not.
+
 **Standalone invocation:** if you were not handed one, invoke the `profile:stack`
 skill and use its output. If the `profile` plugin is not available, read the repo
 directly using the fingerprint tables in `references/test-frameworks.md`, and say
@@ -706,6 +714,11 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/critique.example.j
 
 You are normally handed a `profile:stack` contract; use `inventory.test_files` and
 select the records whose `kind` is `integration` or `e2e`.
+
+You may also be handed a `profile:docs` contract. Its `requirements[]` tell you which
+failure paths the project committed to handling. A test that covers only the happy path
+of a documented `must` requirement is a `missing-failure-path` issue with evidence
+behind it, not a matter of taste.
 
 **Standalone invocation:** if you were not handed one, invoke `profile:stack` and use
 its output. If `profile` is unavailable, find test files yourself and say so.
@@ -809,6 +822,11 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/state.example.json
 You are normally handed a `profile:stack` contract; use its `inventory` to locate
 migrations, models, seed scripts, and test helpers.
 
+You may also be handed a `profile:docs` contract. Its `domain_invariants` and `glossary`
+describe what valid state actually looks like in this domain, which is what turns
+`direct_write_possible` from a literal answer into a useful one: a store you can write
+to but cannot write *validly* is worth reporting as such.
+
 **Standalone invocation:** if you were not handed one, invoke `profile:stack` and use
 its output. If `profile` is unavailable, locate schema sources yourself using the
 tables in `references/state-and-fixtures.md`.
@@ -891,6 +909,18 @@ class TestScenarioContract(unittest.TestCase):
     def test_open_assumptions_survive_into_every_scenario(self):
         self.assertIn("open_assumptions", self.scenario["required"])
 
+    def test_scenario_records_provenance_and_requirement_traceability(self):
+        required = self.scenario["required"]
+        self.assertIn("provenance", required)
+        self.assertIn("requirement_ids", required)
+        self.assertEqual(self.scenario["properties"]["provenance"]["enum"],
+                         ["journey", "requirement", "both"])
+
+    def test_cross_cutting_scenarios_may_have_no_journey(self):
+        """A requirement no journey owns still produces a scenario."""
+        self.assertEqual(self.scenario["properties"]["journey_id"]["type"],
+                         ["string", "null"])
+
     def test_example_has_a_composed_and_an_injected_precondition(self):
         example = json.loads(
             (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
@@ -898,6 +928,14 @@ class TestScenarioContract(unittest.TestCase):
                    for scenario in example["scenarios"]
                    for p in scenario["preconditions"]}
         self.assertEqual(methods, {"compose", "inject"})
+
+    def test_example_demonstrates_a_cross_cutting_scenario(self):
+        example = json.loads(
+            (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
+        by_provenance = {s["provenance"]: s for s in example["scenarios"]}
+        self.assertIn("requirement", by_provenance)
+        self.assertIsNone(by_provenance["requirement"]["journey_id"])
+        self.assertTrue(by_provenance["requirement"]["requirement_ids"])
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -930,16 +968,18 @@ Expected: FAIL — `scenario.schema.json` does not exist.
       "items": {
         "type": "object",
         "required": ["id", "journey_id", "title", "priority", "boundary",
-                     "preconditions", "steps", "assertions", "dependencies",
-                     "isolation", "placement", "runner_invocation",
-                     "open_assumptions"],
+                     "provenance", "requirement_ids", "preconditions", "steps",
+                     "assertions", "dependencies", "isolation", "placement",
+                     "runner_invocation", "open_assumptions"],
         "properties": {
           "id": { "type": "string" },
-          "journey_id": { "type": "string" },
+          "journey_id": { "type": ["string", "null"] },
           "title": { "type": "string" },
           "priority": { "enum": ["p0", "p1", "p2"] },
           "est_cost": { "enum": ["low", "medium", "high"] },
           "boundary": { "type": "string" },
+          "provenance": { "enum": ["journey", "requirement", "both"] },
+          "requirement_ids": { "type": "array", "items": { "type": "string" } },
           "preconditions": {
             "type": "array",
             "items": {
@@ -999,7 +1039,10 @@ Expected: FAIL — `scenario.schema.json` does not exist.
 
 - [ ] **Step 4: Write the example**
 
-Continues the order-service example. It must contain one composed and one injected precondition so the doctrine is demonstrated, not just described:
+Continues the order-service example, and reuses the requirement ids `R1` and `R2` from
+`profile`'s `docs.example.json` so the two plugins' examples read as one story. It must
+demonstrate the doctrine rather than describe it: one composed and one injected
+precondition, and one cross-cutting scenario that came from a requirement no journey owns:
 
 ```json
 {
@@ -1018,6 +1061,8 @@ Continues the order-service example. It must contain one composed and one inject
       "priority": "p0",
       "est_cost": "medium",
       "boundary": "HTTP against the api service with a real Postgres; Stripe stubbed",
+      "provenance": "both",
+      "requirement_ids": ["R1"],
       "preconditions": [
         {
           "state": "an order exists for the acting customer",
@@ -1066,10 +1111,63 @@ Continues the order-service example. It must contain one composed and one inject
         "the compose stack starts cleanly on a developer machine",
         "the migrations directory is the complete schema"
       ]
+    },
+    {
+      "id": "S2",
+      "journey_id": null,
+      "title": "Every response carries a non-empty X-Request-Id header",
+      "priority": "p1",
+      "est_cost": "low",
+      "boundary": "HTTP against the api service with a real Postgres; Stripe stubbed",
+      "provenance": "requirement",
+      "requirement_ids": ["R2"],
+      "preconditions": [
+        {
+          "state": "an order exists so a 200 and a 404 can both be exercised",
+          "method": "compose",
+          "via": "POST /orders, capturing the returned order id",
+          "assert_established": "response is 201 and the body contains a non-empty id",
+          "rationale": "The requirement is about every response, so the check needs both a hit and a miss."
+        }
+      ],
+      "steps": [
+        "GET /orders/{id} for the created order",
+        "GET /orders/{id} for an id that does not exist"
+      ],
+      "assertions": [
+        "the 200 response carries a non-empty X-Request-Id header",
+        "the 404 response carries a non-empty X-Request-Id header"
+      ],
+      "negative_assertions": [
+        "the two responses do not carry the same X-Request-Id"
+      ],
+      "dependencies": { "real": ["postgres"], "stubbed": ["stripe"] },
+      "isolation": {
+        "strategy": "truncate",
+        "cleanup": ["truncate orders, order_items, customers after the test"]
+      },
+      "determinism_controls": [
+        "assert the header is non-empty rather than asserting a specific value"
+      ],
+      "fixtures_to_reuse": ["newTestServer (internal/http/testing.go)"],
+      "new_helpers_needed": [],
+      "placement": {
+        "file_path": "internal/http/request_id_integration_test.go",
+        "naming": "TestResponses_CarryRequestId",
+        "marker_or_tag": "//go:build integration"
+      },
+      "runner_invocation": "go test -tags=integration ./internal/http/ -run TestResponses_CarryRequestId",
+      "open_assumptions": [
+        "the compose stack starts cleanly on a developer machine"
+      ]
     }
   ]
 }
 ```
+
+`S2` is the worked example of the cross-cutting case: it came from requirement `R2`,
+which the gate approved because it mapped to no journey, so its `journey_id` is `null`
+and its `provenance` is `requirement`.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
@@ -1137,10 +1235,11 @@ class TestCrossPluginCoupling(unittest.TestCase):
             with self.subTest(skill=skill.parent.name):
                 self.assertNotIn("itest", skill.read_text(encoding="utf-8"))
 
-    def test_design_preflights_all_three_profile_skills(self):
+    def test_design_preflights_all_four_profile_skills(self):
         text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
             encoding="utf-8")
-        for name in ("profile:stack", "profile:topology", "profile:journeys"):
+        for name in ("profile:stack", "profile:docs", "profile:topology",
+                     "profile:journeys"):
             with self.subTest(skill=name):
                 self.assertIn(name, text)
 
@@ -1149,6 +1248,21 @@ class TestCrossPluginCoupling(unittest.TestCase):
             encoding="utf-8").lower()
         self.assertIn("gate", text)
         self.assertIn("subagents cannot ask", text)
+
+    def test_design_maps_requirements_to_journeys_before_the_gate(self):
+        """Cross-cutting requirements only exist relative to the journey set, so the
+        mapping has to happen in the main context before the user is asked."""
+        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
+            encoding="utf-8").lower()
+        self.assertIn("gate prep", text)
+        self.assertIn("cross-cutting", text)
+
+    def test_design_offers_conflict_disposition_without_building_a_mechanism(self):
+        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
+            encoding="utf-8").lower()
+        self.assertIn("doc_code_conflicts", text)
+        self.assertIn("github:create-issue", text)
+        self.assertIn("no new issue-creation mechanism", text)
 
 
 if __name__ == "__main__":
@@ -1166,13 +1280,13 @@ Expected: FAIL on `test_itest_skills_exist` — `design/SKILL.md` does not exist
 ---
 name: design
 version: 1.0.0
-description: Design an integration test suite for a project — discovering its stack, deployment shape, customer journeys, test conventions, existing-test quality, and state affordances, then synthesizing a prioritized scenario plan. Use when asked to design, plan, or scope integration tests, or to find gaps in an existing integration suite. Requires the profile plugin.
+description: Design an integration test suite for a project — discovering its stack, its documented requirements, deployment shape, customer journeys, test conventions, existing-test quality, and state affordances, then synthesizing a prioritized scenario plan. Use when asked to design, plan, or scope integration tests, or to find gaps in an existing integration suite. Requires the profile plugin.
 ---
 
 # design
 
-Design integration tests for a project: discover, confirm the journeys with the user,
-then synthesize a plan.
+Design integration tests for a project: discover, confirm the journeys and requirements
+with the user, then synthesize a plan.
 
 Doctrine: `${CLAUDE_PLUGIN_ROOT}/references/test-design.md`
 Handoff contract: `${CLAUDE_PLUGIN_ROOT}/references/contracts/scenario.schema.json`
@@ -1184,8 +1298,8 @@ Worked example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/scenario.ex
 
 ## Phase 0 — Preflight
 
-Check your available skills for `profile:stack`, `profile:topology`, and
-`profile:journeys`. If any is missing, stop and tell the user:
+Check your available skills for `profile:stack`, `profile:docs`, `profile:topology`,
+and `profile:journeys`. If any is missing, stop and tell the user:
 
 > This skill needs the `profile` plugin, which is not installed. Install it from the
 > `efitz-skills` marketplace and run `/itest:design` again.
@@ -1193,17 +1307,42 @@ Check your available skills for `profile:stack`, `profile:topology`, and
 Do not attempt to reach `profile`'s files by path, and do not proceed with partial
 discovery. Failing here costs nothing; failing three subagents deep wastes the run.
 
+Then ask the user one question, and accept "none":
+
+> Are there requirements documents, PRDs, specifications, or wiki pages for this project
+> that do not live in the repository? Paste links or paths, or say none.
+
+Ask it here rather than later, because the phase that reads documentation runs as a
+subagent and cannot ask anything.
+
 ## Phase 1 — Stack gate
 
 Invoke `profile:stack` for the target path. Every other phase depends on knowing the
-ecosystem, and its contract carries the repo inventory that all five later phases use.
+ecosystem, and its contract carries the repo inventory that all later phases use.
 
 If its `confidence` is `low`, say so before continuing — everything downstream inherits
 that uncertainty.
 
-## Phase 2 — Parallel discovery
+## Phase 2 — Documentation gate
 
-Dispatch five subagents concurrently, one per phase, each handed the `stack` contract:
+Invoke `profile:docs`, handing it the `stack` contract and any external pointers the
+user gave in Phase 0.
+
+This is a gate rather than a parallel peer because all five phases below read from it,
+and one shared reading of the documentary record beats five private ones. It is the
+slowest step in discovery; say so if the corpus is large rather than going quiet.
+
+When it returns, surface two things immediately:
+
+- `unavailable_sources[]` — named documents it could not reach, each with a remedy. Ask
+  whether to proceed without them or stop so the user can supply them. **Do not try to
+  reach them another way.**
+- how many documents it read out of how many it found, straight from its summary.
+
+## Phase 3 — Parallel discovery
+
+Dispatch five subagents concurrently, one per phase, each handed the `stack` contract
+and the `docs` contract:
 
 | Subagent | Invokes | Returns |
 |---|---|---|
@@ -1219,51 +1358,113 @@ short summary.
 If `conventions` and `critique` disagree about which tests are integration tests,
 report the disagreement in the plan. Do not silently pick a side.
 
-## Phase 3 — Journey gate
+## Phase 4 — Gate prep
+
+Before asking the user anything, map each requirement in the `docs` contract onto the
+journey candidates it plausibly belongs to. A requirement that maps to none is
+**cross-cutting** — "every response carries a request id", "all writes are audited",
+"tenant data never crosses tenants". These are real integration-tier concerns that no
+single journey owns, and they would otherwise vanish.
+
+This mapping happens here, not inside `profile:docs`, because cross-cutting-ness is a
+judgment about the journey set, which does not exist when that phase runs.
+
+## Phase 5 — Human gate
 
 **Subagents cannot ask the user anything, so this gate runs here, in the main
-conversation.** Present the ranked candidates with their evidence and dependency edges.
-Ask the user to approve, edit, remove, and add.
+conversation.** Present four things, tightest first, as short default-approve lists —
+not four separate interrogations:
 
-Also confirm the `depends_on` edges explicitly — users usually know the prerequisite
-relationships faster than they can be inferred, and those edges drive precondition
-design.
+1. **Ranked journey candidates** with evidence and dependency edges. Approve, edit,
+   remove, add. Confirm the `depends_on` edges explicitly: users usually know the
+   prerequisite relationships faster than they can be inferred, and those edges drive
+   precondition design.
+2. **Unmapped requirements** from Phase 4, ordered by `modality` (must first) then
+   `authority`. Approve, drop, or attach to a journey.
+3. **Unavailable sources**, if the user chose to continue past them — restated once so
+   the gap is a decision rather than an oversight.
+4. **Deferred documents** — offer to pull one in if journey coverage looks thin.
 
 Do not proceed until the user has responded.
 
-## Phase 4 — Synthesis
+## Phase 6 — Synthesis
 
-Work through these seven steps in order, presenting each and checking before moving on.
+Work through these eight steps in order, presenting each and checking before moving on.
 
 1. **Boundary selection.** Combine `standup_notes`, `integration_separation`, and the
    state affordances into one chosen boundary. State it explicitly with its rationale,
    and name what is real and what is stubbed. This is the most important sentence in
    the plan; write it down rather than assuming it.
 2. **Scenario expansion.** Expand each approved journey into one happy path plus the
-   failure scenarios that qualify under the doctrine's tier rule. Push everything else
-   down to unit tests and say that you did.
-3. **Precondition design.** Build the DAG from the confirmed `depends_on` edges.
-   Resolve each edge to compose or inject against the doctrine's composition rules, and
-   choose isolation and cleanup from the discovered teardown affordances.
+   failure scenarios that qualify under the doctrine's tier rule. Attach the
+   `requirement_ids` each scenario satisfies, and set `provenance` to `journey` or
+   `both`. Documented acceptance criteria are a rich source of failure cases that
+   code-mining alone will not reveal — but the tier rule still applies to them: a
+   documented input-validation rule is still a unit test. Push everything disqualified
+   down and say that you did.
+2b. **Cross-cutting expansion.** Turn each *approved* unmapped requirement into a
+   scenario with `provenance: requirement` and `journey_id: null`. Only approved ones;
+   the gate is where scope was set.
+3. **Precondition design.** Build the DAG from the confirmed `depends_on` edges, plus
+   any `preconditions_stated` the requirements name. Resolve each edge to compose or
+   inject against the doctrine's composition rules, and choose isolation and cleanup
+   from the discovered teardown affordances.
 4. **Assertion design.** For each scenario, what is observable at the chosen boundary,
    what to assert, which negative assertions matter, and which determinism controls are
-   required.
-5. **Gap map.** Cross the approved journeys with the critique verdicts: covered, weak,
-   missing, misleading. Rank misleading above missing — a test that passes while the
-   journey is broken is worse than no test.
+   required. Use documented `acceptance_criteria` verbatim wherever they are observable
+   at the boundary, turn `domain_invariants` into negative assertions, and name things
+   using the `glossary` — a plan written in the project's own vocabulary reads as though
+   someone who knows the domain wrote it.
+5. **Gap map.** Two axes.
+   - *Journey coverage*: approved journeys crossed with critique verdicts —
+     covered, weak, missing, misleading.
+   - *Requirements coverage*: each requirement — covered, weak, untested,
+     contradicted, unobservable. `contradicted` means the code appears to do something
+     else. `unobservable` means the requirement is real but cannot be checked at the
+     chosen boundary; say so rather than dropping it, because it is a finding about the
+     boundary.
+
+   Priority order: **contradicted > misleading > untested > missing > weak.**
+   Contradicted leads because a normative document disagreeing with the code is either
+   a live defect or a specification nobody maintained. Misleading still outranks
+   absence: a test that passes while the journey is broken is worse than no test.
 6. **Risks and assumptions.** Collect every `assumptions[]` entry from `topology` and
    `state`. Discovery was read-only, so none of them were proven. They ride into each
    scenario's `open_assumptions`, to be confirmed on the build phase's first run.
+
+   Then record `doc_code_conflicts[]`, one entry per conflict that touches a scenario:
+
+       { requirement_id, doc_claim, code_evidence, authority,
+         verdict: likely_stale_doc | likely_code_defect | undetermined }
+
+   State the conflict and both readings. **Do not adjudicate** — you did not run
+   anything, and `authority` is what tells the reader how much the document's claim is
+   worth. Only conflicts touching a scenario go here; this is not a documentation audit.
 7. **Emission.** Produce the scenario set conforming to the handoff contract, print the
    whole plan as one markdown document, then ask whether to save it and where.
+8. **Conflict disposition.** If `doc_code_conflicts[]` is non-empty, offer — never
+   assume — one of:
+   - **Create tracking issues**, one per conflict or one grouped issue, using a
+     capability already available in this session: the `github:create-issue` skill, an
+     issue-tracking MCP, or `gh`. **No new issue-creation mechanism is built.** If none
+     is available, say so and offer the next option instead.
+   - **Save a findings document** at a path the user names, listing each conflict, its
+     document anchor, its code evidence, and both readings.
+   - **Neither** — the conflicts stay in the emitted plan and nowhere else.
+
+   This exists so an inconsistency found in passing is not lost when the session ends.
 
 ## Rules
 
 - Nothing in this workflow executes anything. No builds, no test runs, no containers.
 - Never invoke `profile`'s inventory script by path. Inventory reaches this plugin only
   inside the `stack` contract.
+- Never work around an unreachable document. Report it with its remedy and move on.
 - Every scenario must carry `placement` and `runner_invocation`. A scenario the runner
   would not pick up is not finished.
+- Every scenario must carry `provenance`, and `requirement_ids` for every requirement it
+  covers. A reader asking "why does this test exist" should get an answer with a
+  document anchor attached.
 - If the user's approved journeys have no failure scenarios that qualify under the tier
   rule, say so — a short honest plan beats a padded one.
 ```
@@ -1271,13 +1472,13 @@ Work through these seven steps in order, presenting each and checking before mov
 - [ ] **Step 4: Run the coupling test**
 
 Run: `python3 -m unittest tests.test_itest_coupling -v`
-Expected: PASS, 6 tests
+Expected: PASS, 8 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add itest/skills/design tests/test_itest_coupling.py
-git commit -m "feat(itest): design orchestrator with preflight, parallel discovery, journey gate"
+git commit -m "feat(itest): design orchestrator with docs gate, gate prep, and synthesis"
 ```
 
 ---
@@ -1297,7 +1498,7 @@ git commit -m "feat(itest): design orchestrator with preflight, parallel discove
 Add to the `plugins` array in `.claude-plugin/marketplace.json`, after the `profile` entry:
 
 ```json
-{ "name": "itest", "description": "Integration test design toolkit: discover a project's test conventions and how integration tests are separated (conventions), assess the quality of existing tests for over-mocking and misleading coverage (critique), find state-establishment and teardown affordances (state), and synthesize a prioritized scenario plan from confirmed customer journeys (design). Read-only discovery; requires the profile plugin.", "source": "./itest", "category": "development" }
+{ "name": "itest", "description": "Integration test design toolkit: discover a project's test conventions and how integration tests are separated (conventions), assess the quality of existing tests for over-mocking and misleading coverage (critique), find state-establishment and teardown affordances (state), and synthesize a prioritized scenario plan from confirmed customer journeys and documented requirements (design). Reports conflicts between what the documentation requires and what the code does. Read-only discovery; requires the profile plugin.", "source": "./itest", "category": "development" }
 ```
 
 - [ ] **Step 2: Add the README section**
@@ -1312,11 +1513,16 @@ commands, how integration tests are separated) · `critique` (quality assessment
 existing tests — over-mocking, implementation-detail assertions, non-determinism) ·
 `state` (writable stores, factories, seed tooling, teardown affordances).
 
-Requires the `profile` plugin, which supplies stack, deployment topology, and
-candidate user journeys. Discovery is read-only: nothing is built, booted, or run,
-and every unproven inference is carried into the plan as an explicit assumption.
-Output is a scenario set conforming to `references/contracts/scenario.schema.json`,
-the handoff seam to a future build phase.
+Requires the `profile` plugin, which supplies stack, documented requirements,
+deployment topology, and candidate user journeys. Scenarios trace back to the
+requirement they cover, and requirements no journey owns are surfaced separately
+rather than dropped. Where a normative document and the code disagree, the plan
+reports the conflict and both readings and offers to open a tracking issue.
+
+Discovery is read-only: nothing is built, booted, or run, and every unproven
+inference is carried into the plan as an explicit assumption. Output is a scenario
+set conforming to `references/contracts/scenario.schema.json`, the handoff seam to
+a future build phase.
 ```
 
 - [ ] **Step 3: Run the full suite**
@@ -1349,8 +1555,8 @@ git commit -m "feat(itest): marketplace registration and README"
 
 - `python3 -m unittest discover -s tests -t .` reports `OK`
 - `ruff check tests/test_itest_*.py` passes
-- All four `itest` contracts have validating examples, including a scenario example demonstrating both a composed and an injected precondition
-- `tests/test_itest_coupling.py` passes, proving `itest` never reaches into `profile` by path and `profile` never mentions `itest`
+- All four `itest` contracts have validating examples, including a scenario example demonstrating both a composed and an injected precondition, and a cross-cutting scenario with `provenance: requirement` and a null `journey_id`
+- `tests/test_itest_coupling.py` passes, proving `itest` never reaches into `profile` by path, `profile` never mentions `itest`, and the orchestrator preflights all four `profile` phases, prepares the gate, and offers conflict disposition without building an issue-creation mechanism
 - Both plugins appear in `.claude-plugin/marketplace.json` and `README.md`
 
 ## Deferred
