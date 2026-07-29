@@ -56,6 +56,14 @@ class TestClassifyTestFiles(unittest.TestCase):
         [record] = classify({"tests/helpers.py": "VALUE = 1\n"})
         self.assertEqual(record["kind"], "unknown")
 
+    def test_markdown_in_a_test_directory_is_not_a_test_file(self):
+        """A directory signal alone must not admit a non-source file."""
+        self.assertEqual(classify({"docs/contract/terms.md": "# Terms\n"}), [])
+
+    def test_locale_data_in_a_test_named_directory_is_excluded(self):
+        """'it' is a Maven test convention and an Italian locale code."""
+        self.assertEqual(classify({"src/it/messages.json": "{}\n"}), [])
+
     def test_signals_are_sorted(self):
         [record] = classify({"tests/integration/test_api.py": "def test_x(): pass\n"})
         self.assertEqual(record["signals"], sorted(record["signals"]))

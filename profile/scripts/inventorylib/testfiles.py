@@ -3,6 +3,8 @@
 import fnmatch
 from pathlib import Path, PurePosixPath
 
+from inventorylib.languages import EXT_LANGUAGE
+
 TEST_DIR_NAMES = {
     "test", "tests", "spec", "specs", "__tests__", "testing",
     "e2e", "integration", "it", "itest", "functional", "acceptance",
@@ -37,6 +39,17 @@ CONTENT_MARKERS = (
 )
 
 _KIND_BY_SIGNAL = {name: kind for name, kind, _ in CONTENT_MARKERS}
+
+
+def _is_source(path):
+    """True when the extension maps to a known language.
+
+    Census admission gate. Without it a directory signal alone admits any
+    file: `docs/contract/terms.md` and a locale file under `src/it/` both
+    come back as integration tests, and a later consumer reads every
+    integration file in full.
+    """
+    return PurePosixPath(path).suffix.lower() in EXT_LANGUAGE
 
 
 def _name_signals(path):
@@ -84,6 +97,8 @@ def classify_test_files(root, paths, max_bytes=4096):
     root = Path(root)
     records = []
     for path in paths:
+        if not _is_source(path):
+            continue
         signals, language = _name_signals(path)
         if not signals:
             continue
