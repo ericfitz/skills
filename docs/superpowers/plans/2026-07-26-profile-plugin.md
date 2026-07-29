@@ -635,6 +635,16 @@ git commit -m "feat(profile): manifest and package-manager detection"
 
 **Kind resolution priority (binding):** any `e2e` signal wins; else any `integration` signal; else a filename-pattern match yields `unit`; else `unknown`. A directory signal alone is never enough to call something a unit test.
 
+**Census admission (binding):** a file enters the census only if its extension maps to a
+known language in `EXT_LANGUAGE`. Amended after review: without this guard a directory
+signal alone admits non-source files, and `docs/contract/terms.md` and a locale file under
+`src/it/` both classify as `integration`. That is the same weakness the priority rule
+already forbids for `unit`, and it matters more here — a later consumer reads every
+integration file in full. The extension guard is deliberately chosen over trimming `it` and
+`contract` from `TEST_DIR_NAMES`, because both are real test conventions (Maven's `src/it/`,
+Pact-style contract tests), and over requiring a filename-pattern match, which would lose
+Jest's `__tests__/foo.js` where the directory is the only signal.
+
 - [ ] **Step 1: Write the failing test**
 
 ```python
@@ -696,6 +706,14 @@ class TestClassifyTestFiles(unittest.TestCase):
         [record] = classify({"tests/helpers.py": "VALUE = 1\n"})
         self.assertEqual(record["kind"], "unknown")
 
+    def test_markdown_in_a_test_directory_is_not_a_test_file(self):
+        """A directory signal alone must not admit a non-source file."""
+        self.assertEqual(classify({"docs/contract/terms.md": "# Terms\n"}), [])
+
+    def test_locale_data_in_a_test_named_directory_is_excluded(self):
+        """'it' is a Maven test convention and an Italian locale code."""
+        self.assertEqual(classify({"src/it/messages.json": "{}\n"}), [])
+
     def test_signals_are_sorted(self):
         [record] = classify({"tests/integration/test_api.py": "def test_x(): pass\n"})
         self.assertEqual(record["signals"], sorted(record["signals"]))
@@ -735,6 +753,8 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.testfile
 import fnmatch
 from pathlib import Path, PurePosixPath
 
+from inventorylib.languages import EXT_LANGUAGE
+
 TEST_DIR_NAMES = {
     "test", "tests", "spec", "specs", "__tests__", "testing",
     "e2e", "integration", "it", "itest", "functional", "acceptance",
@@ -769,6 +789,17 @@ CONTENT_MARKERS = (
 )
 
 _KIND_BY_SIGNAL = {name: kind for name, kind, _ in CONTENT_MARKERS}
+
+
+def _is_source(path):
+    """True when the extension maps to a known language.
+
+    Census admission gate. Without it a directory signal alone admits any
+    file: `docs/contract/terms.md` and a locale file under `src/it/` both
+    come back as integration tests, and a later consumer reads every
+    integration file in full.
+    """
+    return PurePosixPath(path).suffix.lower() in EXT_LANGUAGE
 
 
 def _name_signals(path):
@@ -816,6 +847,8 @@ def classify_test_files(root, paths, max_bytes=4096):
     root = Path(root)
     records = []
     for path in paths:
+        if not _is_source(path):
+            continue
         signals, language = _name_signals(path)
         if not signals:
             continue
@@ -837,7 +870,7 @@ def test_dirs(records):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_testfiles -v`
-Expected: PASS, 10 tests
+Expected: PASS, 12 tests
 
 - [ ] **Step 5: Lint and commit**
 
