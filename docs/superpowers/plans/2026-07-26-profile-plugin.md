@@ -1660,6 +1660,19 @@ class TestCoverageConfidence(unittest.TestCase):
                                 ["a.zig"] * 20, 100),
             "partial")
 
+    def test_share_of_exactly_five_percent_is_still_high(self):
+        """The binding rule says at most 5%; the boundary belongs to high."""
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
+                                ["a.zig"] * 5, 100),
+            "high")
+
+    def test_share_just_above_five_percent_is_partial(self):
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
+                                ["a.zig"] * 6, 100),
+            "partial")
+
 
 class TestBuildInventory(unittest.TestCase):
     def test_has_all_required_keys(self):
@@ -1697,6 +1710,32 @@ class TestBuildInventory(unittest.TestCase):
         found = inventory(files)
         self.assertEqual(len(found["docs"]), 200)
         self.assertEqual(found["docs_total"], 250)
+
+    def test_infra_classified_files_are_not_unclassified(self):
+        """The inventory must not contradict itself: recognized IaC is not
+        unknown, and confidence does not degrade for understood files."""
+        found = inventory({
+            "pyproject.toml": "[project]\nname = 'demo'\n",
+            "uv.lock": "version = 1\n",
+            "app.py": "x = 1\n",
+            "infra/main.tf": "resource {}\n",
+            "infra/vars.tfvars": "v = 1\n",
+        })
+        self.assertEqual([r["path"] for r in found["iac"]],
+                         ["infra/main.tf", "infra/vars.tfvars"])
+        self.assertEqual(found["unclassified"], [])
+        self.assertEqual(found["coverage_confidence"], "high")
+
+    def test_confidence_is_computed_before_truncation(self):
+        """300 unclassified in 4000 files is 7.5% -> partial. Computing from
+        the truncated list would floor it at 200/4000 = 5% -> high."""
+        files = {"src/f%04d.py" % i: "x = 1\n" for i in range(3699)}
+        files.update({"odd/f%03d.zig" % i: "x\n" for i in range(300)})
+        files["pyproject.toml"] = "[project]\nname = 'demo'\n"
+        found = inventory(files)
+        self.assertEqual(found["unclassified_total"], 300)
+        self.assertEqual(len(found["unclassified"]), 200)
+        self.assertEqual(found["coverage_confidence"], "partial")
 
     def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
         found = inventory({"main.zig": "pub fn main() void {}\n",
@@ -1763,6 +1802,19 @@ def build_inventory(root):
     infra = detect_infra(root, paths)
     docs = detect_docs(root, paths)
 
+    # A path the infra census recognized is not unclassified, whatever the
+    # language census thinks: .tf/.tfvars/.bicep carry no language, but the
+    # inventory understands them. Without this subtraction the same file is
+    # reported as recognized IaC AND unknown, and confidence degrades for a
+    # repo the census fully understood — a self-contradictory inventory.
+    known = {
+        record["path"]
+        for section in (infra["ci"], infra["containers"], infra["iac"],
+                        infra["test_config"], infra["entrypoints"])
+        for record in section
+    }
+    unclassified = [p for p in unclassified if p not in known]
+
     return {
         "inventory_version": VERSION,
         "root": str(root.resolve()),
@@ -1789,7 +1841,7 @@ def build_inventory(root):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_report -v`
-Expected: PASS, 11 tests
+Expected: PASS, 15 tests
 
 - [ ] **Step 5: Lint and commit**
 
@@ -2692,7 +2744,7 @@ git commit -m "feat(profile): phase contracts with dependency-free schema valida
 
 - A table mapping every key in `MANIFESTS` (Task 3) to its ecosystem, the runtime it implies, and the version file to read for that runtime (`.python-version`, `go.mod` go directive, `.nvmrc`, `rust-toolchain.toml`, `.ruby-version`).
 - A table mapping every key in `LOCKFILE_PM` to its package manager and the command that installs dependencies.
-- A section **"When the script comes back low-confidence"** listing the fallback reading order: root directory listing, any `Makefile` or `justfile` targets, CI workflow files, `README` build instructions, editor config, then file extensions by frequency.
+- A section **"When the script comes back low-confidence"** listing the fallback reading order: root directory listing, any `Makefile` or `justfile` targets, CI workflow files, `README` build instructions, editor config, then file extensions by frequency. It must also state what the number means, verbatim: *"`coverage_confidence` measures the whole tree, assets included — a repo can be `high` while one niche source directory is opaque. Read `unclassified[]` too, not just the label."*
 - A section **"Build command inference"** giving the canonical build command per ecosystem (`go build ./...`, `cargo build`, `npm run build`, `uv build`, `mvn package`, `dotnet build`).
 - A closing rule, verbatim: *"If you cannot identify the ecosystem, say so in `unknowns[]` and set `confidence` to `low`. Do not guess a language from a single file."*
 
