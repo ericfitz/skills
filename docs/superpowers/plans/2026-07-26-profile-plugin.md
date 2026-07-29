@@ -3135,7 +3135,11 @@ Expected: `OK`
 - [ ] **Step 7: Verify the plugin against itself**
 
 Run: `uv run --script profile/scripts/profile_inventory.py . --indent 0 | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['coverage_confidence'], len(d['test_files']))"`
-Expected: prints a confidence value and a non-zero test-file count. If confidence is `low`, investigate — this repo has no root manifest, so `low` is the correct answer here and demonstrates the no-silent-guessing rule working.
+Expected: prints a confidence value and a non-zero test-file count. This repo has a root
+`pyproject.toml` and `uv.lock`, so `manifests` is non-empty and confidence should be `high`
+or `partial` — `low` here would mean either languages or manifests came back empty, which
+is worth investigating. (An earlier draft of this plan claimed the repo had no root
+manifest; that stopped being true when the repo adopted uv.)
 
 - [ ] **Step 8: Lint and commit**
 
