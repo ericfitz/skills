@@ -44,6 +44,19 @@ class TestCoverageConfidence(unittest.TestCase):
                                 ["a.zig"] * 20, 100),
             "partial")
 
+    def test_share_of_exactly_five_percent_is_still_high(self):
+        """The binding rule says at most 5%; the boundary belongs to high."""
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
+                                ["a.zig"] * 5, 100),
+            "high")
+
+    def test_share_just_above_five_percent_is_partial(self):
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
+                                ["a.zig"] * 6, 100),
+            "partial")
+
 
 class TestBuildInventory(unittest.TestCase):
     def test_has_all_required_keys(self):
@@ -81,6 +94,32 @@ class TestBuildInventory(unittest.TestCase):
         found = inventory(files)
         self.assertEqual(len(found["docs"]), 200)
         self.assertEqual(found["docs_total"], 250)
+
+    def test_infra_classified_files_are_not_unclassified(self):
+        """The inventory must not contradict itself: recognized IaC is not
+        unknown, and confidence does not degrade for understood files."""
+        found = inventory({
+            "pyproject.toml": "[project]\nname = 'demo'\n",
+            "uv.lock": "version = 1\n",
+            "app.py": "x = 1\n",
+            "infra/main.tf": "resource {}\n",
+            "infra/vars.tfvars": "v = 1\n",
+        })
+        self.assertEqual([r["path"] for r in found["iac"]],
+                         ["infra/main.tf", "infra/vars.tfvars"])
+        self.assertEqual(found["unclassified"], [])
+        self.assertEqual(found["coverage_confidence"], "high")
+
+    def test_confidence_is_computed_before_truncation(self):
+        """300 unclassified in 4000 files is 7.5% -> partial. Computing from
+        the truncated list would floor it at 200/4000 = 5% -> high."""
+        files = {"src/f%04d.py" % i: "x = 1\n" for i in range(3699)}
+        files.update({"odd/f%03d.zig" % i: "x\n" for i in range(300)})
+        files["pyproject.toml"] = "[project]\nname = 'demo'\n"
+        found = inventory(files)
+        self.assertEqual(found["unclassified_total"], 300)
+        self.assertEqual(len(found["unclassified"]), 200)
+        self.assertEqual(found["coverage_confidence"], "partial")
 
     def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
         found = inventory({"main.zig": "pub fn main() void {}\n",

@@ -35,6 +35,19 @@ def build_inventory(root):
     infra = detect_infra(root, paths)
     docs = detect_docs(root, paths)
 
+    # A path the infra census recognized is not unclassified, whatever the
+    # language census thinks: .tf/.tfvars/.bicep carry no language, but the
+    # inventory understands them. Without this subtraction the same file is
+    # reported as recognized IaC AND unknown, and confidence degrades for a
+    # repo the census fully understood — a self-contradictory inventory.
+    known = {
+        record["path"]
+        for section in (infra["ci"], infra["containers"], infra["iac"],
+                        infra["test_config"], infra["entrypoints"])
+        for record in section
+    }
+    unclassified = [p for p in unclassified if p not in known]
+
     return {
         "inventory_version": VERSION,
         "root": str(root.resolve()),
