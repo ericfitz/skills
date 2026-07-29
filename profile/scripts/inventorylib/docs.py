@@ -68,19 +68,40 @@ def _tokens(path):
     return {token for token in _TOKENS.split(path.lower()) if token}
 
 
-def guess_doc_type(path):
-    """Return one of DOC_TYPES for path, based on its tokens. Never guesses wildly."""
-    parsed = PurePosixPath(path)
-    stem_type = STEM_TYPES.get(parsed.stem.lower())
-    if stem_type:
-        return stem_type
-    tokens = _tokens(path)
+def _match_tokens(tokens):
+    """Return a doc type for one path segment's tokens, or None."""
     if {"getting", "started"} <= tokens or {"get", "started"} <= tokens:
         return "tutorial"
     for names, doc_type in TOKEN_TYPES:
         if tokens & names:
             return doc_type
+    return None
+
+
+def guess_doc_type(path):
+    """Return one of DOC_TYPES for path. Nearer path segments outrank farther ones.
+
+    A file's own name is the strongest signal: docs/design/setup-tutorial.md
+    is a tutorial that happens to live under design/, not a design doc. When
+    the filename says nothing, the nearest ancestor directory that says
+    something wins: docs/design/api/orders.md is API reference filed under
+    design/. Amended after review found pooled whole-path tokens let an
+    ancestor directory confidently override an explicit filename.
+    """
+    parsed = PurePosixPath(path)
+    stem_type = STEM_TYPES.get(parsed.stem.lower())
+    if stem_type:
+        return stem_type
+    for part in reversed(parsed.parts):
+        doc_type = _match_tokens(_tokens(part))
+        if doc_type:
+            return doc_type
     return "unknown"
+
+
+def _in_doc_dir(path):
+    """True when any ancestor directory is a recognized documentation directory."""
+    return any(part.lower() in DOC_DIRS for part in PurePosixPath(path).parts[:-1])
 
 
 def _is_doc(path):
@@ -89,7 +110,19 @@ def _is_doc(path):
         return True
     if parsed.suffix.lower() not in DOC_EXTS:
         return False
-    return any(part.lower() in DOC_DIRS for part in parsed.parts[:-1])
+    return _in_doc_dir(path)
+
+
+def _git_available(root):
+    """One probe so a non-git tree does not pay one doomed subprocess per doc."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
 
 
 def _git_last_modified(root, path):
@@ -118,7 +151,7 @@ def _doc_sites(paths):
         parsed = PurePosixPath(path)
         generator = DOC_SITE_FILES.get(parsed.name)
         if generator is None and parsed.name == SPHINX_CONF:
-            if any(part.lower() in DOC_DIRS for part in parsed.parts[:-1]):
+            if _in_doc_dir(path):
                 generator = "sphinx"
         if generator:
             sites.append({"path": path, "generator": generator})
@@ -130,13 +163,15 @@ def detect_docs(root, paths, max_git_lookups=500):
 
     Git lookups are capped: beyond max_git_lookups, last_modified is None. A
     thousand-page docs site should not turn the census into a thousand
-    subprocess calls.
+    subprocess calls, and a non-git tree pays one probe rather than one failed
+    subprocess per document.
     """
     root = Path(root)
     docs = []
     lookups = 0
+    use_git = _git_available(root)
     for path in sorted(p for p in paths if _is_doc(p)):
-        if lookups < max_git_lookups:
+        if use_git and lookups < max_git_lookups:
             last_modified = _git_last_modified(root, path)
             lookups += 1
         else:

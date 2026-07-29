@@ -45,6 +45,14 @@ class TestGuessDocType(unittest.TestCase):
         """'api' in 'capital' is true; token matching must not be fooled."""
         self.assertEqual(guess_doc_type("docs/capital.md"), "unknown")
 
+    def test_filename_tokens_outrank_directory_tokens(self):
+        """docs/design/setup-tutorial.md is a tutorial filed under design/."""
+        self.assertEqual(guess_doc_type("docs/design/setup-tutorial.md"), "tutorial")
+        self.assertEqual(guess_doc_type("docs/specs/deployment-runbook.md"), "runbook")
+
+    def test_nearest_directory_wins_when_the_filename_says_nothing(self):
+        self.assertEqual(guess_doc_type("docs/design/api/orders.md"), "api_reference")
+
     def test_every_guess_is_in_the_fixed_vocabulary(self):
         for path in ("README.md", "docs/x.md", "docs/adr/1-y.md", "CHANGELOG.md"):
             with self.subTest(path=path):
