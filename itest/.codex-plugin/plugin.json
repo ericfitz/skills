@@ -1,6 +1,6 @@
 {
   "name": "itest",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Integration test design toolkit: discover a project's test conventions (conventions), assess the quality of the tests it already has (critique), find its state-establishment affordances (state), and synthesize a full integration test design from customer journeys (design). Read-only discovery; requires the profile plugin.",
   "author": {
     "name": "efitz"

@@ -1,6 +1,6 @@
 {
   "name": "cats",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Portable CATS API fuzzing toolkit: bootstrap per-repo config (init), run fuzz campaigns via config-declared hooks (run), query and render results from SQLite (report), triage true positives into a remediation plan (analyze), and manage declarative false-positive rules (fp).",
   "author": {
     "name": "efitz"
