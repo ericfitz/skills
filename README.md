@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal Claude Code marketplace (`efitz-skills`). Ten plugins, each
+efitz's personal Claude Code marketplace (`efitz-skills`). Twelve plugins, each
 bundling one or more skills. Invoke a skill as `/<plugin>:<skill>`.
 
 ## loc — localization / i18n

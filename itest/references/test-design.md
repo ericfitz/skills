@@ -50,7 +50,7 @@ spelling.
 |---|---|---|
 | `over-mocking` | The boundary under test is itself mocked, so the test cannot observe the integration it claims to cover | The component named in the test's title or docstring appears in the mock/stub/fake setup rather than in a real call — check what's constructed against what's claimed. |
 | `implementation-detail-assertion` | Asserts on internal call sequences, private state, or structures no customer can observe | The assertion target is a private attribute, a mock's call count, or a value never returned by any public interface. |
-| `non-determinism` | Depends on sleeps, wall-clock time, iteration order, or unseeded randomness | The test body calls a sleep/timer function, reads the system clock, or generates random values or dict/set iteration order without a fixed seed. |
+| `non-determinism` | Depends on sleeps, wall-clock time, iteration order, or unseeded randomness | The test body calls a sleep/timer function, reads the system clock, uses unseeded randomness, or asserts on set/map iteration order as if it were stable. |
 | `shared-mutable-state` | Depends on state left behind by another test, or leaves state that affects others | The test reads fixture or global state it did not itself create in this run, or skips teardown of state it created. |
 | `tautological-assertion` | Asserts something that cannot fail, or re-asserts the value just written by the test | The expected and actual sides of the assertion trace back to the same literal or variable with no independent read path in between. |
 | `assertion-free` | Executes a flow and asserts nothing beyond absence of an exception | Zero assertion/expect calls appear in the test body, or the only one checks that the call didn't raise. |
@@ -66,8 +66,9 @@ deliberately:
 - Compose by default when the prerequisite is itself a journey under test — state is
   valid by construction and the create path gets extra coverage for free.
 - Inject when the chain is deep enough that composition dominates runtime; or the state
-  is unreachable through the public interface; or it belongs to a third party being
-  stubbed; or a corrupt or edge-case state is what is under test.
+  is unreachable through the public interface (produced by a background job, aged by
+  time, migrated legacy data); or it belongs to a third party being stubbed; or a
+  corrupt or edge-case state is what is under test.
 - Never inject state the real system could not itself produce, unless resilience to
   exactly that corruption is under test. Otherwise the test asserts on fiction and
   passes forever.

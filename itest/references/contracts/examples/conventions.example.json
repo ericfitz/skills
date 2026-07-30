@@ -11,7 +11,7 @@
   },
   "integration_separation": {
     "mechanism": "build-tag",
-    "how_to_add": "Add '//go:build integration' as the first line of the file, before the package clause.",
+    "how_to_add": "Add '//go:build integration' as the first line of the file, before the package clause. The file only runs when the runner passes -tags=integration.",
     "evidence": ["internal/store/store_integration_test.go:1", ".github/workflows/test.yml:22"]
   },
   "house_style": {
