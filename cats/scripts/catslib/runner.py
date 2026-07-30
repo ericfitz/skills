@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import logging
 import os
 import re
@@ -14,6 +15,7 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -76,6 +78,104 @@ class PreflightError(Exception):
     """The environment is not ready to fuzz."""
 
 
+class FixtureError(Exception):
+    """Seeded fixtures the campaign depends on are missing before it starts."""
+
+
+@dataclass(frozen=True)
+class Fixture:
+    """A seeded id the campaign substitutes, and how to prove it still exists."""
+
+    key: str
+    id: str
+    verify_url: str
+    anchor_path: str
+    decoyed: bool
+
+
+def load_fixtures(path: Path) -> list[Fixture]:
+    """Read a fixture manifest written by the seed hook; raise FixtureError if malformed."""
+    try:
+        raw = json.loads(path.read_text())
+    except FileNotFoundError as exc:
+        raise FixtureError(
+            f"fixture manifest not found: {path}. It is written by the seed hook, so "
+            "this usually means seeding did not run (did you pass --skip-seed?) or it "
+            "failed before writing the manifest. Unset `cats.fixtures` to disable the "
+            "fixture-integrity gates."
+        ) from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise FixtureError(f"fixture manifest {path} is unreadable: {exc}") from exc
+
+    entries = raw.get("fixtures")
+    if not isinstance(entries, list):
+        raise FixtureError(f"fixture manifest {path}: 'fixtures' must be a list")
+    fixtures: list[Fixture] = []
+    for entry in entries:
+        try:
+            fixtures.append(
+                Fixture(
+                    key=str(entry["key"]),
+                    id=str(entry["id"]),
+                    verify_url=str(entry["verify_url"]),
+                    anchor_path=str(entry.get("anchor_path", "")),
+                    decoyed=bool(entry.get("decoyed", False)),
+                )
+            )
+        except (KeyError, TypeError) as exc:
+            raise FixtureError(
+                f"fixture manifest {path}: malformed entry {entry!r} ({exc})"
+            ) from exc
+    return fixtures
+
+
+def check_fixtures(
+    fixtures: Sequence[Fixture], server: str, header: str, value: str
+) -> list[tuple[Fixture, str]]:
+    """GET each fixture's verify_url; return (fixture, reason) for every one that is gone.
+
+    A fixture is considered alive on any 2xx and dead on 404/410. Anything else
+    (401/403/5xx, a transport error) is reported too, but with the status named,
+    because "the gate could not tell" must not read as "the fixture is fine" —
+    that is the same silent-pass failure the run-validity gates exist to stop.
+    """
+    dead: list[tuple[Fixture, str]] = []
+    for fixture in fixtures:
+        url = server.rstrip("/") + "/" + fixture.verify_url.lstrip("/")
+        request = urllib.request.Request(url, headers={header: value}, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                if not 200 <= response.status < 300:
+                    dead.append((fixture, f"HTTP {response.status}"))
+        except urllib.error.HTTPError as exc:
+            if exc.code in (404, 410):
+                dead.append((fixture, f"HTTP {exc.code} (gone)"))
+            else:
+                dead.append((fixture, f"HTTP {exc.code} (could not verify)"))
+        except (urllib.error.URLError, OSError) as exc:
+            dead.append((fixture, f"unreachable ({exc})"))
+    return dead
+
+
+def describe_dead_fixtures(dead: Sequence[tuple[Fixture, str]]) -> str:
+    """Format dead fixtures as one actionable line each, naming the fix (pure)."""
+    lines = []
+    for fixture, reason in dead:
+        if fixture.decoyed:
+            fix = (
+                f"{fixture.anchor_path} already has a decoy override, so the decoy is not "
+                "working — check that the throwaway is actually seeded and that the "
+                "per-path section names the right parameter"
+            )
+        else:
+            fix = (
+                f"point {fixture.anchor_path} at a throwaway decoy in the seed's refData "
+                "so DELETE consumes the decoy instead of this fixture"
+            )
+        lines.append(f"  - {fixture.key} ({fixture.id}): {reason}; {fix}")
+    return "\n".join(lines)
+
+
 @dataclass
 class RunResult:
     run_id: str
@@ -89,6 +189,7 @@ class RunResult:
     total_tests: int | None = None
     max_connection_error_pct: float = 1.0
     max_unauthenticated_pct: float = 5.0
+    dead_fixtures: list[tuple[Fixture, str]] = field(default_factory=list)
     pruned: list[Path] = field(default_factory=list)
     pruned_bytes: int = 0
 
@@ -107,12 +208,26 @@ class RunResult:
           exercised only the unauthenticated path (TMI #591, a fuzzed
           self-logout endpoint).
 
+        - fixture: a seeded fixture the campaign depends on no longer exists at
+          the end of the run, so the campaign deleted its own test data and
+          every later test nested under that fixture ran against a 404 (TMI
+          #608). Unlike the two rate gates this one is not a percentage — a
+          single dead anchor silently invalidates every path beneath it.
+
         Empty when no stats are available (e.g. --skip-parse) or the run had
-        zero tests.
+        zero tests, except for the fixture gate, which does not depend on
+        parsed results and so is reported either way.
         """
-        if not self.total_tests:
-            return []
         reasons: list[str] = []
+        if self.dead_fixtures:
+            reasons.append(
+                f"{len(self.dead_fixtures)} seeded fixture(s) did not survive the campaign, "
+                "so every test nested under them ran against a resource that no longer "
+                "existed and their results are meaningless:\n"
+                + describe_dead_fixtures(self.dead_fixtures)
+            )
+        if not self.total_tests:
+            return reasons
         if self.connection_errors is not None:
             pct = 100.0 * self.connection_errors / self.total_tests
             if pct > self.max_connection_error_pct:
@@ -641,8 +756,29 @@ def execute(
     unauthenticated: int | None = None
     total_tests: int | None = None
     headers_file: Path | None = None
+    fixtures: list[Fixture] = []
     try:
         token = resolve_token(identity, config.repo_root, hook_env)
+
+        # Fixture gate #1, after seeding and before a single fuzz request: if the
+        # fixtures are already gone there is no point running a campaign whose
+        # every nested path would 404. Fails the run rather than warning —
+        # a campaign against absent fixtures produces confident, worthless
+        # findings, which is strictly worse than no campaign.
+        if config.cats.fixtures is not None:
+            fixtures = load_fixtures(config.cats.fixtures)
+            missing = check_fixtures(
+                fixtures, config.server, config.auth_header,
+                config.auth_template.format(token=token),
+            )
+            if missing:
+                raise FixtureError(
+                    f"{len(missing)} of {len(fixtures)} seeded fixture(s) are missing "
+                    "BEFORE fuzzing started, so the campaign would have run against "
+                    "resources that do not exist:\n" + describe_dead_fixtures(missing)
+                )
+            logger.info("fixture preflight: %d fixture(s) verified present", len(fixtures))
+
         headers_file = write_headers_file(
             config.results_dir, config.auth_header, config.auth_template.format(token=token),
             config.cats.headers,
@@ -688,6 +824,34 @@ def execute(
         if headers_file is not None:
             headers_file.unlink(missing_ok=True)
 
+    # Fixture gate #2: did the fixtures survive the campaign? Deliberately uses a
+    # FRESH token rather than the campaign's, so a fixture reported gone means
+    # "the resource is gone" and not "the token that could see it expired" —
+    # otherwise this gate would double-report whatever the credential gate
+    # already covers. A token failure here is a warning, not a verdict: it
+    # leaves dead_fixtures empty rather than inventing fixture deaths.
+    dead_fixtures: list[tuple[Fixture, str]] = []
+    if fixtures:
+        try:
+            verify_token = resolve_token(identity, config.repo_root, hook_env)
+        except HookError as exc:
+            logger.warning(
+                "could not mint a fresh token for the post-run fixture check, "
+                "skipping it: %s", exc
+            )
+        else:
+            dead_fixtures = check_fixtures(
+                fixtures, config.server, config.auth_header,
+                config.auth_template.format(token=verify_token),
+            )
+            if dead_fixtures:
+                logger.error(
+                    "%d of %d fixture(s) did not survive the campaign",
+                    len(dead_fixtures), len(fixtures),
+                )
+            else:
+                logger.info("fixture integrity: all %d fixture(s) survived", len(fixtures))
+
     # Build the result up front so the validity gates live in exactly one place
     # (RunResult.contamination_reasons) rather than being restated here.
     result = RunResult(
@@ -702,6 +866,7 @@ def execute(
         total_tests=total_tests,
         max_connection_error_pct=config.max_connection_error_pct,
         max_unauthenticated_pct=config.max_unauthenticated_pct,
+        dead_fixtures=dead_fixtures,
     )
     contaminated = result.contaminated
 

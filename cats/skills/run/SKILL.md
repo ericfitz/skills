@@ -65,13 +65,54 @@ itself failed. Use what actually printed to tell these apart:
 
 ## Validity gates
 
-A campaign can run to completion and still be worthless. There are two ways
-that happens, and `run` checks for both after every completed campaign:
+A campaign can run to completion and still be worthless. There are three ways
+that happens, and `run` checks for all of them after every completed campaign:
 
 | gate | config key (default) | what it means |
 |---|---|---|
 | **transport** | `max_connection_error_pct` (1.0%) | tests failing with a connection error (CATS pseudo-codes 953/999) — the requests never reached the API |
 | **credential** | `max_unauthenticated_pct` (5.0%) | tests getting a **non-false-positive** 401 — the campaign lost its bearer token partway through and the rest of the run only exercised the unauthenticated path |
+| **fixture** | `cats.fixtures` (unset = gate off) | a seeded fixture the campaign depends on no longer exists at the end of the run — the campaign DELETEd its own test data, so every later test nested under that fixture ran against a 404 |
+
+The fixture gate is not a percentage. One dead anchor silently invalidates
+every path beneath it, so a single death fails the run.
+
+### The pattern behind all three: the campaign sabotaging itself
+
+Every one of these gates exists because a campaign destroyed its own ability to
+keep testing, **while still reporting as complete**. That is the failure mode to
+be suspicious of, and it generalizes past these three. When triaging any
+surprising result, ask whether the fuzzer did something to the system that
+invalidated the rest of its own run:
+
+- **Revoking its own credential.** A self-logout endpoint blacklists the very
+  bearer token the campaign authenticates with. Everything after that point is
+  a 401 against an unauthenticated path.
+- **Deleting its own fixtures.** DELETE on `/things/{id}` where `{id}` came from
+  refData consumes the seeded fixture, and because CATS walks paths in lexical
+  order the anchor is usually fuzzed *before* everything nested under it.
+- **Mutating its own identity.** A successful PATCH/DELETE against the fuzzing
+  user's own account has the same effect as a logout. Point destructive
+  user/admin routes at a dedicated throwaway account, never the identity in use.
+- **Exhausting a shared budget.** Rate limits, quotas, and lockout counters
+  consumed early make later tests fail for reasons that have nothing to do with
+  the endpoint under test.
+- **Poisoning shared state.** A fuzzer that writes an invalid value into a
+  config or cache other endpoints read will make those endpoints fail
+  independently of their own correctness.
+
+The tell is always the same shape: **findings that cluster by *when* the test
+ran rather than by *what* it tested.** If failures start at some test number and
+never stop, suspect self-sabotage before believing the findings. Check the
+result distribution by test number before concluding anything about the API.
+
+The fixes follow a pattern too — take the destructive operation off the
+resource the rest of the campaign depends on:
+
+- give the anchor path its own **throwaway decoy** id, so a successful DELETE
+  consumes the decoy while the fixture nested paths need survives;
+- or put the endpoint in `cats.skip_paths` and fuzz it in its own short run,
+  where destroying something at the end costs nothing.
 
 Some 401s are expected (`BypassAuthentication` and the header-mangling
 fuzzers provoke them deliberately), which is why the credential gate counts

@@ -34,6 +34,7 @@ from catslib.config import (
 from catslib.parse import parse_report
 from catslib.rules import RuleError, load_rules
 from catslib.runner import (
+    FixtureError,
     HookError,
     PreflightError,
     RunResult,
@@ -341,6 +342,12 @@ def cmd_run(args: argparse.Namespace) -> None:
         print(
             f"Unauthenticated (non-false-positive 401): {result.unauthenticated} / "
             f"{result.total_tests} ({pct:.2f}%)"
+        )
+
+    if result.dead_fixtures:
+        print(
+            f"Fixtures destroyed by this campaign: {len(result.dead_fixtures)} "
+            "(see RUN INVALID below)"
         )
 
     if result.pruned:
@@ -701,7 +708,10 @@ def main() -> None:
     # e.g. reporting.summary()/render_html(), reached via report._connect(), which
     # can't call sys.exit itself since it's a library, not a CLI command — so a
     # malformed database doesn't traceback wherever it's touched next.
-    except (ConfigError, RuleError, ClassifyError, HookError, PreflightError, sqlite3.Error) as exc:
+    except (
+        ConfigError, RuleError, ClassifyError, FixtureError, HookError, PreflightError,
+        sqlite3.Error,
+    ) as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(2)
 

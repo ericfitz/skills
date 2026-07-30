@@ -14,7 +14,7 @@ how the finding "seems."
 
 ## 0. Check run validity first
 
-A run can complete and still be worthless to analyze, in two distinct ways:
+A run can complete and still be worthless to analyze, in three distinct ways:
 
 - **Transport.** A large fraction of tests never reached the API (an
   unreachable server, or a throttled kubectl port-forward silently dropping
@@ -23,8 +23,19 @@ A run can complete and still be worthless to analyze, in two distinct ways:
 - **Credential.** The campaign lost its bearer token partway through — most
   often by fuzzing an endpoint that revokes the caller's own token — and
   every test after that point exercised only the unauthenticated path.
+- **Fixture.** The campaign deleted its own seeded test data, so every test
+  nested under the dead fixture ran against a 404. These show up as a wall of
+  plausible-looking 404 "findings" on endpoints that are in fact fine.
 
-Check both before clustering anything:
+All three are the same underlying failure: **the campaign sabotaged its own
+ability to keep testing, and still reported as complete.** Assume it can happen
+in ways not yet enumerated. The diagnostic tell is always identical — findings
+that cluster by *when* the test ran rather than by *what* it tested. Before
+believing any cluster, check whether its failures begin at some test number and
+never stop; if they do, something the fuzzer did to the system caused them, not
+the endpoint under test.
+
+Check all three before clustering anything:
 
 ```
 uv run ${CLAUDE_PLUGIN_ROOT}/scripts/cats_tool.py query --db latest --json --sql "
@@ -70,6 +81,37 @@ ORDER BY t.test_number DESC LIMIT 20;
 ```
 
 Add whatever that turns up to `cats.skip_paths` and re-run.
+
+The same cliff query diagnoses a **fixture** death — only the fix differs. Look
+for a successful `DELETE` on an anchor path (`/things/{id}`) followed by a run of
+404s on everything nested under it (`/things/{id}/...`):
+
+```sql
+-- successful DELETEs, earliest first: each one consumed something
+SELECT t.test_number, m.method, p.path
+FROM tests t
+JOIN paths p ON p.id = t.path_id
+JOIN requests rq ON rq.test_id = t.id
+JOIN http_methods m ON m.id = rq.http_method_id
+JOIN responses r ON r.test_id = t.id
+WHERE m.method = 'DELETE' AND r.response_code BETWEEN 200 AND 299
+ORDER BY t.test_number;
+
+-- 404 rate per path, to see which families died wholesale
+SELECT p.path,
+       SUM(CASE WHEN r.response_code = 404 THEN 1 ELSE 0 END) AS not_found,
+       COUNT(*) AS total
+FROM tests t JOIN paths p ON p.id = t.path_id JOIN responses r ON r.test_id = t.id
+GROUP BY p.path HAVING not_found > 0 ORDER BY not_found DESC LIMIT 20;
+```
+
+The fix is not `skip_paths` here — that would drop the anchor's DELETE coverage
+entirely. Point the anchor path at a **throwaway decoy** id in the seed's
+generated refData, so a successful DELETE consumes the decoy while the fixture
+the nested paths depend on survives. Nested paths are distinct path strings and
+keep the real fixture. `run`'s fixture gate names the anchor to fix in its
+failure message, and says whether that anchor already has a decoy (in which case
+the decoy itself is broken, not missing).
 
 ## 1. Resolve the database and the spec
 

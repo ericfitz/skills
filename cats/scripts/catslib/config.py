@@ -20,9 +20,9 @@ TOP_LEVEL_KEYS = {
     "max_unauthenticated_pct", "keep_runs",
 }
 CATS_KEYS = {
-    "http_methods", "max_requests_per_minute", "ref_data", "skip_field_format",
-    "skip_field", "skip_fuzzers", "skip_fuzzers_for_extension", "skip_paths",
-    "headers", "extra_args",
+    "http_methods", "max_requests_per_minute", "ref_data", "fixtures",
+    "skip_field_format", "skip_field", "skip_fuzzers", "skip_fuzzers_for_extension",
+    "skip_paths", "headers", "extra_args",
 }
 HOOK_KEYS = {"seed", "pre_run", "post_run"}
 REQUIRED = ("spec", "server", "results_dir", "false_positives", "identities")
@@ -54,6 +54,11 @@ class CatsOptions:
     http_methods: list[str]
     max_requests_per_minute: int
     ref_data: Path | None
+    # Path to a fixture manifest describing the seeded ids this campaign
+    # substitutes, and a GET that proves each is still alive. Optional: when
+    # unset the fixture-integrity gates are skipped entirely, so a repo that
+    # does not seed keeps working unchanged.
+    fixtures: Path | None
     skip_field_format: list[str]
     skip_field: list[str]
     skip_fuzzers: list[str]
@@ -266,6 +271,15 @@ def load_config(path: Path) -> Config:
     else:
         ref_data = None
 
+    fixtures_value = cats_raw.get("fixtures")
+    if fixtures_value is not None:
+        fixtures_str = _require_str(fixtures_value, "cats.fixtures", path)
+        if not fixtures_str:
+            raise ConfigError(f"{path}: 'cats.fixtures' must not be empty; omit it to leave unset")
+        fixtures = repo_root / fixtures_str
+    else:
+        fixtures = None
+
     skip_field_format = _require_list(
         cats_raw.get("skip_field_format", []), "cats.skip_field_format", path
     )
@@ -307,6 +321,7 @@ def load_config(path: Path) -> Config:
         http_methods=http_methods,
         max_requests_per_minute=max_requests_per_minute,
         ref_data=ref_data,
+        fixtures=fixtures,
         skip_field_format=skip_field_format,
         skip_field=skip_field,
         skip_fuzzers=skip_fuzzers,
@@ -440,6 +455,13 @@ cats:
   http_methods: [POST, PUT, GET, DELETE, PATCH]
   max_requests_per_minute: 3000
   # ref_data: test/results/cats/cats-test-data.yml
+  # Fixture manifest written by the seed hook: the seeded ids this campaign
+  # substitutes, each with a GET that proves it is still alive. Enables the
+  # fixture-integrity gates -- one after seeding (fixtures must exist before
+  # fuzzing starts) and one after the campaign (a fixture the campaign DELETEd
+  # out from under itself makes the run contaminated, because every later test
+  # nested under it ran against a 404). Omit to skip both gates.
+  # fixtures: test/results/cats/cats-fixtures.json
   skip_field_format: []
   skip_field: []
   skip_fuzzers: []
