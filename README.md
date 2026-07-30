@@ -51,6 +51,24 @@ than working around it. Each skill emits a versioned JSON contract under
 `references/contracts/`; those contracts are the supported interface for other
 plugins.
 
+## itest — integration test design
+
+`design` (orchestrates the whole workflow) · `conventions` (frameworks, runner
+commands, how integration tests are separated) · `critique` (quality assessment of
+existing tests — over-mocking, implementation-detail assertions, non-determinism) ·
+`state` (writable stores, factories, seed tooling, teardown affordances).
+
+Requires the `profile` plugin, which supplies stack, documented requirements,
+deployment topology, and candidate user journeys. Scenarios trace back to the
+requirement they cover, and requirements no journey owns are surfaced separately
+rather than dropped. Where a normative document and the code disagree, the plan
+reports the conflict and both readings and offers to open a tracking issue.
+
+Discovery is read-only: nothing is built, booted, or run, and every unproven
+inference is carried into the plan as an explicit assumption. Output is a scenario
+set conforming to `references/contracts/scenario.schema.json`, the handoff seam to
+a future build phase.
+
 ## writing
 
 `boring` (evaluate technical business writing for "boringness" across 20
