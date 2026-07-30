@@ -29,11 +29,11 @@ import is stronger evidence than an image name alone — a compose service can b
 
 | Dependency | Image name(s) | Client library signal | Kind | How normally started |
 |---|---|---|---|---|
-| postgres | `postgres`, `postgis` | `psycopg`/`psycopg2` (Python), `pg` (Node), `lib/pq`/`pgx` (Go), the `pg` adapter under ActiveRecord (Ruby) | relational database | container/compose service, or a managed instance (RDS, Cloud SQL) reached by connection string |
+| postgres | `postgres`, `postgis/postgis` | `psycopg`/`psycopg2` (Python), `pg` (Node), `lib/pq`/`pgx` (Go), the `pg` adapter under ActiveRecord (Ruby) | relational database | container/compose service, or a managed instance (RDS, Cloud SQL) reached by connection string |
 | mysql | `mysql`, `mariadb` | `mysql-connector-python`/`PyMySQL` (Python), `mysql2` (Node), `go-sql-driver/mysql` (Go) | relational database | container/compose service, or a managed instance |
 | redis | `redis`, `redis-stack` | `redis-py` (Python), `ioredis`/`redis` (Node), `go-redis` (Go) | cache / session store / lightweight queue backend | container/compose service, or a managed instance (ElastiCache) |
 | rabbitmq | `rabbitmq` | `pika` (Python), `amqplib`/`amqp-connection-manager` (Node), `bunny` (Ruby), `streadway/amqp` (Go) | message queue (AMQP broker) | container/compose service, often with a management-plugin variant in local setups |
-| kafka | `confluentinc/cp-kafka`, `bitnami/kafka`, `apache/kafka` | `kafka-python`/`confluent-kafka` (Python), `kafkajs` (Node), `segmentio/kafka-go` (Go) | event streaming log | container/compose service (often paired with a `zookeeper`/KRaft container), or a managed cluster (MSK, Confluent Cloud) |
+| kafka | `confluentinc/cp-kafka`, `bitnami/kafka`, `apache/kafka` | `kafka-python`/`confluent-kafka` (Python), `kafkajs` (Node), `segmentio/kafka-go` (Go) | event streaming log | container/compose service (paired with a `zookeeper` container, or running KRaft with none), or a managed cluster (MSK, Confluent Cloud) |
 | elasticsearch | `elasticsearch`, `opensearchproject/opensearch` | `elasticsearch`/`opensearch-py` (Python), `@elastic/elasticsearch` (Node) | search / document index | container/compose service, or a managed cluster |
 | minio / S3 | `minio/minio` | `boto3.client("s3")` (Python), `@aws-sdk/client-s3` (Node) with an endpoint override, `aws-sdk-go` `s3.New` | object storage | a `minio` container standing in for S3 locally, or the real AWS S3 service (no container — a bucket name and credentials) |
 | mongodb | `mongo` (`mongo-express` is a UI container, not the dependency itself) | `pymongo`/`motor` (Python), `mongoose`/the `mongodb` driver (Node) | document database | container/compose service, or a managed instance (Atlas) |
