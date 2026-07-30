@@ -1228,6 +1228,8 @@ class TestCrossPluginCoupling(unittest.TestCase):
             for ref in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)",
                                   skill.read_text(encoding="utf-8")):
                 with self.subTest(skill=skill.parent.name, ref=ref):
+                    # Without this, ../profile/... resolves and passes exists().
+                    self.assertNotIn("..", ref)
                     self.assertTrue((REPO / "itest" / ref.lstrip("/")).exists())
 
     def test_profile_skills_never_reference_itest(self):
