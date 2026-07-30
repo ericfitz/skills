@@ -1,6 +1,5 @@
 ---
 name: state
-version: 1.0.0
 description: Discover how test state can be established in a project — writable data stores, factories and builders, seed tooling, test-only endpoints, ID generation, and teardown affordances. Use when planning test data setup or diagnosing test isolation problems. Emits the itest:state contract.
 ---
 

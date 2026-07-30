@@ -1,6 +1,5 @@
 ---
 name: backlog
-version: 1.0.0
 description: Pick the next GitHub issue to work on. Use when the user asks what to work on next, requests the next backlog item, or wants an issue prioritized for the current milestone. Fetches open issues, applies exclusion rules, prioritizes by status/security/dependencies, and recommends one.
 ---
 

@@ -1,6 +1,5 @@
 ---
 name: fp
-version: 0.1.0
 description: Manage CATS false-positive rules (add, review, reclassify). Use when asked to suppress a CATS finding, add a false-positive rule, audit existing rules, or reclassify a database against the current rules.
 ---
 

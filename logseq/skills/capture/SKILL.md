@@ -1,6 +1,5 @@
 ---
 name: capture
-version: 1.0.0
 description: Capture a note, TODO, or meeting summary into the user's local Logseq graph — today's journal by default, or a named page. Use when the user says "add this to Logseq", "log this in my journal", "note this down in Logseq", or wants a TODO captured.
 ---
 

@@ -1,6 +1,5 @@
 ---
 name: sem-auto
-version: 1.0.0
 description: Set up a project so SEM@<sha> intent markers stay maintained — installs a SEM-marker convention block into the project's CLAUDE.md so Claude adds/updates markers as part of normal editing. Use when the user asks to enable sem markers for a project, set up sem-auto, or keep SEM markers fresh automatically.
 ---
 

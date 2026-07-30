@@ -1,6 +1,5 @@
 ---
 name: docs
-version: 1.0.0
 description: Read a project's documentary record — PRDs, requirements documents, specifications, design docs, ADRs, wiki pages — and extract the requirements, user-workflow evidence, domain vocabulary, and invariants it states. Use when profiling an unfamiliar project, gathering requirements, or establishing what a system was supposed to do. Emits the profile:docs contract.
 ---
 

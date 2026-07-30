@@ -1,6 +1,5 @@
 ---
 name: backfill
-version: 1.0.0
 description: Translate every missing or untranslated key across all i18n locale files using the master locale as the source. Tool-agnostic; reads project i18n configuration.
 ---
 

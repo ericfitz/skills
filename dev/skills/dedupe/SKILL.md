@@ -1,6 +1,5 @@
 ---
 name: dedupe
-version: 2.0.0
 description: Find dead code and duplication across a codebase using the sem CLI, then produce a ranked, risk-assessed plan and optionally apply it. Use when the user asks to dedupe, find duplicate or redundant code, or find dead/unused code. Takes a path scope (e.g. /dedupe server/) to exclude unrelated tools/scripts. Supports Go, TypeScript/JavaScript, and Python.
 ---
 

@@ -56,6 +56,15 @@ class TestPluginStructure(unittest.TestCase):
                 name = re.search(r"(?m)^name:\s*(\S+)", front).group(1)
                 self.assertEqual(name, skill.parent.name)
 
+    def test_skill_frontmatter_has_no_version_field(self):
+        # Skill-level versions have no consumer (harnesses and install caching
+        # key on plugin.json's version) and drift silently; the plugin version
+        # is the only one.
+        for skill in skill_files():
+            front = skill.read_text(encoding="utf-8").split("---", 2)[1]
+            with self.subTest(skill=str(skill.relative_to(REPO))):
+                self.assertNotRegex(front, r"(?m)^version:")
+
     def test_plugin_root_references_resolve(self):
         for skill in skill_files():
             plugin = skill.parents[2]

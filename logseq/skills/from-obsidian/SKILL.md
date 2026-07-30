@@ -1,6 +1,5 @@
 ---
 name: from-obsidian
-version: 1.0.0
 description: Convert and import notes from a local Obsidian vault into the user's Logseq graph — a single note, a folder, or the whole vault. Repeatable; already-imported unchanged notes are skipped. Use when the user asks to transfer, migrate, or import Obsidian notes into Logseq.
 ---
 

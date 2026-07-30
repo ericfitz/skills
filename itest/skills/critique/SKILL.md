@@ -1,6 +1,5 @@
 ---
 name: critique
-version: 1.0.0
 description: Assess the quality of a project's existing integration tests — finding over-mocking, implementation-detail assertions, non-determinism, shared state, and missing failure paths — and recommend keep, repair, replace, or delete for each. Use when auditing a test suite or before adding tests to one. Emits the itest:critique contract.
 ---
 

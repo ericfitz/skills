@@ -1,6 +1,5 @@
 ---
 name: vet-plugin
-version: 1.0.0
 description: Security-first plugin vetting for AI agents. Use before installing any plugin (skill, plugin, command, etc.) from any Marketplace, GitHub, or other sources. Checks for red flags, permission scope, and suspicious patterns.
 ---
 

@@ -1,6 +1,5 @@
 ---
 name: query
-version: 1.0.0
 description: Answer questions from the user's local Logseq graph — search pages and journals, follow backlinks, surface TODOs and tagged content. Read-only. Use when the user asks "what do my notes say about…", "find in my Logseq", "which pages link to…", or similar.
 ---
 

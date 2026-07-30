@@ -1,6 +1,5 @@
 ---
 name: design
-version: 1.0.0
 description: Design an integration test suite for a project — discovering its stack, its documented requirements, deployment shape, customer journeys, test conventions, existing-test quality, and state affordances, then synthesizing a prioritized scenario plan. Use when asked to design, plan, or scope integration tests, or to find gaps in an existing integration suite. Requires the profile plugin.
 ---
 

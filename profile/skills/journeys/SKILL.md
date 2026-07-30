@@ -1,6 +1,5 @@
 ---
 name: journeys
-version: 1.0.0
 description: Identify the key workflows users actually perform with a system, mined from documentation evidence, routes, CLI commands, and UI entry points, ranked by business criticality with dependency edges between them. Use when profiling an unfamiliar project for test design, documentation, or product understanding. Emits the profile:journeys contract.
 ---
 

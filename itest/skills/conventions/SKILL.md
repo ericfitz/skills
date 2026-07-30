@@ -1,6 +1,5 @@
 ---
 name: conventions
-version: 1.0.0
 description: Determine how tests are written and run in a project — frameworks, runner commands, how integration tests are separated from unit tests, house style, and reusable fixtures and helpers. Use before writing or designing tests in an unfamiliar codebase. Emits the itest:conventions contract.
 ---
 

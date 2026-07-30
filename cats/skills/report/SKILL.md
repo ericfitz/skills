@@ -1,6 +1,5 @@
 ---
 name: report
-version: 0.1.0
 description: Query and render CATS fuzzing results. Documents the CATS results SQLite schema (tables, views, worked queries) so results can be queried directly. Use when asked about CATS results, fuzzing findings, or to generate a CATS report.
 ---
 

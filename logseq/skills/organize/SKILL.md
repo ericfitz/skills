@@ -1,6 +1,5 @@
 ---
 name: organize
-version: 1.0.0
 description: Merge/dedupe and restructure pages in the user's local Logseq graph — combine duplicate topic pages (rewriting inbound links), split overgrown pages, promote journal content into topic pages. Use when the user asks to merge, dedupe, reorganize, restructure, or consolidate Logseq pages.
 ---
 

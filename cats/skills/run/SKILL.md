@@ -1,6 +1,5 @@
 ---
 name: run
-version: 0.1.0
 description: Run a CATS fuzzing campaign against this repo's configured server and spec. Use when asked to fuzz the API, run CATS, or start a security fuzzing campaign.
 ---
 

@@ -1,6 +1,5 @@
 ---
 name: init
-version: 0.1.0
 description: Bootstrap CATS fuzzing configuration for this repo. Use when setting up CATS/API fuzzing for the first time, or when .local/cats/config.yaml is missing.
 ---
 

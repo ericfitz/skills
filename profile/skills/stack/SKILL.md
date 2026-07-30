@@ -1,6 +1,5 @@
 ---
 name: stack
-version: 1.0.0
 description: Identify what a codebase is built with — languages, runtimes, package managers, build commands, and monorepo layout. Use when profiling an unfamiliar project, before test design, dependency work, or onboarding documentation. Emits the profile:stack contract.
 ---
 

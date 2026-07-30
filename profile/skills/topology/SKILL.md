@@ -1,6 +1,5 @@
 ---
 name: topology
-version: 1.0.0
 description: Determine how a system deploys and what it depends on — components, real dependencies, third-party services, configuration, startup order, and how hard each component is to stand up. Read-only. Use when profiling an unfamiliar project for test design, deployment documentation, or onboarding. Emits the profile:topology contract.
 ---
 

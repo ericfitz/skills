@@ -1,6 +1,5 @@
 ---
 name: analyze
-version: 0.1.0
 description: Triage CATS true positives into a remediation plan (real bug, spec gap, or false-positive candidate). Use after a CATS run completes, or when asked to analyze/triage CATS findings.
 ---
 

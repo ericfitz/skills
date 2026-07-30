@@ -1,6 +1,5 @@
 ---
 name: lint
-version: 1.0.0
 description: Find consistency problems in the user's local Logseq graph — broken links, case-conflicting link spellings, orphan pages, near-duplicate page names, unparseable pages — and apply chosen fixes. Use when the user asks to lint, clean up, or check their Logseq graph for consistency.
 ---
 
