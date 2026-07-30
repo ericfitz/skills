@@ -1,5 +1,6 @@
 # tests/test_codex_manifests.py
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -99,6 +100,37 @@ class TestGenerate(unittest.TestCase):
         build_repo(self.root, {"alpha": manifest("omega")})
         with self.assertRaisesRegex(gcm.GenerationError, "alpha"):
             gcm.generate(self.root)
+
+
+CLAUDE_MARKETPLACE = REPO / ".claude-plugin" / "marketplace.json"
+CODEX_MARKETPLACE = REPO / ".agents" / "plugins" / "marketplace.json"
+
+
+class TestCommittedCodexManifests(unittest.TestCase):
+    def test_committed_files_match_fresh_regeneration(self):
+        for path, content in gcm.generate(REPO).items():
+            with self.subTest(path=str(path.relative_to(REPO))):
+                self.assertTrue(path.is_file(), f"{path} missing — run scripts/gen_codex_manifests.py")
+                self.assertEqual(path.read_text(encoding="utf-8"), content)
+
+    def test_marketplace_membership_matches_both_ways(self):
+        claude = {p["name"] for p in json.loads(CLAUDE_MARKETPLACE.read_text(encoding="utf-8"))["plugins"]}
+        codex = {p["name"] for p in json.loads(CODEX_MARKETPLACE.read_text(encoding="utf-8"))["plugins"]}
+        self.assertEqual(claude, codex)
+
+    def test_codex_plugin_skills_paths_exist(self):
+        for entry in json.loads(CODEX_MARKETPLACE.read_text(encoding="utf-8"))["plugins"]:
+            plugin_dir = REPO / entry["source"]["path"]
+            data = json.loads((plugin_dir / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+            with self.subTest(plugin=entry["name"]):
+                self.assertEqual(data["skills"], "./skills/")
+                self.assertTrue((plugin_dir / "skills").is_dir())
+
+    def test_check_flag_passes_on_committed_tree(self):
+        proc = subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "gen_codex_manifests.py"), "--check"],
+            capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
 
 
 if __name__ == "__main__":

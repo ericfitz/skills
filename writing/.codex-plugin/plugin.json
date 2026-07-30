@@ -1,0 +1,9 @@
+{
+  "name": "writing",
+  "version": "1.0.0",
+  "description": "Evaluate technical business writing for \"boringness\" across 20 sub-dimensions on four axes (Direction, Density, Texture, Surprise). Combines a mechanical analyzer (15 sub-dimensions, deterministic, runs as a Python script) with five LLM-judged sub-dimensions that require semantic judgment. Use when the user asks to review a document for engagement, clarity, or \"is this boring\", or for prose-mechanics issues in technical writing.",
+  "author": {
+    "name": "efitz"
+  },
+  "skills": "./skills/"
+}

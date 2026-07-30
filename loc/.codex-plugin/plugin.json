@@ -1,0 +1,9 @@
+{
+  "name": "loc",
+  "version": "1.0.0",
+  "description": "Localization/i18n toolkit: analyze missing keys, measure coverage, detect non-localizable strings, translate, validate translations, update JSON locale files, and backfill every locale. Use for i18n auditing, translation, and locale-file maintenance.",
+  "author": {
+    "name": "efitz"
+  },
+  "skills": "./skills/"
+}

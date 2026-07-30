@@ -1,0 +1,101 @@
+{
+  "name": "efitz-skills",
+  "plugins": [
+    {
+      "name": "loc",
+      "category": "localization",
+      "source": {
+        "source": "local",
+        "path": "./loc"
+      }
+    },
+    {
+      "name": "security",
+      "category": "security",
+      "source": {
+        "source": "local",
+        "path": "./security"
+      }
+    },
+    {
+      "name": "github",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./github"
+      }
+    },
+    {
+      "name": "ui",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./ui"
+      }
+    },
+    {
+      "name": "wiki",
+      "category": "documentation",
+      "source": {
+        "source": "local",
+        "path": "./wiki"
+      }
+    },
+    {
+      "name": "dev",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./dev"
+      }
+    },
+    {
+      "name": "writing",
+      "category": "writing",
+      "source": {
+        "source": "local",
+        "path": "./writing"
+      }
+    },
+    {
+      "name": "deps",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./deps"
+      }
+    },
+    {
+      "name": "logseq",
+      "category": "productivity",
+      "source": {
+        "source": "local",
+        "path": "./logseq"
+      }
+    },
+    {
+      "name": "cats",
+      "category": "testing",
+      "source": {
+        "source": "local",
+        "path": "./cats"
+      }
+    },
+    {
+      "name": "profile",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./profile"
+      }
+    },
+    {
+      "name": "itest",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./itest"
+      }
+    }
+  ]
+}

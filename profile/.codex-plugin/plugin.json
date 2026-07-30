@@ -1,0 +1,9 @@
+{
+  "name": "profile",
+  "version": "1.0.0",
+  "description": "Project discovery toolkit: identify what a codebase is built with (stack), what its documentation says it must do (docs), how it deploys and what it depends on (topology), and what workflows its users actually perform (journeys). Read-only; emits versioned JSON contracts for downstream consumers.",
+  "author": {
+    "name": "efitz"
+  },
+  "skills": "./skills/"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "ui",
+  "version": "1.1.0",
+  "description": "UI testing toolkit: triage Playwright visual-regression (screenshot) failures \u2014 baseline vs actual vs diff, framed against task context, to decide bug vs expected change (vrt).",
+  "author": {
+    "name": "efitz"
+  },
+  "skills": "./skills/"
+}
