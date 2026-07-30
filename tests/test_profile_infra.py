@@ -24,6 +24,11 @@ class TestDetectInfra(unittest.TestCase):
         self.assertEqual(found["ci"], [{"path": ".github/workflows/test.yml",
                                         "system": "github-actions"}])
 
+    def test_nested_jenkinsfile_detected_by_name(self):
+        found = infra({"svc/Jenkinsfile": "pipeline {}\n"})
+        self.assertEqual(found["ci"], [{"path": "svc/Jenkinsfile",
+                                        "system": "jenkins"}])
+
     def test_gitlab_ci_detected(self):
         found = infra({".gitlab-ci.yml": "stages: [test]\n"})
         self.assertEqual(found["ci"][0]["system"], "gitlab-ci")
@@ -37,6 +42,39 @@ class TestDetectInfra(unittest.TestCase):
     def test_terraform_detected_by_extension(self):
         found = infra({"infra/main.tf": "resource {}\n"})
         self.assertEqual(found["iac"][0]["kind"], "terraform")
+
+    def test_named_iac_files_detected(self):
+        found = infra({
+            "cdk.json": '{"app": "npx ts-node bin/app.ts"}\n',
+            "charts/api/Chart.yaml": "apiVersion: v2\nname: api\n",
+            "deploy/kustomization.yaml": "resources: []\n",
+            "Pulumi.yaml": "name: stack\nruntime: python\n",
+        })
+        by_path = {entry["path"]: entry["kind"] for entry in found["iac"]}
+        self.assertEqual(by_path, {
+            "cdk.json": "cdk",
+            "charts/api/Chart.yaml": "helm",
+            "deploy/kustomization.yaml": "kustomize",
+            "Pulumi.yaml": "pulumi",
+        })
+
+    def test_lists_are_sorted_by_path_regardless_of_input_order(self):
+        files = {
+            "b/Dockerfile": "FROM scratch\n",
+            "a/Dockerfile": "FROM scratch\n",
+            "svc/Jenkinsfile": "pipeline {}\n",
+            ".gitlab-ci.yml": "stages: [test]\n",
+            "zeta/main.tf": "resource {}\n",
+            "alpha/main.tf": "resource {}\n",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, files)
+            found = detect_infra(root, sorted(files, reverse=True))
+        for kind in ("ci", "containers", "iac"):
+            paths = [entry["path"] for entry in found[kind]]
+            self.assertEqual(paths, sorted(paths), kind)
+        self.assertEqual([e["path"] for e in found["containers"]],
+                         ["a/Dockerfile", "b/Dockerfile"])
 
     def test_pytest_ini_is_test_config(self):
         found = infra({"pytest.ini": "[pytest]\n"})
