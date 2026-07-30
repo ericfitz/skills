@@ -36,7 +36,7 @@ def main(argv=None):
 
     root = Path(args.path)
     if not root.is_dir():
-        json.dump({"error": "not a directory: %s" % args.path}, sys.stderr)
+        json.dump({"error": f"not a directory: {args.path}"}, sys.stderr)
         sys.stderr.write("\n")
         return 2
 

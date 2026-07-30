@@ -150,9 +150,8 @@ def _doc_sites(paths):
     for path in sorted(paths):
         parsed = PurePosixPath(path)
         generator = DOC_SITE_FILES.get(parsed.name)
-        if generator is None and parsed.name == SPHINX_CONF:
-            if _in_doc_dir(path):
-                generator = "sphinx"
+        if generator is None and parsed.name == SPHINX_CONF and _in_doc_dir(path):
+            generator = "sphinx"
         if generator:
             sites.append({"path": path, "generator": generator})
     return sites

@@ -2,6 +2,7 @@
 """Detect CI, container, IaC, test-config, and entrypoint artifacts."""
 
 import json
+import re
 from pathlib import Path, PurePosixPath
 
 CI_FILES = {
@@ -71,10 +72,12 @@ TEST_COMMAND_FRAMEWORKS = (
 
 
 def _framework_from_command(command):
-    lowered = command.lower()
+    tokens = re.findall(r"[a-z0-9-]+", command.lower())
     for needle, framework in TEST_COMMAND_FRAMEWORKS:
-        if needle in lowered:
-            return framework
+        needle_tokens = needle.split()
+        for start in range(len(tokens) - len(needle_tokens) + 1):
+            if tokens[start:start + len(needle_tokens)] == needle_tokens:
+                return framework
     return None
 
 

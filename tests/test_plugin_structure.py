@@ -62,7 +62,7 @@ class TestPluginStructure(unittest.TestCase):
             for ref in PLUGIN_ROOT_REF.findall(skill.read_text(encoding="utf-8")):
                 with self.subTest(skill=skill.parent.name, ref=ref):
                     self.assertTrue((plugin / ref.lstrip("/")).exists(),
-                                    "%s references missing %s" % (skill, ref))
+                                    f"{skill} references missing {ref}")
 
 
 if __name__ == "__main__":

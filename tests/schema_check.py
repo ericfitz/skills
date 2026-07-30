@@ -24,24 +24,24 @@ def validate(instance, schema, path="$"):
     if expected:
         types = expected if isinstance(expected, list) else [expected]
         if not any(TYPE_CHECKS[t](instance) for t in types if t in TYPE_CHECKS):
-            return ["%s: expected type %s, got %s"
-                    % (path, "|".join(types), type(instance).__name__)]
+            return [f"{path}: expected type {'|'.join(types)}, "
+                    f"got {type(instance).__name__}"]
 
     if "enum" in schema and instance not in schema["enum"]:
-        errors.append("%s: %r not in enum %r" % (path, instance, schema["enum"]))
+        errors.append(f"{path}: {instance!r} not in enum {schema['enum']!r}")
 
     if isinstance(instance, dict):
         for name in schema.get("required", []):
             if name not in instance:
-                errors.append("%s: missing required property %r" % (path, name))
+                errors.append(f"{path}: missing required property {name!r}")
         for name, subschema in schema.get("properties", {}).items():
             if name in instance:
                 errors.extend(
-                    validate(instance[name], subschema, "%s.%s" % (path, name)))
+                    validate(instance[name], subschema, f"{path}.{name}"))
 
     if isinstance(instance, list) and "items" in schema:
         for index, item in enumerate(instance):
             errors.extend(
-                validate(item, schema["items"], "%s[%d]" % (path, index)))
+                validate(item, schema["items"], f"{path}[{index}]"))
 
     return errors

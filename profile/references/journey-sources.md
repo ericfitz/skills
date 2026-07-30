@@ -10,8 +10,8 @@ Mine sources in this order. A candidate backed by a source near the top of this 
 needs less corroboration than one backed only by a source near the bottom.
 
 1. **The `docs` contract's `journey_evidence[]`.** Someone wrote down what users do
-   with this system — nothing beats that. Each item already carries an `actor`, an
-   `entry_point_hint` where the text gave one, and `source_refs` anchored into the
+   with this system — nothing beats that. Each item already carries an `actor` and
+   an `entry_point_hint` where the text gave them, and `source_refs` anchored into the
    corpus `profile:docs` read. Cite those `corpus_id` references directly in your own
    `sources_read`, and name candidates using the `glossary[]` vocabulary rather than
    inventing new terms for the same concept.

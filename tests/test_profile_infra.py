@@ -53,6 +53,15 @@ class TestDetectInfra(unittest.TestCase):
         found = infra({"package.json": "{not json\n"})
         self.assertEqual(found["test_config"], [])
 
+    def test_java_test_runner_is_not_ava(self):
+        """Substring matching called 'java -jar' an ava run; tokens must not."""
+        found = infra({"package.json": '{"scripts": {"test": "java -jar tests.jar"}}\n'})
+        self.assertIsNone(found["test_config"][0]["framework"])
+
+    def test_go_test_two_token_needle_still_matches(self):
+        found = infra({"package.json": '{"scripts": {"test": "go test ./..."}}\n'})
+        self.assertEqual(found["test_config"][0]["framework"], "go-test")
+
     def test_entrypoints_detected(self):
         found = infra({"cmd/server/main.go": "package main\n", "manage.py": "x = 1\n"})
         paths = {entry["path"] for entry in found["entrypoints"]}

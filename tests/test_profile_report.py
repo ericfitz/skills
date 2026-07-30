@@ -90,7 +90,7 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(found["docs_sites"], [])
 
     def test_docs_are_truncated_with_total_preserved(self):
-        files = {"docs/d%03d.md" % i: "# x\n" for i in range(250)}
+        files = {f"docs/d{i:03d}.md": "# x\n" for i in range(250)}
         found = inventory(files)
         self.assertEqual(len(found["docs"]), 200)
         self.assertEqual(found["docs_total"], 250)
@@ -113,8 +113,8 @@ class TestBuildInventory(unittest.TestCase):
     def test_confidence_is_computed_before_truncation(self):
         """300 unclassified in 4000 files is 7.5% -> partial. Computing from
         the truncated list would floor it at 200/4000 = 5% -> high."""
-        files = {"src/f%04d.py" % i: "x = 1\n" for i in range(3699)}
-        files.update({"odd/f%03d.zig" % i: "x\n" for i in range(300)})
+        files = {f"src/f{i:04d}.py": "x = 1\n" for i in range(3699)}
+        files.update({f"odd/f{i:03d}.zig": "x\n" for i in range(300)})
         files["pyproject.toml"] = "[project]\nname = 'demo'\n"
         found = inventory(files)
         self.assertEqual(found["unclassified_total"], 300)
@@ -130,7 +130,7 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(sorted(found["unclassified"]), ["build.zig", "main.zig"])
 
     def test_unclassified_is_truncated_with_total_preserved(self):
-        files = {"f%03d.zig" % i: "x\n" for i in range(250)}
+        files = {f"f{i:03d}.zig": "x\n" for i in range(250)}
         found = inventory(files)
         self.assertEqual(len(found["unclassified"]), 200)
         self.assertEqual(found["unclassified_total"], 250)

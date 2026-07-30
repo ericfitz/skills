@@ -59,9 +59,9 @@ class TestProfileContracts(unittest.TestCase):
     def test_every_schema_has_an_example_that_validates(self):
         for path in sorted(CONTRACTS.glob("*.schema.json")):
             name = path.name.replace(".schema.json", "")
-            example_path = CONTRACTS / "examples" / ("%s.example.json" % name)
+            example_path = CONTRACTS / "examples" / f"{name}.example.json"
             with self.subTest(contract=name):
-                self.assertTrue(example_path.exists(), "missing example for %s" % name)
+                self.assertTrue(example_path.exists(), f"missing example for {name}")
                 errors = validate(
                     json.loads(example_path.read_text(encoding="utf-8")),
                     json.loads(path.read_text(encoding="utf-8")))
@@ -71,17 +71,17 @@ class TestProfileContracts(unittest.TestCase):
         """Extraction discipline: profile phases stay consumer-agnostic."""
         text = (CONTRACTS / "topology.schema.json").read_text(encoding="utf-8").lower()
         for banned in ("boundary", "test", "fixture", "mock"):
-            self.assertNotIn(banned, text, "topology contract mentions %r" % banned)
+            self.assertNotIn(banned, text, f"topology contract mentions {banned!r}")
 
     def test_journeys_contract_uses_no_testing_vocabulary(self):
         text = (CONTRACTS / "journeys.schema.json").read_text(encoding="utf-8").lower()
         for banned in ("test", "coverage_hint", "fixture"):
-            self.assertNotIn(banned, text, "journeys contract mentions %r" % banned)
+            self.assertNotIn(banned, text, f"journeys contract mentions {banned!r}")
 
     def test_docs_contract_uses_no_testing_vocabulary(self):
         text = (CONTRACTS / "docs.schema.json").read_text(encoding="utf-8").lower()
         for banned in ("test", "fixture", "mock", "scenario"):
-            self.assertNotIn(banned, text, "docs contract mentions %r" % banned)
+            self.assertNotIn(banned, text, f"docs contract mentions {banned!r}")
 
     def test_docs_contract_emits_evidence_not_journey_candidates(self):
         """Ownership boundary: profile:journeys alone forms and ranks candidates."""

@@ -94,7 +94,7 @@ class TestDetectDocs(unittest.TestCase):
 
     def test_git_lookups_are_capped(self):
         with tempfile.TemporaryDirectory() as tmp:
-            files = {"docs/d%02d.md" % i: "# x\n" for i in range(3)}
+            files = {f"docs/d{i:02d}.md": "# x\n" for i in range(3)}
             root = build_repo(tmp, files)
             git_init(root)
             git_commit_all(root)

@@ -56,12 +56,12 @@ def _name_signals(path):
     """Return (signals, language) for path, or ([], None) if it is not a test file."""
     parsed = PurePosixPath(path)
     signals = [
-        "dir:%s" % part for part in parsed.parts[:-1] if part in TEST_DIR_NAMES
+        f"dir:{part}" for part in parsed.parts[:-1] if part in TEST_DIR_NAMES
     ]
     language = None
     for pattern, pattern_language in NAME_PATTERNS:
         if fnmatch.fnmatch(parsed.name, pattern):
-            signals.append("name:%s" % pattern)
+            signals.append(f"name:{pattern}")
             language = pattern_language
             break
     if not signals:
