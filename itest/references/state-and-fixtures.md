@@ -13,14 +13,14 @@ doc or comment is not a schema source.
 
 | Ecosystem | Schema source | Where to look |
 |---|---|---|
-| SQL, any | Migration directory | `migrations/`, `db/migrate/`, `alembic/versions/` — the most recent migration in sequence is the current shape |
+| SQL, any | Migration directory | `migrations/`, `db/migrate/`, `alembic/versions/` — the current shape is the cumulative result of applying the whole sequence in order, not just the latest file |
 | Python (Django) | ORM model modules | `models.py` / `models/` packages, classes subclassing `django.db.models.Model` |
 | Python (SQLAlchemy) | ORM model modules | Classes subclassing a `declarative_base()` result, or annotated with `Mapped[...]` under SQLAlchemy 2.x |
 | Go (GORM) | ORM model modules | Structs with `gorm` struct tags, typically under `internal/models/` or similar |
 | Ruby (ActiveRecord) | ORM model modules, or generated dump | `app/models/*.rb` for associations and validations; `db/schema.rb` for the actual column set |
-| Ruby, any SQL | Generated schema dump | `db/schema.rb` (ActiveRecord) or `db/structure.sql` (raw SQL migrations) — regenerated from migrations, so it is current by construction |
+| Ruby, any SQL | Generated schema dump | `db/schema.rb` (ActiveRecord) or `db/structure.sql` (Rails, when `schema_format` is `:sql`) — regenerated from migrations, so it is current by construction |
 | Node/TS (Prisma) | ORM model modules | `schema.prisma`, the `model` blocks |
-| Rust/Go (Ent) | ORM model modules | `ent/schema/*.go`, the `Fields()` method of each schema type |
+| Go (Ent) | ORM model modules | `ent/schema/*.go`, the `Fields()` method of each schema type |
 
 When a migration directory and an ORM model module disagree, the migration directory
 wins — it is what the store actually ran. Record both in evidence and let the
@@ -65,11 +65,11 @@ not the same finding as one that inserts rows.
 
 ## Determining whether direct writes are possible
 
-`direct_write_possible` is true only when a test process, running the way tests
-actually run in this repo, could open a connection to the store and write to it
-without going through the system's own interface. Check for all of the following;
-the absence of any one of them means the answer is false and composition through the
-public interface is the only route:
+`direct_write_possible` is true when a test process, running the way tests actually
+run in this repo, could open a connection to the store and write to it without going
+through the system's own interface. Check for the following signals; any one of them
+is evidence that direct writes are possible. Only when none of them is present is the
+answer false and composition through the public interface is the only route:
 
 - **Credentials and network access.** Does the test process have (or could it
   plausibly obtain) a credential for the store, and is the store reachable from
