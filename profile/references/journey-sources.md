@@ -92,5 +92,4 @@ These do not qualify as candidates, however prominent they are in the code:
 
 ## Closing rule
 
-"A journey has an actor, an intention, and an observable outcome. If you cannot name
-all three, it is not a journey."
+*A journey has an actor, an intention, and an observable outcome. If you cannot name all three, it is not a journey.*
