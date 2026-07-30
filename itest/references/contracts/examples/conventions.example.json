@@ -1,0 +1,32 @@
+{
+  "contract_version": "1.0.0",
+  "frameworks": [
+    { "name": "go-test", "language": "go", "scope": "all tests",
+      "evidence": ["internal/http/handler_test.go:1"] }
+  ],
+  "runner_commands": {
+    "unit": "go test ./...",
+    "integration": "go test -tags=integration ./...",
+    "all": "go test -tags=integration ./..."
+  },
+  "integration_separation": {
+    "mechanism": "build-tag",
+    "how_to_add": "Add '//go:build integration' as the first line of the file, before the package clause.",
+    "evidence": ["internal/store/store_integration_test.go:1", ".github/workflows/test.yml:22"]
+  },
+  "house_style": {
+    "naming": "TestXxx_Scenario",
+    "layout": "test files sit beside the code under test",
+    "fixture_mechanism": "t.Helper() constructors returning cleanup funcs",
+    "setup_teardown": "t.Cleanup",
+    "assertion_style": "stdlib if/t.Fatalf, no assertion library"
+  },
+  "reusable_helpers": [
+    { "name": "newTestServer", "path": "internal/http/testing.go",
+      "purpose": "starts the HTTP service against a live database",
+      "signature": "func newTestServer(t *testing.T) (*httptest.Server, func())" }
+  ],
+  "existing_fixtures": ["testdata/orders.json"],
+  "ci_invocation": "go test -tags=integration ./...",
+  "convention_gaps": ["No documented way to run a single integration test in isolation."]
+}

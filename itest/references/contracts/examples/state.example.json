@@ -1,0 +1,31 @@
+{
+  "contract_version": "1.0.0",
+  "writable_stores": [
+    { "name": "postgres", "direct_write_possible": true,
+      "how": "database/sql connection using DATABASE_URL, same credentials as the service",
+      "schema_source": "migrations/0003_orders.sql",
+      "evidence": ["migrations/0003_orders.sql:1", "internal/store/store.go:18"] }
+  ],
+  "builders_and_factories": [
+    { "name": "newOrder", "path": "internal/store/testing.go",
+      "produces": "a persisted order row with defaults" }
+  ],
+  "seed_tooling": [
+    { "name": "migrate", "invocation": "make migrate",
+      "evidence": ["Makefile:14"] }
+  ],
+  "test_only_endpoints": [],
+  "id_generation": {
+    "origin": "server",
+    "implications": "Tests cannot choose ids; prerequisite state must be created first and its id captured."
+  },
+  "teardown_affordances": [
+    { "strategy": "transaction-rollback", "available": false,
+      "evidence": ["internal/store/store.go:44"] },
+    { "strategy": "truncate", "available": true, "evidence": ["Makefile:18"] }
+  ],
+  "assumptions": [
+    { "claim": "the migrations directory is the complete schema",
+      "why_unconfirmed": "discovery is read-only; no database was inspected" }
+  ]
+}

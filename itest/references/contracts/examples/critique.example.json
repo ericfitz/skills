@@ -1,0 +1,28 @@
+{
+  "contract_version": "1.0.0",
+  "assessed": [
+    {
+      "path": "internal/store/store_integration_test.go",
+      "verdict": "misleading",
+      "covers": ["J1"],
+      "issues": [
+        { "type": "over-mocking", "severity": "high",
+          "evidence": "store_integration_test.go:31 replaces the database with an in-memory fake, so the integration it claims to test never runs" },
+        { "type": "missing-failure-path", "severity": "medium",
+          "evidence": "only the successful insert is exercised; constraint violations are never asserted" }
+      ],
+      "recommendation": "replace"
+    },
+    {
+      "path": "internal/http/handler_test.go",
+      "verdict": "sound",
+      "covers": [],
+      "issues": [],
+      "recommendation": "keep"
+    }
+  ],
+  "systemic_issues": [
+    { "summary": "Tests named *_integration_test.go mock their primary dependency, so the integration tier is nominal only.",
+      "affected_count": 3 }
+  ]
+}
