@@ -8,7 +8,7 @@ description: Identify what a codebase is built with — languages, runtimes, pac
 
 Identify the ecosystem of a repository and emit the `stack` contract.
 
-This is the gate phase for `/itest:design`: every other phase's search strategy
+This is the gate phase for downstream discovery: every other phase's search strategy
 depends on knowing the ecosystem, and the inventory this phase produces is passed
 forward inside its contract so no downstream phase re-runs the script.
 
