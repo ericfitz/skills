@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "script
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from inventorylib.walk import SKIP_DIRS, walk_repo
-from repobuilder import build_repo, git_init
+from repobuilder import build_repo, git_commit_all, git_init
 
 
 class TestWalkRepo(unittest.TestCase):
@@ -46,6 +46,19 @@ class TestWalkRepo(unittest.TestCase):
             self.assertEqual(method, "git")
             self.assertIn("app.py", files)
             self.assertNotIn("secret.txt", files)
+
+    def test_git_listing_filters_skip_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {
+                "app.py": "x = 1\n",
+                "vendor/lib/thing.go": "package lib\n",
+                "node_modules/left-pad/index.js": "//\n",
+            })
+            git_init(root)
+            git_commit_all(root)
+            files, method = walk_repo(root)
+            self.assertEqual(method, "git")
+            self.assertEqual(files, ["app.py"])
 
     def test_skip_dirs_contains_expected_entries(self):
         self.assertTrue({"node_modules", ".venv", "vendor", "dist"} <= SKIP_DIRS)
