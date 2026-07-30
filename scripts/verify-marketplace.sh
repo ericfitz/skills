@@ -28,10 +28,11 @@ fi
 ok ".claude-plugin/marketplace.json parses as JSON"
 
 PLUGIN_COUNT=$(python3 -c "import json; print(len(json.load(open('.claude-plugin/marketplace.json'))['plugins']))")
-if [ "$PLUGIN_COUNT" -eq 9 ]; then
-  ok "marketplace.json has 9 plugin entries"
+DIR_COUNT=$(ls -d */.claude-plugin/plugin.json 2>/dev/null | wc -l | tr -d ' ')
+if [ "$PLUGIN_COUNT" -eq "$DIR_COUNT" ]; then
+  ok "marketplace.json has $PLUGIN_COUNT plugin entries, matching $DIR_COUNT plugin dirs"
 else
-  bad "marketplace.json has $PLUGIN_COUNT plugin entries (expected 9)"
+  bad "marketplace.json has $PLUGIN_COUNT plugin entries but $DIR_COUNT plugin dirs have .claude-plugin/plugin.json"
 fi
 
 # ---------- Per-plugin structural checks ----------
@@ -183,6 +184,15 @@ if [ -z "$cmd_dirs" ]; then
   ok "no per-plugin commands/ dirs (all command wrappers dropped)"
 else
   bad "stray commands/ dirs found:"; echo "$cmd_dirs" | while IFS= read -r d; do printf '         %s\n' "$d"; done
+fi
+
+# ---------- Codex manifests in sync ----------
+hdr "Codex manifests (generated from Claude manifests)"
+
+if python3 scripts/gen_codex_manifests.py --check >/dev/null 2>&1; then
+  ok "Codex manifests match a fresh regeneration"
+else
+  bad "Codex manifests out of sync — run: uv run scripts/gen_codex_manifests.py"
 fi
 
 # ---------- summary ----------
