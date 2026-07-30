@@ -1,0 +1,118 @@
+{
+  "contract_version": "1.0.0",
+  "boundary": {
+    "description": "The api service running in the compose stack, driven over HTTP, with a real Postgres.",
+    "rationale": "Compose declares both services and the api is externally reachable; Stripe is the only dependency that cannot be run locally.",
+    "real": ["api", "postgres"],
+    "stubbed": ["stripe"]
+  },
+  "scenarios": [
+    {
+      "id": "S1",
+      "journey_id": "J2",
+      "title": "Cancelling a placed order marks it cancelled and refunds nothing else",
+      "priority": "p0",
+      "est_cost": "medium",
+      "boundary": "HTTP against the api service with a real Postgres; Stripe stubbed",
+      "provenance": "both",
+      "requirement_ids": ["R1"],
+      "preconditions": [
+        {
+          "state": "an order exists for the acting customer",
+          "method": "compose",
+          "via": "POST /orders, capturing the returned order id",
+          "assert_established": "response is 201 and the body contains a non-empty id",
+          "rationale": "Order creation is journey J1, already under test, and ids are server-generated so they cannot be chosen."
+        },
+        {
+          "state": "the order is older than the 24-hour free-cancellation window",
+          "method": "inject",
+          "via": "UPDATE orders SET created_at = now() - interval '48 hours' WHERE id = $1",
+          "assert_established": "one row updated",
+          "rationale": "The state is produced only by the passage of time and is unreachable through the public interface."
+        }
+      ],
+      "steps": [
+        "POST /orders/{id}/cancel as the owning customer"
+      ],
+      "assertions": [
+        "response is 200",
+        "GET /orders/{id} reports status 'cancelled'",
+        "the stubbed Stripe client received exactly one refund call for the order total"
+      ],
+      "negative_assertions": [
+        "no other order belonging to the customer changed status"
+      ],
+      "dependencies": { "real": ["postgres"], "stubbed": ["stripe"] },
+      "isolation": {
+        "strategy": "truncate",
+        "cleanup": ["truncate orders, order_items, customers after the test"]
+      },
+      "determinism_controls": [
+        "inject the age rather than sleeping",
+        "poll GET /orders/{id} until status settles, with a bounded timeout; never sleep a fixed duration"
+      ],
+      "fixtures_to_reuse": ["newTestServer (internal/http/testing.go)"],
+      "new_helpers_needed": ["a stub Stripe client recording refund calls"],
+      "placement": {
+        "file_path": "internal/http/cancel_order_integration_test.go",
+        "naming": "TestCancelOrder_AfterFreeWindow",
+        "marker_or_tag": "//go:build integration"
+      },
+      "runner_invocation": "go test -tags=integration ./internal/http/ -run TestCancelOrder_AfterFreeWindow",
+      "open_assumptions": [
+        "the compose stack starts cleanly on a developer machine",
+        "the migrations directory is the complete schema"
+      ]
+    },
+    {
+      "id": "S2",
+      "journey_id": null,
+      "title": "Every response carries a non-empty X-Request-Id header",
+      "priority": "p1",
+      "est_cost": "low",
+      "boundary": "HTTP against the api service with a real Postgres; Stripe stubbed",
+      "provenance": "requirement",
+      "requirement_ids": ["R2"],
+      "preconditions": [
+        {
+          "state": "an order exists so a 200 and a 404 can both be exercised",
+          "method": "compose",
+          "via": "POST /orders, capturing the returned order id",
+          "assert_established": "response is 201 and the body contains a non-empty id",
+          "rationale": "The requirement is about every response, so the check needs both a hit and a miss."
+        }
+      ],
+      "steps": [
+        "GET /orders/{id} for the created order",
+        "GET /orders/{id} for an id that does not exist"
+      ],
+      "assertions": [
+        "the 200 response carries a non-empty X-Request-Id header",
+        "the 404 response carries a non-empty X-Request-Id header"
+      ],
+      "negative_assertions": [
+        "the two responses do not carry the same X-Request-Id"
+      ],
+      "dependencies": { "real": ["postgres"], "stubbed": ["stripe"] },
+      "isolation": {
+        "strategy": "truncate",
+        "cleanup": ["truncate orders, order_items, customers after the test"]
+      },
+      "determinism_controls": [
+        "assert the header is non-empty rather than asserting a specific value"
+      ],
+      "fixtures_to_reuse": ["newTestServer (internal/http/testing.go)"],
+      "new_helpers_needed": [],
+      "placement": {
+        "file_path": "internal/http/request_id_integration_test.go",
+        "naming": "TestResponses_CarryRequestId",
+        "marker_or_tag": "//go:build integration"
+      },
+      "runner_invocation": "go test -tags=integration ./internal/http/ -run TestResponses_CarryRequestId",
+      "open_assumptions": [
+        "the compose stack starts cleanly on a developer machine"
+      ]
+    }
+  ]
+}

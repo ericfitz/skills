@@ -80,5 +80,56 @@ class TestItestContracts(unittest.TestCase):
         self.assertIn("direct_write_possible", store["required"])
 
 
+class TestScenarioContract(unittest.TestCase):
+    def setUp(self):
+        self.schema = json.loads(
+            (CONTRACTS / "scenario.schema.json").read_text(encoding="utf-8"))
+        self.scenario = self.schema["properties"]["scenarios"]["items"]
+
+    def test_scenario_carries_placement_and_runner(self):
+        required = self.scenario["required"]
+        self.assertIn("placement", required)
+        self.assertIn("runner_invocation", required)
+        placement = self.scenario["properties"]["placement"]["required"]
+        self.assertEqual(sorted(placement), ["file_path", "marker_or_tag", "naming"])
+
+    def test_preconditions_record_method_and_assertion(self):
+        precondition = self.scenario["properties"]["preconditions"]["items"]
+        self.assertEqual(precondition["properties"]["method"]["enum"],
+                         ["compose", "inject"])
+        self.assertIn("assert_established", precondition["required"])
+
+    def test_open_assumptions_survive_into_every_scenario(self):
+        self.assertIn("open_assumptions", self.scenario["required"])
+
+    def test_scenario_records_provenance_and_requirement_traceability(self):
+        required = self.scenario["required"]
+        self.assertIn("provenance", required)
+        self.assertIn("requirement_ids", required)
+        self.assertEqual(self.scenario["properties"]["provenance"]["enum"],
+                         ["journey", "requirement", "both"])
+
+    def test_cross_cutting_scenarios_may_have_no_journey(self):
+        """A requirement no journey owns still produces a scenario."""
+        self.assertEqual(self.scenario["properties"]["journey_id"]["type"],
+                         ["string", "null"])
+
+    def test_example_has_a_composed_and_an_injected_precondition(self):
+        example = json.loads(
+            (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
+        methods = {p["method"]
+                   for scenario in example["scenarios"]
+                   for p in scenario["preconditions"]}
+        self.assertEqual(methods, {"compose", "inject"})
+
+    def test_example_demonstrates_a_cross_cutting_scenario(self):
+        example = json.loads(
+            (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
+        by_provenance = {s["provenance"]: s for s in example["scenarios"]}
+        self.assertIn("requirement", by_provenance)
+        self.assertIsNone(by_provenance["requirement"]["journey_id"])
+        self.assertTrue(by_provenance["requirement"]["requirement_ids"])
+
+
 if __name__ == "__main__":
     unittest.main()
