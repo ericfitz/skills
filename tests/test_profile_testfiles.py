@@ -48,6 +48,13 @@ class TestClassifyTestFiles(unittest.TestCase):
         self.assertIn("buildtag:integration", record["signals"])
         self.assertEqual(record["language"], "go")
 
+    def test_e2e_content_marker_beats_integration_directory(self):
+        [record] = classify({
+            "tests/integration/test_flow.py": "import pytest\n\n@pytest.mark.e2e\ndef test_x(): pass\n",
+        })
+        self.assertEqual(record["kind"], "e2e")
+        self.assertIn("marker:pytest.mark.e2e", record["signals"])
+
     def test_e2e_beats_integration(self):
         [record] = classify({"tests/e2e/integration/flow.spec.ts": "it('x', () => {})\n"})
         self.assertEqual(record["kind"], "e2e")
