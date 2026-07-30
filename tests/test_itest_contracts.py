@@ -54,6 +54,15 @@ class TestItestContracts(unittest.TestCase):
                 ["items"]["properties"]["type"]["enum"])
         self.assertEqual(sorted(enum), sorted(ISSUE_TYPES))
 
+    def test_critique_verdicts_match_the_doctrine(self):
+        schema = json.loads((CONTRACTS / "critique.schema.json").read_text(encoding="utf-8"))
+        enum = schema["properties"]["assessed"]["items"]["properties"]["verdict"]["enum"]
+        self.assertEqual(sorted(enum), ["misleading", "sound", "weak"])
+        text = DOCTRINE.read_text(encoding="utf-8")
+        for verdict in enum:
+            with self.subTest(verdict=verdict):
+                self.assertIn(f"`{verdict}`", text)
+
     def test_doctrine_documents_every_issue_type(self):
         text = DOCTRINE.read_text(encoding="utf-8")
         for issue in ISSUE_TYPES:

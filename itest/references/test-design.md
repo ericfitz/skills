@@ -2,8 +2,8 @@
 
 This is the shared vocabulary and rule set for the `itest` plugin. The `conventions`,
 `critique`, `state`, and `design` skills all read this file; the tier rule, the issue
-vocabulary, and the composition/injection rules defined here are load-bearing for their
-contracts — do not restate or redefine them locally.
+and verdict vocabularies, and the composition/injection rules defined here are
+load-bearing for their contracts — do not restate or redefine them locally.
 
 ## What an integration test is for
 
@@ -56,6 +56,15 @@ spelling.
 | `assertion-free` | Executes a flow and asserts nothing beyond absence of an exception | Zero assertion/expect calls appear in the test body, or the only one checks that the call didn't raise. |
 | `framework-not-system` | Verifies that the framework, ORM, or library works, not that this system works | The assertions would still pass if the system's own application code were deleted and only the framework/ORM default behavior remained. |
 | `missing-failure-path` | Covers only the happy path for a workflow whose failure modes matter | The workflow has a documented error, validation, auth, or conflict condition with no corresponding test case anywhere in the file. |
+
+## The verdict vocabulary
+
+These three values are the only permitted entries in `critique.assessed[].verdict`:
+
+- `sound` — no high-severity issues; the test would fail if the workflow it covers broke.
+- `weak` — real coverage, but undermined by issues worth fixing.
+- `misleading` — would pass while the workflow it names is broken. Over-mocking the
+  boundary under test and assertion-free tests land here.
 
 ## Composition and injection
 
