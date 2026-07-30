@@ -65,5 +65,31 @@ class TestPluginStructure(unittest.TestCase):
                                     f"{skill} references missing {ref}")
 
 
+MD_LINK = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)#]+?)(?:#[^)]*)?\)")
+SUBAGENT_REF = re.compile(r"\bsub-?agents?\b", re.IGNORECASE)
+FALLBACK_MARKER = "**No-subagent fallback:**"
+
+
+class TestCodexParity(unittest.TestCase):
+    def test_relative_markdown_links_resolve(self):
+        for skill in skill_files():
+            text = skill.read_text(encoding="utf-8")
+            for target in MD_LINK.findall(text):
+                if "${" in target:
+                    continue  # env-var paths are covered by test_plugin_root_references_resolve
+                with self.subTest(skill=str(skill.relative_to(REPO)), link=target):
+                    self.assertTrue((skill.parent / target).exists(),
+                                    f"dangling relative link: {target}")
+
+    def test_dispatching_skills_declare_no_subagent_fallback(self):
+        for skill in skill_files():
+            text = skill.read_text(encoding="utf-8")
+            if not SUBAGENT_REF.search(text):
+                continue
+            with self.subTest(skill=str(skill.relative_to(REPO))):
+                self.assertIn(FALLBACK_MARKER, text,
+                              "skill dispatches subagents but has no fallback note")
+
+
 if __name__ == "__main__":
     unittest.main()

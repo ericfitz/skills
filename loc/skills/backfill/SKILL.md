@@ -95,6 +95,11 @@ If nothing to translate, report and exit.
 
 ### Step 4: Spawn translation sub-agents in parallel
 
+**No-subagent fallback:** If your harness cannot dispatch subagents (no Task
+tool), translate each locale yourself, sequentially, using the sub-agent
+prompt template below as your own checklist. Same per-locale scope, same
+output contract.
+
 For each locale with work, dispatch a `general-purpose` sub-agent (one Task call per locale, all in a single message so they run in parallel).
 
 Sub-agent prompt template:

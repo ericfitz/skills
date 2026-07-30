@@ -89,6 +89,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/dedupe.py candidates -C <repo-dir> > /tmp/
 This yields `{"dead": [...], "dup_clusters": {...}}`.
 
 ### 4. Verify (parallel subagents, BATCHED)
+
+**No-subagent fallback:** If your harness cannot dispatch subagents (no Task
+tool), do the workers' jobs inline: read
+`${CLAUDE_PLUGIN_ROOT}/agents/dedupe-verify-dead.md` and
+`${CLAUDE_PLUGIN_ROOT}/agents/dedupe-verify-dup.md` and process each batch
+yourself, sequentially, following them exactly. Same batch sizes, same output
+contracts.
+
 - **Batch** candidates (~15–20 per subagent) — do NOT spawn one subagent per candidate.
   For each batch of dead candidates, dispatch a `general-purpose` subagent following
   `${CLAUDE_PLUGIN_ROOT}/agents/dedupe-verify-dead.md` with the batch JSON and

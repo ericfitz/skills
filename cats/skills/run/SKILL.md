@@ -9,6 +9,11 @@ description: Run a CATS fuzzing campaign against this repo's configured server a
 Dispatches the bundled `cats-run` subagent (`${CLAUDE_PLUGIN_ROOT}/agents/cats-run.md`)
 to execute one full fuzzing campaign, then reports its summary.
 
+**No-subagent fallback:** If your harness cannot dispatch subagents (no Task
+tool), do the worker's job inline: read
+`${CLAUDE_PLUGIN_ROOT}/agents/cats-run.md` and execute the campaign yourself,
+following it exactly. Same output contract (the compact summary).
+
 ## Before dispatching
 
 If `.local/cats/config.yaml` is missing, `cats_tool.py` exits 2 with

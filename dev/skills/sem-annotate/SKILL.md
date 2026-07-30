@@ -75,6 +75,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sem_annotate.py --update <files> -C <repo-
 Read the count. If empty, report "All markers fresh — nothing to do." and stop.
 
 ### 3. Generate descriptions (parallel subagents)
+
+**No-subagent fallback:** If your harness cannot dispatch subagents (no Task
+tool), do the worker's job inline: read
+`${CLAUDE_PLUGIN_ROOT}/agents/sem-describe.md` and process each batch
+yourself, sequentially, following it exactly (the Sonnet model note below
+applies only to dispatched subagents). Same batch sizes, same output
+contract.
+
 Split the worklist into batches (~20 entities each). For each batch, dispatch a
 **`dev:SEM Describer`** subagent (defined by `${CLAUDE_PLUGIN_ROOT}/agents/sem-describe.md`),
 passing the batch JSON and `REPO_DIR=<repo-dir>`. This agent runs on **Sonnet** by default

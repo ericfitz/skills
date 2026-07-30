@@ -23,7 +23,11 @@ arguments:
 
 Systematic process for finding concurrency bugs that cause data corruption, deadlocks, or non-deterministic behavior.
 
-**Codex note:** This skill references Claude Code subagents (`Task(...)`). In Codex, run the equivalent steps with tool calls (for example `functions.shell_command` and `multi_tool_use.parallel`) or run them sequentially. See [`../../COMPATIBILITY.md`](../../COMPATIBILITY.md).
+**No-subagent fallback:** If your harness cannot dispatch subagents (no Task
+tool — e.g. Codex), run the per-language and per-category analyses yourself,
+sequentially, following the same instructions you would have handed each
+subagent (in Codex, plain tool calls such as `functions.shell_command`
+replace `Task(...)`).
 
 ## Process
 

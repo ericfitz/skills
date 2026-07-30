@@ -62,6 +62,11 @@ When it returns, surface two things immediately:
 
 ## Phase 3 — Parallel discovery
 
+**No-subagent fallback:** If your harness cannot dispatch subagents (no Task
+tool), run the five phase discoveries yourself, sequentially, following the
+same instructions and returning the same contracts you would have handed
+each subagent.
+
 Dispatch five subagents concurrently, one per phase, each handed the `stack` contract
 and the `docs` contract:
 
