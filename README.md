@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal Claude Code marketplace (`efitz-skills`). Ten plugins, each
+efitz's personal Claude Code marketplace (`efitz-skills`). Twelve plugins, each
 bundling one or more skills. Invoke a skill as `/<plugin>:<skill>`.
 
 ## loc — localization / i18n
@@ -34,6 +34,40 @@ project wiki).
 
 `dedupe` (find and analyze duplicate/overlapping functionality across a
 codebase).
+
+## profile — project discovery
+
+`stack` (languages, runtimes, package managers, build commands) · `docs`
+(requirements, glossary, and domain invariants extracted from PRDs, specs, ADRs,
+and wiki pages) · `topology` (deployment shape, real dependencies, third parties,
+standup difficulty) · `journeys` (ranked candidate user workflows with dependency
+edges).
+
+Read-only inference backed by `scripts/profile_inventory.py`, a deterministic
+repo census. `docs` reaches documentation outside the repo only through
+capabilities already available in the session — an MCP server, a web fetch, a
+local path — and reports anything it cannot reach with a concrete remedy rather
+than working around it. Each skill emits a versioned JSON contract under
+`references/contracts/`; those contracts are the supported interface for other
+plugins.
+
+## itest — integration test design
+
+`design` (orchestrates the whole workflow) · `conventions` (frameworks, runner
+commands, how integration tests are separated) · `critique` (quality assessment of
+existing tests — over-mocking, implementation-detail assertions, non-determinism) ·
+`state` (writable stores, factories, seed tooling, teardown affordances).
+
+Requires the `profile` plugin, which supplies stack, documented requirements,
+deployment topology, and candidate user journeys. Scenarios trace back to the
+requirement they cover, and requirements no journey owns are surfaced separately
+rather than dropped. Where a normative document and the code disagree, the plan
+reports the conflict and both readings and offers to open a tracking issue.
+
+Discovery is read-only: nothing is built, booted, or run, and every unproven
+inference is carried into the plan as an explicit assumption. Output is a scenario
+set conforming to `references/contracts/scenario.schema.json`, the handoff seam to
+a future build phase.
 
 ## writing
 

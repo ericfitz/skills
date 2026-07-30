@@ -1,0 +1,31 @@
+{
+  "contract_version": "1.0.0",
+  "candidates": [
+    {
+      "id": "J1",
+      "name": "Create an order",
+      "actor": "authenticated customer",
+      "narrative": "A signed-in customer adds items and places an order, receiving an order id.",
+      "entry_point": "POST /orders",
+      "evidence": ["README.md:22", "internal/http/routes.go:40"],
+      "business_criticality": "critical",
+      "rank": 1,
+      "rationale": "Named as the primary flow in the README and the only revenue path.",
+      "depends_on": []
+    },
+    {
+      "id": "J2",
+      "name": "Cancel an order",
+      "actor": "authenticated customer",
+      "narrative": "A customer cancels an order they placed and the order becomes cancelled.",
+      "entry_point": "POST /orders/{id}/cancel",
+      "evidence": ["internal/http/routes.go:52"],
+      "business_criticality": "high",
+      "rank": 2,
+      "rationale": "Second most referenced flow in docs; depends on an order existing.",
+      "depends_on": ["J1"]
+    }
+  ],
+  "sources_read": ["README.md", "docs/api.md", "internal/http/routes.go"],
+  "surface_coverage": "2 of 7 public HTTP routes"
+}

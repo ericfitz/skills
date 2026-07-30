@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:stack contract",
+  "type": "object",
+  "required": ["contract_version", "primary_language", "languages", "confidence", "inventory"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "primary_language": { "type": ["string", "null"] },
+    "languages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "files", "share"],
+        "properties": {
+          "name": { "type": "string" },
+          "files": { "type": "integer" },
+          "share": { "type": "number" }
+        }
+      }
+    },
+    "package_managers": { "type": "array", "items": { "type": "string" } },
+    "runtimes": { "type": "array", "items": { "type": "string" } },
+    "build_commands": { "type": "array", "items": { "type": "string" } },
+    "monorepo": {
+      "type": "object",
+      "required": ["is"],
+      "properties": {
+        "is": { "type": "boolean" },
+        "packages": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "unknowns": { "type": "array", "items": { "type": "string" } },
+    "confidence": { "enum": ["high", "partial", "low"] },
+    "inventory": { "type": "object" }
+  }
+}

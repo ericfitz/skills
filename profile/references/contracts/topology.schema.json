@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:topology contract",
+  "type": "object",
+  "required": ["contract_version", "shape", "components", "assumptions"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "shape": {
+      "enum": ["monolith", "service-with-dependencies", "multi-service",
+               "serverless", "cli", "library", "desktop", "hybrid", "unknown"]
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "role", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "role": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "real_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "kind", "how_started", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "kind": { "type": "string" },
+          "how_started": { "type": "string" },
+          "config_source": { "type": ["string", "null"] },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "external_third_parties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "used_for"],
+        "properties": {
+          "name": { "type": "string" },
+          "used_for": { "type": "string" }
+        }
+      }
+    },
+    "config_mechanism": { "type": ["string", "null"] },
+    "ports_and_endpoints": { "type": "array", "items": { "type": "string" } },
+    "startup_sequence": { "type": "array", "items": { "type": "string" } },
+    "standup_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "standup_difficulty", "externally_reachable"],
+        "properties": {
+          "component": { "type": "string" },
+          "standup_difficulty": { "enum": ["trivial", "moderate", "hard", "impractical"] },
+          "config_needed": { "type": "array", "items": { "type": "string" } },
+          "externally_reachable": { "type": "boolean" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

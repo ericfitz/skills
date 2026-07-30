@@ -47,11 +47,17 @@ target-version = "py311"
 # installed. UP/B/SIM/C4/RUF add modernization and correctness checks.
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
 
+[tool.ruff.lint.isort]
+# inventorylib is invoked by path from profile/scripts, not installed;
+# without this, isort treats it as third-party in the test modules.
+known-first-party = ["inventorylib"]
+
 [tool.ruff.lint.per-file-ignores]
 # E501: fixtures embed YAML/JSON documents as single-line "a\nb\n" literals
 #   and stub callables as one-line lambdas. Wrapping them hides the data being
 #   asserted on. Production code is still held to line-length above.
-"tests/**" = ["E501"]
+# E402/I001: test modules mutate sys.path before importing plugin scripts.
+"tests/**" = ["E501", "E402", "I001"]
 
 [tool.ty.environment]
 # ty is the project's type checker (mypy is not installed). Same per-tool

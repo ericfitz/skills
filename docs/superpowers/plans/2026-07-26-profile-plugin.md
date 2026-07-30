@@ -450,7 +450,12 @@ git commit -m "feat(profile): language classification with unclassified census"
 
 **Interfaces:**
 - Consumes: `walk_repo` output
-- Produces: `detect_manifests(paths: list[str]) -> list[dict]` with records `{"path": str, "ecosystem": str, "package_manager": str | None}`, sorted by path. `MANIFESTS: dict[str, tuple[str, str | None]]`, `LOCKFILE_PM: dict[str, str]`.
+- Produces: `detect_manifests(paths: list[str]) -> list[dict]` with records `{"path": str, "ecosystem": str, "package_manager": str | None}`, sorted by path. `MANIFESTS: dict[str, tuple[str, str | None]]`, `LOCKFILE_PM: dict[str, tuple[str, str]]`.
+
+**Lockfile scoping rule (binding):** a lockfile resolves a manifest only when it shares
+both the manifest's directory **and** its ecosystem. Amended after review found that
+unscoped resolution reports `go.mod` beside a `package-lock.json` as npm-managed — a
+confident wrong answer, which this module must never produce.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -500,6 +505,20 @@ class TestDetectManifests(unittest.TestCase):
     def test_non_manifest_files_ignored(self):
         self.assertEqual(detect_manifests(["src/app.py", "README.md"]), [])
 
+    def test_lockfile_from_another_ecosystem_never_overrides_a_default(self):
+        """A Go module beside a package-lock.json is not npm-managed."""
+        found = detect_manifests(["go.mod", "package-lock.json"])
+        self.assertEqual(found[0]["package_manager"], "go")
+
+    def test_foreign_lockfile_does_not_invent_a_manager(self):
+        found = detect_manifests(["pyproject.toml", "yarn.lock"])
+        self.assertIsNone(found[0]["package_manager"])
+
+    def test_competing_lockfiles_resolve_alphabetically(self):
+        """Arbitrary but deterministic; pinned so it cannot drift silently."""
+        found = detect_manifests(["package.json", "package-lock.json", "yarn.lock"])
+        self.assertEqual(found[0]["package_manager"], "npm")
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -537,26 +556,37 @@ MANIFESTS = {
     "pubspec.yaml": ("dart", "pub"),
 }
 
+# filename -> (ecosystem, package manager)
 LOCKFILE_PM = {
-    "uv.lock": "uv",
-    "poetry.lock": "poetry",
-    "pdm.lock": "pdm",
-    "Pipfile.lock": "pipenv",
-    "package-lock.json": "npm",
-    "yarn.lock": "yarn",
-    "pnpm-lock.yaml": "pnpm",
-    "bun.lockb": "bun",
+    "uv.lock": ("python", "uv"),
+    "poetry.lock": ("python", "poetry"),
+    "pdm.lock": ("python", "pdm"),
+    "Pipfile.lock": ("python", "pipenv"),
+    "package-lock.json": ("node", "npm"),
+    "yarn.lock": ("node", "yarn"),
+    "pnpm-lock.yaml": ("node", "pnpm"),
+    "bun.lockb": ("node", "bun"),
 }
 
 
 def detect_manifests(paths):
-    """Return manifest records, resolving package manager from sibling lockfiles."""
+    """Return manifest records, resolving package manager from sibling lockfiles.
+
+    A lockfile resolves a manifest only when it sits in the same directory AND
+    belongs to the same ecosystem. Without the ecosystem check, a Go module
+    beside a package-lock.json reports as npm-managed — a confident wrong
+    answer, which is precisely what this module must never produce.
+
+    Two lockfiles of the same ecosystem in one directory (npm and yarn, say)
+    resolve alphabetically. That tie-break is arbitrary but deterministic, and
+    a test pins it so it cannot drift silently.
+    """
     locks_by_dir = {}
     for path in paths:
         parsed = PurePosixPath(path)
-        manager = LOCKFILE_PM.get(parsed.name)
-        if manager:
-            locks_by_dir.setdefault(parsed.parent.as_posix(), set()).add(manager)
+        entry = LOCKFILE_PM.get(parsed.name)
+        if entry:
+            locks_by_dir.setdefault(parsed.parent.as_posix(), set()).add(entry)
 
     found = []
     for path in sorted(paths):
@@ -565,7 +595,11 @@ def detect_manifests(paths):
         if not entry:
             continue
         ecosystem, default_manager = entry
-        siblings = sorted(locks_by_dir.get(parsed.parent.as_posix(), set()))
+        siblings = sorted(
+            manager
+            for lock_ecosystem, manager in locks_by_dir.get(parsed.parent.as_posix(), set())
+            if lock_ecosystem == ecosystem
+        )
         found.append({
             "path": path,
             "ecosystem": ecosystem,
@@ -577,7 +611,7 @@ def detect_manifests(paths):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_manifests -v`
-Expected: PASS, 7 tests
+Expected: PASS, 10 tests
 
 - [ ] **Step 5: Lint and commit**
 
@@ -600,6 +634,24 @@ git commit -m "feat(profile): manifest and package-manager detection"
 - Produces: `classify_test_files(root: Path, paths: list[str], max_bytes: int = 4096) -> list[dict]` with records `{"path": str, "language": str | None, "kind": str, "signals": list[str]}` where `kind` is one of `unit|integration|e2e|unknown`. Also `test_dirs(records: list[dict]) -> list[str]`.
 
 **Kind resolution priority (binding):** any `e2e` signal wins; else any `integration` signal; else a filename-pattern match yields `unit`; else `unknown`. A directory signal alone is never enough to call something a unit test.
+
+**Census admission (binding):** a file enters the census only if its extension maps to a
+known language in `EXT_LANGUAGE`. Amended after review: without this guard a directory
+signal alone admits non-source files, and `docs/contract/terms.md` and a locale file under
+`src/it/` both classify as `integration`. That is the same weakness the priority rule
+already forbids for `unit`, and it matters more here — a later consumer reads every
+integration file in full. The extension guard is deliberately chosen over trimming `it` and
+`contract` from `TEST_DIR_NAMES`, because both are real test conventions (Maven's `src/it/`,
+Pact-style contract tests), and over requiring a filename-pattern match, which would lose
+Jest's `__tests__/foo.js` where the directory is the only signal.
+
+**Known residual:** the gate excludes non-source files only. A *source* file in an
+ambiguously-named directory — `src/it/messages.py` in an i18n project, where `it` is the
+Italian locale code rather than Maven's integration-test directory — still classifies as
+`integration`. No extension gate can separate those two meanings of `it`; only removing
+`it` from `TEST_DIR_NAMES` would, at the cost of missing real Maven integration tests. The
+`signals[]` audit trail keeps the call inspectable (`['dir:it']` alone is visibly weak
+evidence), and downstream consumers are expected to weigh it. Accepted, not overlooked.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -662,6 +714,14 @@ class TestClassifyTestFiles(unittest.TestCase):
         [record] = classify({"tests/helpers.py": "VALUE = 1\n"})
         self.assertEqual(record["kind"], "unknown")
 
+    def test_markdown_in_a_test_directory_is_not_a_test_file(self):
+        """A directory signal alone must not admit a non-source file."""
+        self.assertEqual(classify({"docs/contract/terms.md": "# Terms\n"}), [])
+
+    def test_locale_data_in_a_test_named_directory_is_excluded(self):
+        """'it' is a Maven test convention and an Italian locale code."""
+        self.assertEqual(classify({"src/it/messages.json": "{}\n"}), [])
+
     def test_signals_are_sorted(self):
         [record] = classify({"tests/integration/test_api.py": "def test_x(): pass\n"})
         self.assertEqual(record["signals"], sorted(record["signals"]))
@@ -701,6 +761,8 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.testfile
 import fnmatch
 from pathlib import Path, PurePosixPath
 
+from inventorylib.languages import EXT_LANGUAGE
+
 TEST_DIR_NAMES = {
     "test", "tests", "spec", "specs", "__tests__", "testing",
     "e2e", "integration", "it", "itest", "functional", "acceptance",
@@ -735,6 +797,17 @@ CONTENT_MARKERS = (
 )
 
 _KIND_BY_SIGNAL = {name: kind for name, kind, _ in CONTENT_MARKERS}
+
+
+def _is_source(path):
+    """True when the extension maps to a known language.
+
+    Census admission gate. Without it a directory signal alone admits any
+    file: `docs/contract/terms.md` and a locale file under `src/it/` both
+    come back as integration tests, and a later consumer reads every
+    integration file in full.
+    """
+    return PurePosixPath(path).suffix.lower() in EXT_LANGUAGE
 
 
 def _name_signals(path):
@@ -782,6 +855,8 @@ def classify_test_files(root, paths, max_bytes=4096):
     root = Path(root)
     records = []
     for path in paths:
+        if not _is_source(path):
+            continue
         signals, language = _name_signals(path)
         if not signals:
             continue
@@ -803,7 +878,7 @@ def test_dirs(records):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_testfiles -v`
-Expected: PASS, 10 tests
+Expected: PASS, 12 tests
 
 - [ ] **Step 5: Lint and commit**
 
@@ -888,6 +963,27 @@ class TestDetectInfra(unittest.TestCase):
         paths = {entry["path"] for entry in found["entrypoints"]}
         self.assertEqual(paths, {"cmd/server/main.go", "manage.py"})
 
+    def test_nested_index_is_a_barrel_not_an_entrypoint(self):
+        found = infra({"index.js": "run()\n",
+                       "src/components/Button/index.ts": "export * from './Button'\n"})
+        paths = {entry["path"] for entry in found["entrypoints"]}
+        self.assertEqual(paths, {"index.js"})
+
+    def test_sam_template_detected_by_transform(self):
+        found = infra({"template.yaml":
+                       "Transform: AWS::Serverless-2016-10-31\nResources: {}\n"})
+        self.assertEqual(found["iac"][0]["kind"], "sam")
+
+    def test_plain_cloudformation_is_not_called_sam(self):
+        found = infra({"infra/template.yaml":
+                       "AWSTemplateFormatVersion: '2010-09-09'\nResources: {}\n"})
+        self.assertEqual(found["iac"][0]["kind"], "cloudformation")
+
+    def test_issue_form_template_is_not_iac(self):
+        found = infra({".github/ISSUE_TEMPLATE/template.yml":
+                       "name: Bug report\nbody: []\n"})
+        self.assertEqual(found["iac"], [])
+
     def test_documentation_is_not_this_modules_job(self):
         """Docs are censused by inventorylib.docs (Task 5b), not here."""
         found = infra({"README.md": "# x\n"})
@@ -907,7 +1003,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.infra'`
 
 ```python
 # profile/scripts/inventorylib/infra.py
-"""Detect CI, container, IaC, test-config, entrypoint, and doc artifacts."""
+"""Detect CI, container, IaC, test-config, and entrypoint artifacts."""
 
 import json
 from pathlib import Path, PurePosixPath
@@ -933,12 +1029,17 @@ CONTAINER_FILES = {
 IAC_FILES = {
     "cdk.json": "cdk",
     "serverless.yml": "serverless",
-    "template.yaml": "sam",
-    "template.yml": "sam",
     "Chart.yaml": "helm",
     "kustomization.yaml": "kustomize",
     "Pulumi.yaml": "pulumi",
 }
+
+# template.yaml is not in IAC_FILES: the name alone proves nothing. A GitHub
+# issue form, a Backstage software template, and a SAM stack all ship as
+# template.yaml. The file's own content decides — see _template_kind.
+TEMPLATE_NAMES = {"template.yaml", "template.yml"}
+SAM_TRANSFORM = "AWS::Serverless-2016-10-31"
+CFN_MARKER = "AWSTemplateFormatVersion"
 
 IAC_EXTS = {".tf": "terraform", ".tfvars": "terraform", ".bicep": "bicep"}
 
@@ -956,9 +1057,14 @@ TEST_CONFIG_FILES = {
 
 ENTRYPOINT_NAMES = {
     "main.py", "__main__.py", "manage.py", "app.py", "wsgi.py", "asgi.py",
-    "main.go", "main.rs", "Program.cs", "index.ts", "main.ts",
-    "index.js", "server.js",
+    "main.go", "main.rs", "Program.cs", "main.ts", "server.js",
 }
+
+# index.* is an entrypoint only at the repo root, where it is npm's default
+# main. Nested index.ts/index.js files are barrel re-exports by convention:
+# on a measured Angular repo, 14 of 16 name-based entrypoint hits were
+# barrels. Root-only keeps the true positive and drops the flood.
+ROOT_ONLY_ENTRYPOINTS = {"index.ts", "index.js"}
 
 # ordered: first substring found in the command wins
 TEST_COMMAND_FRAMEWORKS = (
@@ -973,6 +1079,24 @@ def _framework_from_command(command):
     for needle, framework in TEST_COMMAND_FRAMEWORKS:
         if needle in lowered:
             return framework
+    return None
+
+
+def _template_kind(root, path):
+    """Classify a template.yaml by content, or return None to stay silent.
+
+    SAM templates carry the serverless Transform; plain CloudFormation
+    carries AWSTemplateFormatVersion. Anything else named template.yaml —
+    issue forms, Backstage templates — is not IaC and must not be labeled.
+    """
+    try:
+        text = (Path(root) / path).read_text(encoding="utf-8", errors="replace")[:4096]
+    except OSError:
+        return None
+    if SAM_TRANSFORM in text:
+        return "sam"
+    if CFN_MARKER in text:
+        return "cloudformation"
     return None
 
 
@@ -1016,6 +1140,10 @@ def detect_infra(root, paths):
 
         if name in IAC_FILES:
             iac.append({"path": path, "kind": IAC_FILES[name]})
+        elif name in TEMPLATE_NAMES:
+            kind = _template_kind(root, path)
+            if kind:
+                iac.append({"path": path, "kind": kind})
         elif parsed.suffix in IAC_EXTS:
             iac.append({"path": path, "kind": IAC_EXTS[parsed.suffix]})
 
@@ -1030,7 +1158,9 @@ def detect_infra(root, paths):
             if entry:
                 test_config.append(entry)
 
-        if name in ENTRYPOINT_NAMES:
+        if name in ENTRYPOINT_NAMES or (
+            name in ROOT_ONLY_ENTRYPOINTS and parsed.parent.as_posix() == "."
+        ):
             entrypoints.append({"path": path, "language_hint": parsed.suffix})
 
     return {
@@ -1045,7 +1175,7 @@ def detect_infra(root, paths):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_infra -v`
-Expected: PASS, 9 tests
+Expected: PASS, 13 tests
 
 - [ ] **Step 5: Lint and commit**
 
@@ -1165,6 +1295,14 @@ class TestGuessDocType(unittest.TestCase):
     def test_tokens_not_substrings(self):
         """'api' in 'capital' is true; token matching must not be fooled."""
         self.assertEqual(guess_doc_type("docs/capital.md"), "unknown")
+
+    def test_filename_tokens_outrank_directory_tokens(self):
+        """docs/design/setup-tutorial.md is a tutorial filed under design/."""
+        self.assertEqual(guess_doc_type("docs/design/setup-tutorial.md"), "tutorial")
+        self.assertEqual(guess_doc_type("docs/specs/deployment-runbook.md"), "runbook")
+
+    def test_nearest_directory_wins_when_the_filename_says_nothing(self):
+        self.assertEqual(guess_doc_type("docs/design/api/orders.md"), "api_reference")
 
     def test_every_guess_is_in_the_fixed_vocabulary(self):
         for path in ("README.md", "docs/x.md", "docs/adr/1-y.md", "CHANGELOG.md"):
@@ -1322,19 +1460,40 @@ def _tokens(path):
     return {token for token in _TOKENS.split(path.lower()) if token}
 
 
-def guess_doc_type(path):
-    """Return one of DOC_TYPES for path, based on its tokens. Never guesses wildly."""
-    parsed = PurePosixPath(path)
-    stem_type = STEM_TYPES.get(parsed.stem.lower())
-    if stem_type:
-        return stem_type
-    tokens = _tokens(path)
+def _match_tokens(tokens):
+    """Return a doc type for one path segment's tokens, or None."""
     if {"getting", "started"} <= tokens or {"get", "started"} <= tokens:
         return "tutorial"
     for names, doc_type in TOKEN_TYPES:
         if tokens & names:
             return doc_type
+    return None
+
+
+def guess_doc_type(path):
+    """Return one of DOC_TYPES for path. Nearer path segments outrank farther ones.
+
+    A file's own name is the strongest signal: docs/design/setup-tutorial.md
+    is a tutorial that happens to live under design/, not a design doc. When
+    the filename says nothing, the nearest ancestor directory that says
+    something wins: docs/design/api/orders.md is API reference filed under
+    design/. Amended after review found pooled whole-path tokens let an
+    ancestor directory confidently override an explicit filename.
+    """
+    parsed = PurePosixPath(path)
+    stem_type = STEM_TYPES.get(parsed.stem.lower())
+    if stem_type:
+        return stem_type
+    for part in reversed(parsed.parts):
+        doc_type = _match_tokens(_tokens(part))
+        if doc_type:
+            return doc_type
     return "unknown"
+
+
+def _in_doc_dir(path):
+    """True when any ancestor directory is a recognized documentation directory."""
+    return any(part.lower() in DOC_DIRS for part in PurePosixPath(path).parts[:-1])
 
 
 def _is_doc(path):
@@ -1343,7 +1502,19 @@ def _is_doc(path):
         return True
     if parsed.suffix.lower() not in DOC_EXTS:
         return False
-    return any(part.lower() in DOC_DIRS for part in parsed.parts[:-1])
+    return _in_doc_dir(path)
+
+
+def _git_available(root):
+    """One probe so a non-git tree does not pay one doomed subprocess per doc."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
 
 
 def _git_last_modified(root, path):
@@ -1372,7 +1543,7 @@ def _doc_sites(paths):
         parsed = PurePosixPath(path)
         generator = DOC_SITE_FILES.get(parsed.name)
         if generator is None and parsed.name == SPHINX_CONF:
-            if any(part.lower() in DOC_DIRS for part in parsed.parts[:-1]):
+            if _in_doc_dir(path):
                 generator = "sphinx"
         if generator:
             sites.append({"path": path, "generator": generator})
@@ -1384,13 +1555,15 @@ def detect_docs(root, paths, max_git_lookups=500):
 
     Git lookups are capped: beyond max_git_lookups, last_modified is None. A
     thousand-page docs site should not turn the census into a thousand
-    subprocess calls.
+    subprocess calls, and a non-git tree pays one probe rather than one
+    failed subprocess per document.
     """
     root = Path(root)
     docs = []
     lookups = 0
+    use_git = _git_available(root)
     for path in sorted(p for p in paths if _is_doc(p)):
-        if lookups < max_git_lookups:
+        if use_git and lookups < max_git_lookups:
             last_modified = _git_last_modified(root, path)
             lookups += 1
         else:
@@ -1407,7 +1580,7 @@ def detect_docs(root, paths, max_git_lookups=500):
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_docs -v`
-Expected: PASS, 15 tests
+Expected: PASS, 17 tests
 
 - [ ] **Step 6: Lint and commit**
 
@@ -1430,6 +1603,12 @@ git commit -m "feat(profile): documentation census with fixed doc-type vocabular
 - Produces: `build_inventory(root: Path) -> dict` (the full inventory object) and `coverage_confidence(languages, manifests, unclassified, total_files) -> str`.
 
 **Confidence rules (binding):** `low` when there are no recognized languages **or** no manifests. Otherwise `high` when unclassified paths are at most 5% of all files, else `partial`. `unclassified` is truncated to 200 entries; when truncation occurs the count is preserved in `unclassified_total`.
+
+**Docs truncation (binding, amended after Task 5b review):** `docs` receives the same
+treatment as `unclassified` — truncated to `DOCS_LIMIT = 200` records with the full count
+preserved in `docs_total`. Without this, a 3k-page docs site embeds hundreds of KB of
+census records verbatim in the `stack` contract handed to every downstream phase. The
+census itself stays complete inside `detect_docs`; only the assembled inventory truncates.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1481,6 +1660,19 @@ class TestCoverageConfidence(unittest.TestCase):
                                 ["a.zig"] * 20, 100),
             "partial")
 
+    def test_share_of_exactly_five_percent_is_still_high(self):
+        """The binding rule says at most 5%; the boundary belongs to high."""
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
+                                ["a.zig"] * 5, 100),
+            "high")
+
+    def test_share_just_above_five_percent_is_partial(self):
+        self.assertEqual(
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
+                                ["a.zig"] * 6, 100),
+            "partial")
+
 
 class TestBuildInventory(unittest.TestCase):
     def test_has_all_required_keys(self):
@@ -1488,7 +1680,7 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(set(found), {
             "root", "listing_method", "languages", "manifests", "test_files",
             "test_dirs", "test_config", "ci", "containers", "iac",
-            "entrypoints", "docs", "docs_sites", "unclassified",
+            "entrypoints", "docs", "docs_total", "docs_sites", "unclassified",
             "unclassified_total", "coverage_confidence", "inventory_version",
         })
 
@@ -1510,7 +1702,40 @@ class TestBuildInventory(unittest.TestCase):
         found = inventory(PY_REPO)
         self.assertEqual([d["path"] for d in found["docs"]], ["README.md"])
         self.assertEqual(found["docs"][0]["doc_type_guess"], "readme")
+        self.assertEqual(found["docs_total"], 1)
         self.assertEqual(found["docs_sites"], [])
+
+    def test_docs_are_truncated_with_total_preserved(self):
+        files = {"docs/d%03d.md" % i: "# x\n" for i in range(250)}
+        found = inventory(files)
+        self.assertEqual(len(found["docs"]), 200)
+        self.assertEqual(found["docs_total"], 250)
+
+    def test_infra_classified_files_are_not_unclassified(self):
+        """The inventory must not contradict itself: recognized IaC is not
+        unknown, and confidence does not degrade for understood files."""
+        found = inventory({
+            "pyproject.toml": "[project]\nname = 'demo'\n",
+            "uv.lock": "version = 1\n",
+            "app.py": "x = 1\n",
+            "infra/main.tf": "resource {}\n",
+            "infra/vars.tfvars": "v = 1\n",
+        })
+        self.assertEqual([r["path"] for r in found["iac"]],
+                         ["infra/main.tf", "infra/vars.tfvars"])
+        self.assertEqual(found["unclassified"], [])
+        self.assertEqual(found["coverage_confidence"], "high")
+
+    def test_confidence_is_computed_before_truncation(self):
+        """300 unclassified in 4000 files is 7.5% -> partial. Computing from
+        the truncated list would floor it at 200/4000 = 5% -> high."""
+        files = {"src/f%04d.py" % i: "x = 1\n" for i in range(3699)}
+        files.update({"odd/f%03d.zig" % i: "x\n" for i in range(300)})
+        files["pyproject.toml"] = "[project]\nname = 'demo'\n"
+        found = inventory(files)
+        self.assertEqual(found["unclassified_total"], 300)
+        self.assertEqual(len(found["unclassified"]), 200)
+        self.assertEqual(found["coverage_confidence"], "partial")
 
     def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
         found = inventory({"main.zig": "pub fn main() void {}\n",
@@ -1553,6 +1778,7 @@ from inventorylib.testfiles import classify_test_files, test_dirs
 from inventorylib.walk import walk_repo
 
 UNCLASSIFIED_LIMIT = 200
+DOCS_LIMIT = 200
 HIGH_CONFIDENCE_MAX_UNCLASSIFIED_SHARE = 0.05
 
 
@@ -1576,6 +1802,19 @@ def build_inventory(root):
     infra = detect_infra(root, paths)
     docs = detect_docs(root, paths)
 
+    # A path the infra census recognized is not unclassified, whatever the
+    # language census thinks: .tf/.tfvars/.bicep carry no language, but the
+    # inventory understands them. Without this subtraction the same file is
+    # reported as recognized IaC AND unknown, and confidence degrades for a
+    # repo the census fully understood — a self-contradictory inventory.
+    known = {
+        record["path"]
+        for section in (infra["ci"], infra["containers"], infra["iac"],
+                        infra["test_config"], infra["entrypoints"])
+        for record in section
+    }
+    unclassified = [p for p in unclassified if p not in known]
+
     return {
         "inventory_version": VERSION,
         "root": str(root.resolve()),
@@ -1589,7 +1828,8 @@ def build_inventory(root):
         "containers": infra["containers"],
         "iac": infra["iac"],
         "entrypoints": infra["entrypoints"],
-        "docs": docs["docs"],
+        "docs": docs["docs"][:DOCS_LIMIT],
+        "docs_total": len(docs["docs"]),
         "docs_sites": docs["docs_sites"],
         "unclassified": sorted(unclassified)[:UNCLASSIFIED_LIMIT],
         "unclassified_total": len(unclassified),
@@ -1601,7 +1841,7 @@ def build_inventory(root):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_report -v`
-Expected: PASS, 10 tests
+Expected: PASS, 15 tests
 
 - [ ] **Step 5: Lint and commit**
 
@@ -1664,6 +1904,16 @@ class TestCli(unittest.TestCase):
             code, out, _ = run([str(root), "--json"])
         self.assertEqual(code, 0)
         self.assertIn("coverage_confidence", json.loads(out))
+
+    def test_output_is_deterministic_with_sorted_keys(self):
+        """The determinism contract: sorted keys, byte-stable across runs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"go.mod": "module x\n"})
+            _, first, _ = run([str(root)])
+            _, second, _ = run([str(root)])
+        self.assertEqual(first, second)
+        self.assertEqual(
+            first, json.dumps(json.loads(first), indent=2, sort_keys=True) + "\n")
 
     def test_indent_flag_changes_formatting(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1751,7 +2001,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `python3 -m unittest tests.test_profile_cli -v`
-Expected: PASS, 5 tests
+Expected: PASS, 6 tests
 
 - [ ] **Step 5: Verify it runs against this repo**
 
@@ -2504,7 +2754,7 @@ git commit -m "feat(profile): phase contracts with dependency-free schema valida
 
 - A table mapping every key in `MANIFESTS` (Task 3) to its ecosystem, the runtime it implies, and the version file to read for that runtime (`.python-version`, `go.mod` go directive, `.nvmrc`, `rust-toolchain.toml`, `.ruby-version`).
 - A table mapping every key in `LOCKFILE_PM` to its package manager and the command that installs dependencies.
-- A section **"When the script comes back low-confidence"** listing the fallback reading order: root directory listing, any `Makefile` or `justfile` targets, CI workflow files, `README` build instructions, editor config, then file extensions by frequency.
+- A section **"When the script comes back low-confidence"** listing the fallback reading order: root directory listing, any `Makefile` or `justfile` targets, CI workflow files, `README` build instructions, editor config, then file extensions by frequency. It must also state what the number means, verbatim: *"`coverage_confidence` measures the whole tree, assets included — a repo can be `high` while one niche source directory is opaque. Read `unclassified[]` too, not just the label."*
 - A section **"Build command inference"** giving the canonical build command per ecosystem (`go build ./...`, `cargo build`, `npm run build`, `uv build`, `mvn package`, `dotnet build`).
 - A closing rule, verbatim: *"If you cannot identify the ecosystem, say so in `unknowns[]` and set `confidence` to `low`. Do not guess a language from a single file."*
 
@@ -2521,7 +2771,7 @@ description: Identify what a codebase is built with — languages, runtimes, pac
 
 Identify the ecosystem of a repository and emit the `stack` contract.
 
-This is the gate phase for `/itest:design`: every other phase's search strategy
+This is the gate phase for downstream discovery: every other phase's search strategy
 depends on knowing the ecosystem, and the inventory this phase produces is passed
 forward inside its contract so no downstream phase re-runs the script.
 
@@ -2993,7 +3243,9 @@ PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)")
 
 
 def plugin_dirs():
-    return sorted(p.parent for p in REPO.glob("*/.claude-plugin/plugin.json"))
+    # parents[1], not parent: the match is <plugin>/.claude-plugin/plugin.json,
+    # so one level up is .claude-plugin and two levels up is the plugin dir.
+    return sorted(p.parents[1] for p in REPO.glob("*/.claude-plugin/plugin.json"))
 
 
 def skill_files():
@@ -3101,7 +3353,11 @@ Expected: `OK`
 - [ ] **Step 7: Verify the plugin against itself**
 
 Run: `uv run --script profile/scripts/profile_inventory.py . --indent 0 | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['coverage_confidence'], len(d['test_files']))"`
-Expected: prints a confidence value and a non-zero test-file count. If confidence is `low`, investigate — this repo has no root manifest, so `low` is the correct answer here and demonstrates the no-silent-guessing rule working.
+Expected: prints a confidence value and a non-zero test-file count. This repo has a root
+`pyproject.toml` and `uv.lock`, so `manifests` is non-empty and confidence should be `high`
+or `partial` — `low` here would mean either languages or manifests came back empty, which
+is worth investigating. (An earlier draft of this plan claimed the repo had no root
+manifest; that stopped being true when the repo adopted uv.)
 
 - [ ] **Step 8: Lint and commit**
 

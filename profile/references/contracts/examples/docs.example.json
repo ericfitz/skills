@@ -1,0 +1,89 @@
+{
+  "contract_version": "1.0.0",
+  "sources_available": [
+    { "kind": "in-repo", "locator": "README.md", "capability_used": "Read" },
+    { "kind": "in-repo", "locator": "docs/prd-cancellations.md", "capability_used": "Read" },
+    { "kind": "external", "locator": "https://wiki.example.com/orders/refund-policy",
+      "capability_used": "WebFetch" }
+  ],
+  "unavailable_sources": [
+    {
+      "locator": "Confluence space ORDERS",
+      "reason": "No Atlassian capability is present in this session.",
+      "suggested_remedy": "Enable the Atlassian MCP server, or export the space to markdown under docs/ and run again."
+    }
+  ],
+  "corpus": [
+    { "id": "D1", "locator": "docs/prd-cancellations.md", "doc_type": "prd",
+      "title": "Order cancellation", "last_modified": "2026-03-11T09:14:02+00:00",
+      "authority": "normative", "read": "full" },
+    { "id": "D2", "locator": "README.md", "doc_type": "readme",
+      "title": "orders service", "last_modified": "2026-07-02T16:40:11+00:00",
+      "authority": "descriptive", "read": "full" },
+    { "id": "D3", "locator": "docs/adr/0004-server-generated-ids.md", "doc_type": "adr",
+      "title": "Server-generated order ids", "last_modified": "2025-11-20T11:02:44+00:00",
+      "authority": "historical", "read": "skimmed" }
+  ],
+  "deferred": [
+    { "locator": "docs/api/orders.md", "doc_type": "api_reference", "rank": 14,
+      "why_deferred": "below the 25-document read budget; generated reference with no normative language" }
+  ],
+  "requirements": [
+    {
+      "id": "R1",
+      "statement": "A customer must be able to cancel an order at any time before it ships.",
+      "modality": "must",
+      "actors": ["authenticated customer"],
+      "acceptance_criteria": [
+        "the order reports status 'cancelled'",
+        "any captured payment is refunded in full"
+      ],
+      "preconditions_stated": ["the order exists and has not shipped"],
+      "source_refs": [{ "corpus_id": "D1", "anchor": "## Cancellation window" }],
+      "staleness": {
+        "last_modified": "2026-03-11T09:14:02+00:00",
+        "version_refs": ["v2 API"],
+        "stated_status": "approved"
+      },
+      "confidence": "high"
+    },
+    {
+      "id": "R2",
+      "statement": "Every response must carry the request id in an X-Request-Id header.",
+      "modality": "must",
+      "actors": [],
+      "acceptance_criteria": ["X-Request-Id is present and non-empty on every response"],
+      "preconditions_stated": [],
+      "source_refs": [{ "corpus_id": "D2", "anchor": "### Observability" }],
+      "staleness": {
+        "last_modified": "2026-07-02T16:40:11+00:00",
+        "version_refs": [],
+        "stated_status": null
+      },
+      "confidence": "medium"
+    }
+  ],
+  "journey_evidence": [
+    {
+      "narrative": "A signed-in customer cancels an order they placed and is refunded.",
+      "actor": "authenticated customer",
+      "entry_point_hint": "POST /orders/{id}/cancel",
+      "source_refs": [{ "corpus_id": "D1", "anchor": "## Cancellation window" }]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "settled order",
+      "definition": "An order whose payment has been captured and which can no longer be cancelled without a refund.",
+      "source_refs": [{ "corpus_id": "D1", "anchor": "## Definitions" }]
+    }
+  ],
+  "domain_invariants": [
+    "An order never leaves the 'cancelled' state.",
+    "A refund total never exceeds the captured total."
+  ],
+  "open_questions": [
+    "The PRD describes a 24-hour free-cancellation window; no document states what happens at exactly 24 hours."
+  ],
+  "coverage_confidence": "partial"
+}

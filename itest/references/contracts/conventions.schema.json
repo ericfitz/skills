@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "itest:conventions contract",
+  "type": "object",
+  "required": ["contract_version", "frameworks", "runner_commands", "integration_separation", "house_style"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "frameworks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "language", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "language": { "type": "string" },
+          "scope": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "runner_commands": {
+      "type": "object",
+      "properties": {
+        "unit": { "type": ["string", "null"] },
+        "integration": { "type": ["string", "null"] },
+        "all": { "type": ["string", "null"] }
+      }
+    },
+    "integration_separation": {
+      "type": "object",
+      "required": ["mechanism", "how_to_add"],
+      "properties": {
+        "mechanism": {
+          "enum": ["build-tag", "marker", "directory", "filename-suffix",
+                   "separate-config", "separate-project", "none", "unknown"]
+        },
+        "how_to_add": { "type": "string" },
+        "evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "house_style": {
+      "type": "object",
+      "properties": {
+        "naming": { "type": ["string", "null"] },
+        "layout": { "type": ["string", "null"] },
+        "fixture_mechanism": { "type": ["string", "null"] },
+        "setup_teardown": { "type": ["string", "null"] },
+        "assertion_style": { "type": ["string", "null"] }
+      }
+    },
+    "reusable_helpers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "purpose"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "purpose": { "type": "string" },
+          "signature": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "existing_fixtures": { "type": "array", "items": { "type": "string" } },
+    "ci_invocation": { "type": ["string", "null"] },
+    "convention_gaps": { "type": "array", "items": { "type": "string" } }
+  }
+}
