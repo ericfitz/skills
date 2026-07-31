@@ -22,6 +22,10 @@ def skill_files():
     return sorted(REPO.glob("*/skills/*/SKILL.md"))
 
 
+def hook_files():
+    return sorted(REPO.glob("*/hooks/hooks.json"))
+
+
 class TestPluginStructure(unittest.TestCase):
     def test_every_plugin_is_registered_in_the_marketplace(self):
         registered = {
@@ -72,6 +76,19 @@ class TestPluginStructure(unittest.TestCase):
                 with self.subTest(skill=skill.parent.name, ref=ref):
                     self.assertTrue((plugin / ref.lstrip("/")).exists(),
                                     f"{skill} references missing {ref}")
+
+    def test_hooks_json_parses(self):
+        for hooks_file in hook_files():
+            with self.subTest(hooks=str(hooks_file.relative_to(REPO))):
+                json.loads(hooks_file.read_text(encoding="utf-8"))
+
+    def test_hooks_json_plugin_root_references_resolve(self):
+        for hooks_file in hook_files():
+            plugin = hooks_file.parents[1]
+            for ref in PLUGIN_ROOT_REF.findall(hooks_file.read_text(encoding="utf-8")):
+                with self.subTest(hooks=plugin.name, ref=ref):
+                    self.assertTrue((plugin / ref.lstrip("/")).exists(),
+                                    f"{hooks_file} references missing {ref}")
 
 
 MD_LINK = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)#]+?)(?:#[^)]*)?\)")
