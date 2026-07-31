@@ -44,7 +44,7 @@ degrades silently without it by design.
 2. Load `<root>/.local/gh-projects.json`. Absent/unparseable → exit 0 (never
    "fix" a broken cache — that's provisioning's job).
 3. Per entry (name-keyed): re-resolve via `gh` — project fields/options
-   (GraphQL, as provisioning does), milestones, labels, issue types (REST) —
+   (`gh project field-list`, as provisioning does), milestones, labels, issue types (REST) —
    and rebuild the entry in the identical shape with a fresh `cached_at`.
    Any per-entry failure keeps the old entry untouched.
 4. Write atomically (temp file + rename) only if content actually changed

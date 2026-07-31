@@ -29,7 +29,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 LOCAL_DIR = ".local"
@@ -174,8 +174,11 @@ def _refresh_entry(entry: dict, owner: str | None, repo: str | None, now_iso: st
     try:
         issue_types = _parse_issue_types(
             _run_gh_json(["api", f"repos/{owner}/{repo}/issue-types"]))
-    except Exception:
-        issue_types = []  # issue types not enabled / endpoint unavailable
+    except GhError:
+        # a non-zero exit (404/disabled endpoint) means "not enabled here";
+        # timeouts/missing-binary/bad-JSON are real failures and must
+        # propagate so the caller preserves the whole cached entry instead.
+        issue_types = []
 
     return _build_cache_entry(project, fields, milestones, labels, issue_types, now_iso)
 
@@ -231,7 +234,7 @@ def _do_refresh(cwd: Path, verbose: bool) -> int:
         return 0
 
     owner, repo = _repo_owner_repo(root)
-    now_iso = datetime.now(UTC).isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()  # noqa: UP017 -- bare python3, not py311+
     start = time.monotonic()
     over_budget = False
     new_cache: dict = {}

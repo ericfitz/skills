@@ -1,8 +1,10 @@
 # tests/test_github_refresh.py
 import json
 import os
+import shutil
 import subprocess
 import sys
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -13,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "github" / "scripts
 import refresh_gh_projects as rgp
 
 REPO = Path(__file__).resolve().parents[1]
+SCRIPT_PATH = REPO / "github" / "scripts" / "refresh_gh_projects.py"
 
 FIELD_LIST_JSON = json.dumps({
     "fields": [
@@ -212,6 +215,10 @@ class TestMissingGh(unittest.TestCase):
 
 class TestTimeout(unittest.TestCase):
     def test_sleeping_gh_times_out_and_still_exits_zero(self):
+        # The fake gh sleeps 8s; GH_TIMEOUT is 5s. If subprocess.run were
+        # called without a timeout= (or with a longer one), this test would
+        # take ~8s+ instead of ~5s -- the wall-clock bound below is what
+        # actually pins the 5s-per-call contract, not just the outcome.
         script = "sleep 8\n"
         with rgp.tempfile.TemporaryDirectory() as d:
             root = Path(d) / "repo"
@@ -220,12 +227,48 @@ class TestTimeout(unittest.TestCase):
             with rgp.tempfile.TemporaryDirectory() as bindir:
                 _with_fake_gh(Path(bindir), script)
                 with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}):
+                    started = time.monotonic()
                     rc = rgp.main(["--cwd", str(root)])
+                    elapsed = time.monotonic() - started
             self.assertEqual(rc, 0)
+            self.assertLess(elapsed, 7.0,
+                            "took longer than the 5s per-call timeout should allow; "
+                            "the sleeping fake gh likely ran to completion (8s)")
             new_cache = json.loads(cache_path.read_text())
             # the entry could not be refreshed inside the per-call timeout, so
             # it must be preserved exactly as it was
             self.assertEqual(new_cache["proj"], OLD_ENTRY)
+
+
+class TestSoftBudget(unittest.TestCase):
+    def test_budget_exceeded_preserves_remaining_entries_untouched(self):
+        # Pin the over_budget branch deterministically: rather than racing
+        # real wall-clock time against a near-zero SOFT_BUDGET_SECONDS
+        # (flaky -- entry "a"'s own gh calls take a variable few ms), drive
+        # time.monotonic() with a fixed sequence. The loop calls it once for
+        # `start`, then once per entry's budget check (short-circuited only
+        # once over_budget is already True) -- three calls for two entries:
+        # elapsed=0.0 for entry "a" (under budget, gets refreshed for real),
+        # elapsed=999.0 for entry "b" (over budget, preserved untouched).
+        entry_a = dict(OLD_ENTRY, project={"number": 1, "owner": "acme",
+                                           "id": "PVT_A", "title": "A"})
+        entry_b = dict(OLD_ENTRY, project={"number": 2, "owner": "acme",
+                                           "id": "PVT_B", "title": "B"})
+        with rgp.tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "repo"
+            _init_git_repo(root)
+            cache_path = _write_cache(root, {"a": entry_a, "b": entry_b})
+            with rgp.tempfile.TemporaryDirectory() as bindir:
+                _with_fake_gh(Path(bindir), _HAPPY_GH)
+                with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}), \
+                        mock.patch.object(rgp, "SOFT_BUDGET_SECONDS", 0.0), \
+                        mock.patch.object(rgp.time, "monotonic",
+                                          side_effect=[0.0, 0.0, 999.0]):
+                    rc = rgp.main(["--cwd", str(root)])
+            self.assertEqual(rc, 0)
+            new_cache = json.loads(cache_path.read_text())
+            self.assertNotEqual(new_cache["a"], entry_a)  # refreshed
+            self.assertEqual(new_cache["b"], entry_b)      # preserved verbatim
 
 
 class TestReposJsonUntouched(unittest.TestCase):
@@ -298,6 +341,42 @@ class TestVerbose(unittest.TestCase):
             root.mkdir()
             rc = rgp.main(["--verbose", "--cwd", str(root)])
             self.assertEqual(rc, 0)
+
+
+class TestProcessLevelSmoke(unittest.TestCase):
+    """The rest of this suite calls rgp.main() in-process, which never
+    exercises the module's own import line -- a >=3.10-only construct in a
+    module-level import (e.g. `from datetime import UTC`) still passes every
+    in-process test but crashes with exit 1 at interpreter startup under an
+    older `python3`. These run the actual script as a subprocess under real
+    interpreters to pin "stdlib-only, works under bare python3"."""
+
+    def _assert_clean_exit(self, python_exe: str) -> None:
+        with rgp.tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "not-a-repo"
+            root.mkdir()
+            result = subprocess.run(
+                [python_exe, str(SCRIPT_PATH), "--cwd", str(root)],
+                capture_output=True, text=True, timeout=30,
+            )
+        self.assertEqual(result.returncode, 0,
+                         f"{python_exe}: stderr={result.stderr!r}")
+
+    def test_plain_python3_exits_zero(self):
+        python3 = shutil.which("python3")
+        if not python3:
+            self.skipTest("no python3 on PATH")
+        self._assert_clean_exit(python3)
+
+    def test_system_usr_bin_python3_exits_zero_if_present(self):
+        # The real, non-hypothetical case a SessionStart hook runs under on
+        # macOS: /usr/bin/python3 is whatever Apple shipped (3.9.6 as of
+        # this writing), independent of any project venv or uv-managed
+        # interpreter the rest of this suite runs under.
+        system_python3 = "/usr/bin/python3"
+        if not Path(system_python3).exists():
+            self.skipTest("/usr/bin/python3 not present on this machine")
+        self._assert_clean_exit(system_python3)
 
 
 if __name__ == "__main__":
