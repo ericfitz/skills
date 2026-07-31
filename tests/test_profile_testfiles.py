@@ -8,7 +8,10 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from inventorylib.testfiles import classify_test_files, test_dirs
+# Alias: a bare `test_dirs` in this module's namespace would be collected by
+# pytest as a fixture-less test.
+from inventorylib.testfiles import classify_test_files
+from inventorylib.testfiles import test_dirs as infer_test_dirs
 from repobuilder import build_repo
 
 
@@ -89,7 +92,7 @@ class TestTestDirs(unittest.TestCase):
             {"path": "tests/integration/test_b.py"},
             {"path": "tests/test_c.py"},
         ]
-        self.assertEqual(test_dirs(records), ["tests", "tests/integration"])
+        self.assertEqual(infer_test_dirs(records), ["tests", "tests/integration"])
 
 
 if __name__ == "__main__":
