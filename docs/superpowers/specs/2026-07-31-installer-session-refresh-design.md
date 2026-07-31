@@ -24,6 +24,7 @@
 | Refresher runtime | `python3`, stdlib only (no PEP 723 deps, no uv) | A session-start hook must not depend on the very tooling the env plugin exists to check. `gh` does all API work. |
 | Cache shape | Byte-compatible with `provision-repo-config.py`'s `build_cache_entry` (`cached_at`, `project{number,owner,id,title}`, `fields`, `milestones`, `labels`, `issue_types`), name-keyed | The provisioning script remains the sole creator/migrator (per `.local/` convention); the refresher only updates values in the shape it found. |
 | Installer | `scripts/install.sh <claude|codex|all>` at repo root | Wraps `claude plugin marketplace add ericfitz/skills` + installs, and `codex plugin marketplace add ericfitz/skills` + `codex plugin add <p>@efitz-skills` for each plugin. Idempotent (add-if-missing). `all` (default) targets whichever CLIs are on PATH; a missing CLI is a skip with a note, not an error. |
+| Codex session refresh | Opt-in installer flag `--codex-session-hook`: merges a `SessionStart` entry into `~/.codex/hooks.json` (backup first) whose command resolves the highest installed `github` plugin version's refresher at run time | Verified on Codex 0.146.0: plugin-shipped hooks do NOT fire (`codex features list` → `plugin_hooks removed false`; no hook trace in a live session record), while user-level hooks are stable/enabled. Mutating `~/.codex` config is opt-in only — default install prints a hint instead. Claude Code needs nothing: plugin `hooks/hooks.json` fires natively (same mechanism as the working superpowers plugin). |
 
 ## Components
 
