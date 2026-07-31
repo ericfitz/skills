@@ -24,18 +24,37 @@ def _render(obj: dict) -> str:
     return json.dumps(obj, indent=2) + "\n"
 
 
+def _load_json(path: Path, label: str) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise GenerationError(f"{label}: cannot read {path.name}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise GenerationError(f"{label}: invalid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise GenerationError(f"{label}: expected a JSON object")
+    return data
+
+
 def generate(repo: Path) -> dict[Path, str]:
     """Map each Codex manifest path to its rendered JSON content."""
-    marketplace = json.loads((repo / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+    marketplace = _load_json(repo / ".claude-plugin" / "marketplace.json", "marketplace.json")
+    plugins = marketplace.get("plugins")
+    if not isinstance(plugins, list):
+        raise GenerationError('marketplace.json: missing "plugins" list')
+    if not marketplace.get("name"):
+        raise GenerationError('marketplace.json: missing "name"')
     seen: set[str] = set()
     entries: list[dict] = []
     out: dict[Path, str] = {}
-    for entry in marketplace["plugins"]:
+    for entry in plugins:
+        if not isinstance(entry, dict) or not entry.get("name"):
+            raise GenerationError(f'marketplace.json: entry missing "name": {entry!r}')
         name = entry["name"]
         if name in seen:
             raise GenerationError(f"duplicate plugin name in marketplace.json: {name}")
         seen.add(name)
-        source = entry["source"]
+        source = entry.get("source")
         if not isinstance(source, str) or not source.startswith("./"):
             raise GenerationError(f"{name}: expected string source './<dir>', got {source!r}")
         plugin_dir = repo / source
@@ -44,7 +63,7 @@ def generate(repo: Path) -> dict[Path, str]:
             raise GenerationError(f"{name}: missing {source}/.claude-plugin/plugin.json")
         if not (plugin_dir / "skills").is_dir():
             raise GenerationError(f"{name}: missing {source}/skills/ directory")
-        pdata = json.loads(claude_manifest.read_text(encoding="utf-8"))
+        pdata = _load_json(claude_manifest, name)
         if pdata.get("name") != name:
             raise GenerationError(f"{name}: plugin.json name is {pdata.get('name')!r}, expected {name!r}")
         missing = [key for key in ("version", "description") if not pdata.get(key)]

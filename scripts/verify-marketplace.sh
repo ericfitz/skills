@@ -200,11 +200,15 @@ fi
 # ---------- Codex manifests in sync ----------
 hdr "Codex manifests (generated from Claude manifests)"
 
-if python3 scripts/gen_codex_manifests.py --check >/dev/null 2>&1; then
-  ok "Codex manifests match a fresh regeneration"
-else
-  bad "Codex manifests out of sync — run: uv run scripts/gen_codex_manifests.py"
-fi
+drift_out=$(python3 scripts/gen_codex_manifests.py --check 2>&1)
+drift_rc=$?
+case $drift_rc in
+  0) ok "Codex manifests match a fresh regeneration" ;;
+  1) bad "Codex manifests out of sync — run: uv run scripts/gen_codex_manifests.py"
+     printf '%s\n' "$drift_out" | while IFS= read -r line; do printf '         %s\n' "$line"; done ;;
+  *) bad "Codex manifest generator failed (rc=$drift_rc) — structural problem in the Claude manifests:"
+     printf '%s\n' "$drift_out" | while IFS= read -r line; do printf '         %s\n' "$line"; done ;;
+esac
 
 # ---------- summary ----------
 hdr "Summary"

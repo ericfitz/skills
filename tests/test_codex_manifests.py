@@ -101,6 +101,40 @@ class TestGenerate(unittest.TestCase):
         with self.assertRaisesRegex(gcm.GenerationError, "alpha"):
             gcm.generate(self.root)
 
+    def test_missing_marketplace_file_is_a_generation_error(self):
+        with self.assertRaisesRegex(gcm.GenerationError, "marketplace.json"):
+            gcm.generate(self.root)
+
+    def test_invalid_marketplace_json_is_a_generation_error(self):
+        build_repo(self.root, {"alpha": manifest("alpha")})
+        (self.root / ".claude-plugin" / "marketplace.json").write_text("{not json", encoding="utf-8")
+        with self.assertRaisesRegex(gcm.GenerationError, "marketplace.json"):
+            gcm.generate(self.root)
+
+    def test_entry_missing_name_is_a_generation_error(self):
+        build_repo(self.root, {"alpha": manifest("alpha")}, market_entries=[{"description": "d"}])
+        with self.assertRaisesRegex(gcm.GenerationError, "name"):
+            gcm.generate(self.root)
+
+    def test_entry_missing_source_is_a_generation_error(self):
+        build_repo(self.root, {"alpha": manifest("alpha")}, market_entries=[{"name": "alpha"}])
+        with self.assertRaisesRegex(gcm.GenerationError, "alpha"):
+            gcm.generate(self.root)
+
+    def test_invalid_plugin_json_is_a_generation_error(self):
+        build_repo(self.root, {"alpha": manifest("alpha")})
+        (self.root / "alpha" / ".claude-plugin" / "plugin.json").write_text("[1,", encoding="utf-8")
+        with self.assertRaisesRegex(gcm.GenerationError, "alpha"):
+            gcm.generate(self.root)
+
+    def test_cli_exits_2_on_structural_error(self):
+        proc = subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "gen_codex_manifests.py"),
+             "--repo", str(self.root), "--check"],
+            capture_output=True, text=True, timeout=60)
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertIn("FAIL:", proc.stderr)
+
 
 CLAUDE_MARKETPLACE = REPO / ".claude-plugin" / "marketplace.json"
 CODEX_MARKETPLACE = REPO / ".agents" / "plugins" / "marketplace.json"
