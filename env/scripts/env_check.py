@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import re
 import subprocess
 import sys
@@ -54,12 +55,26 @@ def _first_line(text: str, limit: int = 200) -> str:
     return ""
 
 
+_PLATFORM_KEYS = {"Darwin": "macos", "Linux": "linux", "Windows": "windows"}
+
+
 def _install_hint(install: dict | None) -> str:
+    """Resolve the `remedy` string shown in a report for an `install` object.
+
+    This is display guidance for a human reading the report, not a command
+    the checker runs -- `env_check.py` is read-only. It picks the key for the
+    detected host platform (`platform.system()`: Darwin -> macos, Linux ->
+    linux, Windows -> windows) and falls through to `docs` when the host has
+    no key of its own, or when `install` has no `docs` either, `""`.
+
+    The skill layer's `--fix` does its own platform detection and reads the
+    same `install` object directly (see env/skills/check/SKILL.md Step 3) --
+    it never runs the string this function returns."""
     if not install:
         return ""
-    for key in ("macos", "linux", "windows"):
-        if install.get(key):
-            return install[key]
+    key = _PLATFORM_KEYS.get(platform.system())
+    if key and install.get(key):
+        return install[key]
     return install.get("docs", "")
 
 
@@ -457,7 +472,10 @@ def _print_human(report: dict) -> None:
                 print(f"    remedy: {f['remedy']}")
 
     if report["undeclared"]:
-        print(f"\nUndeclared plugins (see issue #21): {', '.join(report['undeclared'])}")
+        count = len(report["undeclared"])
+        noun = "plugin has" if count == 1 else "plugins have"
+        print(f"\nWARNING: {count} {noun} no requirements.json -- "
+              f"their needs are unchecked (see issue #21): {', '.join(report['undeclared'])}")
 
     print(f"\nOK: {report['ok_count']} requirement(s) met")
 

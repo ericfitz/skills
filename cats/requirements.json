@@ -1,0 +1,35 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "cats",
+  "tools": [
+    {
+      "name": "cats",
+      "required": true,
+      "why": "run executes the CATS fuzzer directly; init's doctor check verifies it's on PATH",
+      "probe": ["cats", "--version"],
+      "install": {
+        "macos": "brew install cats",
+        "docs": "https://github.com/Endava/cats"
+      }
+    },
+    {
+      "name": "uv",
+      "required": true,
+      "why": "init, run, report, analyze, and fp all invoke cats_tool.py via `uv run` -- no fallback is documented",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    }
+  ],
+  "config": [
+    {
+      "path": ".local/cats/config.yaml",
+      "scope": "repo",
+      "required": false,
+      "why": "run, report, analyze, and fp all read it for spec/server/results-dir/identities; run points the user at /cats:init when it's missing",
+      "remedy": "run /cats:init in the target repo"
+    }
+  ]
+}

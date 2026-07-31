@@ -57,7 +57,8 @@ The file lives in `.local/` and is gitignored (machine-local convention). Create
 ## Process
 
 ### 1. Preflight
-- Confirm the `sem` CLI is available: `sem --version`. If missing, stop and tell the user to
+- Confirm the `sem` CLI is available: run `/env:check dev` if the env plugin is installed;
+  otherwise probe directly with `sem --version`. If missing, stop and tell the user to
   install it (`brew install sem-cli` / see sem docs).
 - Determine the repo dir (default: cwd) and the path scope from arguments.
 

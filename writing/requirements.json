@@ -1,0 +1,16 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "writing",
+  "tools": [
+    {
+      "name": "uv",
+      "required": true,
+      "why": "boring's Phase 1 setup (Check 1) stops outright without it -- uv manages the analyzer's venv (uv sync) and runs it (uv run python -m analyzer)",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    }
+  ]
+}

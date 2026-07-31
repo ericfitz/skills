@@ -176,7 +176,7 @@ Created: <issue_url>
 
 | Situation | Behavior |
 |---|---|
-| `gh` not authenticated | Tell the user to run `gh auth login`. |
+| `gh` not authenticated | Run `/env:check github` if the env plugin is installed; otherwise tell the user to run `gh auth login`. |
 | Target not in `.local/repos.json` | Error with the list of known names. |
 | `github.project == ""` | Create a plain issue; skip project add/status. |
 | Cache file/entry missing | Tell the user to run `~/Scripts/provision-repo-config.py`, then stop. |

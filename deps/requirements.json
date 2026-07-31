@@ -1,0 +1,36 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "deps",
+  "tools": [
+    {
+      "name": "git",
+      "required": true,
+      "why": "bump's branch/commit/PR flow (Phases 2, 8, 9, 11) -- current-branch detection, stash, checkout, commit, push",
+      "probe": ["git", "--version"],
+      "install": {
+        "macos": "brew install git",
+        "docs": "https://git-scm.com/downloads"
+      }
+    },
+    {
+      "name": "uv",
+      "required": false,
+      "why": "bump's CLI wrapper (scripts/bump.py) normally runs through uv; the skill documents a python3 fallback when uv is unavailable",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    },
+    {
+      "name": "gh",
+      "required": false,
+      "why": "bump's codeHost/issueTracker adapter (Dependabot alerts, PR open/merge/status, changelog research); Error Handling documents graceful degradation when gh is missing or unauthenticated",
+      "probe": ["gh", "--version"],
+      "install": {
+        "macos": "brew install gh",
+        "docs": "https://cli.github.com"
+      }
+    }
+  ]
+}

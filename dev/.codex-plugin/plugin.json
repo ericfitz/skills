@@ -1,6 +1,6 @@
 {
   "name": "dev",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "Developer toolkit (sem-powered): annotate code with durable SEM@<sha> intent markers (sem-annotate), keep them maintained via a project convention (sem-auto), and find dead code + duplication and produce a ranked plan (dedupe). Uses the sem CLI entity graph. Supports Go, TypeScript/JavaScript, and Python.",
   "author": {
     "name": "efitz"

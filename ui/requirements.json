@@ -1,0 +1,35 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "ui",
+  "tools": [
+    {
+      "name": "gh",
+      "required": false,
+      "why": "vrt's task-context gathering (Step 1) fetches the referenced issue with `gh issue view`",
+      "probe": ["gh", "--version"],
+      "install": {
+        "macos": "brew install gh",
+        "docs": "https://cli.github.com"
+      }
+    },
+    {
+      "name": "jq",
+      "required": false,
+      "why": "vrt reads the owner/repo out of .local/repos.json with jq before calling `gh issue view`",
+      "probe": ["jq", "--version"],
+      "install": {
+        "macos": "brew install jq",
+        "docs": "https://jqlang.org/download/"
+      }
+    }
+  ],
+  "config": [
+    {
+      "path": ".local/repos.json",
+      "scope": "repo",
+      "required": false,
+      "why": "vrt's task-context lookup (Step 1) resolves the GitHub owner/repo for `gh issue view`; absent, it falls back to whatever `gh` is configured to use",
+      "remedy": "run ~/Scripts/provision-repo-config.py in the target repo"
+    }
+  ]
+}

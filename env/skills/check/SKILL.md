@@ -68,7 +68,10 @@ Capture stdout and the exit code regardless of which exit code comes back
 to parse — a broken declaration, not a missing requirement.
 
 If `"error"` is present (exit 2, e.g. an unknown `--plugin` name), report the
-error and stop; there is no report to render.
+error and stop; there is no report to render. A discovery error (e.g. the
+env plugin's own declaration can't be found or read) also exits 2, but
+prints its message to stderr with **no JSON on stdout at all** — the
+`"error"` JSON key only ever appears for the bad-`--plugin` case above.
 
 ## Step 2: Render the report
 

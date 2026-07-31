@@ -1,0 +1,25 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "wiki",
+  "tools": [
+    {
+      "name": "git",
+      "required": true,
+      "why": "verify-doc's Phase 5 uses `git mv` to move the migrated doc into docs/migrated/ while preserving history",
+      "probe": ["git", "--version"],
+      "install": {
+        "macos": "brew install git",
+        "docs": "https://git-scm.com/downloads"
+      }
+    }
+  ],
+  "config": [
+    {
+      "path": ".local/repos.json",
+      "scope": "repo",
+      "required": false,
+      "why": "verify-doc resolves the target repo path and github.wiki_path for migration (Phase 4); absent, it still verifies the doc but reports migration as skipped",
+      "remedy": "run ~/Scripts/provision-repo-config.py in the target repo"
+    }
+  ]
+}

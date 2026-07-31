@@ -14,6 +14,13 @@
   ],
   "config": [
     {
+      "path": ".local/repos.json",
+      "scope": "repo",
+      "required": false,
+      "why": "create-issue resolves the target repo's GitHub owner/repo from this file (SKILL.md's Configuration & cache section and its Error Handling table)",
+      "remedy": "run ~/Scripts/provision-repo-config.py in the target repo"
+    },
+    {
       "path": ".local/gh-projects.json",
       "scope": "repo",
       "required": false,

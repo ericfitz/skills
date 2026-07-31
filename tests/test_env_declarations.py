@@ -22,6 +22,7 @@ TOOL_ENTRY_KEYS = {"name", "required", "why", "probe", "version_pattern",
                     "min_version", "install"}
 CONFIG_ENTRY_KEYS = {"path", "scope", "required", "why", "remedy"}
 AUTH_ENTRY_KEYS = {"name", "probe", "why", "remedy"}
+INSTALL_KEYS = {"macos", "linux", "windows", "docs"}
 
 
 def declaration_files():
@@ -108,6 +109,16 @@ class TestDeclarationInvariants(unittest.TestCase):
                         self.assertEqual(
                             unknown, set(),
                             f"unknown key(s) {unknown} in {rel} {section} entry {label!r}")
+            for tool in data.get("tools", []):
+                install = tool.get("install")
+                if install is None:
+                    continue
+                label = tool.get("name")
+                with self.subTest(declaration=rel, section="tools.install", name=label):
+                    unknown = set(install.keys()) - INSTALL_KEYS
+                    self.assertEqual(
+                        unknown, set(),
+                        f"unknown install key(s) {unknown} in {rel} tool entry {label!r}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,16 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "profile",
+  "tools": [
+    {
+      "name": "uv",
+      "required": false,
+      "why": "stack runs the bundled profile_inventory.py via `uv run --script`; the skill documents a python3 fallback when uv is unavailable",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    }
+  ]
+}

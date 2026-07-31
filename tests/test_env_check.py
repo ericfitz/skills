@@ -482,6 +482,37 @@ class TestEvaluateAuth(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# _install_hint: platform-aware remedy resolution
+# ---------------------------------------------------------------------------
+
+class TestInstallHint(unittest.TestCase):
+    def test_picks_the_detected_platform_key(self):
+        install = {"macos": "brew install x", "linux": "apt install x", "docs": "https://x"}
+        with mock.patch.object(ec.platform, "system", return_value="Darwin"):
+            self.assertEqual(ec._install_hint(install), "brew install x")
+        with mock.patch.object(ec.platform, "system", return_value="Linux"):
+            self.assertEqual(ec._install_hint(install), "apt install x")
+
+    def test_falls_through_to_docs_when_host_key_absent(self):
+        install = {"macos": "brew install x", "docs": "https://x"}
+        with mock.patch.object(ec.platform, "system", return_value="Linux"):
+            self.assertEqual(ec._install_hint(install), "https://x")
+
+    def test_falls_through_to_docs_on_unrecognized_platform(self):
+        install = {"macos": "brew install x", "docs": "https://x"}
+        with mock.patch.object(ec.platform, "system", return_value="FreeBSD"):
+            self.assertEqual(ec._install_hint(install), "https://x")
+
+    def test_no_install_object_is_empty_string(self):
+        self.assertEqual(ec._install_hint(None), "")
+
+    def test_no_matching_key_and_no_docs_is_empty_string(self):
+        install = {"linux": "apt install x"}
+        with mock.patch.object(ec.platform, "system", return_value="Darwin"):
+            self.assertEqual(ec._install_hint(install), "")
+
+
+# ---------------------------------------------------------------------------
 # report assembly: categories + exit codes
 # ---------------------------------------------------------------------------
 
@@ -604,6 +635,47 @@ class TestBuildReport(unittest.TestCase):
             report = ec.build_report(root=root / "env", plugin_filter="nonexistent")
 
             self.assertEqual(report["exit_code"], 2)
+
+
+# ---------------------------------------------------------------------------
+# _print_human: undeclared plugins render as a warning, not a neutral list
+# (issue #21 item 3 -- once every marketplace plugin is declared, undeclared
+# should be rare, so it earns warning-toned wording in the human renderer;
+# the JSON `undeclared` list itself stays a neutral list, unchanged).
+# ---------------------------------------------------------------------------
+
+def _bare_report(**overrides) -> dict:
+    report = {
+        "plugins": {}, "degraded_discovery": False,
+        "missing": [], "degraded": [], "undeclared": [],
+        "ok_count": 0, "exit_code": 0,
+    }
+    report.update(overrides)
+    return report
+
+
+class TestPrintHumanUndeclaredWarning(unittest.TestCase):
+    def test_undeclared_line_is_warning_toned_plural(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            ec._print_human(_bare_report(undeclared=["alpha", "beta"]))
+        text = out.getvalue()
+        self.assertIn("WARNING", text)
+        self.assertIn("2 plugins have no requirements.json", text)
+        self.assertIn("unchecked", text)
+        self.assertIn("alpha, beta", text)
+
+    def test_undeclared_line_is_warning_toned_singular(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            ec._print_human(_bare_report(undeclared=["alpha"]))
+        self.assertIn("1 plugin has no requirements.json", out.getvalue())
+
+    def test_no_undeclared_line_when_empty(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            ec._print_human(_bare_report())
+        self.assertNotIn("WARNING", out.getvalue())
 
 
 # ---------------------------------------------------------------------------

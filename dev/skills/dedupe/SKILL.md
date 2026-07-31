@@ -65,7 +65,8 @@ The file lives in `.local/` and is gitignored (machine-local convention). Create
 ## Process
 
 ### 1. Preflight
-- Confirm `sem` is available: `sem --version`. If missing, stop and tell the user to install it.
+- Confirm `sem` is available: run `/env:check dev` if the env plugin is installed; otherwise
+  probe directly with `sem --version`. If missing, stop and tell the user to install it.
 - Determine repo dir (default cwd) and path scope from arguments. Ensure `.dedupe/` is gitignored.
 
 ### 2. Load + detect (one tool call)
