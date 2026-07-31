@@ -8,7 +8,7 @@
       "why": "run executes the CATS fuzzer directly; init's doctor check verifies it's on PATH",
       "probe": ["cats", "--version"],
       "install": {
-        "macos": "brew install cats",
+        "macos": "brew install endava/tap/cats",
         "docs": "https://github.com/Endava/cats"
       }
     },

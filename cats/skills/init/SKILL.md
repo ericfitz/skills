@@ -115,4 +115,6 @@ all-✓ `doctor` run doesn't confirm authentication actually works — that's
 only proven by a real `/cats:run`.
 
 If `cats` itself isn't installed, point at
-https://github.com/Endava/cats (e.g. `brew install cats`).
+https://github.com/Endava/cats (e.g. `brew install endava/tap/cats` --
+homebrew-core has no `cats` formula, so the plain `brew install cats` name
+does not resolve; brew auto-taps the fully-qualified name).

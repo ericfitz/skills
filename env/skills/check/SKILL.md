@@ -40,11 +40,22 @@ requirement — see `${CLAUDE_PLUGIN_ROOT}/requirements.json`):
 uv run ${CLAUDE_PLUGIN_ROOT}/scripts/env_check.py check --json
 ```
 
+`scripts/env_check.py` is stdlib-only, so if `uv` itself is the thing
+missing, fall back to running it directly: `python3
+${CLAUDE_PLUGIN_ROOT}/scripts/env_check.py check --json`.
+
 To scope the check to one plugin, add `--plugin NAME`:
 
 ```bash
 uv run ${CLAUDE_PLUGIN_ROOT}/scripts/env_check.py check --json --plugin github
 ```
+
+Scoping to one plugin only restricts which plugin's `tools`/`config`/`auth`
+entries get evaluated into `missing`/`degraded` — a broken-declaration
+finding (`"section": "declaration"`) from any *other* plugin still appears
+in `degraded`, by design, since a corrupt sibling declaration is exactly the
+kind of thing this checker exists to surface regardless of which plugin you
+asked about.
 
 Capture stdout and the exit code regardless of which exit code comes back
 (`0` all hard requirements met, `1` at least one hard requirement missing,
@@ -104,17 +115,21 @@ them:
    treated as a failure and never affects the exit code.
 
 5. **Undeclared plugins** — plugins discovered with no `requirements.json`
-   at all. The JSON list itself carries no issue pointer, so add one when
-   rendering: "see https://github.com/ericfitz/skills/issues/21". Keep this
-   list separate from failures — it is neutral, not a finding.
+   at all. Render this as a warning that their needs are unchecked (matching
+   the CLI's own warning-toned wording), not a neutral aside — e.g. "WARNING:
+   N plugin(s) have no requirements.json; their needs are unchecked" — and
+   add an issue pointer: "see https://github.com/ericfitz/skills/issues/21".
+   Still keep it separate from `missing`/`degraded`: it never drives the
+   exit code and is not itself a hard or optional finding, just a gap in
+   what could be checked.
 
 6. **OK** — summarize as a count (`ok_count`), never enumerated
    individually.
 
 Only call the environment fully ready when `exit_code` is `0`, `degraded`
-contains no `"declaration"` entries, and `undeclared` is empty (or note the
-undeclared plugins explicitly even then, since it's neutral information the
-user may still want).
+contains no `"declaration"` entries, and `undeclared` is empty (or surface
+the undeclared-plugins warning explicitly even then — it doesn't block
+"ready," but it's still worth the user seeing).
 
 ## Step 3: `--fix` (only when explicitly requested)
 
