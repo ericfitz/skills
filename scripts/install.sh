@@ -68,6 +68,10 @@ done
 
 TARGET="${TARGET:-all}"
 
+if [ "$CODEX_SESSION_HOOK" -eq 1 ] && [ "$TARGET" = "claude" ]; then
+  echo "Note: --codex-session-hook has no effect when the target is 'claude' (it only applies to codex)."
+fi
+
 # Print the plugin names declared in .claude-plugin/marketplace.json, one per line.
 plugin_names() {
   python3 -c "
@@ -105,6 +109,12 @@ sys.exit(0 if '$MARKETPLACE_NAME' in names else 1)
   local installed
   installed="$(claude plugin list --json 2>/dev/null || echo '[]')"
 
+  local names
+  if ! names="$(plugin_names)"; then
+    echo "FAILED: could not read plugin names from $REPO_ROOT/.claude-plugin/marketplace.json" >&2
+    exit 1
+  fi
+
   local name
   while IFS= read -r name; do
     [ -z "$name" ] && continue
@@ -122,50 +132,74 @@ sys.exit(0 if '$name@$MARKETPLACE_NAME' in ids else 1)
         exit 1
       fi
     fi
-  done < <(plugin_names)
+  done <<< "$names"
 }
 
 # Merge a SessionStart hook into ~/.codex/hooks.json that resolves and runs
 # the highest installed github plugin version's refresh_gh_projects.py at
 # run time, so plugin upgrades never leave the hook stale. Merges (never
-# clobbers) an existing hooks.json; backs it up first; idempotent (skips if
-# an entry already references refresh_gh_projects.py).
+# clobbers) an existing hooks.json; idempotent (skips, untouched, if an
+# entry already references refresh_gh_projects.py). A backup is written to
+# hooks.json.bak only at the moment the file is actually about to be
+# modified, and an existing .bak is never overwritten, so it always holds
+# the file's original pre-installer content. Malformed JSON, or JSON that
+# doesn't parse to an object, is left completely untouched (no backup, no
+# write, no invented structure) — that's the user's to fix or discard.
 install_codex_session_hook() {
   local codex_dir="$HOME/.codex"
   local hooks_file="$codex_dir/hooks.json"
 
   mkdir -p "$codex_dir"
 
-  if [ -f "$hooks_file" ]; then
-    cp "$hooks_file" "$hooks_file.bak"
-  fi
-
-  python3 - "$hooks_file" <<'PYEOF'
+  if ! python3 - "$hooks_file" <<'PYEOF'
 import json
+import shutil
 import sys
 from pathlib import Path
 
 hooks_path = Path(sys.argv[1])
+backup_path = hooks_path.parent / (hooks_path.name + ".bak")
 
 command = (
     "bash -c 'p=$(ls -d \"$HOME\"/.codex/plugins/cache/efitz-skills/github/*/scripts/refresh_gh_projects.py "
     "2>/dev/null | sort -V | tail -1); [ -n \"$p\" ] && exec python3 \"$p\"; exit 0'"
 )
 
+
+def refuse(reason: str) -> None:
+    print(
+        f"REFUSING to modify {hooks_path}: {reason}\n"
+        f"Fix or remove the file by hand, then re-run with --codex-session-hook.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 if hooks_path.exists():
     try:
         data = json.loads(hooks_path.read_text())
-    except (json.JSONDecodeError, OSError):
-        data = {}
+    except json.JSONDecodeError as e:
+        refuse(f"not valid JSON ({e})")
+    except OSError as e:
+        refuse(f"could not be read ({e})")
+    if not isinstance(data, dict):
+        refuse(f"top-level JSON is a {type(data).__name__}, expected an object")
 else:
     data = {}
 
 hooks = data.setdefault("hooks", {})
+if not isinstance(hooks, dict):
+    refuse('the "hooks" key is not an object')
+
 session_start = hooks.setdefault("SessionStart", [])
+if not isinstance(session_start, list):
+    refuse('"hooks.SessionStart" is not an array')
 
 for matcher_entry in session_start:
-    for h in matcher_entry.get("hooks", []):
-        if "refresh_gh_projects.py" in h.get("command", ""):
+    if not isinstance(matcher_entry, dict):
+        continue
+    for h in matcher_entry.get("hooks", []) or []:
+        if isinstance(h, dict) and "refresh_gh_projects.py" in h.get("command", ""):
             print(f"{hooks_path}: a SessionStart entry already references refresh_gh_projects.py; leaving as-is")
             sys.exit(0)
 
@@ -181,9 +215,20 @@ session_start.append({
     ],
 })
 
+if hooks_path.exists():
+    if backup_path.exists():
+        print(f"note: {backup_path} already exists; leaving it as the original backup")
+    else:
+        shutil.copy2(hooks_path, backup_path)
+        print(f"backed up {hooks_path} to {backup_path}")
+
 hooks_path.write_text(json.dumps(data, indent=2) + "\n")
 print(f"merged SessionStart refresh_gh_projects.py hook into {hooks_path}")
 PYEOF
+  then
+    echo "FAILED: could not merge SessionStart hook into $hooks_file (see message above)" >&2
+    exit 1
+  fi
 }
 
 install_codex() {
@@ -212,6 +257,12 @@ sys.exit(0 if '$MARKETPLACE_NAME' in names else 1)
   local installed
   installed="$(codex plugin list --json 2>/dev/null || echo '{"installed": []}')"
 
+  local names
+  if ! names="$(plugin_names)"; then
+    echo "FAILED: could not read plugin names from $REPO_ROOT/.claude-plugin/marketplace.json" >&2
+    exit 1
+  fi
+
   local name
   while IFS= read -r name; do
     [ -z "$name" ] && continue
@@ -229,7 +280,7 @@ sys.exit(0 if '$name@$MARKETPLACE_NAME' in ids else 1)
         exit 1
       fi
     fi
-  done < <(plugin_names)
+  done <<< "$names"
 
   if [ "$CODEX_SESSION_HOOK" -eq 1 ]; then
     install_codex_session_hook
