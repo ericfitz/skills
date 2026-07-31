@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync environment
+        run: uv sync
+      - name: Lint
+        run: uv run ruff check .
+      - name: Tests
+        run: uv run pytest -q
+      - name: Codex manifest drift
+        run: uv run scripts/gen_codex_manifests.py --check
+      - name: Marketplace structure
+        run: REPO="$GITHUB_WORKSPACE" bash scripts/verify-marketplace.sh
