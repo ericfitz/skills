@@ -16,7 +16,7 @@
 
 | Decision | Choice | Why |
 |---|---|---|
-| Where the hook lives | The `github` plugin ships `hooks/hooks.json` (SessionStart) + `scripts/refresh_gh_projects.py` | The plugin whose skills consume the cache owns its freshness; installing `github` in either harness sets up the refresh with zero extra steps. Both harnesses auto-detect `hooks/hooks.json` and export `CLAUDE_PLUGIN_ROOT` (verified: superpowers plugin in Claude Code; Codex packaging docs, which also alias `CLAUDE_PLUGIN_ROOT`). |
+| Where the hook lives | The `github` plugin ships `hooks/hooks.json` (SessionStart) + `scripts/refresh_gh_projects.py` | The plugin whose skills consume the cache owns its freshness. Claude Code auto-detects plugin `hooks/hooks.json` and exports `CLAUDE_PLUGIN_ROOT` (verified live via the superpowers plugin), so installing `github` there sets up the refresh with zero extra steps. Codex does NOT currently execute plugin-shipped hooks (see the "Codex session refresh" row); the file still ships so Codex picks it up if the platform enables `plugin_hooks` later. |
 | Hook matcher | `startup` only (not `clear`/`compact`) | "New session means a top-level session start." Subagents fire no SessionStart in either harness — satisfies the not-on-subagent requirement structurally. |
 | Refresh semantics | Refresh-only: if `<repo-root>/.local/gh-projects.json` exists, re-resolve each entry and rewrite; if absent, exit 0 silently | Creating the cache requires choosing a Project — that's provisioning (`~/Scripts/provision-repo-config.py`, user-run). Refresh-only also guarantees the hook never creates `.local/` state in repos the user hasn't opted in. |
 | `repos.json` | Never read, never written, never required | Issue constraint, verbatim. |
@@ -76,7 +76,10 @@ refreshed/skipped; the hook invocation does not pass it.
 
 - [x] Installer supports both Claude Code and Codex → `scripts/install.sh`.
 - [x] Cache updated at each top-level session start, not subagent start →
-  SessionStart hook, `startup` matcher; subagents fire no SessionStart.
+  Claude Code: plugin SessionStart hook, `startup` matcher, automatic on
+  install. Codex: plugin hooks are platform-disabled (0.146.0), so the refresh
+  requires the installer's opt-in `--codex-session-hook` user-level hook.
+  Subagents fire no SessionStart in either harness.
 - [x] Nothing creates or requires `.local/repos.json` → refresher never touches
   it; installer never touches `.local/` at all.
 - [x] Failed refresh never blocks session start → always-exit-0 + timeouts.
