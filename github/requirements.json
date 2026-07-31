@@ -17,7 +17,7 @@
       "path": ".local/gh-projects.json",
       "scope": "repo",
       "required": false,
-      "why": "project and field IDs for issue filing",
+      "why": "project and field IDs for issue filing in create-issue",
       "remedy": "run ~/Scripts/provision-repo-config.py in the target repo"
     }
   ],
@@ -25,7 +25,7 @@
     {
       "name": "github",
       "probe": ["gh", "auth", "status"],
-      "why": "issue creation and project mutation",
+      "why": "issue creation and project mutation in create-issue and backlog",
       "remedy": "gh auth login"
     }
   ]

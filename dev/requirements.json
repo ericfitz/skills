@@ -5,7 +5,7 @@
     {
       "name": "sem",
       "required": true,
-      "why": "the sem entity graph backing dedupe and sem-annotate",
+      "why": "the sem entity graph backing dedupe and sem-annotate; sem-auto soft-checks it too",
       "probe": ["sem", "--version"],
       "install": {
         "macos": "brew install sem-cli",

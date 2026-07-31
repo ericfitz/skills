@@ -13,6 +13,16 @@ REPO = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO / "env" / "references" / "requirements.schema.json"
 EXEMPLAR_PLUGINS = ["dev", "env", "github"]
 
+# Known keys per shape, kept in sync with requirements.schema.json by hand.
+# schema_check.py ignores unknown keywords and the schema has no
+# additionalProperties enforcement, so a typo like "min_verison" would
+# otherwise validate silently and just never fire. This closes that gap.
+TOP_LEVEL_KEYS = {"requirements_version", "plugin", "tools", "config", "auth"}
+TOOL_ENTRY_KEYS = {"name", "required", "why", "probe", "version_pattern",
+                    "min_version", "install"}
+CONFIG_ENTRY_KEYS = {"path", "scope", "required", "why", "remedy"}
+AUTH_ENTRY_KEYS = {"name", "probe", "why", "remedy"}
+
 
 def declaration_files():
     return sorted(REPO.glob("*/requirements.json"))
@@ -75,6 +85,29 @@ class TestDeclarationInvariants(unittest.TestCase):
                         for token in probe:
                             self.assertIsInstance(
                                 token, str, "every probe token must be a string")
+
+    def test_no_unknown_keys(self):
+        # A typo'd optional key (e.g. "min_verison") satisfies the schema
+        # (no additionalProperties enforcement) and is silently ignored by
+        # schema_check.py, so the field it was meant to set is silently
+        # inert. Guard the known key sets directly instead.
+        sections = (("tools", TOOL_ENTRY_KEYS),
+                    ("config", CONFIG_ENTRY_KEYS),
+                    ("auth", AUTH_ENTRY_KEYS))
+        for path in declaration_files():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            rel = str(path.relative_to(REPO))
+            with self.subTest(declaration=rel, level="top"):
+                unknown = set(data.keys()) - TOP_LEVEL_KEYS
+                self.assertEqual(unknown, set(), f"unknown top-level key(s) in {rel}")
+            for section, known_keys in sections:
+                for entry in data.get(section, []):
+                    label = entry.get("name") or entry.get("path")
+                    with self.subTest(declaration=rel, section=section, name=label):
+                        unknown = set(entry.keys()) - known_keys
+                        self.assertEqual(
+                            unknown, set(),
+                            f"unknown key(s) {unknown} in {rel} {section} entry {label!r}")
 
 
 if __name__ == "__main__":

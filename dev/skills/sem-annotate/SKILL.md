@@ -58,7 +58,7 @@ The file lives in `.local/` and is gitignored (machine-local convention). Create
 
 ### 1. Preflight
 - Confirm the `sem` CLI is available: `sem --version`. If missing, stop and tell the user to
-  install it (`brew install sem` / see sem docs).
+  install it (`brew install sem-cli` / see sem docs).
 - Determine the repo dir (default: cwd) and the path scope from arguments.
 
 ### 2. Scan for work
