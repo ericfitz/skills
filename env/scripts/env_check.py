@@ -68,6 +68,16 @@ def _finding(plugin: str, section: str, name: str, why: str, remedy: str, detail
             "why": why, "remedy": remedy, "detail": detail}
 
 
+def _broken_finding(plugin: str, path: Path, exc: Exception) -> dict:
+    """A distinct finding for a sibling requirements.json that exists but
+    fails to parse -- never a crash, never misfiled as merely 'undeclared'."""
+    return _finding(
+        plugin, "declaration", "requirements.json",
+        "env_check.py must be able to parse this file to check the plugin",
+        "fix the plugin's requirements.json (or reinstall this version of the plugin)",
+        f"failed to parse {path}: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # version comparison
 # ---------------------------------------------------------------------------
@@ -146,67 +156,112 @@ def _layout_info(self_dir: Path) -> tuple[str, str, Path]:
     return "cache", plugin_name, self_dir.parent.parent
 
 
-def discover(root: Path | None = None) -> dict[str, tuple[str | None, Path]]:
-    """Find every discoverable plugin's requirements.json.
+def _discover_all(
+    root: Path | None,
+) -> tuple[dict[str, tuple[str | None, Path]], list[dict], str, str, Path, Path]:
+    """Single filesystem pass shared by discover(), _discover_broken(), and
+    discover_undeclared(), so all three agree on layout and on which sibling
+    requirements.json files actually parse.
 
-    Returns {plugin_name: (version_or_None, path_to_requirements_json)}.
-    version is only meaningful in the cache layout (the version directory
-    name); the flat layout has no version concept, so it is always None.
+    Both layouts key by directory name, never by the declaration's own
+    `plugin` field -- the schema already pins plugin == dirname for every
+    committed declaration (see tests/test_env_declarations.py), and keying by
+    directory name means a declaration that disagrees with its own directory
+    can't silently show up as both declared (under the field's name) and
+    undeclared (under the dirname).
 
-    If discovery finds no siblings -- standalone install, or an unrecognized
-    layout -- this degrades to reporting on self only, honestly, rather than
-    guessing.
+    Returns (found, broken, layout, plugin_name, self_dir, glob_root). `found`
+    holds every sibling requirements.json that parses as JSON; `broken` holds
+    a 'broken declaration' finding (see _broken_finding) for every sibling
+    that exists but doesn't parse -- kept separate so a corrupt file
+    elsewhere in the cache can never crash the checker (a broken declaration
+    is exactly what this tool exists to diagnose) and never gets misfiled as
+    merely "undeclared" (see discover_undeclared).
     """
     self_dir = _self_dir(root)
     layout, plugin_name, glob_root = _layout_info(self_dir)
-    self_declaration = self_dir / "requirements.json"
 
-    found: dict[str, tuple[str | None, Path]]
+    found: dict[str, tuple[str | None, Path]] = {}
+    broken: list[dict] = []
+
     if layout == "flat":
-        found = {}
         for path in sorted(glob_root.glob("*/requirements.json")):
+            name = path.parent.name
             try:
-                data = _load_json(path)
-            except (OSError, json.JSONDecodeError):
+                _load_json(path)
+            except (OSError, json.JSONDecodeError) as exc:
+                broken.append(_broken_finding(name, path, exc))
                 continue
-            name = data.get("plugin", path.parent.name)
             found[name] = (None, path)
     else:
         by_plugin: dict[str, list[tuple[tuple[int, ...], str, Path]]] = {}
         for path in sorted(glob_root.glob("*/*/requirements.json")):
             version_str = path.parent.name
             plugin_dir_name = path.parent.parent.name
+            try:
+                _load_json(path)
+            except (OSError, json.JSONDecodeError) as exc:
+                broken.append(_broken_finding(plugin_dir_name, path, exc))
+                continue
             by_plugin.setdefault(plugin_dir_name, []).append(
                 (_version_key(version_str), version_str, path))
-        found = {}
         for name, versions in by_plugin.items():
             versions.sort(key=lambda t: t[0])
             best_version, best_path = versions[-1][1], versions[-1][2]
             found[name] = (best_version, best_path)
 
+    return found, broken, layout, plugin_name, self_dir, glob_root
+
+
+def discover(root: Path | None = None) -> dict[str, tuple[str | None, Path]]:
+    """Find every discoverable plugin's requirements.json.
+
+    Returns {plugin_name: (version_or_None, path_to_requirements_json)}.
+    version is only meaningful in the cache layout (the version directory
+    name); the flat layout has no version concept, so it is always None.
+    A sibling whose requirements.json exists but fails to parse is excluded
+    here -- see _discover_broken -- rather than crashing or being counted as
+    present-and-valid.
+
+    If discovery finds no siblings -- standalone install, or an unrecognized
+    layout -- this degrades to reporting on self only, honestly, rather than
+    guessing.
+    """
+    found, _broken, layout, plugin_name, self_dir, _glob_root = _discover_all(root)
     if len(found) <= 1:
         version = self_dir.name if layout == "cache" else None
-        return {plugin_name: (version, self_declaration)}
+        return {plugin_name: (version, self_dir / "requirements.json")}
     return found
+
+
+def _discover_broken(root: Path | None = None) -> list[dict]:
+    """'Broken declaration' findings for siblings whose requirements.json
+    exists but fails to parse, in either layout. Degraded discovery (no real
+    siblings found) reports none, matching discover_undeclared."""
+    found, broken, _layout, _plugin_name, _self_dir, _glob_root = _discover_all(root)
+    if len(found) <= 1:
+        return []
+    return broken
 
 
 def discover_undeclared(root: Path | None = None) -> list[str]:
     """Plugin directories (identified by .claude-plugin/plugin.json) that have
-    no requirements.json. Neutral, not a failure -- see issue #21.
+    no requirements.json at all. Neutral, not a failure -- see issue #21. A
+    plugin whose requirements.json exists but fails to parse is reported by
+    _discover_broken instead, never here.
 
     Degraded discovery (no siblings visible) reports an empty list rather
     than claiming visibility it doesn't have."""
-    self_dir = _self_dir(root)
-    layout, _plugin_name, glob_root = _layout_info(self_dir)
-    declared = discover(root)
-    if len(declared) <= 1:
+    found, broken, layout, _plugin_name, _self_dir, glob_root = _discover_all(root)
+    if len(found) <= 1:
         return []
 
     if layout == "flat":
         candidates = {p.parents[1].name for p in glob_root.glob("*/.claude-plugin/plugin.json")}
     else:
         candidates = {p.parents[2].name for p in glob_root.glob("*/*/.claude-plugin/plugin.json")}
-    return sorted(candidates - set(declared))
+    broken_names = {f["plugin"] for f in broken}
+    return sorted(candidates - set(found) - broken_names)
 
 
 # ---------------------------------------------------------------------------
@@ -307,6 +362,11 @@ def build_report(root: Path | None = None, plugin_filter: str | None = None, *,
     declarations = discover(root)
     degraded_discovery = len(declarations) <= 1
     undeclared = [] if degraded_discovery else discover_undeclared(root)
+    # A sibling requirements.json that exists but fails to parse -- surfaced
+    # as its own findings (folded into `degraded`, since a malformed
+    # declaration carries no `required` signal of its own) rather than
+    # crashing build_report or being misfiled as "undeclared".
+    broken = [] if degraded_discovery else _discover_broken(root)
 
     plugins_report = {
         name: {"version": version, "path": str(path)}
@@ -318,7 +378,7 @@ def build_report(root: Path | None = None, plugin_filter: str | None = None, *,
             "plugins": plugins_report,
             "degraded_discovery": degraded_discovery,
             "missing": [],
-            "degraded": [],
+            "degraded": list(broken),
             "undeclared": undeclared,
             "ok_count": 0,
             "exit_code": 2,
@@ -330,12 +390,21 @@ def build_report(root: Path | None = None, plugin_filter: str | None = None, *,
     names = [plugin_filter] if plugin_filter else sorted(declarations)
 
     missing: list[dict] = []
-    degraded: list[dict] = []
+    degraded: list[dict] = list(broken)
     ok_count = 0
 
     for name in names:
         _version, path = declarations[name]
-        data = _load_json(path)
+        try:
+            data = _load_json(path)
+        except (OSError, json.JSONDecodeError) as exc:
+            # Defense in depth: discover() already excludes unparseable
+            # siblings from `declarations`, so this should be unreachable in
+            # practice -- but a broken declaration must never traceback
+            # regardless of how it got past discovery (e.g. edited on disk
+            # between the discover() call above and this read).
+            degraded.append(_broken_finding(name, path, exc))
+            continue
 
         for tool in data.get("tools", []):
             status, finding = evaluate_tool(name, tool)

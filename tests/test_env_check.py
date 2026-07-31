@@ -26,6 +26,13 @@ def _write_requirements(path: Path, data: dict) -> Path:
     return path
 
 
+def _write_raw(path: Path, text: str) -> Path:
+    """Write literal (possibly malformed) text, for broken-declaration fixtures."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 def _plugin_marker(plugin_dir: Path) -> None:
     """Drop a .claude-plugin/plugin.json so the dir is recognized as a plugin
     for undeclared-plugin discovery, mirroring the real marketplace layout."""
@@ -160,6 +167,81 @@ class TestDiscoveryErrors(unittest.TestCase):
     def test_missing_self_declaration_raises_discovery_error(self):
         with tempfile.TemporaryDirectory() as d, self.assertRaises(ec.DiscoveryError):
             ec.discover(Path(d) / "env")
+
+
+# ---------------------------------------------------------------------------
+# broken declarations: a sibling requirements.json that exists but fails to
+# parse must never crash the checker (IMPORTANT 1) and must never be
+# misclassified as neutrally "undeclared" (MINOR 3).
+# ---------------------------------------------------------------------------
+
+class TestBrokenDeclarations(unittest.TestCase):
+    def test_flat_layout_broken_declaration_is_not_treated_as_undeclared(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _write_requirements(root / "env" / "requirements.json",
+                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "alpha" / "requirements.json",
+                                 {"requirements_version": "1.0.0", "plugin": "alpha"})
+            _write_raw(root / "broken" / "requirements.json", "{not valid json")
+            _plugin_marker(root / "env")
+            _plugin_marker(root / "alpha")
+            _plugin_marker(root / "broken")
+
+            found = ec.discover(root / "env")
+            undeclared = ec.discover_undeclared(root / "env")
+            broken = ec._discover_broken(root / "env")
+
+            self.assertNotIn("broken", found)
+            self.assertNotIn("broken", undeclared)  # MINOR 3: not neutral-undeclared
+            self.assertEqual([f["plugin"] for f in broken], ["broken"])
+            self.assertEqual(broken[0]["section"], "declaration")
+
+    def test_cache_layout_broken_sibling_does_not_crash_build_report(self):
+        # IMPORTANT 1: a malformed sibling declaration in the installed cache
+        # must not traceback build_report -- it must be named as broken, and
+        # a valid sibling elsewhere must still be evaluated normally.
+        with tempfile.TemporaryDirectory() as d:
+            mkt = Path(d) / "cache" / "efitz-skills"
+            _write_requirements(
+                mkt / "env" / "1.0.0" / "requirements.json",
+                {"requirements_version": "1.0.0", "plugin": "env"})
+            bindir = mkt / "bin"
+            _fake_probe_script(bindir, "sem", "exit 0")
+            _write_requirements(
+                mkt / "dev" / "1.0.0" / "requirements.json",
+                {"requirements_version": "1.0.0", "plugin": "dev",
+                 "tools": [{"name": "sem", "required": True, "why": "x",
+                            "probe": [str(bindir / "sem")]}]})
+            _write_raw(mkt / "ghost" / "1.0.0" / "requirements.json", "{not valid json")
+
+            report = ec.build_report(root=mkt / "env" / "1.0.0")  # must not raise
+
+            self.assertEqual(report["exit_code"], 0)
+            broken_findings = [f for f in report["degraded"] if f["section"] == "declaration"]
+            self.assertEqual([f["plugin"] for f in broken_findings], ["ghost"])
+            self.assertIn("dev", report["plugins"])  # valid sibling still evaluated
+            self.assertNotIn("ghost", report["plugins"])
+
+    def test_keying_uses_directory_name_not_declared_plugin_field(self):
+        # MINOR 2: a declaration whose own `plugin` field disagrees with its
+        # directory name must key by directory name in both layouts, so it
+        # can't appear as both declared (one name) and undeclared (the other).
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _write_requirements(root / "env" / "requirements.json",
+                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "actual-dir-name" / "requirements.json",
+                                 {"requirements_version": "1.0.0", "plugin": "different-name"})
+            _plugin_marker(root / "env")
+            _plugin_marker(root / "actual-dir-name")
+
+            found = ec.discover(root / "env")
+            undeclared = ec.discover_undeclared(root / "env")
+
+            self.assertIn("actual-dir-name", found)
+            self.assertNotIn("different-name", found)
+            self.assertEqual(undeclared, [])  # not misfiled as undeclared either
 
 
 # ---------------------------------------------------------------------------
