@@ -372,21 +372,30 @@ class TestPreflight(unittest.TestCase):
             run.preflight(c)
 
     def test_unreachable_server_raises(self):
+        # Fake cats on PATH: this test is about server reachability and must
+        # not depend on a real cats install (CI runners have none).
         c = self._config()
         self.server.stop()
-        with self.assertRaises(run.PreflightError) as ctx:
-            run.preflight(c)
+        with tempfile.TemporaryDirectory() as bindir:
+            _with_fake_cats(Path(bindir))
+            with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}), \
+                    self.assertRaises(run.PreflightError) as ctx:
+                run.preflight(c)
         self.assertIn(c.health_url, str(ctx.exception))
 
     def test_server_error_response_raises_with_distinct_message(self):
         # HTTPError subclasses URLError — a server that IS running but answers
         # health_url with 404/401/500 must not be reported as "not running".
+        # Fake cats on PATH for the same reason as above.
         self.server.stop()
         error_server = _LiveServer(_NotFoundHandler)
         self.addCleanup(error_server.stop)
         c = make_config(self, CONFIG.replace("http://localhost:8080", error_server.url))
-        with self.assertRaises(run.PreflightError) as ctx:
-            run.preflight(c)
+        with tempfile.TemporaryDirectory() as bindir:
+            _with_fake_cats(Path(bindir))
+            with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}), \
+                    self.assertRaises(run.PreflightError) as ctx:
+                run.preflight(c)
         message = str(ctx.exception)
         self.assertIn("404", message)
         self.assertNotIn("not running", message)
