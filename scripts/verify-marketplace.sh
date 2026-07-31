@@ -52,6 +52,7 @@ declare -a PLUGINS=(
   "cats:testing:analyze,fp,init,report,run"
   "profile:development:docs,journeys,stack,topology"
   "itest:development:conventions,critique,design,state"
+  "env:development:check"
 )
 
 # Guard against this array going stale again: it must name every plugin dir.

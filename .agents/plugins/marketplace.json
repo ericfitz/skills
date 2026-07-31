@@ -96,6 +96,14 @@
         "source": "local",
         "path": "./itest"
       }
+    },
+    {
+      "name": "env",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./env"
+      }
     }
   ]
 }

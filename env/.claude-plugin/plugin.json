@@ -1,0 +1,6 @@
+{
+  "name": "env",
+  "version": "1.0.0",
+  "description": "Environment readiness toolkit: checks whether the CLI tools, config files, and auth sessions the other plugins depend on are present and working (check). Reports what's missing, why it matters, and how to fix it; report-only by default, with an explicit --fix mode that confirms and installs declared remedies for the detected platform.",
+  "author": { "name": "efitz" }
+}
