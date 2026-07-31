@@ -49,7 +49,18 @@ declare -a PLUGINS=(
   "writing:writing:boring"
   "deps:development:bump"
   "logseq:productivity:capture,query,lint,organize,from-obsidian"
+  "cats:testing:analyze,fp,init,report,run"
+  "profile:development:docs,journeys,stack,topology"
+  "itest:development:conventions,critique,design,state"
 )
+
+# Guard against this array going stale again: it must name every plugin dir.
+ARRAY_COUNT=${#PLUGINS[@]}
+if [ "$ARRAY_COUNT" -eq "$DIR_COUNT" ]; then
+  ok "PLUGINS array covers all $DIR_COUNT plugin dirs"
+else
+  bad "PLUGINS array has $ARRAY_COUNT entries but $DIR_COUNT plugin dirs exist — update the array"
+fi
 
 for entry in "${PLUGINS[@]}"; do
   IFS=: read -r name expected_cat skills_csv <<< "$entry"
