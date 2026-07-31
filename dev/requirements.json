@@ -1,0 +1,16 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "dev",
+  "tools": [
+    {
+      "name": "sem",
+      "required": true,
+      "why": "the sem entity graph backing dedupe and sem-annotate",
+      "probe": ["sem", "--version"],
+      "install": {
+        "macos": "brew install sem-cli",
+        "docs": "https://ataraxy-labs.github.io/sem/"
+      }
+    }
+  ]
+}

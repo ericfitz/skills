@@ -1,0 +1,32 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "github",
+  "tools": [
+    {
+      "name": "gh",
+      "required": true,
+      "why": "every GitHub API call in backlog and create-issue",
+      "probe": ["gh", "--version"],
+      "version_pattern": "gh version (\\d+\\.\\d+)",
+      "min_version": "2.40",
+      "install": { "macos": "brew install gh", "docs": "https://cli.github.com" }
+    }
+  ],
+  "config": [
+    {
+      "path": ".local/gh-projects.json",
+      "scope": "repo",
+      "required": false,
+      "why": "project and field IDs for issue filing",
+      "remedy": "run ~/Scripts/provision-repo-config.py in the target repo"
+    }
+  ],
+  "auth": [
+    {
+      "name": "github",
+      "probe": ["gh", "auth", "status"],
+      "why": "issue creation and project mutation",
+      "remedy": "gh auth login"
+    }
+  ]
+}
