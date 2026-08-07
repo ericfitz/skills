@@ -26,6 +26,39 @@ class TestSemver(unittest.TestCase):
         self.assertEqual(cat.classify_bump("1.2.3", "1.2.5"), "patch")
         self.assertEqual(cat.classify_bump("1.2.3", "1.2.3"), "none")
 
+    def test_parse_two_component_version(self):
+        """Two-component releases are routine on PyPI (packaging 26.2, attrs 25.3).
+        These used to miss the three-group regex entirely and parse as (0, 0, 0)."""
+        self.assertEqual(cat.parse_semver("26.2"), (26, 2, 0))
+        self.assertEqual(cat.parse_semver("v1.2"), (1, 2, 0))
+
+    def test_parse_single_component_version(self):
+        self.assertEqual(cat.parse_semver("5"), (5, 0, 0))
+
+    def test_parse_unparseable_still_zero(self):
+        self.assertEqual(cat.parse_semver("latest"), (0, 0, 0))
+        self.assertEqual(cat.parse_semver(""), (0, 0, 0))
+
+    def test_classify_two_component_versions(self):
+        """Regression: every one of these collapsed to (0, 0, 0) and reported 'none',
+        which routes a real update to 'Skipped: up to date' and silently drops it."""
+        self.assertEqual(cat.classify_bump("26.2", "26.3"), "minor")
+        self.assertEqual(cat.classify_bump("1.2", "2.0"), "major")
+        self.assertEqual(cat.classify_bump("26.2", "26.2"), "none")
+
+    def test_classify_mixed_component_counts(self):
+        """Regression: '1.2' parsed as (0,0,0) while '1.2.1' parsed as (1,2,1), so a
+        patch bump was reported as 'major'."""
+        self.assertEqual(cat.classify_bump("1.2", "1.2.1"), "patch")
+        self.assertEqual(cat.classify_bump("1.2", "1.3.0"), "minor")
+        self.assertEqual(cat.classify_bump("1.2.1", "1.2"), "none")   # downgrade
+
+    def test_classify_three_component_behavior_unchanged(self):
+        """The widened parser must not move any version that already parsed."""
+        self.assertEqual(cat.parse_semver("2.0.0-rc.1"), (2, 0, 0))
+        self.assertEqual(cat.parse_semver("1.2.3.post1"), (1, 2, 3))
+        self.assertEqual(cat.classify_bump("0.184.0", "0.185.1"), "minor")
+
 
 class TestGlob(unittest.TestCase):
     def test_exact_and_prefix(self):

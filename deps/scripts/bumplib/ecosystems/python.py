@@ -1,5 +1,6 @@
 """Python ecosystem adapter (uv / pip)."""
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -49,6 +50,29 @@ def parse_audit(json_text: str) -> list:
     return advs
 
 
+def _project_python(root: Path):
+    """Absolute path to the project virtualenv's interpreter, or None if there isn't one.
+
+    bump.py declares PEP 723 inline metadata, so `uv run bump.py` runs it in an isolated
+    ephemeral environment and exports that environment in VIRTUAL_ENV. Anything asking uv
+    "what is installed?" then answers for the ephemeral env -- which holds nothing -- so
+    every uv project looked fully up to date. Naming the interpreter explicitly is what
+    pins the question back to the project; it also wins over an inherited VIRTUAL_ENV.
+
+    UV_PROJECT_ENVIRONMENT is uv's documented override for projects whose environment is
+    not `.venv`. A relative value resolves against the project root, as uv resolves it.
+    """
+    env_dir = os.environ.get("UV_PROJECT_ENVIRONMENT") or ".venv"
+    base = Path(env_dir)
+    if not base.is_absolute():
+        base = Path(root) / env_dir
+    for rel in ("bin/python", "Scripts/python.exe"):
+        exe = base / rel
+        if exe.exists():
+            return exe
+    return None
+
+
 def _run(args):
     """Safe: list form, no shell."""
     return subprocess.run(args, capture_output=True, text=True)
@@ -69,16 +93,21 @@ def handle(verb, argv):
         _run(["uv", "cache", "clean"] if mgr == "uv" else ["pip", "cache", "purge"])
         return {"warnings": []}
     if verb == "outdated":
-        cmd = (["uv", "pip", "list", "--outdated", "--format", "json"] if mgr == "uv"
-               else ["pip", "list", "--outdated", "--format", "json"])
+        if mgr == "uv":
+            cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
+            venv = _project_python(root)
+            if venv:                     # else let uv discover; a bad path is worse
+                cmd += ["--python", str(venv)]
+        else:
+            cmd = ["pip", "list", "--outdated", "--format", "json"]
         out = _run(cmd)
         return parse_outdated(out.stdout)
     if verb == "audit":
         probe = "uv" if mgr == "uv" else "pip-audit"
         if shutil.which(probe) is None:
             return []
-        out = _run(["uv", "run", "pip-audit", "--format", "json"] if mgr == "uv"
-                   else ["pip-audit", "--format", "json"])
+        out = _run(["uv", "run", "--project", str(root), "pip-audit", "--format", "json"]
+                   if mgr == "uv" else ["pip-audit", "--format", "json"])
         return parse_audit(out.stdout)
     if verb == "apply":
         if mgr == "uv":
