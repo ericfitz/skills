@@ -118,5 +118,96 @@ class TestProjectEnvironmentTargeting(unittest.TestCase):
         self.assertEqual(self.calls[0], ["pip", "list", "--outdated", "--format", "json"])
 
 
+class TestAuditAgainstLockfile(unittest.TestCase):
+    """audit must read the LOCKFILE, never the installed environment.
+
+    pip-audit's environment mode asks pip to enumerate installed distributions. In a
+    uv-created venv pip enumerates nothing -- measured here: 0 from `pip list` against 33
+    dist-info directories on disk and 33 from importlib.metadata -- so pip-audit scanned
+    an empty set and reported "No known vulnerabilities found". A security check that
+    silently passes because it saw nothing is the failure mode worth engineering against.
+    """
+
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
+        (self.root / "uv.lock").write_text("")
+        self.calls = []
+        self.responses = {}
+        self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
+        self.enterContext(mock.patch("bumplib.ecosystems.python.shutil.which", return_value="/bin/uv"))
+        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
+                                     return_value={"packageManager": "uv", "present": True}))
+        self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
+
+    def _path(self, p):
+        return self.root if str(p) == "." else Path(p)
+
+    def _record(self, args):
+        args = list(args)
+        self.calls.append(args)
+        for marker, (rc, out) in self.responses.items():
+            if marker in args:
+                return mock.Mock(returncode=rc, stdout=out, stderr="")
+        return mock.Mock(returncode=0, stdout="{}", stderr="")
+
+    def _export_call(self):
+        return next(c for c in self.calls if "export" in c)
+
+    def _audit_call(self):
+        return next(c for c in self.calls if "pip-audit" in c)
+
+    def test_exports_lockfile_to_pylock(self):
+        py.handle("audit", [])
+        exp = self._export_call()
+        self.assertEqual(exp[:2], ["uv", "export"])
+        self.assertIn("--frozen", exp)                       # never re-resolve to audit
+        self.assertEqual(exp[exp.index("--format") + 1], "pylock.toml")
+        self.assertEqual(exp[exp.index("--project") + 1], str(self.root))
+
+    def test_audits_the_exported_file_not_the_environment(self):
+        py.handle("audit", [])
+        exp, aud = self._export_call(), self._audit_call()
+        written = Path(exp[exp.index("-o") + 1])
+        self.assertEqual(written.name, "pylock.toml")
+        self.assertIn("--locked", aud)
+        self.assertEqual(aud[aud.index("--locked") + 1], str(written.parent))
+
+    def test_export_is_temporary_not_written_into_the_project(self):
+        """uv ignores a pylock.toml and silently re-resolves, so it must never land
+        beside uv.lock where it could be mistaken for the source of truth."""
+        py.handle("audit", [])
+        exp = self._export_call()
+        written = Path(exp[exp.index("-o") + 1])
+        self.assertNotIn(str(self.root), str(written))
+        self.assertFalse((self.root / "pylock.toml").exists())
+
+    def test_advisories_parsed_from_audit_output(self):
+        self.responses["pip-audit"] = (1, (FIX / "pip_audit.json").read_text())
+        advs = py.handle("audit", [])
+        self.assertTrue(advs)
+        self.assertTrue(any("PYSEC" in (a.ids[0] if a.ids else "") for a in advs))
+
+    def test_export_failure_degrades_to_empty(self):
+        """No lockfile, or a stale one under --frozen: report nothing rather than
+        falling back to the environment mode that silently passes."""
+        self.responses["export"] = (2, "")
+        self.assertEqual(py.handle("audit", []), [])
+        self.assertFalse(any("pip-audit" in c for c in self.calls))
+
+    def test_non_json_output_degrades_to_empty(self):
+        """Offline, or pip-audit unavailable: a usage banner must not crash the run."""
+        self.responses["pip-audit"] = (1, "error: failed to fetch pip-audit\n")
+        self.assertEqual(py.handle("audit", []), [])
+
+    def test_pip_manager_path_unchanged(self):
+        with mock.patch("bumplib.ecosystems.python.detect",
+                        return_value={"packageManager": "pip", "present": True}):
+            py.handle("audit", [])
+        self.assertEqual(self.calls, [["pip-audit", "--format", "json"]])
+
+
 if __name__ == "__main__":
     unittest.main()
