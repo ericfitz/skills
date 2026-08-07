@@ -32,6 +32,12 @@ Represents a dependency update opportunity.
 | `ecosystem` | string | no | (default: "") Ecosystem name for context (e.g., "python", "go", "node") |
 | `meta` | dict | no | (default: {}) Ecosystem-specific metadata (e.g., `{"dependencyType": "dev"}` for Node) |
 
+For Node, `location` is the workspace manifest that actually declares the package (e.g.
+`packages/viewer/package.json`), `kind` is `"transitive"` for anything no manifest declares, and
+`meta` additionally carries `declaredRange` (the specifier as written, e.g. `"^0.184.0"`) and
+`dependent` (the workspace npm attributed the entry to). `declaredRange` is what lets `apply`
+tell an in-range target from one that needs the manifest widened.
+
 **Example UpdateRecord (JSON):**
 ```json
 {
@@ -171,7 +177,7 @@ Adapters: `python`, `go`, `node`, or `none` (special case).
 | `cache-clear` | dict | `{"warnings": []}` — clears package manager cache (no-op for some managers like Go) |
 | `outdated` | list | `[UpdateRecord, ...]` — list of available updates; empty if no updates or if ecosystem not detected |
 | `audit` | list | `[Advisory, ...]` — list of security vulnerabilities; empty if tool not installed or no vulns found |
-| `apply` | dict | `{"applied": [spec, ...], "filesModified": [path, ...]}` — applies the updates specified in argv; files are relative paths that were changed |
+| `apply` | dict | `{"applied": [spec, ...], "filesModified": [path, ...]}` — applies the updates specified in argv; files are relative paths that were changed. Pass fully-qualified specs (`name@X.Y.Z`); a bare name still works but only permits a within-range move. Node honors the version: a declared dependency whose target is provably outside its range is installed into its own workspace so the manifest range widens, while bare names, transitive packages and unrecognized range forms stay on `update` and touch only the lockfile. |
 | `validate` | dict | Returns `{"<step>": "pass"/"fail", "<step>_output": "..."}` for each step. **Per-ecosystem shapes differ:** Go and Node include `build`, `test`, `lint` (all three); Python includes only `test` and `lint` (no build step). Output keys are literally `build_output`, `test_output`, `lint_output` for applicable steps. |
 
 **Example invocation & output:**

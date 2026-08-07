@@ -1,0 +1,41 @@
+{
+  "eslint": {
+    "current": "10.6.0",
+    "wanted": "10.8.0",
+    "latest": "10.8.0",
+    "dependent": "msgbusviz",
+    "location": "node_modules/eslint"
+  },
+  "js-yaml": [
+    {
+      "current": "4.3.0",
+      "wanted": "4.3.1",
+      "latest": "5.2.3",
+      "dependent": "core",
+      "location": "node_modules/js-yaml"
+    },
+    {
+      "current": "4.3.0",
+      "wanted": "4.3.1",
+      "latest": "5.2.3",
+      "dependent": "server",
+      "location": "node_modules/js-yaml"
+    }
+  ],
+  "three": [
+    {
+      "current": "0.184.0",
+      "wanted": "0.184.0",
+      "latest": "0.185.1",
+      "dependent": "viewer",
+      "location": "node_modules/three"
+    }
+  ],
+  "undici": {
+    "current": "7.28.0",
+    "wanted": "7.29.0",
+    "latest": "7.29.0",
+    "dependent": "server",
+    "location": "node_modules/undici"
+  }
+}
