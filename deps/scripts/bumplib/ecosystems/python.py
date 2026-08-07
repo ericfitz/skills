@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from .. import contracts as c
@@ -73,6 +74,43 @@ def _project_python(root: Path):
     return None
 
 
+def _audit_uv(root: Path) -> list:
+    """Audit the LOCKFILE rather than the installed environment.
+
+    pip-audit's default source asks pip to enumerate installed distributions, and in a
+    uv-created venv pip enumerates nothing: measured in this repo, `pip list` returned []
+    where 33 dist-info directories sat on disk and importlib.metadata found all 33. Having
+    scanned an empty set, pip-audit reports "No known vulnerabilities found" and exits 0 --
+    a security check whose silent pass is indistinguishable from a real one.
+
+    Exporting uv.lock to PEP 751 pylock.toml and auditing that file takes pip out of the
+    path entirely; against this repo's pre-fix lock it scanned 58 packages and caught the
+    nltk advisories the environment mode missed. The export goes to a temp directory and
+    is discarded: uv has no notion of pylock.toml as an input -- given one in place of
+    uv.lock it silently re-resolves from pyproject.toml -- so a copy left in the project
+    could be mistaken for a lockfile while pinning nothing.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        pylock = Path(tmp) / "pylock.toml"
+        exported = _run(["uv", "export", "--frozen", "--project", str(root),
+                         "--format", "pylock.toml", "-o", str(pylock)])
+        if exported.returncode != 0:
+            return []       # no lockfile, or stale under --frozen: report nothing found
+        out = _run(["uv", "tool", "run", "pip-audit", "--locked", str(pylock.parent),
+                    "--format", "json", "--progress-spinner", "off"])
+        return _parse_audit_lenient(out.stdout)
+
+
+def _parse_audit_lenient(text: str) -> list:
+    """pip-audit exits non-zero when it finds something, so returncode says nothing about
+    whether stdout is JSON. Offline or missing, it prints a banner instead -- degrade to
+    'nothing found' the way every other optional-tool path here does."""
+    try:
+        return parse_audit(text)
+    except ValueError:
+        return []
+
+
 def _run(args):
     """Safe: list form, no shell."""
     return subprocess.run(args, capture_output=True, text=True)
@@ -106,8 +144,9 @@ def handle(verb, argv):
         probe = "uv" if mgr == "uv" else "pip-audit"
         if shutil.which(probe) is None:
             return []
-        out = _run(["uv", "run", "--project", str(root), "pip-audit", "--format", "json"]
-                   if mgr == "uv" else ["pip-audit", "--format", "json"])
+        if mgr == "uv":
+            return _audit_uv(root)
+        out = _run(["pip-audit", "--format", "json"])
         return parse_audit(out.stdout)
     if verb == "apply":
         if mgr == "uv":
