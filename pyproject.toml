@@ -17,7 +17,7 @@ boring = [
     "spacy>=3.7",
     "proselint>=0.14",
     "textstat>=0.7",
-    "pypdf>=4.0",
+    "pypdf>=6.15.0",
     "python-docx>=1.1",
     # The en_core_web_sm model is not on PyPI. Pinning it here keeps the
     # model and spaCy in lockstep, which is the drift SKILL.md warns about.
