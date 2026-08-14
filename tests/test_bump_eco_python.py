@@ -71,7 +71,7 @@ class TestProjectEnvironmentTargeting(unittest.TestCase):
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
 
-    def _record(self, args):
+    def _record(self, args, env=None):
         self.calls.append(list(args))
         return mock.Mock(returncode=0, stdout="", stderr="")
 
@@ -83,10 +83,56 @@ class TestProjectEnvironmentTargeting(unittest.TestCase):
         self.assertIn("--python", self.calls[0])
         self.assertEqual(self.calls[0][self.calls[0].index("--python") + 1], str(exe))
 
-    def test_outdated_without_venv_omits_flag(self):
-        """No project venv -> fall back to ambient discovery rather than passing a bad path."""
-        py.handle("outdated", [])
+    def test_no_venv_with_lockfile_auto_syncs_then_targets_venv(self):
+        """#28: a fresh clone has uv.lock but no .venv; querying the ambient env returns
+        [] for every project. outdated must create the env, then ask it."""
+        (self.root / "uv.lock").write_text("")
+        exe_holder = {}
+
+        def record(args, env=None):
+            args = list(args)
+            self.calls.append(args)
+            if args[:2] == ["uv", "sync"]:
+                exe_holder["exe"] = _make_venv(self.root)
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
+            py.handle("outdated", [])
+        self.assertEqual(self.calls[0][:2], ["uv", "sync"])
+        listing = self.calls[1]
+        self.assertIn("--python", listing)
+        self.assertEqual(listing[listing.index("--python") + 1], str(exe_holder["exe"]))
+
+    def test_no_venv_no_lockfile_skips_sync_and_strips_virtual_env(self):
+        """Lockless project: don't create an env, but never let the ephemeral
+        VIRTUAL_ENV answer 'what is installed?'."""
+        captured = {}
+
+        def record(args, env=None):
+            self.calls.append(list(args))
+            captured["env"] = env
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch("bumplib.ecosystems.python._run", side_effect=record), \
+                mock.patch.dict(os.environ, {"VIRTUAL_ENV": "/ephemeral"}):
+            py.handle("outdated", [])
+        self.assertFalse(any(c[:2] == ["uv", "sync"] for c in self.calls))
         self.assertNotIn("--python", self.calls[0])
+        self.assertIsNotNone(captured["env"])
+        self.assertNotIn("VIRTUAL_ENV", captured["env"])
+
+    def test_sync_failure_still_queries_without_virtual_env(self):
+        (self.root / "uv.lock").write_text("")
+
+        def record(args, env=None):
+            args = list(args)
+            self.calls.append(args)
+            rc = 1 if args[:2] == ["uv", "sync"] else 0
+            return mock.Mock(returncode=rc, stdout="", stderr="boom")
+
+        with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
+            py.handle("outdated", [])
+        self.assertNotIn("--python", self.calls[1])
 
     def test_outdated_honors_uv_project_environment(self):
         """uv's documented override for a non-.venv environment directory."""

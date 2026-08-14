@@ -414,6 +414,7 @@ The `Pull Request:` line reflects the actual outcome:
 ## Error Handling
 
 - **Network/registry errors:** transient failures surface as empty adapter output; re-run that single `outdated`/`audit` once before treating the result as empty, then continue (never fail the whole run for one flaky check).
+- **Empty `outdated` beside non-empty `audit`:** an ecosystem whose `audit` lists advisories while its `outdated` is `[]` is inconsistent — the environment query was probably vacuous. Re-run that `outdated` once; if still empty, surface the discrepancy in the report (list the advisories as un-actioned) instead of reporting a clean run.
 - **Optional tool not installed** (`govulncheck`, `safety`, `pip-audit`, `gh`): the adapter returns the empty contract shape (`[]`, empty `Context`) — treat as "nothing found," display a brief note where useful, and continue. Never fail the whole run because one optional tool is missing.
 - **Audit/alerts fail**: adapters return empty; continue with outdated checks. An audit failure never blocks updates.
 - **Non-GitHub remote**: `HOST`/`TRACKER` resolve to `none`; gather calls return empty shapes. Skip GitHub-specific behavior gracefully — not an error.

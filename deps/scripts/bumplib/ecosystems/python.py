@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -133,13 +134,26 @@ def handle(verb, argv):
         return {"warnings": []}
     if verb == "outdated":
         if mgr == "uv":
-            cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
             venv = _project_python(root)
-            if venv:                     # else let uv discover; a bad path is worse
+            # Fresh clone / rm -rf .venv: there is a lockfile to honor but no
+            # environment to inspect. Create it -- `uv sync` runs later in the
+            # flow anyway -- rather than silently querying the ephemeral env (#28).
+            if venv is None and (root / "uv.lock").exists() and _run(["uv", "sync"]).returncode == 0:
+                venv = _project_python(root)
+            cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
+            env = None
+            if venv:
                 cmd += ["--python", str(venv)]
+            else:
+                # Without an explicit interpreter uv answers for VIRTUAL_ENV, which under
+                # `uv run bump.py` is the empty PEP 723 ephemeral env -- strip it so
+                # discovery can never resolve there, and say so.
+                print("warning: no project environment found; outdated results may be "
+                      "incomplete (run `uv sync`)", file=sys.stderr)
+                env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+            out = _run(cmd, env=env)
         else:
-            cmd = ["pip", "list", "--outdated", "--format", "json"]
-        out = _run(cmd)
+            out = _run(["pip", "list", "--outdated", "--format", "json"])
         return parse_outdated(out.stdout)
     if verb == "audit":
         probe = "uv" if mgr == "uv" else "pip-audit"
