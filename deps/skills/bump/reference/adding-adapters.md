@@ -79,6 +79,8 @@ def handle(verb, argv):
     if verb == "apply":
         # argv: list of specs to apply (e.g., ["requests==2.31.0", "flask==3.0.0"])
         # Return: {"applied": [spec, ...], "filesModified": [path, ...]}
+        # On failure: {"applied": [], "filesModified": [], "error": "<failed command>: <output tail>"}
+        # filesModified must list only files that actually changed (git-verified).
         ...
     
     if verb == "validate":

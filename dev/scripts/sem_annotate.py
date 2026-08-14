@@ -205,6 +205,19 @@ def head_sha(cwd=None):
         return ""
 
 
+def sha_reachable(sha, cwd=None):
+    """True when sha is an ancestor of HEAD.
+
+    Squash-merge workflows orphan every branch commit: the objects still resolve, but
+    `sem diff <orphan>..HEAD` silently reports no changes, which classified genuinely
+    stale markers as fresh (issue #30). An anchor we cannot compare against must be
+    re-anchored, never trusted.
+    """
+    r = subprocess.run(["git", "merge-base", "--is-ancestor", sha, "HEAD"],
+                       cwd=cwd, capture_output=True, text=True)
+    return r.returncode == 0
+
+
 def scan(paths, cwd=None, rebuild=False):
     """Worklist for entities classified missing/stale (or all when rebuild=True).
 
@@ -247,6 +260,14 @@ def scan(paths, cwd=None, rebuild=False):
                 logic = False
                 if existing_sha and not _is_uncommitted(anchor_sha) \
                         and not anchor_sha.startswith(existing_sha):
+                    if not sha_reachable(existing_sha, cwd=cwd):
+                        work.append({
+                            "file": f, "name": e["name"],
+                            "start_line": e["start_line"], "end_line": e["end_line"],
+                            "status": "orphaned", "anchor_sha": anchor_sha,
+                            "existing_desc": existing_desc, "bad_sha": existing_sha,
+                        })
+                        continue
                     try:
                         logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
                     except SemError:
@@ -265,6 +286,12 @@ def scan(paths, cwd=None, rebuild=False):
                     "status": status, "anchor_sha": anchor_sha,
                     "existing_desc": existing_desc,
                 })
+    orphans = sum(1 for w in work if w["status"] == "orphaned")
+    if orphans:
+        print(f"warning: {orphans} marker(s) anchored to commits unreachable from HEAD "
+              "(orphaned by squash-merge or history rewrite); staleness could not be "
+              "computed against them, so they are queued for re-annotation.",
+              file=sys.stderr)
     return work
 
 
