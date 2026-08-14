@@ -192,6 +192,8 @@ class TestApply(unittest.TestCase):
         self.calls = []
         self.enterContext(mock.patch("bumplib.ecosystems.node.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.node._run", side_effect=self._record))
+        self.enterContext(mock.patch("bumplib.ecosystems.node.changed_files",
+                                     side_effect=lambda cands, cwd=None: list(cands)))
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
@@ -237,6 +239,54 @@ class TestApply(unittest.TestCase):
         res = node.handle("apply", ["three@0.185.1"])
         self.assertIn(["pnpm", "add", "--filter", "@mono/viewer", "three@^0.185.1"], self.calls)
         self.assertIn("pnpm-lock.yaml", res["filesModified"])
+
+
+class TestApplyReportsFailure(unittest.TestCase):
+    """apply must surface a failed npm/pnpm command, never report success (#32)."""
+
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        _write(self.root / "package.json",
+               {"name": "monorepo", "devDependencies": {"eslint": "^10.3.0"}})
+        (self.root / "package-lock.json").write_text("{}")
+        self.calls = []
+        self.fail_on = None
+        self.enterContext(mock.patch("bumplib.ecosystems.node.Path", side_effect=self._path))
+        self.enterContext(mock.patch("bumplib.ecosystems.node._run", side_effect=self._record))
+        self.enterContext(mock.patch("bumplib.ecosystems.node.changed_files",
+                                     side_effect=lambda cands, cwd=None: list(cands)))
+
+    def _path(self, p):
+        return self.root if str(p) == "." else Path(p)
+
+    def _record(self, args):
+        args = list(args)
+        self.calls.append(args)
+        if self.fail_on and self.fail_on in args:
+            return mock.Mock(returncode=1, stdout="", stderr="ERESOLVE unable to resolve")
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    def test_update_failure_surfaces_error(self):
+        self.fail_on = "update"
+        res = node.handle("apply", ["eslint@10.8.0"])
+        self.assertEqual(res["applied"], [])
+        self.assertEqual(res["filesModified"], [])
+        self.assertIn("ERESOLVE", res["error"])
+        self.assertFalse(any(c[-1:] == ["install"] for c in self.calls))  # stops before final install
+
+    def test_install_failure_surfaces_error(self):
+        self.fail_on = "install"
+        res = node.handle("apply", ["eslint@10.8.0"])
+        self.assertIn("error", res)
+
+    def test_success_shape_unchanged(self):
+        res = node.handle("apply", ["eslint@10.8.0"])
+        self.assertEqual(res["applied"], ["eslint@10.8.0"])
+        # eslint is declared in the root manifest, so its location joins the lockfile
+        self.assertEqual(res["filesModified"], ["package-lock.json", "package.json"])
+        self.assertNotIn("error", res)
 
 
 if __name__ == "__main__":
