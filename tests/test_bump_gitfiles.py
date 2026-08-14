@@ -42,6 +42,12 @@ class TestChangedFiles(unittest.TestCase):
         with TemporaryDirectory() as plain:
             self.assertEqual(changed_files(["a", "b"], cwd=plain), ["a", "b"])
 
+    def test_subdirectory_cwd_resolves_repo_root_relative_paths(self):
+        nested = self.root / "writing" / "skills" / "boring"
+        nested.mkdir(parents=True)
+        (nested / "uv.lock").write_text("x")
+        self.assertEqual(changed_files(["uv.lock"], cwd=nested), ["uv.lock"])
+
 
 if __name__ == "__main__":
     unittest.main()
