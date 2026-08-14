@@ -1,6 +1,6 @@
 {
   "name": "deps",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Update dependencies safely across Go, Python, and Node ecosystems. Use when the user asks to bump, update, or upgrade dependencies, packages, or deps; run a dependency bump/upgrade; fix Dependabot or security advisories; or refresh outdated packages. Triggers on phrasings like 'bump the deps', 'bump dependencies on <branch>', 'update packages on main', or 'run a dep upgrade'. Auto-detects ecosystems (Go/Python/Node), applies safe patch and minor updates with build, test, and lint validation, bisects failures to isolate bad packages, and surfaces a prioritized plan for major or held packages that need manual review.",
   "author": { "name": "efitz" }
 }

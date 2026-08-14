@@ -240,6 +240,8 @@ bump.py ecosystem <eco> validate                   # -> {"build":"pass"/"fail", 
 ```
 `validate` returns per-step `pass`/`fail` plus truncated `_output` (Go/Node run build+test+lint; Python runs test+lint only — no build step). **Config override:** if `.bump-config.json` sets `ecosystems.<eco>.{build,test,lint}` commands, run those shell commands directly instead of `validate` (the CLI's `validate` uses only the adapter defaults).
 
+**If `apply` returns an `error` field:** nothing was durably applied (the tree may hold partial changes). Run `git checkout -- .` to reset, record every spec in the batch as problematic with the error tail, and fall through to the one-at-a-time re-apply below to isolate which spec (if any) can land — a spec whose solo `apply` also errors is recorded with its error and skipped. Never proceed to validate or commit on an `error` result.
+
 **If build and test both pass:** proceed to Phase 8 (Commit). (A lint-only failure does **not** trigger bisect — see below.)
 
 **If build or test fails — bisect:**
@@ -271,7 +273,7 @@ Commits to the **current working branch** — the bump branch when `MODE=pr`, th
 
 Otherwise:
 
-1. **Stage** manifests + lockfiles that exist and were modified (use the `filesModified` lists from `apply`): `go.mod go.sum pyproject.toml uv.lock requirements.txt package.json pnpm-lock.yaml package-lock.json` and any `requirements/*.txt`.
+1. **Stage** manifests + lockfiles using the `filesModified` lists from successful `apply` results (these are git-verified; an `apply` that returned `error` contributes nothing): `go.mod go.sum pyproject.toml uv.lock requirements.txt package.json pnpm-lock.yaml package-lock.json` and any `requirements/*.txt`.
 2. **Compose** a detailed message listing every updated package grouped by ecosystem, security fixes called out with CVE/severity, and a "Reverted (caused build/test failures)" section if bisect dropped any:
    ```
    chore(deps): bump dependencies
@@ -412,6 +414,7 @@ The `Pull Request:` line reflects the actual outcome:
 ## Error Handling
 
 - **Network/registry errors:** transient failures surface as empty adapter output; re-run that single `outdated`/`audit` once before treating the result as empty, then continue (never fail the whole run for one flaky check).
+- **Empty `outdated` beside non-empty `audit`:** an ecosystem whose `audit` lists advisories while its `outdated` is `[]` is inconsistent — the environment query was probably vacuous. Re-run that `outdated` once; if still empty, surface the discrepancy in the report (list the advisories as un-actioned) instead of reporting a clean run.
 - **Optional tool not installed** (`govulncheck`, `safety`, `pip-audit`, `gh`): the adapter returns the empty contract shape (`[]`, empty `Context`) — treat as "nothing found," display a brief note where useful, and continue. Never fail the whole run because one optional tool is missing.
 - **Audit/alerts fail**: adapters return empty; continue with outdated checks. An audit failure never blocks updates.
 - **Non-GitHub remote**: `HOST`/`TRACKER` resolve to `none`; gather calls return empty shapes. Skip GitHub-specific behavior gracefully — not an error.

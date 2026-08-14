@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .. import contracts as c
 from ..categorize import classify_bump
+from ..gitfiles import changed_files
 
 # Directories that never hold a workspace manifest. node_modules is the one that
 # matters -- without it the manifest walk would read every vendored package.json.
@@ -278,6 +279,14 @@ def handle(verb, argv):
         declared = dep_index(root)
         lock = "pnpm-lock.yaml" if mgr == "pnpm" else "package-lock.json"
         modified, update_names = {lock}, []
+
+        def _checked(cmd):
+            r = _run(cmd)
+            if r.returncode != 0:
+                return {"applied": [], "filesModified": [],
+                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+            return None
+
         for spec in argv:
             name, version = split_spec(spec)
             decl = declared.get(name)
@@ -289,13 +298,19 @@ def handle(verb, argv):
             # packages and unrecognized range forms all stay on `update`, which touches
             # only the lockfile.
             if version and decl and satisfies(version, decl.get("range", "")) is False:
-                _run(_install_cmd(mgr, name, version, decl))
+                err = _checked(_install_cmd(mgr, name, version, decl))
+                if err:
+                    return err
             else:
                 update_names.append(name)
         if update_names:
-            _run([mgr, "update", *update_names])
-        _run([mgr, "install"])
-        return {"applied": list(argv), "filesModified": sorted(modified)}
+            err = _checked([mgr, "update", *update_names])
+            if err:
+                return err
+        err = _checked([mgr, "install"])
+        if err:
+            return err
+        return {"applied": list(argv), "filesModified": changed_files(sorted(modified), cwd=root)}
     if verb == "validate":
         results = {}
         cmds = (("build", f"{mgr} run build"), ("test", f"{mgr} test"),

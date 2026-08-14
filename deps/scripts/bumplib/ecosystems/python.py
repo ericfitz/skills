@@ -3,11 +3,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 from .. import contracts as c
 from ..categorize import classify_bump
+from ..gitfiles import changed_files
 
 
 def detect(root: Path) -> dict:
@@ -111,9 +113,9 @@ def _parse_audit_lenient(text: str) -> list:
         return []
 
 
-def _run(args):
+def _run(args, env=None):
     """Safe: list form, no shell."""
-    return subprocess.run(args, capture_output=True, text=True)
+    return subprocess.run(args, capture_output=True, text=True, env=env)
 
 
 def _run_shell(cmd):
@@ -132,13 +134,26 @@ def handle(verb, argv):
         return {"warnings": []}
     if verb == "outdated":
         if mgr == "uv":
-            cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
             venv = _project_python(root)
-            if venv:                     # else let uv discover; a bad path is worse
+            # Fresh clone / rm -rf .venv: there is a lockfile to honor but no
+            # environment to inspect. Create it -- `uv sync` runs later in the
+            # flow anyway -- rather than silently querying the ephemeral env (#28).
+            if venv is None and (root / "uv.lock").exists() and _run(["uv", "sync"]).returncode == 0:
+                venv = _project_python(root)
+            cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
+            env = None
+            if venv:
                 cmd += ["--python", str(venv)]
+            else:
+                # Without an explicit interpreter uv answers for VIRTUAL_ENV, which under
+                # `uv run bump.py` is the empty PEP 723 ephemeral env -- strip it so
+                # discovery can never resolve there, and say so.
+                print("warning: no project environment found; outdated results may be "
+                      "incomplete (run `uv sync`)", file=sys.stderr)
+                env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+            out = _run(cmd, env=env)
         else:
-            cmd = ["pip", "list", "--outdated", "--format", "json"]
-        out = _run(cmd)
+            out = _run(["pip", "list", "--outdated", "--format", "json"])
         return parse_outdated(out.stdout)
     if verb == "audit":
         probe = "uv" if mgr == "uv" else "pip-audit"
@@ -153,12 +168,17 @@ def handle(verb, argv):
             flags = []
             for a in argv:              # a e.g. "requests==2.31.0"
                 flags += ["--upgrade-package", a.split("==")[0]]
-            _run(["uv", "lock", *flags])
-            _run(["uv", "sync"])
+            steps = [["uv", "lock", *flags], ["uv", "sync"]]
+            candidates = ["pyproject.toml", "uv.lock"]
         else:
-            _run(["pip", "install", *argv])
-        modified = ["pyproject.toml", "uv.lock"] if mgr == "uv" else ["requirements.txt"]
-        return {"applied": argv, "filesModified": modified}
+            steps = [["pip", "install", *argv]]
+            candidates = ["requirements.txt"]
+        for cmd in steps:
+            r = _run(cmd)
+            if r.returncode != 0:
+                return {"applied": [], "filesModified": [],
+                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+        return {"applied": argv, "filesModified": changed_files(candidates, cwd=root)}
     if verb == "validate":
         results = {}
         cmds = (("test", "uv run pytest" if mgr == "uv" else "pytest"),

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .. import contracts as c
 from ..categorize import classify_bump
+from ..gitfiles import changed_files
 
 _OUTDATED = re.compile(r"^(\S+)\s+(\S+)\s+\[(\S+)\]")
 
@@ -114,12 +115,16 @@ def handle(verb, argv):
         out = _run(["govulncheck", "-json", "./..."])
         return parse_vuln(out.stdout)
     if verb == "apply":
-        for spec in argv:               # spec e.g. "github.com/foo/bar@v1.2.3"
-            _run(["go", "get", spec])
-        _run(["go", "mod", "tidy"])
+        steps = [["go", "get", spec] for spec in argv]   # spec e.g. "github.com/foo/bar@v1.2.3"
+        steps.append(["go", "mod", "tidy"])
         if (root / "go.work").exists():
-            _run(["go", "work", "sync"])
-        return {"applied": argv, "filesModified": ["go.mod", "go.sum"]}
+            steps.append(["go", "work", "sync"])
+        for cmd in steps:
+            r = _run(cmd)
+            if r.returncode != 0:
+                return {"applied": [], "filesModified": [],
+                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+        return {"applied": argv, "filesModified": changed_files(["go.mod", "go.sum"], cwd=root)}
     if verb == "validate":
         results = {}
         for step, cmd in (("build", "go build ./..."), ("test", "go test ./..."), ("lint", "go vet ./...")):
