@@ -1,10 +1,14 @@
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import ClassVar
+from unittest import mock
 
 import sem_annotate as sa
 
@@ -239,19 +243,20 @@ class TestScanInvalidSha(unittest.TestCase):
     def setUp(self):
         self.files = {"src/a.ts": "// SEM@deadbee: old\nfunction A() {}\n"}
         self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
-                      sa.entity_logic_sha, sa.logic_changed_entities)
+                      sa.entity_logic_sha, sa.logic_changed_entities, sa.sha_reachable)
         sa._read_text = lambda p: self.files[p]
         sa.sem_entities = lambda paths, cwd=None: [
             {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 2, "end_line": 2}]
         sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "ffff999"}]
         sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "ffff999"
+        sa.sha_reachable = lambda sha, cwd=None: True
         def boom(base, f, cwd=None):
             raise sa.InvalidRevError("revspec not found")
         sa.logic_changed_entities = boom
 
     def tearDown(self):
         (sa._read_text, sa.sem_entities, sa.sem_blame,
-         sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
+         sa.entity_logic_sha, sa.logic_changed_entities, sa.sha_reachable) = self._orig
 
     def test_bad_hash_reported_not_crashed(self):
         work = sa.scan(["src/a.ts"])
@@ -268,12 +273,13 @@ class TestScanInvalidShaPlainSemError(unittest.TestCase):
     def setUp(self):
         self.files = {"src/a.ts": "// SEM@deadbee: old\nfunction A() {}\n"}
         self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
-                      sa.entity_logic_sha, sa.logic_changed_entities)
+                      sa.entity_logic_sha, sa.logic_changed_entities, sa.sha_reachable)
         sa._read_text = lambda p: self.files[p]
         sa.sem_entities = lambda paths, cwd=None: [
             {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 2, "end_line": 2}]
         sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "ffff999"}]
         sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "ffff999"
+        sa.sha_reachable = lambda sha, cwd=None: True
         def boom(base, f, cwd=None):
             raise sa.SemError(
                 "sem diff failed: the git_object of id 'deadbee...' "
@@ -283,7 +289,7 @@ class TestScanInvalidShaPlainSemError(unittest.TestCase):
 
     def tearDown(self):
         (sa._read_text, sa.sem_entities, sa.sem_blame,
-         sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
+         sa.entity_logic_sha, sa.logic_changed_entities, sa.sha_reachable) = self._orig
 
     def test_plain_semerror_on_bad_sha_reported_not_crashed(self):
         work = sa.scan(["src/a.ts"])
@@ -542,6 +548,82 @@ class TestDbSubcommand(unittest.TestCase):
             sem_db.auto_update = orig
         self.assertEqual(rc, 0)
         self.assertEqual(called["auto"], 1)
+
+
+class TestShaReachable(unittest.TestCase):
+    """Squash-merge orphans branch commits: they resolve as objects but are not
+    ancestors of HEAD, and sem diff against them silently reports nothing (#30)."""
+
+    GIT_ENV: ClassVar[dict] = {
+        "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+        "HOME": "/dev/null", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+
+    def _git(self, *args):
+        r = subprocess.run(["git", *args], cwd=self.root, env=self.GIT_ENV,
+                           capture_output=True, text=True, check=True)
+        return r.stdout.strip()
+
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        self._git("init", "-q", "-b", "main")
+        (self.root / "a.txt").write_text("1\n")
+        self._git("add", "a.txt")
+        self._git("commit", "-qm", "base")
+        self.base = self._git("rev-parse", "HEAD")
+        self._git("checkout", "-qb", "feat")
+        (self.root / "a.txt").write_text("2\n")
+        self._git("commit", "-qam", "feat work")
+        self.branch_sha = self._git("rev-parse", "HEAD")
+        self._git("checkout", "-q", "main")
+        self._git("merge", "--squash", "feat")
+        self._git("commit", "-qm", "squashed")
+        self._git("branch", "-qD", "feat")
+
+    def test_reachable_ancestor(self):
+        self.assertTrue(sa.sha_reachable(self.base, cwd=self.root))
+
+    def test_orphaned_commit_resolves_but_is_unreachable(self):
+        # the object still exists...
+        subprocess.run(["git", "cat-file", "-e", self.branch_sha], cwd=self.root,
+                       env=self.GIT_ENV, check=True)
+        # ...but must be treated as unreachable
+        self.assertFalse(sa.sha_reachable(self.branch_sha, cwd=self.root))
+
+    def test_garbage_sha_is_unreachable(self):
+        self.assertFalse(sa.sha_reachable("zzzzzzz", cwd=self.root))
+
+
+class TestScanClassifiesOrphaned(unittest.TestCase):
+    """An unreachable anchor must never classify fresh -- sem diff cannot compute
+    against it, so the silent no-op previously hid every squash-merged stale marker."""
+
+    def setUp(self):
+        ent = {"name": "F", "type": "function", "file": "a.go",
+               "start_line": 2, "end_line": 4}
+        self.enterContext(mock.patch.object(sa, "sem_entities", return_value=[ent]))
+        self.enterContext(mock.patch.object(sa, "sem_blame", return_value=[]))
+        self.enterContext(mock.patch.object(sa, "entity_logic_sha", return_value="a1b2c3d4e5"))
+        self.enterContext(mock.patch.object(
+            sa, "_read_text", return_value="// SEM@deadbee: does a thing\nfunc F() {}\n"))
+        self.diff = self.enterContext(mock.patch.object(sa, "logic_changed_entities"))
+
+    def test_unreachable_anchor_yields_orphaned_not_fresh(self):
+        with mock.patch.object(sa, "sha_reachable", return_value=False):
+            work = sa.scan(["a.go"])
+        self.assertEqual(len(work), 1)
+        self.assertEqual(work[0]["status"], "orphaned")
+        self.assertEqual(work[0]["bad_sha"], "deadbee")
+        self.diff.assert_not_called()          # sem diff against an orphan is meaningless
+
+    def test_reachable_anchor_still_uses_sem_diff(self):
+        self.diff.return_value = set()          # cosmetic-only change
+        with mock.patch.object(sa, "sha_reachable", return_value=True):
+            work = sa.scan(["a.go"])
+        self.assertEqual(work, [])              # fresh: not in worklist
+        self.diff.assert_called_once()
 
 
 if __name__ == "__main__":
