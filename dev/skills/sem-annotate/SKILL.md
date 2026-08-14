@@ -152,9 +152,12 @@ to `{missing: 0}` with no `stale` entries.
 - `stale` — marker present but entity has a logical change since the anchored commit
 - `uncommitted` — marker present but the anchor SHA is blank or all-zeros (dirty tree with
   no committed history for this entity); will resolve once changes are committed
-- `invalid-sha` — a previously-written marker carries a SHA that `sem diff` cannot resolve
-  (the commit was garbage-collected or the SHA is corrupt); the entity will be re-annotated
-  by the next annotate pass
+- `orphaned` — marker present but its anchor commit is not reachable from HEAD (typically
+  orphaned by a squash-merge, or the sha no longer resolves); staleness cannot be computed
+  against it, so the entity is re-described and re-anchored at a reachable commit
+- `invalid-sha` — a previously-written marker carries a SHA that is reachable but `sem diff`
+  cannot process (corrupt or unresolvable to sem); the entity will be re-annotated by the
+  next annotate pass
 
 ### 6. Offer the CLAUDE.md convention note (once)
 If the project's `CLAUDE.md` does not already mention SEM markers, offer to add a short
