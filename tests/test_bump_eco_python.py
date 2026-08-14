@@ -209,5 +209,61 @@ class TestAuditAgainstLockfile(unittest.TestCase):
         self.assertEqual(self.calls, [["pip-audit", "--format", "json"]])
 
 
+class TestApplyReportsFailure(unittest.TestCase):
+    """apply must surface a failed package-manager command, never report success (#32)."""
+
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
+        self.calls = []
+        self.fail_on = None          # substring of argv marking the command that fails
+        self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
+        self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
+        self.enterContext(mock.patch("bumplib.ecosystems.python.changed_files",
+                                     side_effect=lambda cands, cwd=None: list(cands)))
+        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
+                                     return_value={"packageManager": "uv", "present": True}))
+
+    def _path(self, p):
+        return self.root if str(p) == "." else Path(p)
+
+    def _record(self, args, env=None):
+        args = list(args)
+        self.calls.append(args)
+        if self.fail_on and self.fail_on in args:
+            return mock.Mock(returncode=1, stdout="", stderr="resolution is unsatisfiable")
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    def test_uv_lock_failure_surfaces_error(self):
+        self.fail_on = "lock"
+        res = py.handle("apply", ["tqdm==4.70.0"])
+        self.assertEqual(res["applied"], [])
+        self.assertEqual(res["filesModified"], [])
+        self.assertIn("unsatisfiable", res["error"])
+        self.assertFalse(any("sync" in c for c in self.calls))   # stops at first failure
+
+    def test_uv_sync_failure_surfaces_error(self):
+        self.fail_on = "sync"
+        res = py.handle("apply", ["tqdm==4.70.0"])
+        self.assertEqual(res["applied"], [])
+        self.assertIn("error", res)
+
+    def test_success_reports_git_verified_files(self):
+        res = py.handle("apply", ["tqdm==4.70.0"])
+        self.assertEqual(res["applied"], ["tqdm==4.70.0"])
+        self.assertEqual(res["filesModified"], ["pyproject.toml", "uv.lock"])
+        self.assertNotIn("error", res)
+
+    def test_pip_install_failure_surfaces_error(self):
+        with mock.patch("bumplib.ecosystems.python.detect",
+                        return_value={"packageManager": "pip", "present": True}):
+            self.fail_on = "install"
+            res = py.handle("apply", ["tqdm==4.70.0"])
+        self.assertEqual(res["applied"], [])
+        self.assertIn("error", res)
+
+
 if __name__ == "__main__":
     unittest.main()
