@@ -240,6 +240,8 @@ bump.py ecosystem <eco> validate                   # -> {"build":"pass"/"fail", 
 ```
 `validate` returns per-step `pass`/`fail` plus truncated `_output` (Go/Node run build+test+lint; Python runs test+lint only — no build step). **Config override:** if `.bump-config.json` sets `ecosystems.<eco>.{build,test,lint}` commands, run those shell commands directly instead of `validate` (the CLI's `validate` uses only the adapter defaults).
 
+**If `apply` returns an `error` field:** nothing was durably applied (the tree may hold partial changes). Run `git checkout -- .` to reset, record every spec in the batch as problematic with the error tail, and fall through to the one-at-a-time re-apply below to isolate which spec (if any) can land — a spec whose solo `apply` also errors is recorded with its error and skipped. Never proceed to validate or commit on an `error` result.
+
 **If build and test both pass:** proceed to Phase 8 (Commit). (A lint-only failure does **not** trigger bisect — see below.)
 
 **If build or test fails — bisect:**
@@ -271,7 +273,7 @@ Commits to the **current working branch** — the bump branch when `MODE=pr`, th
 
 Otherwise:
 
-1. **Stage** manifests + lockfiles that exist and were modified (use the `filesModified` lists from `apply`): `go.mod go.sum pyproject.toml uv.lock requirements.txt package.json pnpm-lock.yaml package-lock.json` and any `requirements/*.txt`.
+1. **Stage** manifests + lockfiles using the `filesModified` lists from successful `apply` results (these are git-verified; an `apply` that returned `error` contributes nothing): `go.mod go.sum pyproject.toml uv.lock requirements.txt package.json pnpm-lock.yaml package-lock.json` and any `requirements/*.txt`.
 2. **Compose** a detailed message listing every updated package grouped by ecosystem, security fixes called out with CVE/severity, and a "Reverted (caused build/test failures)" section if bisect dropped any:
    ```
    chore(deps): bump dependencies
