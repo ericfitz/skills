@@ -1,6 +1,7 @@
-# DRAFT upstream issue for ataraxy-labs/sem — not yet filed
+# Upstream issue for ataraxy-labs/sem — FILED 2026-08-15
 
-Adapted from ericfitz/skills#30. Review before filing.
+Filed as https://github.com/Ataraxy-Labs/sem/issues/479 (adapted from ericfitz/skills#30;
+filed copy fixes one wording nit in suggested-fix 3).
 
 ---
 
