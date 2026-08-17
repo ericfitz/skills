@@ -308,7 +308,7 @@ If the push fails because of an inaccessible SSH key (e.g. a required physical t
 ```bash
 bump.py codeHost <HOST> open-pr "$BUMP_BRANCH" "chore(deps): bump dependencies" "<commit message body>"
 ```
-Returns `{"ok": bool, "output": str}`. If `ok` is false (gh missing or not authenticated, command failed): report it, leave the committed bump branch in place, and stop the PR flow (skip merge/cleanup). Suggest `gh auth login`. On success, capture the PR number/URL from `output` and display `Opened PR #<number>: <url>`.
+Returns `{"ok": bool, "output": str}`. On failure `output` carries `gh`'s own error (stderr is appended only on the failure path). If `ok` is false: report `output` verbatim, leave the committed bump branch in place, and stop the PR flow (skip merge/cleanup). Choose the remedy from the message — a transient API error (HTTP 5xx) is worth one retry of `open-pr`; "already exists" means reuse the PR it names; suggest `gh auth login` only when the message indicates an auth problem or `gh` is missing. On success, capture the PR number/URL from `output` and display `Opened PR #<number>: <url>`.
 
 **Step 3 — Monitor until ready:**
 ```bash
@@ -423,7 +423,7 @@ The `Pull Request:` line reflects the actual outcome:
 - **Git operations fail** (stash, checkout): report and stop. Do not continue with uncertain git state.
 - **Lint fails**: report it but do **not** revert updates — lint failures are usually pre-existing and unrelated.
 - **`git push` fails (e.g. inaccessible SSH key)**: do not work around it. Leave the local bump branch and commit intact, report, and stop the PR flow so the user can push manually.
-- **`gh` missing / not authenticated** (`open-pr`/`merge-pr` return `ok:false`, `pr-status` returns `{"error": ...}`): the PR flow cannot run. Report it, leave the committed bump branch in place, stop the PR flow (skip merge/cleanup). Suggest `gh auth login`.
+- **`gh` missing / not authenticated / PR command failed** (`open-pr`/`merge-pr` return `ok:false`, `pr-status` returns `{"error": ...}`): the PR flow cannot run. Report the returned `output`/`error` verbatim (it carries `gh`'s reason), leave the committed bump branch in place, stop the PR flow (skip merge/cleanup). Suggest `gh auth login` only when the message points at auth or a missing `gh`; retry once on a transient HTTP 5xx.
 - **PR checks fail / never complete / PR not mergeable** (conflicts, required review): stop and report (Phase 9 Step 4). Never merge a not-ready PR; leave the branch and open PR for manual resolution.
 - **`merge-pr` fails** (`ok:false`): report, leave the PR open and branch in place, stop. Do not delete the branch when the merge did not succeed.
 

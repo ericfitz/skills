@@ -119,7 +119,12 @@ def handle(verb, argv):
             return {"ok": False, "output": "gh not installed"}
         branch, title, body = argv[0], argv[1], argv[2]
         r = _run(open_pr_cmd(branch, title, body))
-        return {"output": r.stdout.strip(), "ok": r.returncode == 0}
+        # `gh pr create` prints the PR URL to stdout and the failure reason to stderr,
+        # so on failure stdout is empty by construction. Append stderr only then: the
+        # skill scrapes the URL out of `output` on success and gh may still emit
+        # unrelated warnings on stderr in that case (#36).
+        ok = r.returncode == 0
+        return {"output": (r.stdout if ok else r.stdout + r.stderr).strip(), "ok": ok}
 
     if verb == "pr-status":
         # Check if gh is installed for read operations

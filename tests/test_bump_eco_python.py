@@ -1,3 +1,4 @@
+import io
 import os
 import unittest
 from pathlib import Path
@@ -162,6 +163,115 @@ class TestProjectEnvironmentTargeting(unittest.TestCase):
                         return_value={"packageManager": "pip", "present": True}):
             py.handle("outdated", [])
         self.assertEqual(self.calls[0], ["pip", "list", "--outdated", "--format", "json"])
+
+
+class TestOutdatedReconcilesVenvWithLock(unittest.TestCase):
+    """#37: `uv pip list --outdated` answers for the venv, but uv.lock is what the project
+    declares. A venv behind the lock (any `git pull` that touched uv.lock) reports the
+    drift as phantom updates; a venv ahead of it hides real ones. So whenever a lockfile
+    exists, reconcile the environment to it first -- `--frozen`, so a read verb never
+    rewrites the lockfile -- and only then ask the environment."""
+
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
+        self.calls = []
+        self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
+        self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
+        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
+                                     return_value={"packageManager": "uv", "present": True}))
+        self.sync_rc = 0
+
+    def _path(self, p):
+        return self.root if str(p) == "." else Path(p)
+
+    def _record(self, args, env=None):
+        args = list(args)
+        self.calls.append(args)
+        rc = self.sync_rc if args[:2] == ["uv", "sync"] else 0
+        return mock.Mock(returncode=rc, stdout="", stderr="boom" if rc else "")
+
+    def test_existing_venv_with_lockfile_syncs_before_listing(self):
+        """The stale-venv case: venv present, lock present -> sync first, then list."""
+        exe = _make_venv(self.root)
+        (self.root / "uv.lock").write_text("")
+        py.handle("outdated", [])
+        self.assertEqual(self.calls[0][:2], ["uv", "sync"])
+        listing = self.calls[1]
+        self.assertEqual(listing[:5], ["uv", "pip", "list", "--outdated", "--format"])
+        self.assertEqual(listing[listing.index("--python") + 1], str(exe))
+
+    def test_sync_is_frozen(self):
+        """A read verb must not rewrite uv.lock: plain `uv sync` re-resolves when
+        pyproject drifted from the lock, which would then show up in apply's
+        git-verified filesModified."""
+        _make_venv(self.root)
+        (self.root / "uv.lock").write_text("")
+        py.handle("outdated", [])
+        self.assertIn("--frozen", self.calls[0])
+
+    def test_no_lockfile_does_not_sync(self):
+        _make_venv(self.root)
+        py.handle("outdated", [])
+        self.assertFalse(any(c[:2] == ["uv", "sync"] for c in self.calls))
+        self.assertEqual(self.calls[0][:2], ["uv", "pip"])
+
+    def test_sync_failure_with_existing_venv_still_queries_it_and_warns(self):
+        exe = _make_venv(self.root)
+        (self.root / "uv.lock").write_text("")
+        self.sync_rc = 1
+        with mock.patch("bumplib.ecosystems.python.sys.stderr", new_callable=io.StringIO) as err:
+            py.handle("outdated", [])
+        listing = self.calls[1]
+        self.assertEqual(listing[listing.index("--python") + 1], str(exe))
+        self.assertIn("uv sync", err.getvalue())
+
+    def test_pip_manager_never_syncs(self):
+        with mock.patch("bumplib.ecosystems.python.detect",
+                        return_value={"packageManager": "pip", "present": True}):
+            py.handle("outdated", [])
+        self.assertEqual(self.calls, [["pip", "list", "--outdated", "--format", "json"]])
+
+
+class TestApplyReportsOnlyRealChanges(unittest.TestCase):
+    """#37: `uv lock --upgrade-package X` is a no-op when the lock already holds the
+    target, yet apply echoed every spec back in `applied`. A commit message built from
+    `applied` then claims a bump that did not happen. For uv the lockfile IS the evidence,
+    so an empty git-verified `filesModified` means nothing was applied."""
+
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        self.enterContext(mock.patch("bumplib.ecosystems.python.Path",
+                                     side_effect=lambda p: self.root if str(p) == "." else Path(p)))
+        self.enterContext(mock.patch("bumplib.ecosystems.python._run",
+                                     return_value=mock.Mock(returncode=0, stdout="", stderr="")))
+
+    def test_uv_noop_apply_reports_nothing_applied(self):
+        with mock.patch("bumplib.ecosystems.python.detect",
+                        return_value={"packageManager": "uv", "present": True}), \
+                mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]):
+            result = py.handle("apply", ["charset-normalizer==3.5.1"])
+        self.assertEqual(result, {"applied": [], "filesModified": []})
+
+    def test_uv_apply_with_lock_change_reports_specs(self):
+        with mock.patch("bumplib.ecosystems.python.detect",
+                        return_value={"packageManager": "uv", "present": True}), \
+                mock.patch("bumplib.ecosystems.python.changed_files", return_value=["uv.lock"]):
+            result = py.handle("apply", ["requests==2.32.4"])
+        self.assertEqual(result, {"applied": ["requests==2.32.4"], "filesModified": ["uv.lock"]})
+
+    def test_pip_apply_unchanged(self):
+        """pip install never edits requirements.txt, so an empty filesModified carries
+        no signal there; keep echoing the specs."""
+        with mock.patch("bumplib.ecosystems.python.detect",
+                        return_value={"packageManager": "pip", "present": True}), \
+                mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]):
+            result = py.handle("apply", ["requests==2.32.4"])
+        self.assertEqual(result["applied"], ["requests==2.32.4"])
 
 
 class TestAuditAgainstLockfile(unittest.TestCase):
