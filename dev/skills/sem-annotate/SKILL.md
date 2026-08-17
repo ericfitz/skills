@@ -149,15 +149,16 @@ to `{missing: 0}` with no `stale` entries.
 
 **Status vocabulary:**
 - `missing` — no marker exists yet
-- `stale` — marker present but entity has a logical change since the anchored commit
+- `stale` — marker present but entity has a logical change since the anchored commit, or the
+  entity does not exist at the anchored commit at all (the marker was written before the
+  entity's introducing commit — e.g. hand-anchored at `HEAD` in the same commit that added
+  it — so the anchor cannot vouch for the body); either way it is re-described and re-anchored
 - `uncommitted` — marker present but the anchor SHA is blank or all-zeros (dirty tree with
   no committed history for this entity); will resolve once changes are committed
-- `orphaned` — marker present but its anchor commit is not reachable from HEAD (typically
-  orphaned by a squash-merge, or the sha no longer resolves); staleness cannot be computed
-  against it, so the entity is re-described and re-anchored at a reachable commit
-- `invalid-sha` — a previously-written marker carries a SHA that is reachable but `sem diff`
-  cannot process (corrupt or unresolvable to sem); the entity will be re-annotated by the
-  next annotate pass
+- `invalid-sha` — a previously-written marker carries a SHA that `sem diff` cannot resolve
+  (the commit was garbage-collected or the SHA is corrupt); the entity will be re-annotated
+  by the next annotate pass. Anchors merely orphaned by a squash-merge are *not* this case:
+  the object still resolves and `sem diff` compares against it correctly
 
 ### 6. Offer the CLAUDE.md convention note (once)
 If the project's `CLAUDE.md` does not already mention SEM markers, offer to add a short
