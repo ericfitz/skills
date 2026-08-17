@@ -144,11 +144,22 @@ def sem_blame(file, cwd=None):
     return json.loads(run_sem(["blame", file], cwd=cwd))
 
 
+_ANCHOR_INVALIDATING_CHANGES = ("modified", "added")
+
+
 def _parse_changed_entities(data):
-    """Names of entities with a logical (modified) change in a sem diff --json payload."""
+    """Names of entities whose anchor can no longer vouch for them, per a sem diff
+    --json payload (run with --no-cosmetics, so anything left is a logical change).
+
+    `modified` is the obvious case. `added` means the entity does not exist at the anchor
+    at all -- the marker was written before the introducing commit existed (typically
+    hand-anchored at HEAD in the same commit that created the entity), so the anchor
+    predates the body and a later change is indistinguishable from the original. Treat it
+    as changed, never fresh (#39). Deleted/moved/reordered entities keep their marker.
+    """
     names = set()
     for ch in data.get("changes", []):
-        if ch.get("changeType") == "modified":
+        if ch.get("changeType") in _ANCHOR_INVALIDATING_CHANGES:
             n = ch.get("entityName")
             if n:
                 names.add(n)
@@ -205,19 +216,6 @@ def head_sha(cwd=None):
         return ""
 
 
-def sha_reachable(sha, cwd=None):
-    """True when sha is an ancestor of HEAD.
-
-    Squash-merge workflows orphan every branch commit: the objects still resolve, but
-    `sem diff <orphan>..HEAD` silently reports no changes, which classified genuinely
-    stale markers as fresh (issue #30). An anchor we cannot compare against must be
-    re-anchored, never trusted.
-    """
-    r = subprocess.run(["git", "merge-base", "--is-ancestor", sha, "HEAD"],
-                       cwd=cwd, capture_output=True, text=True)
-    return r.returncode == 0
-
-
 def scan(paths, cwd=None, rebuild=False):
     """Worklist for entities classified missing/stale (or all when rebuild=True).
 
@@ -260,14 +258,9 @@ def scan(paths, cwd=None, rebuild=False):
                 logic = False
                 if existing_sha and not _is_uncommitted(anchor_sha) \
                         and not anchor_sha.startswith(existing_sha):
-                    if not sha_reachable(existing_sha, cwd=cwd):
-                        work.append({
-                            "file": f, "name": e["name"],
-                            "start_line": e["start_line"], "end_line": e["end_line"],
-                            "status": "orphaned", "anchor_sha": anchor_sha,
-                            "existing_desc": existing_desc, "bad_sha": existing_sha,
-                        })
-                        continue
+                    # Anchors orphaned by squash-merge still diff correctly (sem resolves
+                    # the object; Ataraxy-Labs/sem#479), so no reachability gate here --
+                    # an unresolvable anchor errors loudly and lands in invalid-sha below.
                     try:
                         logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
                     except SemError:
@@ -286,12 +279,6 @@ def scan(paths, cwd=None, rebuild=False):
                     "status": status, "anchor_sha": anchor_sha,
                     "existing_desc": existing_desc,
                 })
-    orphans = sum(1 for w in work if w["status"] == "orphaned")
-    if orphans:
-        print(f"warning: {orphans} marker(s) anchored to commits unreachable from HEAD "
-              "(orphaned by squash-merge or history rewrite); staleness could not be "
-              "computed against them, so they are queued for re-annotation.",
-              file=sys.stderr)
     return work
 
 
