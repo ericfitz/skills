@@ -53,5 +53,36 @@ class TestGitHubCodeHost(unittest.TestCase):
             self.assertEqual(result.pullRequests, [])
 
 
+class TestOpenPrSurfacesStderr(unittest.TestCase):
+    """#36: `gh pr create` writes its failure reason to stderr and only the PR URL to
+    stdout, so an adapter that returns stdout alone reports every failure as "".
+    The skill scrapes the URL out of `output` on success, so stderr must be appended
+    only on the failure path (gh may warn on stderr even when it succeeds)."""
+
+    def _handle(self, rc, stdout, stderr):
+        with mock.patch("bumplib.codehosts.github.shutil.which", return_value="/usr/bin/gh"), \
+                mock.patch("bumplib.codehosts.github._run",
+                           return_value=mock.Mock(returncode=rc, stdout=stdout, stderr=stderr)):
+            return gh.handle("open-pr", ["bump-x", "title", "body"])
+
+    def test_failure_includes_stderr(self):
+        err = 'a pull request for branch "bump-x" into branch "main" already exists:\n' \
+              'https://github.com/o/r/pull/856\n'
+        result = self._handle(1, "", err)
+        self.assertFalse(result["ok"])
+        self.assertIn("already exists", result["output"])
+        self.assertIn("pull/856", result["output"])
+
+    def test_failure_keeps_stdout_too(self):
+        result = self._handle(1, "partial\n", "HTTP 503\n")
+        self.assertEqual(result["output"], "partial\nHTTP 503")
+
+    def test_success_output_is_stdout_only(self):
+        result = self._handle(0, "https://github.com/o/r/pull/857\n",
+                              "Warning: 1 uncommitted change\n")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["output"], "https://github.com/o/r/pull/857")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -134,12 +134,17 @@ def handle(verb, argv):
         return {"warnings": []}
     if verb == "outdated":
         if mgr == "uv":
+            # `uv pip list --outdated` answers for the venv, but uv.lock is what the
+            # project declares. Reconcile the environment to the lockfile before
+            # inspecting it: a venv behind the lock (any `git pull` that touched
+            # uv.lock) reports the drift as phantom updates, a venv ahead of it hides
+            # real ones, and a missing venv (fresh clone, #28) leaves only the ephemeral
+            # env to answer. `--frozen` keeps a read verb from rewriting the lockfile;
+            # the sync is a no-op when already in sync (#37).
+            if (root / "uv.lock").exists() and _run(["uv", "sync", "--frozen"]).returncode != 0:
+                print("warning: `uv sync --frozen` failed; outdated results reflect the "
+                      "existing environment, which may not match uv.lock", file=sys.stderr)
             venv = _project_python(root)
-            # Fresh clone / rm -rf .venv: there is a lockfile to honor but no
-            # environment to inspect. Create it -- `uv sync` runs later in the
-            # flow anyway -- rather than silently querying the ephemeral env (#28).
-            if venv is None and (root / "uv.lock").exists() and _run(["uv", "sync"]).returncode == 0:
-                venv = _project_python(root)
             cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
             env = None
             if venv:
@@ -178,7 +183,13 @@ def handle(verb, argv):
             if r.returncode != 0:
                 return {"applied": [], "filesModified": [],
                         "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
-        return {"applied": argv, "filesModified": changed_files(candidates, cwd=root)}
+        modified = changed_files(candidates, cwd=root)
+        # For uv the lockfile is the evidence: `uv lock --upgrade-package X` is a no-op
+        # when uv.lock already holds the target, and echoing the spec back as applied
+        # would let a commit message claim a bump that never happened (#37). pip never
+        # edits requirements.txt, so an empty diff carries no signal there.
+        applied = [] if mgr == "uv" and not modified else argv
+        return {"applied": applied, "filesModified": modified}
     if verb == "validate":
         results = {}
         cmds = (("test", "uv run pytest" if mgr == "uv" else "pytest"),
