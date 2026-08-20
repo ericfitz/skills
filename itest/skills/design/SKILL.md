@@ -112,6 +112,23 @@ not four separate interrogations:
 
 Do not proceed until the user has responded.
 
+**Persist the confirmed journeys.** Once the user has confirmed the journey set, write
+it to `docs/journeys.md` in the target repo, from the main conversation (not a
+subagent). If the file already exists, summarize what would change and ask before
+overwriting. The doc contains:
+
+- a generation header: date, repo, and the commit sha discovery ran against;
+- one section per confirmed journey: name, actor, narrative (intention and observable
+  outcome), rank, `depends_on` edges, and evidence anchors — journeys the user added at
+  the gate without code evidence are marked "(user-supplied)";
+- one fenced ```json block at the end holding the confirmed set in the
+  `profile:journeys` contract shape, with user edits applied. User-added entries carry
+  `"evidence": []` and `"user_supplied": true`.
+
+This doc is the durable output of the gate — downstream consumers (workflow-spec
+generation, wiki tooling) read it from this well-known path rather than re-running
+discovery.
+
 ## Phase 6 — Synthesis
 
 Work through these eight steps in order, presenting each and checking before moving on.

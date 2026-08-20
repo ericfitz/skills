@@ -58,6 +58,22 @@ class TestCrossPluginCoupling(unittest.TestCase):
         self.assertIn("gate prep", text)
         self.assertIn("cross-cutting", text)
 
+    def test_design_writes_confirmed_journeys_doc_after_the_gate(self):
+        """Issue #45: the confirmed journeys must be persisted to docs/journeys.md
+        after the Phase 5 human gate, not left in chat (profile:journeys stays a
+        pure proposer)."""
+        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
+            encoding="utf-8")
+        self.assertIn("docs/journeys.md", text)
+        lower = text.lower()
+        # The write is documented inside/after the human gate, not during discovery.
+        self.assertGreater(lower.index("docs/journeys.md"),
+                           lower.index("phase 5"))
+        # Journeys the user adds at the gate carry the user_supplied marker.
+        self.assertIn("user_supplied", text)
+        # Existing docs are never silently clobbered.
+        self.assertIn("overwrit", lower)
+
     def test_design_offers_conflict_disposition_without_building_a_mechanism(self):
         text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
             encoding="utf-8").lower()
