@@ -1,0 +1,65 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "openapi",
+  "tools": [
+    {
+      "name": "uv",
+      "required": true,
+      "why": "init runs scripts/find_specs.py via `uv run`",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    },
+    {
+      "name": "rg",
+      "required": false,
+      "why": "spec discovery prefers ripgrep (honors .gitignore); a built-in walk fallback covers its absence",
+      "probe": ["rg", "--version"],
+      "install": {
+        "macos": "brew install ripgrep",
+        "docs": "https://github.com/BurntSushi/ripgrep"
+      }
+    },
+    {
+      "name": "vacuum",
+      "required": false,
+      "why": "preferred external validator for OpenAPI candidates and emitted specs",
+      "probe": ["vacuum", "version"],
+      "install": {
+        "macos": "brew install daveshanley/vacuum/vacuum",
+        "docs": "https://quobix.com/vacuum/"
+      }
+    },
+    {
+      "name": "redocly",
+      "required": false,
+      "why": "validator for OpenAPI and Arazzo documents when vacuum is absent",
+      "probe": ["redocly", "--version"],
+      "install": {
+        "macos": "npm i -g @redocly/cli",
+        "docs": "https://redocly.com/docs/cli/"
+      }
+    },
+    {
+      "name": "spectral",
+      "required": false,
+      "why": "fallback OpenAPI linter",
+      "probe": ["spectral", "--version"],
+      "install": {
+        "macos": "npm i -g @stoplight/spectral-cli",
+        "docs": "https://github.com/stoplightio/spectral"
+      }
+    }
+  ],
+  "config": [
+    {
+      "path": ".local/openapi/config.yaml",
+      "scope": "repo",
+      "required": false,
+      "why": "arazzo reads openapi_spec/arazzo_spec paths from it; init creates it and arazzo offers to run init when missing",
+      "remedy": "run /openapi:init in the target repo"
+    }
+  ]
+}

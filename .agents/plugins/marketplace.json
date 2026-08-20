@@ -104,6 +104,14 @@
         "source": "local",
         "path": "./env"
       }
+    },
+    {
+      "name": "openapi",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./openapi"
+      }
     }
   ]
 }
