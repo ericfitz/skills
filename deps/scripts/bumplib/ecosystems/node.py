@@ -223,17 +223,23 @@ def _widen(rng: str, version: str) -> str:
     return f"{op}{version}"
 
 
-def _install_cmd(mgr: str, name: str, version: str, decl: dict) -> list:
+def _install_cmd(mgr: str, name: str, version: str, decl: dict, root: Path) -> list:
     """Command that moves a declared dependency PAST its current range, rewriting the manifest.
 
     npm targets a workspace by directory (`-w <dir>`); pnpm targets one by package name
     (`--filter <name>`) because pnpm's own `-w` means 'the workspace root', not 'a workspace'.
+    An empty workspaceName only means 'root manifest' -- whether that root IS a workspace
+    root is decided by pnpm-workspace.yaml (pnpm ignores package.json's `workspaces`), and
+    `-w` outside a workspace is an error, not a no-op.
     """
     spec = f"{name}@{_widen(decl.get('range', ''), version)}"
     flag = {"dev": "-D", "optional": "-O", "peer": "--save-peer"}.get(decl.get("type", ""))
     if mgr == "pnpm":
         cmd = ["pnpm", "add"]
-        cmd += ["--filter", decl["workspaceName"]] if decl.get("workspaceName") else ["-w"]
+        if decl.get("workspaceName"):
+            cmd += ["--filter", decl["workspaceName"]]
+        elif (root / "pnpm-workspace.yaml").exists():
+            cmd += ["-w"]
     else:
         cmd = ["npm", "install"]
         if decl.get("workspaceDir"):
@@ -298,7 +304,7 @@ def handle(verb, argv):
             # packages and unrecognized range forms all stay on `update`, which touches
             # only the lockfile.
             if version and decl and satisfies(version, decl.get("range", "")) is False:
-                err = _checked(_install_cmd(mgr, name, version, decl))
+                err = _checked(_install_cmd(mgr, name, version, decl, root))
                 if err:
                     return err
             else:

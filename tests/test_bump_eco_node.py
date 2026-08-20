@@ -240,6 +240,20 @@ class TestApply(unittest.TestCase):
         self.assertIn(["pnpm", "add", "--filter", "@mono/viewer", "three@^0.185.1"], self.calls)
         self.assertIn("pnpm-lock.yaml", res["filesModified"])
 
+    def test_pnpm_plain_repo_omits_workspace_flag(self):
+        """A single-package pnpm repo has no workspace, so `-w` is rejected by pnpm (#40)."""
+        (self.root / "pnpm-lock.yaml").write_text("")
+        node.handle("apply", ["eslint@11.0.0"])
+        self.assertIn(["pnpm", "add", "-D", "eslint@^11.0.0"], self.calls)
+        self.assertFalse(any("-w" in cmd for cmd in self.calls))
+
+    def test_pnpm_workspace_root_keeps_w_flag(self):
+        """At a real workspace root, plain `pnpm add` fails with ERR_PNPM_ADDING_TO_ROOT."""
+        (self.root / "pnpm-lock.yaml").write_text("")
+        (self.root / "pnpm-workspace.yaml").write_text("packages:\n  - packages/*\n")
+        node.handle("apply", ["eslint@11.0.0"])
+        self.assertIn(["pnpm", "add", "-w", "-D", "eslint@^11.0.0"], self.calls)
+
 
 class TestApplyReportsFailure(unittest.TestCase):
     """apply must surface a failed npm/pnpm command, never report success (#32)."""
