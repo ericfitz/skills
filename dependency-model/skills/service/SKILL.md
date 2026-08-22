@@ -48,24 +48,32 @@ invoke `profile:topology` first and use its output as `seeded_by`.
    the like) inside `uv.lock`, `package-lock.json`, `go.sum`, or a similar
    lockfile is a build-time artifact source, not a service the running
    system depends on — it belongs to `package`, not here.
-5. Assign `details.kind` from the enumerated set, and `details.managed_by`
+5. For each service identified, set `id` to `service:<slug>` — a stable slug
+   built from the service's name and role (e.g. `service:postgres-primary`,
+   `service:stripe-api`) — and `name` to the service's plain name (e.g.
+   `postgres`, `stripe`). Set `evidence` to the `file:line` locations that
+   show this service exists: the compose/k8s/iac declaration line, the
+   url/host-port literal's line, or the client-construction line — the
+   schema requires `id`, `name`, and `evidence`, and none of them is implied
+   by anything else you set.
+6. Assign `details.kind` from the enumerated set, and `details.managed_by`
    from how it is brought up.
-6. Fill `details.config_keys[]` from `findings.env_refs` whose name plainly
+7. Fill `details.config_keys[]` from `findings.env_refs` whose name plainly
    points at this service, and link each to its `config:` id in
    `related_ids`.
-7. Fill `resilience` per `resilience-signatures.md`: correlate
+8. Fill `resilience` per `resilience-signatures.md`: correlate
    `findings.resilience_calls` in the files that construct this service's
    client, record the call's `file:line` as evidence, and set every fact you
    cannot find to `null`.
-8. Set `resilience.on_path` from where the client is constructed — startup
+9. Set `resilience.on_path` from where the client is constructed — startup
    wiring, a request handler, a background worker, or a build step. Leave it
    empty when the repository does not say.
-9. Link `related_ids` to the `network:` entry for the host and port this
-   service is reached on. Both categories record it; `categories.md` has the
-   rule.
-10. If the index's `coverage.skipped` is non-empty, record one assumption per
+10. Link `related_ids` to the `network:` entry for the host and port this
+    service is reached on. Both categories record it; `categories.md` has
+    the rule.
+11. If the index's `coverage.skipped` is non-empty, record one assumption per
     skipped language naming it and what went unscanned.
-11. Emit the full envelope, then a short prose summary.
+12. Emit the full envelope, then a short prose summary.
 
 ## Rules
 
