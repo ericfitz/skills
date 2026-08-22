@@ -48,55 +48,79 @@ whatever static evidence shows.
 
 ## Decisions
 
-### D2 — Health is defined over run-time dependencies only
+### D2 — Health is filtered by failability, not by lifecycle or category
 
-"Dependency" is overloaded in this project, and the two senses were never
-distinguished in layer 1:
+**Healthy means: the service in production has all of its environment and service
+dependencies met, and all metric-sensitive ones within acceptable bounds.**
 
-- **build-time** — packages and modules the system is built against
-- **run-time** — services, network paths, configuration, and credentials the system
-  needs while running
+The tempting rule — "health covers run-time dependencies, not packages" — is wrong,
+and it is wrong in a way that hides a real failure mode. It also collides with the
+`lifecycle` field (D3), where "run-time dependency" already means something else
+entirely: npm's `dependencies`, which includes every library the app imports.
 
-**Healthy means: all run-time dependencies are met, and all metric-sensitive
-run-time dependencies are within acceptable bounds.** Build-time dependencies are
-not part of health.
+The property that actually matters is:
 
-`references/definitions.md` states this, because the ambiguity lives in layer 1's
-six categories rather than in this layer.
+> **Can this dependency fail independently while the process is up?**
+
+| Can fail while running | Cannot |
+|---|---|
+| services — unreachable, slow, or reporting degraded | a bundled library: it is in the artifact, or the deploy failed |
+| credentials — expire, get rotated | |
+| CPU and memory limits — you hit them | |
+| remote configuration — changes underneath you | |
+| a **dynamically loaded** package — a reflectively resolved JDBC driver, an `importlib` plugin, a `dlopen`ed `.so` | |
+
+So packages are **not** excluded from health by rule. A dependency enters the health
+definition **iff a condition can be stated about it with evidence.** A bundled
+library produces no statable condition and self-excludes — which is what keeps 270
+packages from drowning a handful of services, without needing an exclusion rule. A
+dynamically resolved package produces a `presence` condition and correctly appears,
+because its loading site is the evidence.
+
+The cost is honest: "is there a statable condition" is judgment, not a mechanical
+filter, and this plugin has otherwise fought to keep its rules pinnable. The trade
+is deliberate — a category filter is fully testable and silently wrong about dynamic
+loading. It is mitigated by pinning both ends (see Testing): a bundled library must
+not appear in health; a dynamically loaded one must, citing its loading site.
+
+`references/definitions.md` carries this test and the worked cases above.
 
 ### D3 — `lifecycle` is added to the layer-1 contract, and no version moves
 
-The build/run split is a fact about a dependency, so it belongs on the dependency,
-not in one consumer that re-derives it. `dependency-core.schema.json` gains a
-required `lifecycle` enum with exactly two values — `build` and `run` — set by each
-layer-1 skill from evidence it already reads. **The category supplies the default;
-the evidence decides.**
+`lifecycle` carries **npm's semantics, exactly**: `run` is `dependencies`, `build`
+is `devDependencies`. `dependency-core.schema.json` gains it as a required enum with
+those two values.
 
-| Category | Default | Evidence that overrides it |
-|---|---|---|
-| `package` | `build` | dynamic loading at runtime — a reflectively loaded JDBC driver, an `importlib` plugin resolution, a `dlopen`ed `.so` — makes it `run`, and the entry must cite the loading site |
-| `service`, `network`, `config`, `security` | `run` | none; these are run-time by construction |
-| `platform` | per `details.kind`: `cpu`/`memory`/`disk`/`gpu`/`cloud-service` → `run`; `arch`/`os`/`runtime-version` → `build` | none |
+**The build environment is a strict superset of the runtime environment.** You need
+the runtime dependencies present at build in order to run the app for debugging; the
+reverse does not hold. `npm ci --omit=dev` is the operator that drops the difference.
 
-A test pins the defaults, including `platform`'s split by `details.kind`. An
-unenforced classification is how two skills come to disagree about the same entry.
+| Category | `lifecycle` |
+|---|---|
+| `package` | from the manifest section it was declared in: `[project] dependencies`, npm `dependencies`, Go `require` → `run`; `[dependency-groups] dev`, npm `devDependencies`, a test-only extra → `build` |
+| `service`, `network`, `config`, `security` | `run` — needed while the service runs |
+| `platform` | per `details.kind`: `cpu`/`memory`/`disk`/`gpu`/`cloud-service` → `run`; `arch`/`os`/`runtime-version` → `build` |
 
-**There is deliberately no `both` value.** The label does not assert set
-membership — it answers which phase's failure matters for health, and that always
-has one answer. The reasoning is worth recording because the obvious
-justification is wrong: it is *not* the case that build-time dependencies are a
-superset of run-time ones. Dev and test dependencies (`pytest`, `ruff`, `@types/*`)
-are build-only and provably absent at runtime; compile-time-only artifacts (Rust
-proc macros, a statically linked `.a`, a discarded multi-stage builder toolchain)
-likewise; and most ordinary application libraries genuinely are both, since they
-are installed at build and imported at runtime. Build and run overlap without
-either containing the other.
+`package` is the only category that must read something to decide, and what it reads
+is already in front of it — syft records the manifest each artifact came from. A test
+pins the other categories' constants and `platform`'s split by `details.kind`.
 
-`both` is unnecessary anyway. An application library is technically present at
-runtime, but packages are not part of health (D2), so it is `build` and gets
-filtered out. A package that *is* part of health — because something loads it
-dynamically — is `run`. Every entry lands in exactly one bucket, and a two-value
-enum has no soft middle to shrug into.
+Note that `lifecycle` does **not** determine health (D2). Most libraries are `run`
+under npm semantics and still contribute no health condition, because they cannot
+fail while the process is up. The two questions are separate and the fields are
+separate.
+
+**There is deliberately no `both` value**, and the reason is the superset relation
+above rather than anything subtler. A runtime dependency is present in the build
+environment *because* it is a runtime dependency — that is what makes the build
+environment a superset, not a separate fact about the dependency. Labelling such a
+package `both` would record the containment twice.
+
+Every dependency is therefore in exactly one set: shipped in the runtime artifact
+(`run`), or not (`build`). Package managers have converged on the same two-value
+answer — `dependencies` versus `devDependencies`, `[project] dependencies` versus
+`[dependency-groups] dev` — which is a reasonable signal it is the right cut. A
+two-value enum also has no soft middle to shrug into under time pressure.
 
 Making the field required invalidates all six shipped category examples, which
 carry no `lifecycle`. All six are updated in the same change, and the existing
@@ -276,7 +300,9 @@ edges; one asking what the system is built against filters to `build`.
 
 Plus `cycles[]` — a cycle is a fact and deterministic to detect.
 
-**`health`** — one entry per run-time service, holding `conditions[]` per D7.
+**`health`** — one entry per service, holding `conditions[]` per D7. Which
+dependencies contribute conditions is decided by D2's failability test, not by
+`lifecycle` and not by category.
 
 **`assumptions[]`** — same shape as layer 1's.
 
@@ -309,15 +335,26 @@ needed."
 | `tests/test_dependency_model_contracts.py` (extended) | the synthesis schema and its example; `conditions[]` accepts all three kinds and a `null` expectation |
 | `tests/test_dependency_model_coupling.py` (extended) | the two new skills state the `null` discipline, name their own contract, and reach into no other plugin by path |
 
-Four tests exist specifically to pin decisions from this design, because each
-guards a choice that would otherwise erode silently:
+Six tests exist specifically to pin decisions from this design, because each guards
+a choice that would otherwise erode silently:
 
 1. The synthesis schema contains no `healthy`/`degraded`/`unhealthy` enum (D9).
-2. The `lifecycle` defaults are pinned per category, including `platform`'s split
-   by `details.kind`; and the enum admits exactly `build` and `run`, so a `both`
-   cannot reappear (D3).
-3. A `status: "failed"` category propagates as failed through the merge.
-4. `expectation: null` is legal and documented as "no declaration found" (D7).
+2. `lifecycle` admits exactly `build` and `run`, so a `both` cannot reappear; the
+   constants are pinned for `service`/`network`/`config`/`security`, and
+   `platform`'s split by `details.kind` is pinned (D3).
+3. The `package` skill maps manifest section to `lifecycle` — a `[project]`
+   dependency and an npm `dependencies` entry are `run`; a `[dependency-groups] dev`
+   and an npm `devDependencies` entry are `build` (D3).
+4. A `status: "failed"` category propagates as failed through the merge.
+5. `expectation: null` is legal and documented as "no declaration found" (D7).
+
+D2's failability rule is judgment rather than a mechanical filter, so it is pinned
+at both ends instead:
+
+6. A bundled library contributes **no** health condition, and a dynamically loaded
+   package contributes a `presence` condition citing its loading site. These are the
+   two cases a category filter would have got wrong in opposite directions, so
+   fixture envelopes covering both are the guard.
 
 ## Definition of done
 
