@@ -47,6 +47,24 @@ DOCKERFILE = (
     "RUN pip install -r requirements.txt\n"
 )
 
+K8S_TRAILING_COMMENT = (
+    "apiVersion: apps/v1\n"
+    "kind: Deployment\n"
+    "spec:\n"
+    "  containers:\n"
+    "    - resources:\n"
+    "        limits:\n"
+    "          memory: 512Mi  # bump later\n"
+    "          cpu: \"2\"\n"
+)
+
+COMPOSE_TRAILING_COMMENT = (
+    "services:\n"
+    "  app:\n"
+    "    mem_limit: 1g  # raised after OOM\n"
+    "    cpus: 1.5\n"
+)
+
 
 def scan(files):
     with tempfile.TemporaryDirectory() as tmp:
@@ -71,12 +89,19 @@ class TestKubernetesResources(unittest.TestCase):
 
     def test_records_source_and_one_indexed_line(self):
         records = scan({"deploy/api.yaml": K8S})
+        self.assertTrue(records)
         self.assertTrue(all(r["source"] == "kubernetes" for r in records))
         self.assertTrue(all(r["line"] >= 1 for r in records))
 
     def test_requests_are_captured_as_well_as_limits(self):
         records = scan({"deploy/api.yaml": K8S})
         self.assertEqual(len([r for r in records if r["kind"] == "cpu"]), 2)
+
+    def test_trailing_comment_does_not_drop_the_line(self):
+        records = scan({"deploy/api.yaml": K8S_TRAILING_COMMENT})
+        self.assertEqual(kinds(records), ["cpu", "memory"])
+        memory = next(r for r in records if r["kind"] == "memory")
+        self.assertEqual(memory["raw"], "512Mi")
 
 
 class TestComposeResources(unittest.TestCase):
@@ -88,7 +113,14 @@ class TestComposeResources(unittest.TestCase):
 
     def test_source_is_compose(self):
         records = scan({"docker-compose.yml": COMPOSE})
+        self.assertTrue(records)
         self.assertTrue(all(r["source"] == "compose" for r in records))
+
+    def test_trailing_comment_does_not_drop_the_line(self):
+        records = scan({"docker-compose.yml": COMPOSE_TRAILING_COMMENT})
+        self.assertEqual(kinds(records), ["cpu", "memory"])
+        memory = next(r for r in records if r["kind"] == "memory")
+        self.assertEqual(memory["raw"], "1g")
 
 
 class TestDockerfileResources(unittest.TestCase):
@@ -103,6 +135,14 @@ class TestDockerfileResources(unittest.TestCase):
         records = scan({"Dockerfile": "FROM golang:1.23-alpine AS build\n"})
         self.assertEqual(kinds(records), ["runtime-version"])
         self.assertEqual(records[0]["raw"], "golang:1.23-alpine")
+
+    def test_dockerfile_dot_suffix_variant_is_scanned(self):
+        records = scan({"Dockerfile.dev": DOCKERFILE})
+        self.assertEqual(kinds(records), ["arch", "runtime-version"])
+
+    def test_dot_dockerfile_extension_variant_is_scanned(self):
+        records = scan({"backend.dockerfile": DOCKERFILE})
+        self.assertEqual(kinds(records), ["arch", "runtime-version"])
 
 
 class TestNoise(unittest.TestCase):

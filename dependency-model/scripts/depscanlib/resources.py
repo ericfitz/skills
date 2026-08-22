@@ -12,21 +12,41 @@ from pathlib import PurePosixPath
 
 from depscanlib.walk import read_text
 
+# A trailing `# ...` comment is ordinary on a hand-maintained resource line
+# (`memory: 2Gi  # raised after OOM`); every pattern below tolerates one so a
+# comment doesn't silently drop the whole line.
+_COMMENT_TAIL = r'\s*(?:#.*)?$'
+
 DOCKERFILE_NAMES = {"Dockerfile", "Containerfile"}
 
-K8S_CPU_RE = re.compile(r'^\s*cpu:\s*["\']?([^"\'\n#]+?)["\']?\s*$')
-K8S_MEMORY_RE = re.compile(r'^\s*memory:\s*["\']?([^"\'\n#]+?)["\']?\s*$')
-K8S_GPU_RE = re.compile(r'^\s*[\w.\-/]*gpu:\s*["\']?([^"\'\n#]+?)["\']?\s*$',
+
+def _is_dockerfile_name(name):
+    """True for Dockerfile/Containerfile and common variant conventions.
+
+    Covers exact names, `Dockerfile.dev`-style suffixes, and
+    `backend.dockerfile`-style extensions, case-insensitively for the
+    variant forms.
+    """
+    if name in DOCKERFILE_NAMES:
+        return True
+    lower = name.lower()
+    return (lower.startswith("dockerfile.") or lower.startswith("containerfile.") or
+            lower.endswith(".dockerfile"))
+
+
+K8S_CPU_RE = re.compile(r'^\s*cpu:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL)
+K8S_MEMORY_RE = re.compile(r'^\s*memory:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL)
+K8S_GPU_RE = re.compile(r'^\s*[\w.\-/]*gpu:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL,
                         re.IGNORECASE)
-K8S_STORAGE_RE = re.compile(r'^\s*(?:ephemeral-)?storage:\s*["\']?([^"\'\n#]+?)["\']?\s*$')
+K8S_STORAGE_RE = re.compile(r'^\s*(?:ephemeral-)?storage:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL)
 
 COMPOSE_RES_RES = (
-    (re.compile(r'^\s*mem_limit:\s*["\']?([^"\'\n#]+?)["\']?\s*$'), "memory"),
-    (re.compile(r'^\s*mem_reservation:\s*["\']?([^"\'\n#]+?)["\']?\s*$'), "memory"),
-    (re.compile(r'^\s*memory:\s*["\']?([^"\'\n#]+?)["\']?\s*$'), "memory"),
-    (re.compile(r'^\s*cpus:\s*["\']?([^"\'\n#]+?)["\']?\s*$'), "cpu"),
-    (re.compile(r'^\s*cpu_shares:\s*["\']?([^"\'\n#]+?)["\']?\s*$'), "cpu"),
-    (re.compile(r'^\s*shm_size:\s*["\']?([^"\'\n#]+?)["\']?\s*$'), "memory"),
+    (re.compile(r'^\s*mem_limit:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL), "memory"),
+    (re.compile(r'^\s*mem_reservation:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL), "memory"),
+    (re.compile(r'^\s*memory:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL), "memory"),
+    (re.compile(r'^\s*cpus:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL), "cpu"),
+    (re.compile(r'^\s*cpu_shares:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL), "cpu"),
+    (re.compile(r'^\s*shm_size:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL), "memory"),
 )
 
 FROM_RE = re.compile(
@@ -84,6 +104,6 @@ def scan_resources(root, paths, files):
     for path in sorted(files.get("compose", [])):
         _scan_compose(root, path, out)
     for path in sorted(paths):
-        if PurePosixPath(path).name in DOCKERFILE_NAMES:
+        if _is_dockerfile_name(PurePosixPath(path).name):
             _scan_dockerfile(root, path, out)
     return sorted(out, key=lambda r: (r["file"], r["line"], r["kind"]))
