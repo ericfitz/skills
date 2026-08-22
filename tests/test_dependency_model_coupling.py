@@ -91,16 +91,22 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
     def test_no_skill_promises_criticality_or_remediation(self):
         banned = ("criticality", "blast radius", "remediation",
                   "monitoring gap", "chaos test")
+        # Word-boundary patterns: a bare substring match ("not " inside
+        # "cannot ", "never" inside "whenever") would count prose as a
+        # disclaimer that never disclaimed anything.
+        disclaim_markers = (r"\bno\b", r"\bnot\b", r"\bnever\b", r"\bdo not\b")
         for skill in SKILLS:
             text = body(skill).lower()
             for word in banned:
                 with self.subTest(skill=skill.parent.name, word=word):
-                    # Allowed only in a sentence that disclaims it.
-                    if word in text:
-                        line = next(ln for ln in text.splitlines() if word in ln)
+                    # Allowed only where every occurrence sits in a line that
+                    # disclaims it — a single disclaiming line must not give
+                    # cover to a later line that promises the word outright.
+                    for line in text.splitlines():
+                        if word not in line:
+                            continue
                         self.assertTrue(
-                            any(marker in line
-                                for marker in ("no ", "not ", "never", "do not")),
+                            any(re.search(pat, line) for pat in disclaim_markers),
                             f"{skill.parent.name} promises {word!r}: {line}")
 
 
