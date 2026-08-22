@@ -92,5 +92,14 @@ class TestCli(unittest.TestCase):
             self.assertNotIn("\n  ", proc.stdout)
 
 
+class TestCoverageReportsUnscannedLanguages(unittest.TestCase):
+    def test_partial_confidence_when_a_language_is_out_of_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"app.py": "x = 1\n", "main.rs": "fn main() {}\n"})
+            coverage = build_scan(root)["coverage"]
+            self.assertEqual(coverage["confidence"], "partial")
+            self.assertEqual(coverage["skipped"][0]["language"], "rust")
+
+
 if __name__ == "__main__":
     unittest.main()

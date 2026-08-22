@@ -4,6 +4,7 @@ from pathlib import Path
 
 from depscanlib import VERSION
 from depscanlib.files import classify_files
+from depscanlib.source import scan_source
 from depscanlib.walk import EXCLUDE_DIRS, walk_repo
 
 EMPTY_FINDINGS = ("env_refs", "url_literals", "host_port_literals",
@@ -30,7 +31,8 @@ def build_scan(root):
     paths, method = walk_repo(root)
     files = classify_files(root, paths)
     findings = {key: [] for key in EMPTY_FINDINGS}
-    skipped = []
+    source_findings, skipped = scan_source(root, paths)
+    findings.update(source_findings)
 
     return {
         "scan_version": VERSION,
