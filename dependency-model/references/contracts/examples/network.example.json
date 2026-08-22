@@ -1,0 +1,39 @@
+{
+  "contract_version": "1.0.0",
+  "target": "/abs/path/to/repo",
+  "seeded_by": { "contract": "profile:topology", "contract_version": "1.0.0" },
+  "scan": { "scan_version": "1.0.0", "confidence": "high" },
+  "categories": {
+    "network": {
+      "status": "discovered",
+      "dependencies": [
+        {
+          "id": "network:postgres-5432",
+          "name": "postgres:5432",
+          "evidence": ["docker-compose.yml:15"],
+          "related_ids": ["service:postgres-primary"],
+          "resilience": {
+            "timeout": null,
+            "retry": null,
+            "fallback": null,
+            "health_check": null,
+            "on_path": ["startup", "request"]
+          },
+          "details": {
+            "kind": "port",
+            "value": "postgres:5432",
+            "direction": "outbound",
+            "protocol": "tcp",
+            "resolution_mechanism": null
+          }
+        }
+      ],
+      "assumptions": [
+        {
+          "claim": "the port is reachable from the api container at runtime",
+          "why_unconfirmed": "network policy manifests are not committed to this repository"
+        }
+      ]
+    }
+  }
+}

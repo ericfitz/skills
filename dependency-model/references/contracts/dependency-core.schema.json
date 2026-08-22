@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model shared dependency core",
+  "description": "Fields every discovered dependency carries, whatever its category. Referenced by each category schema as the dependencies[] item; the category adds its own details object on top.",
+  "type": "object",
+  "required": ["id", "name", "evidence", "resilience", "details"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable identifier, '<category>:<slug>'. Stable across runs so a consumer can key a graph on it."
+    },
+    "name": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "description": "Locations that prove this dependency exists, as 'file:line'. The package category carries a bare file path instead: syft reports file-level locations only.",
+      "items": { "type": "string" }
+    },
+    "related_ids": {
+      "type": "array",
+      "description": "Ids of this dependency's counterparts in other categories, so a consumer gets cross-category edges without re-inferring them by string-matching hostnames.",
+      "items": { "type": "string" }
+    },
+    "resilience": {
+      "type": "object",
+      "description": "Failure-relevant declarations found in the repository. null in any field means no declaration was found — it never means the behaviour is confirmed absent. Consumers treat a null on a request-path dependency as a candidate gap, not a proven one.",
+      "required": ["timeout", "retry", "fallback", "health_check", "on_path"],
+      "properties": {
+        "timeout": {
+          "type": ["object", "null"],
+          "required": ["value", "evidence"],
+          "properties": {
+            "value": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "retry": {
+          "type": ["object", "null"],
+          "required": ["description", "evidence"],
+          "properties": {
+            "description": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "fallback": {
+          "type": ["object", "null"],
+          "required": ["description", "evidence"],
+          "properties": {
+            "description": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "health_check": {
+          "type": ["object", "null"],
+          "required": ["description", "evidence"],
+          "properties": {
+            "description": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "on_path": {
+          "type": "array",
+          "description": "Where in the system's lifecycle this dependency is used. Empty means no path could be established from the repository.",
+          "items": { "enum": ["startup", "request", "background", "build"] }
+        }
+      }
+    },
+    "details": { "type": "object" }
+  }
+}

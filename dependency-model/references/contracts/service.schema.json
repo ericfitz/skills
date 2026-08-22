@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:service category",
+  "description": "Out-of-project services the system needs: databases, caches, queues, object stores, search engines, and APIs. Records the thing depended on; the network category records the path used to reach it. The two link through related_ids.",
+  "type": "object",
+  "required": ["status", "dependencies", "assumptions"],
+  "properties": {
+    "status": {
+      "enum": ["discovered", "not-applicable", "failed"],
+      "description": "discovered: the scan ran and this list is what it found, empty included. not-applicable: the category cannot apply to this project. failed: the scan could not complete, so an empty list proves nothing."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "dependency-core.schema.json",
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "enum": ["database", "cache", "queue", "object-store", "search", "api"] },
+              "protocol": { "type": ["string", "null"] },
+              "client_library": { "type": ["string", "null"] },
+              "managed_by": {
+                "type": ["string", "null"],
+                "description": "How the service is normally brought up: compose, kubernetes, terraform, managed-cloud, external, unknown."
+              },
+              "config_keys": {
+                "type": "array",
+                "description": "Configuration keys that point at this service. Each should match a config category id.",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "contract_version": "1.0.0",
+  "target": "/abs/path/to/repo",
+  "seeded_by": { "contract": "profile:topology", "contract_version": "1.0.0" },
+  "scan": { "scan_version": "1.0.0", "confidence": "high" },
+  "categories": {
+    "config": {
+      "status": "discovered",
+      "dependencies": [
+        {
+          "id": "config:database-url",
+          "name": "DATABASE_URL",
+          "evidence": ["internal/db/pool.go:38", "docker-compose.yml:14"],
+          "related_ids": ["service:postgres-primary"],
+          "resilience": {
+            "timeout": null,
+            "retry": null,
+            "fallback": null,
+            "health_check": null,
+            "on_path": ["startup"]
+          },
+          "details": {
+            "mechanism": "env",
+            "key": "DATABASE_URL",
+            "required": true,
+            "default": null,
+            "consumed_by": ["internal/db/pool.go"],
+            "validated": null
+          }
+        }
+      ],
+      "assumptions": [
+        {
+          "claim": "the key is required in every deployment environment, not only local compose",
+          "why_unconfirmed": "no production manifest is committed to check against"
+        }
+      ]
+    }
+  }
+}

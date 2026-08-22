@@ -1,0 +1,38 @@
+{
+  "contract_version": "1.0.0",
+  "target": "/abs/path/to/repo",
+  "seeded_by": { "contract": "profile:topology", "contract_version": "1.0.0" },
+  "scan": { "scan_version": "1.0.0", "confidence": "high" },
+  "categories": {
+    "platform": {
+      "status": "discovered",
+      "dependencies": [
+        {
+          "id": "platform:api-memory-limit",
+          "name": "api memory limit",
+          "evidence": ["deploy/k8s/api-deployment.yaml:27"],
+          "related_ids": [],
+          "resilience": {
+            "timeout": null,
+            "retry": null,
+            "fallback": null,
+            "health_check": null,
+            "on_path": ["startup"]
+          },
+          "details": {
+            "kind": "memory",
+            "declared_value": "512Mi",
+            "source": "kubernetes",
+            "component": "api"
+          }
+        }
+      ],
+      "assumptions": [
+        {
+          "claim": "the declared limit matches what is actually enforced in production",
+          "why_unconfirmed": "no admission-controller or resource-quota override is visible in this repository"
+        }
+      ]
+    }
+  }
+}

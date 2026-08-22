@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:network category",
+  "description": "Names, hosts, and ports that must resolve and connect. Records the path used to reach a dependency; the service category records the thing itself. The two link through related_ids.",
+  "type": "object",
+  "required": ["status", "dependencies", "assumptions"],
+  "properties": {
+    "status": {
+      "enum": ["discovered", "not-applicable", "failed"],
+      "description": "discovered: the scan ran and this list is what it found, empty included. not-applicable: the category cannot apply to this project. failed: the scan could not complete, so an empty list proves nothing."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "dependency-core.schema.json",
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["kind", "value", "direction"],
+            "properties": {
+              "kind": { "enum": ["hostname", "ip", "port", "dns", "egress", "proxy", "ingress"] },
+              "value": { "type": "string" },
+              "direction": { "enum": ["inbound", "outbound", "internal", "unknown"] },
+              "protocol": { "type": ["string", "null"] },
+              "resolution_mechanism": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}
