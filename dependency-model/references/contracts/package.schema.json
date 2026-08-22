@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:package category",
+  "description": "Libraries the system ships with, catalogued by syft. Evidence is a file path, not file:line: syft reports file-level locations only.",
+  "type": "object",
+  "required": ["status", "dependencies", "assumptions"],
+  "properties": {
+    "status": {
+      "enum": ["discovered", "not-applicable", "failed"],
+      "description": "discovered: the scan ran and this list is what it found, empty included. not-applicable: the category cannot apply to this project. failed: the scan could not complete, so an empty list proves nothing."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "dependency-core.schema.json",
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["ecosystem", "resolution", "direct"],
+            "additionalProperties": false,
+            "properties": {
+              "ecosystem": { "type": "string" },
+              "package_manager": { "type": ["string", "null"] },
+              "purl": { "type": ["string", "null"] },
+              "version": { "type": ["string", "null"] },
+              "version_constraint": { "type": ["string", "null"] },
+              "pinned": { "type": ["boolean", "null"] },
+              "resolution": {
+                "enum": ["declared", "locked", "installed"],
+                "description": "declared: named in a manifest. locked: pinned by a lockfile. installed: found in an installed tree. syft conflates these, so the skill must decide from the location it was catalogued at."
+              },
+              "direct": { "type": ["boolean", "null"] },
+              "depends_on": {
+                "type": "array",
+                "description": "Ids of other package dependencies this one requires, from syft's dependency-of relationships.",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

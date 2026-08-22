@@ -1,9 +1,62 @@
 """Minimal JSON Schema subset validator.
 
-Supports type, properties, required, items, and enum — the subset the profile
-and itest contracts actually use. Unknown keywords are ignored by design.
-Exists because jsonschema is not installed and this repo is stdlib-only.
+Supports type, properties, required, items, enum, and local-file $ref — the
+subset the profile, itest, and dependency-model contracts actually use.
+Unknown keywords are ignored by design. Exists because jsonschema is not
+installed and this repo is stdlib-only.
 """
+
+import json
+from pathlib import Path
+
+
+def resolve_refs(schema, base_dir, _seen=None):
+    """Return schema with local-file $ref pointers replaced by their targets.
+
+    Only same-directory-relative file refs are supported ("core.schema.json").
+    Remote refs and JSON-pointer fragments raise ValueError rather than being
+    silently ignored: a $ref the validator skips is a schema that passes
+    everything, which is worse than no schema at all.
+
+    Keys sitting alongside a $ref are merged over the resolved target:
+    `properties` merge key-by-key, `required` unions with the target's order
+    first, everything else overrides.
+    """
+    if isinstance(schema, list):
+        return [resolve_refs(item, base_dir, _seen) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    if "$ref" not in schema:
+        return {key: resolve_refs(value, base_dir, _seen)
+                for key, value in schema.items()}
+
+    ref = schema["$ref"]
+    if "://" in ref or ref.startswith("#"):
+        raise ValueError(
+            f"unsupported $ref {ref!r}: only local file refs are supported")
+    seen = set(_seen or ())
+    if ref in seen:
+        raise ValueError(f"circular $ref: {ref!r}")
+
+    target_path = Path(base_dir) / ref
+    target = json.loads(target_path.read_text(encoding="utf-8"))
+    merged = resolve_refs(target, target_path.parent, seen | {ref})
+    if not isinstance(merged, dict):
+        raise ValueError(f"$ref target is not an object: {ref!r}")
+
+    for key, value in schema.items():
+        if key == "$ref":
+            continue
+        value = resolve_refs(value, base_dir, _seen)
+        current = merged.get(key)
+        if key == "properties" and isinstance(current, dict) and isinstance(value, dict):
+            merged[key] = {**current, **value}
+        elif key == "required" and isinstance(current, list) and isinstance(value, list):
+            merged[key] = current + [n for n in value if n not in current]
+        else:
+            merged[key] = value
+    return merged
+
 
 TYPE_CHECKS = {
     "object": lambda v: isinstance(v, dict),
@@ -16,8 +69,14 @@ TYPE_CHECKS = {
 }
 
 
-def validate(instance, schema, path="$"):
-    """Return a list of error strings; empty means the instance is valid."""
+def validate(instance, schema, path="$", base_dir=None):
+    """Return a list of error strings; empty means the instance is valid.
+
+    Pass base_dir to resolve local-file $ref pointers relative to it. The
+    resolution happens once, at the top; recursive calls see a flat schema.
+    """
+    if base_dir is not None:
+        schema = resolve_refs(schema, base_dir)
     errors = []
 
     expected = schema.get("type")

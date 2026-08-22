@@ -1,0 +1,36 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "dependency-model",
+  "tools": [
+    {
+      "name": "syft",
+      "required": true,
+      "why": "package is the only category with no fallback: syft is the sole source of the package inventory and the dependency-of edges, across ~30 ecosystems",
+      "probe": ["syft", "version"],
+      "install": {
+        "macos": "brew install syft",
+        "docs": "https://github.com/anchore/syft#installation"
+      }
+    },
+    {
+      "name": "uv",
+      "required": false,
+      "why": "the five file-scanning skills run the bundled depscan.py via `uv run --script`; each skill documents a python3 fallback, and depscan.py declares no dependencies so the fallback works",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    },
+    {
+      "name": "git",
+      "required": false,
+      "why": "depscan.py prefers `git ls-files` so .gitignore is honoured; it falls back to a filesystem walk when git is unavailable or the target is not a repo",
+      "probe": ["git", "--version"],
+      "install": {
+        "macos": "xcode-select --install",
+        "docs": "https://git-scm.com/downloads"
+      }
+    }
+  ]
+}

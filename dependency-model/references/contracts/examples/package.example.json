@@ -1,0 +1,43 @@
+{
+  "contract_version": "1.0.0",
+  "target": "/abs/path/to/repo",
+  "seeded_by": { "contract": "profile:topology", "contract_version": "1.0.0" },
+  "scan": null,
+  "categories": {
+    "package": {
+      "status": "discovered",
+      "dependencies": [
+        {
+          "id": "package:pgx-v5-5.5.0",
+          "name": "github.com/jackc/pgx/v5",
+          "evidence": ["go.mod"],
+          "related_ids": ["service:postgres-primary"],
+          "resilience": {
+            "timeout": null,
+            "retry": null,
+            "fallback": null,
+            "health_check": null,
+            "on_path": ["build"]
+          },
+          "details": {
+            "ecosystem": "go",
+            "package_manager": "go-modules",
+            "purl": "pkg:golang/github.com/jackc/pgx/v5",
+            "version": "5.5.0",
+            "version_constraint": "v5.5.0",
+            "pinned": true,
+            "resolution": "locked",
+            "direct": true,
+            "depends_on": ["package:puddle-v2-2.2.1"]
+          }
+        }
+      ],
+      "assumptions": [
+        {
+          "claim": "the locked version is the one actually deployed",
+          "why_unconfirmed": "no build manifest for the deployed artifact is committed alongside go.sum"
+        }
+      ]
+    }
+  }
+}

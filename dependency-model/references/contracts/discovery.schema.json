@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:discovery contract",
+  "description": "The envelope every dependency-model discovery skill emits. A single skill populates exactly one key under categories; merging several skills' output is a key union.",
+  "type": "object",
+  "required": ["contract_version", "target", "categories"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "target": {
+      "type": "string",
+      "description": "Absolute path of the repository this was discovered from."
+    },
+    "seeded_by": {
+      "type": ["object", "null"],
+      "description": "The contract this discovery was seeded from, normally profile:topology. null when the skill bootstrapped its own seed.",
+      "required": ["contract", "contract_version"],
+      "properties": {
+        "contract": { "type": "string" },
+        "contract_version": { "type": "string" }
+      }
+    },
+    "scan": {
+      "type": ["object", "null"],
+      "description": "Provenance of the shared evidence index this skill read. null for the package category, which reads syft instead.",
+      "required": ["scan_version", "confidence"],
+      "properties": {
+        "scan_version": { "type": "string" },
+        "confidence": { "enum": ["high", "partial", "low"] }
+      }
+    },
+    "categories": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config": { "$ref": "config.schema.json" },
+        "network": { "$ref": "network.schema.json" },
+        "package": { "$ref": "package.schema.json" },
+        "platform": { "$ref": "platform.schema.json" },
+        "security": { "$ref": "security.schema.json" },
+        "service": { "$ref": "service.schema.json" }
+      }
+    }
+  }
+}

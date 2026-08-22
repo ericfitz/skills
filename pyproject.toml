@@ -49,9 +49,10 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
 
 [tool.ruff.lint.isort]
-# inventorylib is invoked by path from profile/scripts, not installed;
-# without this, isort treats it as third-party in the test modules.
-known-first-party = ["inventorylib"]
+# inventorylib and depscanlib are invoked by path from their plugins' scripts
+# dirs, not installed; without this, isort treats them as third-party in the
+# test modules.
+known-first-party = ["inventorylib", "depscanlib"]
 
 [tool.ruff.lint.per-file-ignores]
 # E501: fixtures embed YAML/JSON documents as single-line "a\nb\n" literals
@@ -69,6 +70,7 @@ extra-paths = [
     "deps/scripts",
     "logseq/scripts",
     "dev/scripts",
+    "dependency-model/scripts",
     "tests",
 ]
 

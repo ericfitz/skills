@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:security category",
+  "description": "Secrets and permissions the system requires. Records what a credential is named and where it is read, never its value. This schema deliberately declares no field a value could be written into.",
+  "type": "object",
+  "required": ["status", "dependencies", "assumptions"],
+  "properties": {
+    "status": {
+      "enum": ["discovered", "not-applicable", "failed"],
+      "description": "discovered: the scan ran and this list is what it found, empty included. not-applicable: the category cannot apply to this project. failed: the scan could not complete, so an empty list proves nothing."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "dependency-core.schema.json",
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["secret", "credential-ref", "permission", "role", "policy", "certificate-ref"] },
+              "provider": { "type": ["string", "null"] },
+              "scope": { "type": ["string", "null"] },
+              "granted_to": { "type": "array", "items": { "type": "string" } },
+              "rotation_declared": { "type": ["boolean", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

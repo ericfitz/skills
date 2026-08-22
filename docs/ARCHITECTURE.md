@@ -66,8 +66,13 @@ flowchart LR
     d_dedupe["dedupe"]
   end
 
-  subgraph planned["planned — issue 46"]
-    x_disc["dependency discovery"]
+  subgraph depmodel["dependency-model — dependency discovery"]
+    x_pkg["package"]
+    x_svc["service"]
+    x_cfg["config"]
+    x_sec["security"]
+    x_plat["platform"]
+    x_net["network"]
   end
 
   gh["github:create-issue"]
@@ -106,13 +111,22 @@ flowchart LR
   d_auto -. "CLAUDE.md convention" .-> d_annot
   d_annot -. "SEM@sha markers" .-> d_dedupe
 
-  p_topo -- "topology" --> x_disc
+  p_topo -- "topology" --> x_pkg
+  p_topo -- "topology" --> x_svc
+  p_topo -- "topology" --> x_cfg
+  p_topo -- "topology" --> x_sec
+  p_topo -- "topology" --> x_plat
+  p_topo -- "topology" --> x_net
+
+  x_svc -. "related_ids" .-> x_net
+  x_cfg -. "related_ids" .-> x_svc
 
   envchk -. "requirements.json" .-> profile
   envchk -. "requirements.json" .-> itest
   envchk -. "requirements.json" .-> openapi
   envchk -. "requirements.json" .-> cats
   envchk -. "requirements.json" .-> dev
+  envchk -. "requirements.json" .-> depmodel
 ```
 
 `env:check` is drawn against whole plugins because it reads every plugin's sidecar
@@ -132,6 +146,10 @@ gate, and emits the `scenario` contract. Its durable side effect is `docs/journe
 the confirmed journey set, with the `profile:journeys` contract in a fenced JSON block at
 the end. That file is the handoff to `openapi:arazzo`, which is why the arazzo skill can
 skip discovery entirely.
+
+`profile:topology` is the seed for all six `dependency-model` discovery skills — the same
+refinement-tier relationship `stack` has to `topology`, and the same one-way direction
+`itest` has to `profile`.
 
 ## Skill catalog
 
@@ -172,6 +190,23 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `report` | Answers from the results database; also *is* the schema reference | queries and rendered reports | `latest.db` |
 | `analyze` | Triage of true positives into real bug / spec gap / false-positive candidate, evidence-backed | remediation plan | `latest.db` |
 | `fp` | Declarative false-positive rules, added only after a mandatory dry run | committed rules file | `latest.db` for the dry run |
+
+### dependency-model
+
+| Skill | Value produced | Outputs | Consumes |
+|---|---|---|---|
+| `package` | The libraries the system ships with, with declared/locked/installed resolution and the dependency edges between them | `discovery` contract, `package` category | `topology`; `syft` |
+| `service` | Out-of-project services — databases, caches, queues, object stores, search, APIs — with how each is brought up and how it is declared to fail | `discovery` contract, `service` category | `topology`, `depscan.py` index |
+| `config` | The configuration the system must be supplied with, with what reads each key and what it declares as required or defaulted | `discovery` contract, `config` category | `topology`, `depscan.py` index |
+| `security` | The credential and permission surface — what each secret is named and where it is read, never its value | `discovery` contract, `security` category | `topology`, `depscan.py` index |
+| `platform` | Declared OS and cloud resources — CPU, memory, disk, GPU, architecture, runtime versions, managed services | `discovery` contract, `platform` category | `topology`, `depscan.py` index |
+| `network` | The names, hosts, and ports that must resolve and connect, inbound and outbound | `discovery` contract, `network` category | `topology`, `depscan.py` index |
+
+All six emit the same `discovery` envelope with exactly one key under `categories`
+populated, so merging them is a key union rather than a transform. There is no
+orchestrator in this layer by decision: the report skill in #49 must gather all six
+contracts to render anything, so it becomes the orchestrator, and building one here
+would mean building it twice.
 
 ### dev
 

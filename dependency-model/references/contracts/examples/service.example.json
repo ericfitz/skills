@@ -1,0 +1,39 @@
+{
+  "contract_version": "1.0.0",
+  "target": "/abs/path/to/repo",
+  "seeded_by": { "contract": "profile:topology", "contract_version": "1.0.0" },
+  "scan": { "scan_version": "1.0.0", "confidence": "high" },
+  "categories": {
+    "service": {
+      "status": "discovered",
+      "dependencies": [
+        {
+          "id": "service:postgres-primary",
+          "name": "postgres",
+          "evidence": ["docker-compose.yml:12", "internal/db/pool.go:41"],
+          "related_ids": ["network:postgres-5432", "config:database-url"],
+          "resilience": {
+            "timeout": { "value": "5s", "evidence": ["internal/db/pool.go:44"] },
+            "retry": null,
+            "fallback": null,
+            "health_check": { "description": "pg_isready", "evidence": ["docker-compose.yml:19"] },
+            "on_path": ["startup", "request"]
+          },
+          "details": {
+            "kind": "database",
+            "protocol": "postgres",
+            "client_library": "github.com/jackc/pgx/v5",
+            "managed_by": "compose",
+            "config_keys": ["DATABASE_URL"]
+          }
+        }
+      ],
+      "assumptions": [
+        {
+          "claim": "postgres is also the production database, not only the local compose one",
+          "why_unconfirmed": "no production manifest is committed; DATABASE_URL is supplied externally"
+        }
+      ]
+    }
+  }
+}

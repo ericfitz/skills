@@ -1,0 +1,9 @@
+{
+  "name": "dependency-model",
+  "version": "0.1.0",
+  "description": "Dependency discovery toolkit: enumerate what a system depends on across six categories \u2014 packages (package), out-of-project services (service), configuration (config), secrets and permissions (security), OS and cloud resources (platform), and network paths (network) \u2014 each with the timeout, retry, fallback, and health-check declarations that bear on how it fails. Static and read-only; nothing is executed, resolved, or probed. Emits one versioned JSON contract for downstream consumers.",
+  "author": {
+    "name": "efitz"
+  },
+  "skills": "./skills/"
+}
