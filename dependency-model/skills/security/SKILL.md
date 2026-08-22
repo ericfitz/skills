@@ -25,33 +25,38 @@ Standalone invocation: if you were not handed a `profile:topology` contract,
 invoke `profile:topology` first and use its output as `seeded_by`. Never invoke
 another plugin's script by path.
 
-If the shared scan has not already been run for this repository, run it once:
+If the shared scan has not already been run for this repository, run it once
+and save the JSON to `/tmp/depscan.json` (see
+`references/running-discovery.md`):
 
-    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path>
+    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path> > /tmp/depscan.json
 
 Use `python3` in place of `uv run --script` if `uv` is unavailable. If another of
-the six discovery skills already produced this output for the same target, reuse
-it rather than scanning again.
+the six discovery skills already produced this output for the same target, read
+`/tmp/depscan.json` rather than scanning again.
 
 ## Procedure
 
 1. Read `findings.secret_shaped_keys` — the scanner records key names and
-   locations and deliberately never captures a value.
+   locations and deliberately never captures a value; the `file:line` of each
+   record goes straight into `evidence`.
 2. Read IAM, RBAC, and policy files under `files.iac` and `files.k8s` for
    grants, roles, and scopes.
 3. Read auth middleware and client construction for the credentials they
    consume.
-4. Set `details.kind` from the enumerated set, `details.provider` from where the
+4. Set `id` to `security:<slug>` and `name` to the credential's literal name
+   (the env var, secret, or role name — e.g. `POSTGRES_PASSWORD`).
+5. Set `details.kind` from the enumerated set, `details.provider` from where the
    credential lives (`kubernetes`, `vault`, `aws-secrets-manager`, `env`, `file`,
    `unknown`), `details.scope` from what it authorises, and
    `details.granted_to[]` from the principals a policy names.
-5. Set `details.rotation_declared` true only when the repository declares a
+6. Set `details.rotation_declared` true only when the repository declares a
    rotation mechanism.
-6. `resilience` on a security entry: all four facts `null`, `on_path` from where
+7. `resilience` on a security entry: all four facts `null`, `on_path` from where
    the credential is read.
-7. If the scan's `coverage.skipped` is non-empty, record one assumption per
+8. If the scan's `coverage.skipped` is non-empty, record one assumption per
    skipped language, naming the language and what went unscanned.
-8. Emit the full envelope, then a short prose summary: credential count by
+9. Emit the full envelope, then a short prose summary: credential count by
    `kind`, and how many declare a rotation mechanism.
 
 ## The credential rule

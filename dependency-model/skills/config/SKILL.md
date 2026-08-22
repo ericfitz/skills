@@ -25,13 +25,15 @@ Standalone invocation: if you were not handed a `profile:topology` contract,
 invoke `profile:topology` first and use its output as `seeded_by`. Never invoke
 another plugin's script by path.
 
-If the shared scan has not already been run for this repository, run it once:
+If the shared scan has not already been run for this repository, run it once
+and save the JSON to `/tmp/depscan.json` (see
+`references/running-discovery.md`):
 
-    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path>
+    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path> > /tmp/depscan.json
 
 Use `python3` in place of `uv run --script` if `uv` is unavailable. If another of
-the six discovery skills already produced this output for the same target, reuse
-it rather than scanning again.
+the six discovery skills already produced this output for the same target, read
+`/tmp/depscan.json` rather than scanning again.
 
 ## Procedure
 
@@ -39,21 +41,25 @@ it rather than scanning again.
    primary evidence and the `file:line` goes straight into `evidence`.
 2. Read every file under `files.env` for declared keys and their presence, and
    every config loader in the repository for keys the literal scan missed.
-3. Set `details.mechanism` from where the key is read: `env`, `file`, `flag`,
+3. Set `id` to `config:<key-slug>` and `name` to the key's literal name (e.g.
+   `DATABASE_URL`), and set `details.key` to that same literal name — the
+   schema requires `details.key` and it is not implied by anything else you
+   set.
+4. Set `details.mechanism` from where the key is read: `env`, `file`, `flag`,
    `remote`, `constant`, or `unknown`.
-4. Set `details.required` from whether the code fails without it — a lookup with
+5. Set `details.required` from whether the code fails without it — a lookup with
    no default is required, a `.get(name, default)` is not. Set it `null` when the
    repository does not say.
-5. Record `details.default` only when the repository declares one literally.
-6. Fill `details.consumed_by[]` from the files the key is read in.
-7. Set `details.validated` true only when the repository declares a parse or
+6. Record `details.default` only when the repository declares one literally.
+7. Fill `details.consumed_by[]` from the files the key is read in.
+8. Set `details.validated` true only when the repository declares a parse or
    validation step for the key.
-8. Link `related_ids` to the `service:` or `network:` entry the key points at.
-9. `resilience` on a config entry: all four facts `null`, `on_path` from where the
-   key is read.
-10. If the scan's `coverage.skipped` is non-empty, record one assumption per
+9. Link `related_ids` to the `service:` or `network:` entry the key points at.
+10. `resilience` on a config entry: all four facts `null`, `on_path` from where the
+    key is read.
+11. If the scan's `coverage.skipped` is non-empty, record one assumption per
     skipped language, naming the language and what went unscanned.
-11. Emit the full envelope, then a short prose summary: key count, how many are
+12. Emit the full envelope, then a short prose summary: key count, how many are
     required, and how many carry no declared default.
 
 ## Rules
