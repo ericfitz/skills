@@ -70,10 +70,12 @@ valid against the shared envelope schema on its own.
 
 ## `exclusions[]` is the single source of truth
 
-`depscan.py`'s output carries an `exclusions[]` list (`.venv`, `node_modules`,
-`vendor`, `dist`, `site-packages`, `.git`, and any repo-specific additions). This
-list is the single source of truth for both tools that need to skip the same
-noise:
+`depscan.py`'s output carries an `exclusions[]` list — a fixed set
+(`.venv`, `node_modules`, `vendor`, `dist`, `site-packages`, `.git`), not a
+configurable one: `EXCLUDE_DIRS` in `walk.py` is the sole source, and
+`depscan.py` takes no `--exclude` flag or other config input to extend it. This
+fixed list is the single source of truth for both tools that need to skip the
+same noise:
 
 - The `package` skill passes each entry to `syft --exclude` when it runs syft.
 - The five file-scanning skills inherit the same list by reading it from the
@@ -82,7 +84,8 @@ noise:
 Without it, `syft scan dir:` reports a nested virtualenv or `node_modules` tree
 as part of the project's own dependency set — verified against this repository,
 where an unscoped `syft scan dir:.` reported 270 packages against the 2 direct
-dependencies `pyproject.toml` actually declares, with 188 coming from a nested
-`writing/skills/boring/.venv/` and 7 from the repo's own `.venv/`. Reading
+dependencies plus one optional extra that `pyproject.toml` actually declares,
+with 188 coming from a nested `writing/skills/boring/.venv/` and 7 from the
+repo's own `.venv/`. Reading
 `exclusions[]` from the shared index, rather than each tool maintaining its own
 list, is what keeps that from happening independently in six places.

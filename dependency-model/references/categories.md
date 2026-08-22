@@ -59,10 +59,15 @@ actually states, then place it there.
 
 - **A config key naming an endpoint** (`API_BASE_URL` read via `os.getenv`).
   `config` records the key: its name, where it's read, whether it has a default.
-  `network` records the value once resolved — the hostname or URL the key names —
-  as its own entry. The two link through `related_ids` so a reader can go from
-  "this is configurable" to "this is what it resolves to" without re-parsing the
-  key.
+  `network` records the value, when one is statically declared (a default
+  argument to the read call, a `.env` entry, a value set in a checked-in
+  config file) — the hostname or URL the key names — as its own entry. The two
+  link through `related_ids` so a reader can go from "this is configurable" to
+  "this is what it resolves to" without re-parsing the key. When no value is
+  statically declared anywhere in the repository — no default, no `.env`
+  entry, nothing checked in — there is a `config` entry for the key and no
+  `network` counterpart: discovery does not resolve or guess a runtime value,
+  per D3.
 
 - **A Kubernetes `Secret` holding a database password** (a `Secret` named
   `db-credentials`, mounted as an env var `DB_PASSWORD` that the app reads).
