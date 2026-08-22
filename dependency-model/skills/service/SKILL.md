@@ -42,7 +42,12 @@ invoke `profile:topology` first and use its output as `seeded_by`.
    service resources.
 4. Read `findings.url_literals` and `findings.host_port_literals` for services
    the config files do not declare, and the manifests from the `package`
-   category for client libraries that imply one.
+   category for client libraries that imply one. **Filter out registry and
+   lockfile URLs before reading `url_literals`.** A package-download URL
+   (`files.pythonhosted.org`, `registry.npmjs.org`, a Go module proxy, and
+   the like) inside `uv.lock`, `package-lock.json`, `go.sum`, or a similar
+   lockfile is a build-time artifact source, not a service the running
+   system depends on — it belongs to `package`, not here.
 5. Assign `details.kind` from the enumerated set, and `details.managed_by`
    from how it is brought up.
 6. Fill `details.config_keys[]` from `findings.env_refs` whose name plainly

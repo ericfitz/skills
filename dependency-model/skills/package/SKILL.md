@@ -38,17 +38,30 @@ hand-rolled lockfile parse.
    Use `python3` in place of `uv run --script` if `uv` is unavailable.
 
 2. Run syft with every entry from the scan's `exclusions[]` passed as
-   `--exclude`:
+   `--exclude`. `exclusions[]` holds bare directory names (`node_modules`,
+   `.venv`); syft's own exclusion syntax only matches a glob, so each bare
+   name must be rewritten to a `**/<name>` glob, quoted, before it is passed:
 
-       syft scan dir:<path> -o syft-json --quiet --exclude './node_modules' --exclude './.venv' ...
+       syft scan dir:<path> -o syft-json --quiet --exclude '**/node_modules' --exclude '**/.venv' ...
+
+   Do not pass the bare name (`--exclude '.venv'`) or a root-anchored path
+   (`--exclude './.venv'`): the bare form makes syft error out with no valid
+   JSON output, and the root-anchored form only matches at the scan root, so
+   a nested `sub/.venv` or `sub/node_modules` is not excluded at all — the
+   installed-tree contamination this step exists to prevent.
 
    **The exclusions are not optional.** Unscoped, syft catalogues installed
    trees as though they were the project's dependency set: measured on this
-   marketplace, an unscoped scan reported 270 packages against 2 declared
-   direct dependencies, 188 of them from a nested virtualenv.
+   marketplace, an unscoped `syft scan dir:.` reported 270 packages against 2
+   declared direct dependencies, 188 of them from a nested virtualenv — and
+   only the `**/<name>` glob form actually removes that contamination; the
+   root-anchored form leaves it in.
 
 3. For each syft artifact, emit one dependency:
-   - `id` is `package:<name>-<major-or-version-slug>`, stable across runs.
+   - `id` is `package:<name>-<full-version-slug>`, e.g. `package:pgx-v5-5.5.0` —
+     the full resolved version, not just the major, so the same package
+     pinned at two versions in two lockfiles gets two distinct ids instead
+     of colliding. Stable across runs.
    - `name`, `details.version`, `details.purl`, `details.ecosystem` come
      straight from the artifact.
    - `evidence` is `locations[].path` — **a bare file path, no line number.**
