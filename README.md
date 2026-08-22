@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal agent-skills marketplace (`efitz-skills`). Thirteen plugins,
+efitz's personal agent-skills marketplace (`efitz-skills`). Fourteen plugins,
 each bundling one or more skills, installable into **Claude Code** or
 **OpenAI Codex CLI** — the repo carries native manifests for both harnesses.
 Invoke a skill as `/<plugin>:<skill>`.
@@ -122,6 +122,14 @@ booted, or run, and every unproven inference is carried into the plan as an
 explicit assumption. Where a normative document and the code disagree, the
 plan reports the conflict and both readings. Output conforms to
 `references/contracts/scenario.schema.json`.
+
+### openapi
+
+- **init** — Locate and record the project's OpenAPI spec (and any Arazzo doc) in `.local/openapi/config.yaml`, verifying each before writing.
+- **arazzo** — Turn the confirmed customer-journeys doc into an Arazzo 1.0 workflow spec, mapping each journey's steps onto real operations in the OpenAPI spec.
+
+Prose-driven with human gates; validators are used when installed. `arazzo` reads
+the `docs/journeys.md` written by `/itest:design`.
 
 ### env
 

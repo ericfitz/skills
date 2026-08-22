@@ -52,6 +52,7 @@ declare -a PLUGINS=(
   "cats:testing:analyze,fp,init,report,run"
   "profile:development:docs,journeys,stack,topology"
   "itest:development:conventions,critique,design,state"
+  "openapi:development:arazzo,init"
   "env:development:check"
 )
 
