@@ -68,22 +68,35 @@ six categories rather than in this layer.
 
 The build/run split is a fact about a dependency, so it belongs on the dependency,
 not in one consumer that re-derives it. `dependency-core.schema.json` gains a
-required `lifecycle` enum — `build`, `run`, `both` — set by each layer-1 skill from
-evidence it already reads:
+required `lifecycle` enum with exactly two values — `build` and `run` — set by each
+layer-1 skill from evidence it already reads. **The category supplies the default;
+the evidence decides.**
 
-| Category | `lifecycle` |
-|---|---|
-| `package` | `build` |
-| `service`, `network`, `config`, `security` | `run` |
-| `platform` | per `details.kind`: `cpu`/`memory`/`disk`/`gpu`/`cloud-service` → `run`; `arch`/`os`/`runtime-version` → `build` |
+| Category | Default | Evidence that overrides it |
+|---|---|---|
+| `package` | `build` | dynamic loading at runtime — a reflectively loaded JDBC driver, an `importlib` plugin resolution, a `dlopen`ed `.so` — makes it `run`, and the entry must cite the loading site |
+| `service`, `network`, `config`, `security` | `run` | none; these are run-time by construction |
+| `platform` | per `details.kind`: `cpu`/`memory`/`disk`/`gpu`/`cloud-service` → `run`; `arch`/`os`/`runtime-version` → `build` | none |
 
-`platform` is the only category needing a rule rather than a constant. A test pins
-the mapping: an unenforced classification is how two skills come to disagree about
-the same entry.
+A test pins the defaults, including `platform`'s split by `details.kind`. An
+unenforced classification is how two skills come to disagree about the same entry.
 
-`both` is for a genuine straddler — a package also loaded at runtime by a plugin
-host. Each SKILL.md states that it is used only with evidence, never as a hedge; a
-three-value enum with a vague middle invites shrugging into it.
+**There is deliberately no `both` value.** The label does not assert set
+membership — it answers which phase's failure matters for health, and that always
+has one answer. The reasoning is worth recording because the obvious
+justification is wrong: it is *not* the case that build-time dependencies are a
+superset of run-time ones. Dev and test dependencies (`pytest`, `ruff`, `@types/*`)
+are build-only and provably absent at runtime; compile-time-only artifacts (Rust
+proc macros, a statically linked `.a`, a discarded multi-stage builder toolchain)
+likewise; and most ordinary application libraries genuinely are both, since they
+are installed at build and imported at runtime. Build and run overlap without
+either containing the other.
+
+`both` is unnecessary anyway. An application library is technically present at
+runtime, but packages are not part of health (D2), so it is `build` and gets
+filtered out. A package that *is* part of health — because something loads it
+dynamically — is `run`. Every entry lands in exactly one bucket, and a two-value
+enum has no soft middle to shrug into.
 
 Making the field required invalidates all six shipped category examples, which
 carry no `lifecycle`. All six are updated in the same change, and the existing
@@ -300,8 +313,9 @@ Four tests exist specifically to pin decisions from this design, because each
 guards a choice that would otherwise erode silently:
 
 1. The synthesis schema contains no `healthy`/`degraded`/`unhealthy` enum (D9).
-2. The `lifecycle` mapping is pinned per category, including `platform`'s split by
-   `details.kind` (D3).
+2. The `lifecycle` defaults are pinned per category, including `platform`'s split
+   by `details.kind`; and the enum admits exactly `build` and `run`, so a `both`
+   cannot reappear (D3).
 3. A `status: "failed"` category propagates as failed through the merge.
 4. `expectation: null` is legal and documented as "no declaration found" (D7).
 
@@ -316,7 +330,9 @@ gains `depgraph.py`, Codex manifests regenerate, and the README section and
 Specific to #49:
 
 1. Both skills implemented, `synthesize` emitting a valid contract
-2. Layer 1 amended with `lifecycle`, all six skills setting it, mapping pinned
+2. Layer 1 amended with `lifecycle` (two values), all six skills setting it,
+   defaults pinned by test, and the `package` skill stating that `run` requires
+   evidence of dynamic loading and must cite the loading site
 3. `references/definitions.md` written
 4. `requirements.json` declares `mmdc` optional — when present, `report` verifies
    its generated Mermaid renders, the same discipline `CLAUDE.md` imposes on
