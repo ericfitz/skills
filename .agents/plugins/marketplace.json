@@ -106,6 +106,14 @@
       }
     },
     {
+      "name": "dependency-model",
+      "category": "development",
+      "source": {
+        "source": "local",
+        "path": "./dependency-model"
+      }
+    },
+    {
       "name": "openapi",
       "category": "development",
       "source": {

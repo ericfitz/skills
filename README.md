@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal agent-skills marketplace (`efitz-skills`). Fourteen plugins,
+efitz's personal agent-skills marketplace (`efitz-skills`). Fifteen plugins,
 each bundling one or more skills, installable into **Claude Code** or
 **OpenAI Codex CLI** — the repo carries native manifests for both harnesses.
 Invoke a skill as `/<plugin>:<skill>`.
@@ -142,6 +142,24 @@ the `docs/journeys.md` written by `/itest:design`.
 ### env
 
 - **check** — Preflight the environment for this marketplace's plugins: required CLI tools, config files, and auth sessions. Reports hard failures, degraded (optional) capability loss, and undeclared plugins; supports checking a single plugin and an explicit `--fix` mode.
+
+### dependency-model — dependency discovery
+
+- **package** — Inventory the libraries the project ships with, across every ecosystem syft catalogues, with declared/locked/installed resolution and the dependency edges between them.
+- **service** — Identify out-of-project services: databases, caches, queues, object stores, search engines, and APIs, with how each is brought up and what config points at it.
+- **config** — Enumerate the configuration the system must be supplied with: environment variables, files, flags, and remote config, with what reads each key and what default it declares.
+- **security** — Enumerate the secrets and permissions the system requires, recording what each credential is named and where it is read — never its value.
+- **platform** — Enumerate the declared OS and cloud resources: CPU, memory, disk, GPU, architecture, runtime versions, and managed services.
+- **network** — Enumerate the names, hosts, and ports that must resolve and connect, inbound and outbound, with how each name is expected to resolve.
+
+Static and read-only: nothing is executed, resolved, or probed, because these
+skills run on a developer's machine or in CI rather than inside the environment
+the code runs in — a measured latency or a resolved hostname would be
+confidently wrong. Each dependency carries the timeout, retry, fallback, and
+health-check declarations found for it; a `null` means no declaration was found,
+never that the behaviour is confirmed absent. All six emit the same
+`discovery` envelope with one category populated, so their output merges by key
+union. Requires `syft`; seeded by the `profile:topology` contract.
 
 ---
 
