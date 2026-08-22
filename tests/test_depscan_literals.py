@@ -72,6 +72,53 @@ class TestUrlLiterals(unittest.TestCase):
         blob = json.dumps(findings)
         self.assertNotIn("sup3rs3cr3t", blob)
 
+    def test_redacts_userinfo_password_containing_a_slash(self):
+        """An unencoded '/' in the password must not defeat redaction or
+        push the derived host off by one segment."""
+        findings = scan({"a.env": "URL=https://user:pa/ss@host/x\n"})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "https://***@host/x")
+        self.assertEqual(findings["url_literals"][0]["host"], "host")
+
+    def test_redacts_secret_valued_query_parameter(self):
+        findings = scan({"a.py":
+            'URL = "https://api.example.com/v1?api_key=sk_live_abcDEF123"\n'})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "https://api.example.com/v1?api_key=***")
+
+    def test_redacts_secret_valued_query_parameter_jdbc_form(self):
+        """JDBC connection strings carry credentials as query parameters,
+        not userinfo -- this is the standard Java database-URL shape."""
+        findings = scan({"application.properties":
+            "url=jdbc:mysql://dbhost:3306/app?user=root&password=hunter2xyz\n"})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "mysql://dbhost:3306/app?user=root&password=***")
+
+    def test_redacts_secret_valued_fragment_parameter(self):
+        findings = scan({"a.js":
+            'const cb = "https://app.example.com/cb#access_token=eyJfaketok"\n'})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "https://app.example.com/cb#access_token=***")
+
+    def test_leaves_non_secret_query_parameters_untouched(self):
+        findings = scan({"a.py": 'URL = "https://example.com/x?page=2&sort=name"\n'})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "https://example.com/x?page=2&sort=name")
+
+    def test_never_records_a_query_or_fragment_secret_value(self):
+        """A skill reading url_literals must never receive a query-string or
+        fragment credential either -- the same guarantee as userinfo."""
+        findings = scan({
+            "a.py": 'URL = "https://api.example.com/v1?api_key=sk_live_abcDEF123"\n',
+            "application.properties":
+                "url=jdbc:mysql://dbhost:3306/app?user=root&password=hunter2xyz\n",
+            "a.js": 'const cb = "https://app.example.com/cb#access_token=eyJfaketok"\n',
+        })
+        blob = json.dumps(findings)
+        for secret in ("sk_live_abcDEF123", "hunter2xyz", "eyJfaketok"):
+            with self.subTest(secret=secret):
+                self.assertNotIn(secret, blob)
+
 
 class TestHostPortLiterals(unittest.TestCase):
     def test_extracts_hostname_and_port(self):
@@ -98,6 +145,12 @@ class TestHostPortLiterals(unittest.TestCase):
     def test_port_is_an_integer_not_a_string(self):
         findings = scan({"a.env": "ADDR=db:5432\n"})
         self.assertIsInstance(findings["host_port_literals"][0]["port"], int)
+
+    def test_ignores_a_schemeless_userinfo_credential(self):
+        """bob:54321@example.com looks like host:port, but the digits before
+        the '@' are a password, not a port."""
+        findings = scan({"notes.txt": "bob:54321@example.com\n"})
+        self.assertEqual(findings["host_port_literals"], [])
 
 
 class TestSecretShapedKeys(unittest.TestCase):

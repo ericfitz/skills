@@ -19,11 +19,13 @@ TEXT_SUFFIXES_SKIPPED = {
 URL_RE = re.compile(r'\b([a-z][a-z0-9+.\-]{1,15})://([^\s"\'`<>,)\]}]+)')
 
 # host:port, not image:tag and not a clock. The port must be 2-5 digits and
-# the whole match must not be followed by another colon-separated token.
+# the whole match must not be followed by another colon-separated token. A
+# port immediately followed by '@' is not a port at all -- it is a numeric
+# password in a schemeless `user:pass@host` credential.
 HOST_PORT_RE = re.compile(
     r'(?<![\w.:/@-])'
     r'((?:\d{1,3}(?:\.\d{1,3}){3})|(?:[a-z][a-z0-9\-]*(?:\.[a-z0-9\-]+)*))'
-    r':(\d{2,5})(?![\w.:])',
+    r':(\d{2,5})(?![\w.:@])',
     re.IGNORECASE)
 
 # A port is a port. 16 is an image tag, 30 is half past the hour.
@@ -51,10 +53,48 @@ def _is_text(path):
     return dot < 0 or path[dot:].lower() not in TEXT_SUFFIXES_SKIPPED
 
 
+def _looks_like_partial_userinfo(head):
+    """True if `head` (the text up to the first '/') looks like a truncated
+    `user:password` rather than a complete `host[:port]`.
+
+    A real `host:port` authority has an all-digit tail after the last ':'.
+    A `user:password` fragment usually does not -- that difference is what
+    lets `_split_authority` tell an ordinary `host:port/path` apart from a
+    password that itself contains an unencoded '/'.
+    """
+    if ":" not in head:
+        return False
+    return not head.rsplit(":", 1)[-1].isdigit()
+
+
+def _split_authority(rest):
+    """Split a URL's `scheme://` remainder into (userinfo, hostport, tail).
+
+    The authority normally ends at the first '/'. A raw, unencoded password
+    can itself contain '/' (`user:pa/ss@host/path`), which would otherwise
+    truncate the authority before the real '@'. Look past the first '/' for
+    a later '@' only when what precedes it looks like a partial
+    `user:password` (see `_looks_like_partial_userinfo`) rather than a
+    complete `host:port` -- an ordinary path segment with '@' in it (a
+    social-style `/@handle`) or an explicit `host:port/path@thing` is left
+    alone, since neither is a credential.
+
+    Returns `(None, hostport, tail)` when no userinfo is present.
+    """
+    head, slash, after_slash = rest.partition("/")
+    if "@" not in head and slash and _looks_like_partial_userinfo(head):
+        next_head, next_slash, next_tail = after_slash.partition("/")
+        if "@" in next_head:
+            head, slash, after_slash = head + slash + next_head, next_slash, next_tail
+    if "@" in head:
+        userinfo, _, hostport = head.rpartition("@")
+        return userinfo, hostport, slash + after_slash
+    return None, head, slash + after_slash
+
+
 def _url_host(rest):
-    authority = rest.split("/", 1)[0]
-    authority = authority.rsplit("@", 1)[-1]
-    return authority.split(":", 1)[0]
+    _, hostport, _ = _split_authority(rest)
+    return hostport.split(":", 1)[0]
 
 
 def _redact_userinfo(rest):
@@ -65,10 +105,38 @@ def _redact_userinfo(rest):
     one was present -- that a connection string carries inline credentials
     is itself worth recording -- without reproducing it.
     """
-    authority, sep, tail = rest.partition("/")
-    if "@" in authority:
-        authority = "***@" + authority.rsplit("@", 1)[-1]
-    return authority + sep + tail
+    userinfo, hostport, tail = _split_authority(rest)
+    if userinfo is None:
+        return rest
+    return "***@" + hostport + tail
+
+
+# Query-string / fragment `name=value` pairs, delimited by '&'. Applied only
+# to the text from the first '?' or '#' onward -- the path is never touched.
+_QUERY_KV_RE = re.compile(r'([^&=?#]+)=([^&#]*)')
+
+
+def _redact_secret_params(text):
+    """Blank out the value of any query-string or fragment parameter whose
+    name is secret-shaped (per SECRET_NAME_RE).
+
+    JDBC and OAuth-style URLs carry credentials as `?password=...` or
+    `#access_token=...` rather than in userinfo -- the same leak, through a
+    different URL component. The parameter name and the path, and any
+    non-secret parameter, are left untouched: query shape is legitimate
+    evidence, only the secret value is not.
+    """
+    start = next((i for i, ch in enumerate(text) if ch in "?#"), None)
+    if start is None:
+        return text
+
+    def redact(match):
+        name = match.group(1)
+        if SECRET_NAME_RE.search(name + "="):
+            return f"{name}=***"
+        return match.group(0)
+
+    return text[:start] + _QUERY_KV_RE.sub(redact, text[start:])
 
 
 def _strip_trailing(value):
@@ -89,7 +157,8 @@ def scan_literals(root, paths):
             if not any(marker in line for marker in SCHEMA_KEYS):
                 for match in URL_RE.finditer(line):
                     scheme, rest = match.group(1), match.group(2)
-                    value = _strip_trailing(f"{scheme}://{_redact_userinfo(rest)}")
+                    redacted = _redact_secret_params(_redact_userinfo(rest))
+                    value = _strip_trailing(f"{scheme}://{redacted}")
                     urls.append({"value": value, "scheme": scheme,
                                  "host": _url_host(rest),
                                  "file": path, "line": number})
