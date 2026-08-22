@@ -8,7 +8,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from depscanlib.walk import EXCLUDE_DIRS, walk_repo
+from depscanlib.files import classify_files
+from depscanlib.walk import EXCLUDE_DIRS, read_text, walk_repo
 from repobuilder import build_repo, git_commit_all, git_init
 
 
@@ -61,6 +62,36 @@ class TestWalkRepo(unittest.TestCase):
                      "site-packages", "dist", ".git"):
             with self.subTest(directory=name):
                 self.assertIn(name, EXCLUDE_DIRS)
+
+    def test_git_listing_preserves_non_ascii_filenames(self):
+        """core.quotepath defaults to true, which C-quotes non-ASCII names in
+        plain `git ls-files` output ("caf\\303\\251.yaml" as literal text) --
+        a path that does not exist on disk. -z must be used to avoid that."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"café.yaml": "a: 1\n", "app.py": "x = 1\n"})
+            git_init(root)
+            git_commit_all(root)
+            files, method = walk_repo(root)
+            self.assertEqual(method, "git")
+            self.assertEqual(files, ["app.py", "café.yaml"])
+            self.assertEqual(read_text(root, "café.yaml"), "a: 1\n")
+
+    def test_non_ascii_filename_is_still_classifiable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"café.env": "A=1\n"})
+            git_init(root)
+            git_commit_all(root)
+            files, _ = walk_repo(root)
+            self.assertEqual(classify_files(root, files)["env"], ["café.env"])
+
+    def test_git_listing_preserves_filenames_with_spaces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"my file.py": "x = 1\n"})
+            git_init(root)
+            git_commit_all(root)
+            files, method = walk_repo(root)
+            self.assertEqual(method, "git")
+            self.assertEqual(files, ["my file.py"])
 
 
 if __name__ == "__main__":

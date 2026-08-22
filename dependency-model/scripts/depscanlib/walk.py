@@ -24,10 +24,18 @@ def _excluded(rel):
 
 
 def _git_files(root):
-    """Return git's view of the repo, or None if root is not a usable git repo."""
+    """Return git's view of the repo, or None if root is not a usable git repo.
+
+    Uses -z (NUL-separated, unquoted paths) rather than the newline-delimited
+    default: with core.quotepath's default of true, git C-quotes non-ASCII
+    filenames in plain output ("caf\\303\\251.yaml" as literal characters),
+    which turns into a path that does not exist on disk. -z also survives
+    filenames containing newlines, which `-c core.quotepath=false` alone
+    would not.
+    """
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--cached", "--others",
+            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
              "--exclude-standard"],
             capture_output=True, text=True, timeout=30, check=False,
         )
@@ -35,7 +43,9 @@ def _git_files(root):
         return None
     if proc.returncode != 0:
         return None
-    return [line for line in proc.stdout.splitlines() if line]
+    # -z output is NUL-terminated, not NUL-separated: split() leaves one
+    # trailing empty string to drop.
+    return [f for f in proc.stdout.split("\0") if f]
 
 
 def _walk_files(root):
