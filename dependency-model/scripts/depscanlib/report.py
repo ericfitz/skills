@@ -5,6 +5,7 @@ from pathlib import Path
 from depscanlib import VERSION
 from depscanlib.files import classify_files
 from depscanlib.literals import scan_literals
+from depscanlib.resources import scan_resources
 from depscanlib.source import scan_source
 from depscanlib.walk import EXCLUDE_DIRS, walk_repo
 
@@ -35,6 +36,7 @@ def build_scan(root):
     source_findings, skipped = scan_source(root, paths)
     findings.update(source_findings)
     findings.update(scan_literals(root, paths))
+    findings["resource_limits"] = scan_resources(root, paths, files)
 
     return {
         "scan_version": VERSION,
