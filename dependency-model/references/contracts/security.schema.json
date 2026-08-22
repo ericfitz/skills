@@ -17,6 +17,7 @@
           "details": {
             "type": "object",
             "required": ["kind"],
+            "additionalProperties": false,
             "properties": {
               "kind": { "enum": ["secret", "credential-ref", "permission", "role", "policy", "certificate-ref"] },
               "provider": { "type": ["string", "null"] },

@@ -8,29 +8,29 @@
       "status": "discovered",
       "dependencies": [
         {
-          "id": "security:stripe-api-key",
-          "name": "STRIPE_API_KEY",
-          "evidence": ["internal/billing/client.go:12", "deploy/k8s/secrets.yaml:8"],
-          "related_ids": ["service:stripe-api", "config:stripe-api-key"],
+          "id": "security:postgres-db-password",
+          "name": "POSTGRES_PASSWORD",
+          "evidence": ["deploy/k8s/secrets.yaml:8", "internal/db/pool.go:41"],
+          "related_ids": ["service:postgres-primary", "config:database-url"],
           "resilience": {
             "timeout": null,
             "retry": null,
             "fallback": null,
             "health_check": null,
-            "on_path": ["request"]
+            "on_path": ["startup"]
           },
           "details": {
             "kind": "secret",
             "provider": "kubernetes",
             "scope": null,
-            "granted_to": ["internal/billing/client.go"],
+            "granted_to": ["internal/db/pool.go"],
             "rotation_declared": null
           }
         }
       ],
       "assumptions": [
         {
-          "claim": "the secret is scoped to the billing component only",
+          "claim": "the secret is scoped to the database component only",
           "why_unconfirmed": "the kubernetes secret manifest does not restrict which pods may mount it"
         }
       ]

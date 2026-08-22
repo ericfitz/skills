@@ -17,6 +17,7 @@
           "details": {
             "type": "object",
             "required": ["ecosystem", "resolution", "direct"],
+            "additionalProperties": false,
             "properties": {
               "ecosystem": { "type": "string" },
               "package_manager": { "type": ["string", "null"] },

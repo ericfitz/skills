@@ -17,6 +17,7 @@
           "details": {
             "type": "object",
             "required": ["kind", "declared_value"],
+            "additionalProperties": false,
             "properties": {
               "kind": { "enum": ["cpu", "memory", "disk", "gpu", "arch", "os", "runtime-version", "cloud-service"] },
               "declared_value": { "type": "string" },

@@ -17,6 +17,7 @@
           "details": {
             "type": "object",
             "required": ["kind", "value", "direction"],
+            "additionalProperties": false,
             "properties": {
               "kind": { "enum": ["hostname", "ip", "port", "dns", "egress", "proxy", "ingress"] },
               "value": { "type": "string" },

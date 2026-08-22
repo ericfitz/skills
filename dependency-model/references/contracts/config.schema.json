@@ -17,6 +17,7 @@
           "details": {
             "type": "object",
             "required": ["mechanism", "key"],
+            "additionalProperties": false,
             "properties": {
               "mechanism": { "enum": ["env", "file", "flag", "remote", "constant", "unknown"] },
               "key": { "type": "string" },

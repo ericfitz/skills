@@ -15,11 +15,40 @@ EXAMPLES = CONTRACTS / "examples"
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
 
 VALUE_SHAPED = ("value", "secret", "token", "password", "passwd",
-                "credential", "content", "material")
+                "credential", "content", "material", "key")
+
+# Enum membership pinned so a later rename (e.g. "object-store" ->
+# "objectstore") fails a test instead of silently passing every example,
+# since each example exercises only one enum member.
+CATEGORY_DETAIL_ENUMS = {
+    "service": {"kind": ["database", "cache", "queue", "object-store", "search", "api"]},
+    "package": {"resolution": ["declared", "locked", "installed"]},
+    "config": {"mechanism": ["env", "file", "flag", "remote", "constant", "unknown"]},
+    "security": {"kind": ["secret", "credential-ref", "permission", "role", "policy",
+                          "certificate-ref"]},
+    "platform": {
+        "kind": ["cpu", "memory", "disk", "gpu", "arch", "os", "runtime-version",
+                 "cloud-service"],
+        "source": ["dockerfile", "compose", "kubernetes", "iac", "ci", "manifest", "docs"],
+    },
+    "network": {
+        "kind": ["hostname", "ip", "port", "dns", "egress", "proxy", "ingress"],
+        "direction": ["inbound", "outbound", "internal", "unknown"],
+    },
+}
+
+RESILIENCE_OBJECT_FACTS = ("timeout", "retry", "fallback", "health_check")
 
 
 def load(path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def is_value_shaped(name):
+    """Substring match, not exact: a field named 'secret_value' or 'api_key'
+    is just as much of a leak vector as one named 'value' outright."""
+    lowered = name.lower()
+    return any(banned in lowered for banned in VALUE_SHAPED)
 
 
 class TestContractFilesExist(unittest.TestCase):
@@ -91,6 +120,17 @@ class TestExamplesValidate(unittest.TestCase):
                     load(EXAMPLES / f"{category}.example.json")["contract_version"],
                     "1.0.0")
 
+    def test_each_example_carries_at_least_one_null_resilience_fact(self):
+        """The brief requires this; nothing pinned it before now."""
+        for category in CATEGORIES:
+            with self.subTest(category=category):
+                instance = load(EXAMPLES / f"{category}.example.json")
+                deps = instance["categories"][category]["dependencies"]
+                facts = [dep["resilience"][fact]
+                         for dep in deps for fact in RESILIENCE_OBJECT_FACTS]
+                self.assertIn(None, facts,
+                              "example declares no 'no declaration found' fact")
+
 
 class TestSharedCore(unittest.TestCase):
     def test_every_category_item_refs_the_shared_core(self):
@@ -133,6 +173,36 @@ class TestSharedCore(unittest.TestCase):
                 schema = load(CONTRACTS / f"{category}.schema.json")
                 self.assertIn("assumptions", schema["required"])
 
+    def test_every_category_details_rejects_unknown_properties(self):
+        """A typo'd field name in a category's details object should fail a
+        real validator, not silently pass through as an unknown key."""
+        for category in CATEGORIES:
+            with self.subTest(category=category):
+                schema = load(CONTRACTS / f"{category}.schema.json")
+                details = schema["properties"]["dependencies"]["items"]["properties"]["details"]
+                self.assertEqual(details.get("additionalProperties"), False)
+
+
+class TestEnumMembership(unittest.TestCase):
+    """Each enum has exactly one member exercised by its example, so a
+    silent rename would pass every other test in this suite. Pin the full
+    membership here instead."""
+
+    def test_category_details_enums_are_pinned(self):
+        for category, fields in CATEGORY_DETAIL_ENUMS.items():
+            schema = load(CONTRACTS / f"{category}.schema.json")
+            details_props = (schema["properties"]["dependencies"]["items"]
+                              ["properties"]["details"]["properties"])
+            for field, expected in fields.items():
+                with self.subTest(category=category, field=field):
+                    self.assertEqual(details_props[field]["enum"], expected)
+
+    def test_core_on_path_enum_is_pinned(self):
+        core = load(CONTRACTS / "dependency-core.schema.json")
+        on_path = core["properties"]["resilience"]["properties"]["on_path"]
+        self.assertEqual(on_path["items"]["enum"],
+                         ["startup", "request", "background", "build"])
+
 
 class TestSecurityNeverCarriesValues(unittest.TestCase):
     """A discovery skill that writes credentials into a contract is a leak.
@@ -143,14 +213,32 @@ class TestSecurityNeverCarriesValues(unittest.TestCase):
         details = schema["properties"]["dependencies"]["items"]["properties"]["details"]
         for name in details["properties"]:
             with self.subTest(field=name):
-                self.assertNotIn(name.lower(), VALUE_SHAPED)
+                self.assertFalse(is_value_shaped(name))
 
     def test_security_example_carries_no_value_shaped_key_anywhere(self):
         text = (EXAMPLES / "security.example.json").read_text(encoding="utf-8")
-        for key in json.loads(text)["categories"]["security"]["dependencies"]:
-            for field in key["details"]:
+        for dep in json.loads(text)["categories"]["security"]["dependencies"]:
+            for field in dep["details"]:
                 with self.subTest(field=field):
-                    self.assertNotIn(field.lower(), VALUE_SHAPED)
+                    self.assertFalse(is_value_shaped(field))
+
+    def test_widened_value_shaped_list_does_not_false_positive_on_real_fields(self):
+        """Guards the widening itself: security's own legitimate field names
+        must survive the substring check that api_key-style names must not."""
+        for name in ("kind", "provider", "scope", "granted_to", "rotation_declared"):
+            with self.subTest(field=name):
+                self.assertFalse(is_value_shaped(name))
+        for name in ("api_key", "key_material", "secret_value", "value"):
+            with self.subTest(field=name):
+                self.assertTrue(is_value_shaped(name))
+
+    def test_security_details_rejects_unknown_properties(self):
+        """additionalProperties: false is inert to this repo's validator but
+        enforced by real downstream validators — the guarantee in the
+        description is only real once nothing unlisted can be written."""
+        schema = load(CONTRACTS / "security.schema.json")
+        details = schema["properties"]["dependencies"]["items"]["properties"]["details"]
+        self.assertEqual(details.get("additionalProperties"), False)
 
 
 class TestContractStaysInItsLayer(unittest.TestCase):

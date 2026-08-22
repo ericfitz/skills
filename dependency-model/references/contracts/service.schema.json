@@ -17,6 +17,7 @@
           "details": {
             "type": "object",
             "required": ["kind"],
+            "additionalProperties": false,
             "properties": {
               "kind": { "enum": ["database", "cache", "queue", "object-store", "search", "api"] },
               "protocol": { "type": ["string", "null"] },
