@@ -23,6 +23,22 @@ def _excluded(rel):
     return any(part in EXCLUDE_DIRS for part in Path(rel).parts)
 
 
+def _split_git_z(raw):
+    """Decode git's -z (NUL-terminated) byte output into filenames.
+
+    Decoded with surrogateescape rather than strict UTF-8: a git-tracked
+    filename that is not valid UTF-8 -- impossible on this machine's APFS,
+    but ordinary on ext4/Linux -- would otherwise raise UnicodeDecodeError
+    and crash the whole scan instead of degrading gracefully. surrogateescape
+    round-trips the original bytes losslessly, so the path still opens
+    correctly when handed back to the filesystem.
+    """
+    text = raw.decode("utf-8", "surrogateescape")
+    # -z output is NUL-terminated, not NUL-separated: split() leaves one
+    # trailing empty string to drop.
+    return [f for f in text.split("\0") if f]
+
+
 def _git_files(root):
     """Return git's view of the repo, or None if root is not a usable git repo.
 
@@ -37,15 +53,13 @@ def _git_files(root):
         proc = subprocess.run(
             ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
              "--exclude-standard"],
-            capture_output=True, text=True, timeout=30, check=False,
+            capture_output=True, timeout=30, check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
     if proc.returncode != 0:
         return None
-    # -z output is NUL-terminated, not NUL-separated: split() leaves one
-    # trailing empty string to drop.
-    return [f for f in proc.stdout.split("\0") if f]
+    return _split_git_z(proc.stdout)
 
 
 def _walk_files(root):

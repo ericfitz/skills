@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depscanlib.files import classify_files
-from depscanlib.walk import EXCLUDE_DIRS, read_text, walk_repo
+from depscanlib.walk import EXCLUDE_DIRS, _split_git_z, read_text, walk_repo
 from repobuilder import build_repo, git_commit_all, git_init
 
 
@@ -92,6 +92,25 @@ class TestWalkRepo(unittest.TestCase):
             files, method = walk_repo(root)
             self.assertEqual(method, "git")
             self.assertEqual(files, ["my file.py"])
+
+    def test_split_git_z_survives_non_utf8_bytes(self):
+        """A git-tracked filename that is not valid UTF-8 is impossible to
+        create on this machine's APFS, so this cannot be exercised through a
+        real git repo here -- it would need an ext4/Linux filesystem. This
+        instead calls the decoding step directly with crafted invalid-UTF-8
+        bytes, proving two things unconditionally on any OS: the decode does
+        not raise UnicodeDecodeError, and surrogateescape round-trips the
+        exact original bytes losslessly. It does not prove git itself always
+        emits such bytes the same way -- only that this function tolerates
+        them if it does."""
+        raw = b"a.py\x00b\xff\xfe.py\x00"
+        names = _split_git_z(raw)
+        self.assertEqual(names, ["a.py", "b\udcff\udcfe.py"])
+        self.assertEqual(names[1].encode("utf-8", "surrogateescape"), b"b\xff\xfe.py")
+
+    def test_split_git_z_drops_trailing_empty_string(self):
+        self.assertEqual(_split_git_z(b"a.py\x00b.py\x00"), ["a.py", "b.py"])
+        self.assertEqual(_split_git_z(b""), [])
 
 
 if __name__ == "__main__":
