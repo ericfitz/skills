@@ -33,6 +33,14 @@ Codex manifests (`.agents/plugins/marketplace.json` and each plugin's
 Run `/env:check` after installing to confirm the CLI tools, config files, and
 auth sessions the plugins depend on are present.
 
+## Architecture
+
+Several plugins build on each other: `itest` runs on `profile`'s contracts,
+`openapi:arazzo` reads the journeys doc `itest:design` writes, `dev:dedupe` reads the
+markers `dev:sem-annotate` writes. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps
+those edges as a graph, says what each skill produces and consumes, and lists the
+recommended entry point for common goals.
+
 ## Plugins
 
 ### loc — localization / i18n
