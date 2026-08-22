@@ -40,6 +40,37 @@ layer is bounded to these three.
 | `p-retry` (import or `pRetry(...)` call) | `retry` |
 | `opossum` (circuit breaker construction) | `circuit-breaker` |
 
+## Multi-line constructs are a silent miss
+
+`source.py`'s pattern matching is line-based: every pattern above is matched
+against one line of source at a time, never across a line boundary. A
+construct split across lines — `const {\n  A,\n  B,\n} = process.env` for an
+env-var destructure, or a multi-line `context.WithTimeout(\n  ctx,\n  5*time.Second,\n)`
+call — matches nothing on any single line and so yields no
+`resilience_calls` or `env_refs` entry at all, with no `coverage.skipped`
+signal to say so. A downstream skill cannot distinguish this from the
+construct genuinely being absent; treat it as one more reason a `null` fact
+is a candidate gap, never a confirmed one.
+
+## Mapping a scanner `kind` to a contract fact
+
+`RESILIENCE_PATTERNS` emits four `kind`s: `timeout`, `deadline`, `retry`,
+`circuit-breaker`. `dependency-core.schema.json`'s `resilience` object has
+four facts: `timeout`, `retry`, `fallback`, `health_check`. `deadline` and
+`circuit-breaker` have no fact of the same name, so a skill correlating a
+match must map explicitly rather than guess:
+
+| scanner `kind` | contract fact |
+|---|---|
+| `timeout` | `timeout` |
+| `deadline` | `timeout` |
+| `retry` | `retry` |
+| `circuit-breaker` | `fallback`, with `description` naming the library (e.g. `"circuit breaker: sony/gobreaker"`) |
+
+Nothing populates `health_check` from `resilience_calls` — that fact is
+filled from file-based evidence (a compose/k8s health-check declaration), not
+a source-literal pattern.
+
 ## Correlating a call to a dependency
 
 `resilience_calls` is emitted once, cross-cutting, by the shared scan — it is not

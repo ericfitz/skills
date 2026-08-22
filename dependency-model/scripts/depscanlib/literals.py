@@ -115,10 +115,27 @@ def _redact_userinfo(rest):
 # to the text from the first '?' or '#' onward -- the path is never touched.
 _QUERY_KV_RE = re.compile(r'([^&=?#]+)=([^&#]*)')
 
+# Deliberately separate from SECRET_NAME_RE, and deliberately wider: this list
+# is tuned for the commonest credential *query-parameter* names seen in real
+# URLs (Google API keys, Azure SAS signatures, AWS presigned-URL parameters,
+# OAuth authorization codes), not for key NAMES in config files. Do not merge
+# this into SECRET_NAME_RE -- widening that regex to match "code"/"key"/"sig"
+# would flood secret_shaped_keys with false positives across every config
+# file in a repo. A query *value* is worth over-redacting; a config *key
+# name* is not. Exact match, case-insensitive: these are short, common words
+# that would over-match badly as a substring test.
+QUERY_SECRET_PARAM_NAMES = {
+    "key", "sig", "signature", "code", "auth", "pass", "pwd", "secret",
+    "token", "password", "credential", "apikey", "api_key", "access_token",
+    "refresh_token", "x-amz-signature", "x-amz-credential",
+    "x-amz-security-token",
+}
+
 
 def _redact_secret_params(text):
     """Blank out the value of any query-string or fragment parameter whose
-    name is secret-shaped (per SECRET_NAME_RE).
+    name is secret-shaped (per SECRET_NAME_RE) or is a known credential
+    parameter name (per QUERY_SECRET_PARAM_NAMES).
 
     JDBC and OAuth-style URLs carry credentials as `?password=...` or
     `#access_token=...` rather than in userinfo -- the same leak, through a
@@ -132,7 +149,8 @@ def _redact_secret_params(text):
 
     def redact(match):
         name = match.group(1)
-        if SECRET_NAME_RE.search(name + "="):
+        if (SECRET_NAME_RE.search(name + "=")
+                or name.lower() in QUERY_SECRET_PARAM_NAMES):
             return f"{name}=***"
         return match.group(0)
 

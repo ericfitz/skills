@@ -26,13 +26,19 @@ Resilience signatures: `${CLAUDE_PLUGIN_ROOT}/references/resilience-signatures.m
 Standalone invocation: if you were not handed a `profile:topology` contract,
 invoke `profile:topology` first and use its output as `seeded_by`.
 
+If the shared scan has not already been run for this repository, run it once
+and save the JSON to `/tmp/depscan.json` (see
+`references/running-discovery.md`):
+
+    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path> > /tmp/depscan.json
+
+Use `python3` in place of `uv run --script` if `uv` is unavailable. If another of
+the six discovery skills already produced this output for the same target, read
+`/tmp/depscan.json` rather than scanning again.
+
 ## Procedure
 
-1. Run `depscan.py` once and read the index:
-
-       uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path>
-
-   Use `python3` in place of `uv run --script` if `uv` is unavailable.
+1. Read the index from `/tmp/depscan.json`.
 
 2. Seed from the `topology` contract's `real_dependencies` and
    `external_third_parties`. These are coarse by design — refine them, do not
@@ -64,7 +70,10 @@ invoke `profile:topology` first and use its output as `seeded_by`.
 8. Fill `resilience` per `resilience-signatures.md`: correlate
    `findings.resilience_calls` in the files that construct this service's
    client, record the call's `file:line` as evidence, and set every fact you
-   cannot find to `null`.
+   cannot find to `null`. The scanner's `kind` does not name-match the
+   contract's facts one-to-one: a `deadline` match fills `timeout`, and a
+   `circuit-breaker` match fills `fallback` (with `description` naming the
+   library) — see the mapping table in `resilience-signatures.md`.
 9. Set `resilience.on_path` from where the client is constructed — startup
    wiring, a request handler, a background worker, or a build step. Leave it
    empty when the repository does not say.
@@ -85,6 +94,10 @@ invoke `profile:topology` first and use its output as `seeded_by`.
 - `service` records the thing depended on; `network` records the path used to
   reach it. Both categories record the same `postgres:5432` and link through
   `related_ids`.
+- When a URL embeds what is plainly a credential in its path (a webhook
+  token, a signed URL segment), record the URL with that segment replaced by
+  `***`, and hand the fact that a credential is embedded in this URL to the
+  `security` category.
 - No criticality, no blast radius, no monitoring-gap judgment, no test
   strategy. This layer reports facts.
 - Never invoke `profile`'s scripts by path; invoke `profile:topology` by name.

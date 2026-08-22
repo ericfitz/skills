@@ -182,6 +182,22 @@ class TestSharedCore(unittest.TestCase):
                 details = schema["properties"]["dependencies"]["items"]["properties"]["details"]
                 self.assertEqual(details.get("additionalProperties"), False)
 
+    def test_envelope_categories_rejects_unknown_properties(self):
+        """A typo'd category key (e.g. "servcie") must fail a real validator,
+        not merge silently into layer 2's key-union graph."""
+        schema = load(CONTRACTS / "discovery.schema.json")
+        categories = schema["properties"]["categories"]
+        self.assertEqual(categories.get("additionalProperties"), False)
+
+    def test_every_resilience_object_fact_rejects_unknown_properties(self):
+        """Same guarantee as details objects: a typo'd resilience field
+        should fail validation, not pass through silently."""
+        core = load(CONTRACTS / "dependency-core.schema.json")
+        props = core["properties"]["resilience"]["properties"]
+        for fact in RESILIENCE_OBJECT_FACTS:
+            with self.subTest(fact=fact):
+                self.assertEqual(props[fact].get("additionalProperties"), False)
+
 
 class TestEnumMembership(unittest.TestCase):
     """Each enum has exactly one member exercised by its example, so a

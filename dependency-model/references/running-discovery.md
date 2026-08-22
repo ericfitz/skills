@@ -70,14 +70,17 @@ valid against the shared envelope schema on its own.
 
 ## `exclusions[]` is the single source of truth
 
-`depscan.py`'s output carries an `exclusions[]` list — a fixed set
-(`.venv`, `node_modules`, `vendor`, `dist`, `site-packages`, `.git`), not a
+`depscan.py`'s output carries an `exclusions[]` list — a fixed set, not a
 configurable one: `EXCLUDE_DIRS` in `walk.py` is the sole source, and
-`depscan.py` takes no `--exclude` flag or other config input to extend it. This
-fixed list is the single source of truth for both tools that need to skip the
-same noise:
+`depscan.py` takes no `--exclude` flag or other config input to extend it.
+See `walk.py` for the current membership; this document does not restate it,
+so it cannot go stale against the code. This fixed list is the single source
+of truth for both tools that need to skip the same noise:
 
-- The `package` skill passes each entry to `syft --exclude` when it runs syft.
+- The `package` skill reads `exclusions[]` and rewrites each bare directory
+  name to a `**/<name>` glob before passing it to `syft --exclude` — see
+  `skills/package/SKILL.md` step 2 for the exact form and why the bare and
+  root-anchored forms don't work.
 - The five file-scanning skills inherit the same list by reading it from the
   scan index — they don't re-derive their own exclusion rules.
 

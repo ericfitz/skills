@@ -28,6 +28,7 @@
         "timeout": {
           "type": ["object", "null"],
           "required": ["value", "evidence"],
+          "additionalProperties": false,
           "properties": {
             "value": { "type": "string" },
             "evidence": { "type": "array", "items": { "type": "string" } }
@@ -36,6 +37,7 @@
         "retry": {
           "type": ["object", "null"],
           "required": ["description", "evidence"],
+          "additionalProperties": false,
           "properties": {
             "description": { "type": "string" },
             "evidence": { "type": "array", "items": { "type": "string" } }
@@ -44,6 +46,7 @@
         "fallback": {
           "type": ["object", "null"],
           "required": ["description", "evidence"],
+          "additionalProperties": false,
           "properties": {
             "description": { "type": "string" },
             "evidence": { "type": "array", "items": { "type": "string" } }
@@ -52,6 +55,7 @@
         "health_check": {
           "type": ["object", "null"],
           "required": ["description", "evidence"],
+          "additionalProperties": false,
           "properties": {
             "description": { "type": "string" },
             "evidence": { "type": "array", "items": { "type": "string" } }

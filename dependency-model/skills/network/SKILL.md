@@ -78,6 +78,10 @@ the six discovery skills already produced this output for the same target, read
   `related_ids`.
 - Ignore registry and lockfile URLs — they name where a package is downloaded
   from, not a network path the running system reaches. See step 1.
+- When a URL embeds what is plainly a credential in its path (a webhook
+  token, a signed URL segment), record the URL with that segment replaced by
+  `***`, and hand the fact that a credential is embedded in this URL to the
+  `security` category.
 - `null` in `resilience` means no declaration was found — never that the
   behaviour is confirmed absent.
 - An empty `dependencies` list with `status: "discovered"` is a legitimate finding

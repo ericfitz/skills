@@ -30,6 +30,7 @@
     },
     "categories": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "config": { "$ref": "config.schema.json" },
         "network": { "$ref": "network.schema.json" },

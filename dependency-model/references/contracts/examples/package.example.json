@@ -8,7 +8,7 @@
       "status": "discovered",
       "dependencies": [
         {
-          "id": "package:pgx-v5",
+          "id": "package:pgx-v5-5.5.0",
           "name": "github.com/jackc/pgx/v5",
           "evidence": ["go.mod"],
           "related_ids": ["service:postgres-primary"],
@@ -28,7 +28,7 @@
             "pinned": true,
             "resolution": "locked",
             "direct": true,
-            "depends_on": ["package:puddle-v2"]
+            "depends_on": ["package:puddle-v2-2.2.1"]
           }
         }
       ],

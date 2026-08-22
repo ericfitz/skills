@@ -105,6 +105,32 @@ class TestUrlLiterals(unittest.TestCase):
         self.assertEqual(findings["url_literals"][0]["value"],
                          "https://example.com/x?page=2&sort=name")
 
+    def test_redacts_commonest_real_credential_query_params(self):
+        """SECRET_NAME_RE alone catches ?api_key=/?password=/?token= but
+        misses the commonest real-world credential parameter names -- Google
+        API keys, Azure SAS signatures, AWS presigned-URL parameters, OAuth
+        authorization codes. QUERY_SECRET_PARAM_NAMES must catch all of
+        these, exact-match and case-insensitively."""
+        cases = [
+            ("?key=AIzaSyAAA", "?key=***"),
+            ("?sig=SIGAAA", "?sig=***"),
+            ("?X-Amz-Signature=abc123", "?X-Amz-Signature=***"),
+            ("?code=oauthcodeAAA", "?code=***"),
+            ("?pass=pw123", "?pass=***"),
+            ("?pwd=pw456", "?pwd=***"),
+            ("?auth=authAAA", "?auth=***"),
+        ]
+        for query, expected_suffix in cases:
+            with self.subTest(query=query):
+                findings = scan({"a.py": f'URL = "https://example.com/v1{query}"\n'})
+                self.assertEqual(findings["url_literals"][0]["value"],
+                                 f"https://example.com/v1{expected_suffix}")
+
+    def test_leaves_a_non_secret_query_param_like_page_untouched(self):
+        findings = scan({"a.py": 'URL = "https://example.com/v1?page=2"\n'})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "https://example.com/v1?page=2")
+
     def test_never_records_a_query_or_fragment_secret_value(self):
         """A skill reading url_literals must never receive a query-string or
         fragment credential either -- the same guarantee as userinfo."""

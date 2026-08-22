@@ -29,13 +29,20 @@ another plugin's script by path.
 `status: "failed"`, an assumption saying so, and stop — do not substitute a
 hand-rolled lockfile parse.
 
+If the shared scan has not already been run for this repository, run it once
+and save the JSON to `/tmp/depscan.json` (see
+`references/running-discovery.md`):
+
+    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path> > /tmp/depscan.json
+
+Use `python3` in place of `uv run --script` if `uv` is unavailable. If another of
+the six discovery skills already produced this output for the same target, read
+`/tmp/depscan.json` rather than scanning again.
+
 ## Procedure
 
-1. Run the shared scan once to get the exclusion list:
-
-       uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <path>
-
-   Use `python3` in place of `uv run --script` if `uv` is unavailable.
+1. Read `exclusions[]` from `/tmp/depscan.json` — this skill needs nothing
+   else from the shared scan; `package`'s own evidence comes from syft.
 
 2. Run syft with every entry from the scan's `exclusions[]` passed as
    `--exclude`. `exclusions[]` holds bare directory names (`node_modules`,

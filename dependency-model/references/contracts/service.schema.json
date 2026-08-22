@@ -28,7 +28,7 @@
               },
               "config_keys": {
                 "type": "array",
-                "description": "Configuration keys that point at this service. Each should match a config category id.",
+                "description": "Configuration key names (e.g. an env var name like DATABASE_URL) that point at this service. The matching config: id, if one exists, belongs in related_ids, not here.",
                 "items": { "type": "string" }
               }
             }
