@@ -57,6 +57,20 @@ def _url_host(rest):
     return authority.split(":", 1)[0]
 
 
+def _redact_userinfo(rest):
+    """Blank out a URL's userinfo (`user:pass@`) before it is emitted.
+
+    Scheme, host, port, and path are the signal a discovery skill wants; the
+    userinfo component is, by definition, a credential. Keep the fact that
+    one was present -- that a connection string carries inline credentials
+    is itself worth recording -- without reproducing it.
+    """
+    authority, sep, tail = rest.partition("/")
+    if "@" in authority:
+        authority = "***@" + authority.rsplit("@", 1)[-1]
+    return authority + sep + tail
+
+
 def _strip_trailing(value):
     return value.rstrip('.,;:"\'`)]}>')
 
@@ -74,9 +88,10 @@ def scan_literals(root, paths):
         for number, line in enumerate(text.splitlines(), start=1):
             if not any(marker in line for marker in SCHEMA_KEYS):
                 for match in URL_RE.finditer(line):
-                    value = _strip_trailing(match.group(0))
-                    urls.append({"value": value, "scheme": match.group(1),
-                                 "host": _url_host(match.group(2)),
+                    scheme, rest = match.group(1), match.group(2)
+                    value = _strip_trailing(f"{scheme}://{_redact_userinfo(rest)}")
+                    urls.append({"value": value, "scheme": scheme,
+                                 "host": _url_host(rest),
                                  "file": path, "line": number})
             for match in HOST_PORT_RE.finditer(line):
                 port = int(match.group(2))

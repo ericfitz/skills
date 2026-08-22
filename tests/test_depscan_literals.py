@@ -45,6 +45,33 @@ class TestUrlLiterals(unittest.TestCase):
             {"$schema": "https://json-schema.org/draft/2020-12/schema"}) + "\n"})
         self.assertEqual(findings["url_literals"], [])
 
+    def test_redacts_userinfo_with_password(self):
+        findings = scan({"compose.yml":
+            "DSN: postgres://admin:sup3rs3cr3t@db:5432/x\n"})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "postgres://***@db:5432/x")
+        self.assertEqual(findings["url_literals"][0]["host"], "db")
+
+    def test_redacts_userinfo_without_password(self):
+        findings = scan({"a.py": 'URL = "https://token@host/"\n'})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "https://***@host/")
+        self.assertEqual(findings["url_literals"][0]["host"], "host")
+
+    def test_leaves_urls_without_userinfo_unchanged(self):
+        findings = scan({"client.go": 'const base = "https://api.stripe.com/v1"\n'})
+        self.assertEqual(findings["url_literals"][0]["value"],
+                         "https://api.stripe.com/v1")
+
+    def test_never_records_a_url_password(self):
+        """A committed connection string with inline credentials must not
+        reach the scan index verbatim -- url_literals is not exempt from
+        the same rule secret_shaped_keys enforces for key values."""
+        findings = scan({"compose.yml":
+            "DSN: postgres://admin:sup3rs3cr3t@db:5432/x\n"})
+        blob = json.dumps(findings)
+        self.assertNotIn("sup3rs3cr3t", blob)
+
 
 class TestHostPortLiterals(unittest.TestCase):
     def test_extracts_hostname_and_port(self):
