@@ -30,18 +30,51 @@ OTHER_LANGUAGES = {
 
 SKIP_REASON = "source-literal scanning covers go, js, python, and ts only"
 
+# raw text captured by the end-of-line resilience patterns is attacker/bundle
+# controlled (a minified vendor file's single line can run tens of KB) — cap
+# it so one match can't blow up the findings payload.
+RAW_MAX_LEN = 200
+
+_IDENT = r"[A-Za-z_][A-Za-z0-9_]*"
+
+
+def _extract_single(match):
+    return [match.group(1)]
+
+
+def _extract_destructured(match):
+    """Pull every bound name out of a `{ A, B: renamed, C = default }` group.
+
+    The env var name is what's destructured *from* process.env, i.e. the
+    left side of a `:` rename or `=` default — not the local binding.
+    """
+    names = []
+    for part in match.group(1).split(","):
+        name = re.split(r"[:=]", part, maxsplit=1)[0].strip()
+        if re.fullmatch(_IDENT, name):
+            names.append(name)
+    return names
+
+
 ENV_PATTERNS = {
     "go": [
-        re.compile(r'os\.(?:Getenv|LookupEnv)\(\s*"([A-Za-z_][A-Za-z0-9_]*)"'),
+        (re.compile(r'os\.(?:Getenv|LookupEnv)\(\s*"([A-Za-z_][A-Za-z0-9_]*)"'),
+         _extract_single),
     ],
     "python": [
-        re.compile(r'os\.environ\[\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
-        re.compile(r'os\.environ\.get\(\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
-        re.compile(r'os\.getenv\(\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
+        (re.compile(r'(?:os\.)?\benviron\[\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
+         _extract_single),
+        (re.compile(r'(?:os\.)?\benviron\.get\(\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
+         _extract_single),
+        (re.compile(r'os\.getenv\(\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
+         _extract_single),
     ],
     "js": [
-        re.compile(r'process\.env\.([A-Za-z_][A-Za-z0-9_]*)'),
-        re.compile(r'process\.env\[\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
+        (re.compile(r'process\.env\.([A-Za-z_][A-Za-z0-9_]*)'), _extract_single),
+        (re.compile(r'process\.env\?\.([A-Za-z_][A-Za-z0-9_]*)'), _extract_single),
+        (re.compile(r'process\.env\[\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
+         _extract_single),
+        (re.compile(r'\{\s*([^{}]+)\}\s*=\s*process\.env\b'), _extract_destructured),
     ],
 }
 ENV_PATTERNS["ts"] = ENV_PATTERNS["js"]
@@ -57,7 +90,7 @@ RESILIENCE_PATTERNS = {
         (re.compile(r'\bgobreaker\b[^\n]*'), "circuit-breaker"),
     ],
     "python": [
-        (re.compile(r'\btimeout\s*=\s*[^,)\n]+'), "timeout"),
+        (re.compile(r'\btimeout\s*=(?!=)\s*[^,)\n]+'), "timeout"),
         (re.compile(r'@retry\b[^\n]*'), "retry"),
         (re.compile(r'\btenacity\b[^\n]*'), "retry"),
         (re.compile(r'\bpybreaker\b[^\n]*'), "circuit-breaker"),
@@ -82,13 +115,14 @@ def _scan_file(root, path, language, env_out, resilience_out):
     if not text:
         return
     for number, line in enumerate(text.splitlines(), start=1):
-        for pattern in ENV_PATTERNS.get(language, []):
+        for pattern, extractor in ENV_PATTERNS.get(language, []):
             for match in pattern.finditer(line):
-                env_out.append({"name": match.group(1), "file": path,
-                                "line": number})
+                for name in extractor(match):
+                    env_out.append({"name": name, "file": path, "line": number})
         for pattern, kind in RESILIENCE_PATTERNS.get(language, []):
             for match in pattern.finditer(line):
-                resilience_out.append({"kind": kind, "raw": match.group(0).strip(),
+                raw = match.group(0).strip()[:RAW_MAX_LEN]
+                resilience_out.append({"kind": kind, "raw": raw,
                                        "file": path, "line": number,
                                        "language": language})
 

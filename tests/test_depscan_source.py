@@ -65,6 +65,19 @@ class TestEnvRefs(unittest.TestCase):
         findings, _ = scan({"main.rs": 'let x = std::env::var("DATABASE_URL");\n'})
         self.assertEqual(findings["env_refs"], [])
 
+    def test_javascript_destructured_process_env(self):
+        findings, _ = scan({"server.js": 'const { DATABASE_URL, PORT } = process.env;\n'})
+        self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "PORT"])
+
+    def test_javascript_optional_chaining_process_env(self):
+        findings, _ = scan({"config.js": 'const u = process.env?.FOO;\n'})
+        self.assertEqual(names(findings, "env_refs"), ["FOO"])
+
+    def test_python_bare_environ_imported_from_os(self):
+        findings, _ = scan({"app.py":
+            'from os import environ\nX = environ.get("DB_URL")\n'})
+        self.assertEqual(names(findings, "env_refs"), ["DB_URL"])
+
 
 class TestResilienceCalls(unittest.TestCase):
     def test_go_context_with_timeout_and_deadline(self):
@@ -95,7 +108,9 @@ class TestResilienceCalls(unittest.TestCase):
             "b.py": 'import pybreaker\n',
             "b.js": 'const CircuitBreaker = require("opossum");\n',
         })
-        self.assertEqual(kinds(findings), ["circuit-breaker"])
+        by_file = {r["file"]: r["kind"] for r in findings["resilience_calls"]}
+        self.assertEqual(by_file, {"b.go": "circuit-breaker", "b.py": "circuit-breaker",
+                                   "b.js": "circuit-breaker"})
 
     def test_records_the_matched_text_verbatim_as_raw(self):
         findings, _ = scan({"db.go": 'context.WithTimeout(parent, 5*time.Second)\n'})
@@ -106,10 +121,27 @@ class TestResilienceCalls(unittest.TestCase):
         self.assertEqual(record["language"], "go")
 
     def test_findings_are_sorted_by_file_then_line(self):
-        findings, _ = scan({"b.py": 'requests.get(u, timeout=1)\n',
-                            "a.py": 'requests.get(u, timeout=2)\n'})
+        """Feed an unsorted paths list directly: walk_repo already returns
+        sorted paths, so routing through it would pass even if scan_source
+        never sorted anything itself."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"b.py": 'requests.get(u, timeout=1)\n',
+                                    "a.py": 'requests.get(u, timeout=2)\n'})
+            findings, _ = scan_source(root, ["b.py", "a.py"])
         files = [r["file"] for r in findings["resilience_calls"]]
         self.assertEqual(files, ["a.py", "b.py"])
+
+    def test_raw_is_capped_at_200_characters(self):
+        """A minified bundle line can run tens of KB; raw must not carry
+        that into the findings payload."""
+        huge_line = 'const CircuitBreaker=require("opossum");' + ("x" * 40000)
+        findings, _ = scan({"vendor.min.js": huge_line + "\n"})
+        record = findings["resilience_calls"][0]
+        self.assertEqual(len(record["raw"]), 200)
+
+    def test_timeout_kwarg_not_confused_with_equality_check(self):
+        findings, _ = scan({"app.py": 'if timeout == 30:\n    pass\n'})
+        self.assertEqual(kinds(findings), [])
 
 
 class TestSkippedLanguages(unittest.TestCase):
