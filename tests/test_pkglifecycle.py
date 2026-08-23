@@ -100,6 +100,37 @@ PEP621_DEPENDENCIES_IS_A_BARE_STRING = (
     '[project]\nname = "x"\ndependencies = "requests"\n'
 )
 
+# Same class of defect, two passes further: PEP 735 [dependency-groups].
+# classify_roots must return {} for these, not raise.
+INVALID_DEPENDENCY_GROUPS_SHAPES = {
+    "dependency_groups_is_a_string": 'dependency-groups = "x"\n',
+    "group_value_is_an_int": '[dependency-groups]\ndev = 5\n',
+}
+
+DEPENDENCY_GROUPS_DEV_IS_A_BARE_STRING = (
+    '[dependency-groups]\ndev = "pytest"\n'
+)
+
+# Same class of defect in _package_json: dependencies/devDependencies are
+# JSON objects by spec, but a malformed package.json can put anything there.
+INVALID_PACKAGE_JSON_SHAPES = {
+    "dependencies_is_an_int": '{"name": "x", "dependencies": 5}',
+    "dev_dependencies_is_an_int": '{"name": "x", "devDependencies": 5}',
+}
+
+PACKAGE_JSON_DEPENDENCIES_IS_A_BARE_STRING = (
+    '{"name": "x", "dependencies": "left-pad"}'
+)
+
+# Same class of defect in _cargo: [dependencies]/[dev-dependencies] are TOML
+# tables by spec, but a malformed Cargo.toml can put anything there.
+INVALID_CARGO_SHAPES = {
+    "dependencies_is_an_int": "dependencies = 5\n",
+    "dev_dependencies_is_an_int": "dev-dependencies = 5\n",
+}
+
+CARGO_DEPENDENCIES_IS_A_BARE_STRING = 'dependencies = "serde"\n'
+
 
 class TestClassifyRoots(unittest.TestCase):
     def test_pyproject_splits_project_from_dev(self):
@@ -200,6 +231,65 @@ class TestClassifyRoots(unittest.TestCase):
         result is empty."""
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"pyproject.toml": PEP621_DEPENDENCIES_IS_A_BARE_STRING})
+            self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_invalid_dependency_groups_shapes_do_not_raise(self):
+        """R1: the PEP 735 [dependency-groups] pass has the identical hole as
+        the [project] pass fixed for I7, one pass over. A spec-invalid shape
+        must not abort classification for the whole repository."""
+        for label, text in INVALID_DEPENDENCY_GROUPS_SHAPES.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                root = build_repo(tmp, {"pyproject.toml": text})
+                self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_dependency_groups_dev_as_a_bare_string_is_not_silently_classified(self):
+        """The worst of the shapes: `dev = "pytest"` never raises, so an
+        unguarded pass silently classifies the characters p/y/t/e/s as
+        individual `build` roots -- garbage rather than a loud failure.
+        Guarded, the string is rejected as a non-list and the result is
+        empty."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"pyproject.toml": DEPENDENCY_GROUPS_DEV_IS_A_BARE_STRING})
+            self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_invalid_package_json_shapes_do_not_raise(self):
+        """R1: _package_json iterates data.get("dependencies") / (...
+        "devDependencies") directly, the identical hole as the [project]
+        pass fixed for I7. A spec-invalid shape must not abort
+        classification for the whole repository."""
+        for label, text in INVALID_PACKAGE_JSON_SHAPES.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                root = build_repo(tmp, {"package.json": text})
+                self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_package_json_dependencies_as_a_bare_string_is_not_silently_classified(self):
+        """The worst of the shapes: a string `dependencies` value never
+        raises, so an unguarded pass silently classifies the characters of
+        the package name as individual `run` roots -- garbage rather than a
+        loud failure. Guarded, the string is rejected as a non-dict and the
+        result is empty."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"package.json": PACKAGE_JSON_DEPENDENCIES_IS_A_BARE_STRING})
+            self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_invalid_cargo_shapes_do_not_raise(self):
+        """R1: _cargo iterates data.get("dependencies") / ("dev-dependencies")
+        directly, the identical hole as the [project] pass fixed for I7. A
+        spec-invalid shape must not abort classification for the whole
+        repository."""
+        for label, text in INVALID_CARGO_SHAPES.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                root = build_repo(tmp, {"Cargo.toml": text})
+                self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_cargo_dependencies_as_a_bare_string_is_not_silently_classified(self):
+        """The worst of the shapes: a string `dependencies` value never
+        raises, so an unguarded pass silently classifies the characters of
+        the package name as individual `run` roots -- garbage rather than a
+        loud failure. Guarded, the string is rejected as a non-dict and the
+        result is empty."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"Cargo.toml": CARGO_DEPENDENCIES_IS_A_BARE_STRING})
             self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
 
     def test_repo_nested_under_a_skip_dir_name_is_still_walked(self):

@@ -34,7 +34,7 @@ path.
    invoke `synthesize` by name and take the contract it emits.
 
 2. Assemble the sections of `docs/dependencies.md`, in order — the document
-   itself is written after step 3's verification, not here:
+   itself is written after step 4's verification, not here:
    - **Inventory summary**, one subsection per category present in
      `inventory.categories`. For a category whose `status` is `discovered`,
      list its dependencies — name, lifecycle, evidence — or state plainly

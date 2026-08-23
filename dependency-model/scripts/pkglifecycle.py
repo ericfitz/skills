@@ -75,8 +75,8 @@ def _pyproject(path, out):
     for deps in _as_dict(project.get("optional-dependencies")).values():
         for dep in _as_list(deps):
             out.setdefault(_name(dep), RUN)
-    for deps in (data.get("dependency-groups") or {}).values():
-        for dep in deps:
+    for deps in _as_dict(data.get("dependency-groups")).values():
+        for dep in _as_list(deps):
             out.setdefault(_name(dep), BUILD)
 
     # Poetry predates PEP 621 [project] and uses its own [tool.poetry] tables
@@ -105,9 +105,9 @@ def _package_json(path, out):
         return
     if not isinstance(data, dict):
         return
-    for dep in (data.get("dependencies") or {}):
+    for dep in _as_dict(data.get("dependencies")):
         out[_name(dep)] = RUN
-    for dep in (data.get("devDependencies") or {}):
+    for dep in _as_dict(data.get("devDependencies")):
         out.setdefault(_name(dep), BUILD)
 
 
@@ -115,9 +115,9 @@ def _cargo(path, out):
     data = _load_toml(path)
     if not data:
         return
-    for dep in (data.get("dependencies") or {}):
+    for dep in _as_dict(data.get("dependencies")):
         out[_name(dep)] = RUN
-    for dep in (data.get("dev-dependencies") or {}):
+    for dep in _as_dict(data.get("dev-dependencies")):
         out.setdefault(_name(dep), BUILD)
 
 

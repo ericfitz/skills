@@ -123,7 +123,11 @@ with evidence:
 - A bundled library produces no such condition — there is nothing to observe
   about it after startup that could change — and it self-excludes.
 - A dynamically loaded package produces a `presence` condition, citing the
-  `file:line` of the site that performs the load.
+  `file:line` of the site that performs the load — **when such a site
+  appears in the evidence a discovery skill can read**. Nothing in layer 1
+  records dynamic-loading sites today (issue #56); until it does,
+  `synthesize` records an assumption naming the gap instead. Keep this
+  bullet and `synthesize/SKILL.md` step 3 in step.
 - A service, credential, resource limit, remote-config value, or network path
   produces whatever condition (`presence`, a metric bound, and so on) its own
   reference page defines.
