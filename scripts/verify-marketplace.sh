@@ -54,7 +54,7 @@ declare -a PLUGINS=(
   "itest:development:conventions,critique,design,state"
   "openapi:development:arazzo,init"
   "env:development:check"
-  "dependency-model:development:config,network,package,platform,security,service"
+  "dependency-model:development:config,network,package,platform,report,security,service,synthesize"
 )
 
 # Guard against this array going stale again: it must name every plugin dir.
@@ -125,6 +125,8 @@ declare -a SCRIPTS=(
   "dev/scripts/sem_annotate.py"
   "logseq/scripts/logseq-cli.py"
   "dependency-model/scripts/depscan.py"
+  "dependency-model/scripts/depgraph.py"
+  "dependency-model/scripts/pkglifecycle.py"
 )
 for s in "${SCRIPTS[@]}"; do
   if [ -f "$s" ]; then ok "$s exists"; else bad "$s missing"; fi

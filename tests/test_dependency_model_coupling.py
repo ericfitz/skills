@@ -4,6 +4,7 @@ import re
 import sys
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 sys.dont_write_bytecode = True
 
@@ -11,16 +12,44 @@ REPO = Path(__file__).resolve().parents[1]
 PLUGIN = REPO / "dependency-model"
 SKILLS = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
+LAYER2 = ["report", "synthesize"]
+ALL_SKILLS = sorted(CATEGORIES + LAYER2)
 PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)")
+
+
+def skill_path(name):
+    return PLUGIN / "skills" / name / "SKILL.md"
 
 
 def body(skill):
     return skill.read_text(encoding="utf-8")
 
 
+def collapse_ws(text):
+    """Collapse whitespace runs to a single space.
+
+    These tests grep exact phrases out of prose. A mid-sentence line wrap
+    breaks a raw substring match even though the wrap position carries no
+    meaning — this has broken assertions here four times, and started
+    deforming the prose it exists to check (skills carrying lines far past
+    house wrap purely to keep a phrase contiguous). Comparing on collapsed
+    whitespace fixes wrap sensitivity only; it does not touch case, which
+    every call site already handles for itself before matching.
+    """
+    return re.sub(r"\s+", " ", text)
+
+
+def assert_phrase_in(test_case, needle, haystack):
+    test_case.assertIn(collapse_ws(needle), collapse_ws(haystack))
+
+
+def assert_phrase_not_in(test_case, needle, haystack):
+    test_case.assertNotIn(collapse_ws(needle), collapse_ws(haystack))
+
+
 class TestSkillSet(unittest.TestCase):
-    def test_all_six_category_skills_exist(self):
-        self.assertEqual([p.parent.name for p in SKILLS], CATEGORIES)
+    def test_all_eight_skills_exist(self):
+        self.assertEqual([p.parent.name for p in SKILLS], ALL_SKILLS)
 
 
 class TestNoCrossPluginPathCoupling(unittest.TestCase):
@@ -28,13 +57,13 @@ class TestNoCrossPluginPathCoupling(unittest.TestCase):
         for skill in SKILLS:
             with self.subTest(skill=skill.parent.name):
                 text = body(skill)
-                self.assertNotIn("profile/scripts", text)
-                self.assertNotIn("profile_inventory.py", text)
+                assert_phrase_not_in(self, "profile/scripts", text)
+                assert_phrase_not_in(self, "profile_inventory.py", text)
 
     def test_every_skill_names_profile_topology_as_a_skill(self):
         for skill in SKILLS:
             with self.subTest(skill=skill.parent.name):
-                self.assertIn("profile:topology", body(skill))
+                assert_phrase_in(self, "profile:topology", body(skill))
 
     def test_plugin_root_refs_stay_inside_this_plugin(self):
         for skill in SKILLS:
@@ -48,29 +77,50 @@ class TestNoCrossPluginPathCoupling(unittest.TestCase):
         """#48 AC 4: the dependency direction is one-way."""
         for skill in sorted((REPO / "profile" / "skills").glob("*/SKILL.md")):
             with self.subTest(skill=skill.parent.name):
-                self.assertNotIn("dependency-model", body(skill))
+                assert_phrase_not_in(self, "dependency-model", body(skill))
 
 
 class TestEachSkillOwnsItsCategory(unittest.TestCase):
+    """Category-scoped: only the six discovery skills emit a `discovery`
+    envelope with their own per-category contract. The two layer-2 skills
+    consume that envelope and emit `synthesis` instead — see
+    TestLayer2SkillsNameTheirDependencies."""
+
     def test_each_skill_names_its_own_contract_and_example(self):
-        for skill in SKILLS:
-            category = skill.parent.name
+        for category in CATEGORIES:
             with self.subTest(skill=category):
-                text = body(skill)
-                self.assertIn(f"contracts/{category}.schema.json", text)
-                self.assertIn(f"examples/{category}.example.json", text)
+                text = body(skill_path(category))
+                assert_phrase_in(self, f"contracts/{category}.schema.json", text)
+                assert_phrase_in(
+                    self, f"examples/{category}.example.json", text)
 
     def test_each_skill_names_the_shared_envelope(self):
-        for skill in SKILLS:
-            with self.subTest(skill=skill.parent.name):
-                self.assertIn("discovery.schema.json", body(skill))
+        for category in CATEGORIES:
+            with self.subTest(skill=category):
+                assert_phrase_in(
+                    self, "discovery.schema.json", body(skill_path(category)))
+
+
+class TestLayer2SkillsNameTheirDependencies(unittest.TestCase):
+    def test_both_layer2_skills_name_the_synthesis_contract(self):
+        for skill in LAYER2:
+            with self.subTest(skill=skill):
+                assert_phrase_in(
+                    self, "synthesis.schema.json", body(skill_path(skill)))
+
+    def test_report_names_synthesize(self):
+        assert_phrase_in(self, "synthesize", body(skill_path("report")))
+
+    def test_synthesize_names_depgraph(self):
+        assert_phrase_in(
+            self, "depgraph.py", body(skill_path("synthesize")))
 
 
 class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
     def test_every_skill_states_it_is_read_only(self):
         for skill in SKILLS:
             with self.subTest(skill=skill.parent.name):
-                self.assertIn("read-only", body(skill).lower())
+                assert_phrase_in(self, "read-only", body(skill).lower())
 
     def test_every_skill_states_null_is_not_confirmed_absent(self):
         """D1: layer 3 reads a null as a candidate gap. Layer 1 must not have
@@ -78,15 +128,15 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
         for skill in SKILLS:
             with self.subTest(skill=skill.parent.name):
                 text = body(skill).lower()
-                self.assertIn("no declaration was found", text)
-                self.assertIn("confirmed absent", text)
+                assert_phrase_in(self, "no declaration was found", text)
+                assert_phrase_in(self, "confirmed absent", text)
 
     def test_every_skill_distinguishes_an_empty_list_from_a_failed_scan(self):
         for skill in SKILLS:
             with self.subTest(skill=skill.parent.name):
                 text = body(skill).lower()
-                self.assertIn("failed", text)
-                self.assertIn("legitimate finding", text)
+                assert_phrase_in(self, "failed", text)
+                assert_phrase_in(self, "legitimate finding", text)
 
     def test_no_skill_promises_criticality_or_remediation(self):
         banned = ("criticality", "blast radius", "remediation",
@@ -102,6 +152,10 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
                     # Allowed only where every occurrence sits in a line that
                     # disclaims it — a single disclaiming line must not give
                     # cover to a later line that promises the word outright.
+                    # (Scoped per physical line by design, not the phrase
+                    # helper above: a disclaimer and the word it disclaims
+                    # are expected to sit together, so line boundaries here
+                    # are meaningful rather than incidental wrapping.)
                     for line in text.splitlines():
                         if word not in line:
                             continue
@@ -112,22 +166,71 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
 
 class TestSecuritySkillCarriesTheCredentialRule(unittest.TestCase):
     def test_security_skill_forbids_reading_values_and_keys_dir(self):
-        text = body(PLUGIN / "skills" / "security" / "SKILL.md")
-        self.assertIn("~/.keys/", text)
+        text = body(skill_path("security"))
+        assert_phrase_in(self, "~/.keys/", text)
         lower = text.lower()
-        self.assertIn("never read a secret", lower)
-        self.assertIn("stringdata", lower)
+        assert_phrase_in(self, "never read a secret", lower)
+        assert_phrase_in(self, "stringdata", lower)
 
 
 class TestPackageSkillHonoursSyftsLimits(unittest.TestCase):
     def test_package_skill_requires_the_exclusions(self):
-        text = body(PLUGIN / "skills" / "package" / "SKILL.md")
-        self.assertIn("--exclude", text)
-        self.assertIn("270", text)
+        text = body(skill_path("package"))
+        assert_phrase_in(self, "--exclude", text)
+        assert_phrase_in(self, "270", text)
 
     def test_package_skill_documents_file_level_evidence(self):
-        text = body(PLUGIN / "skills" / "package" / "SKILL.md").lower()
-        self.assertIn("no line number", text)
+        text = body(skill_path("package")).lower()
+        assert_phrase_in(self, "no line number", text)
+
+
+class TestLifecycleInstructions(unittest.TestCase):
+    """Spec pin: an unenforced classification is how two skills come to
+    disagree about the same entry."""
+
+    RUN_CONSTANT: ClassVar[list[str]] = ["service", "network", "config", "security"]
+
+    def test_the_four_constant_categories_say_run(self):
+        for category in self.RUN_CONSTANT:
+            text = body(skill_path(category))
+            with self.subTest(skill=category):
+                self.assertRegex(text, r"`lifecycle`[^\n]*`run`")
+
+    def test_platform_states_the_split_by_details_kind(self):
+        text = body(skill_path("platform"))
+        assert_phrase_in(self, "details.kind", text)
+        for kind in ("cpu", "memory", "disk", "gpu", "cloud-service",
+                     "arch", "os", "runtime-version"):
+            with self.subTest(kind=kind):
+                assert_phrase_in(self, kind, text)
+
+    def test_package_defers_to_pkglifecycle_and_says_syft_cannot(self):
+        text = body(skill_path("package"))
+        assert_phrase_in(self, "pkglifecycle.py", text)
+        assert_phrase_in(self, "syft cannot", text.lower())
+
+    def test_no_skill_mentions_a_third_lifecycle_value(self):
+        for skill in ALL_SKILLS:
+            text = body(skill_path(skill))
+            with self.subTest(skill=skill):
+                assert_phrase_not_in(self, "`both`", text)
+
+
+class TestFailabilityRuleIsStated(unittest.TestCase):
+    """Spec pin, both ends: a bundled library must not enter health, a
+    dynamically loaded package must. These are the two cases a category
+    filter would have got wrong in opposite directions."""
+
+    def test_synthesize_states_the_failability_test_not_a_category_filter(self):
+        text = body(skill_path("synthesize")).lower()
+        assert_phrase_in(self, "fail independently while the process is up", text)
+        assert_phrase_in(self, "not by `lifecycle`", text)
+
+    def test_synthesize_names_both_ends_explicitly(self):
+        text = body(skill_path("synthesize")).lower()
+        assert_phrase_in(self, "bundled", text)
+        assert_phrase_in(self, "dynamically loaded", text)
+        assert_phrase_in(self, "loading site", text)
 
 
 class TestRegistration(unittest.TestCase):
@@ -144,12 +247,15 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(entry["source"], "./dependency-model")
         self.assertEqual(entry["category"], "development")
 
-    def test_verify_script_declares_the_plugin_with_all_six_skills(self):
+    def test_verify_script_declares_the_plugin_with_all_eight_skills(self):
         text = (REPO / "scripts" / "verify-marketplace.sh").read_text(encoding="utf-8")
         self.assertIn(
-            '"dependency-model:development:config,network,package,platform,security,service"',
+            '"dependency-model:development:'
+            'config,network,package,platform,report,security,service,synthesize"',
             text)
         self.assertIn("dependency-model/scripts/depscan.py", text)
+        self.assertIn("dependency-model/scripts/depgraph.py", text)
+        self.assertIn("dependency-model/scripts/pkglifecycle.py", text)
 
     def test_requirements_declare_syft_as_required(self):
         data = json.loads((PLUGIN / "requirements.json").read_text(encoding="utf-8"))
@@ -158,13 +264,19 @@ class TestRegistration(unittest.TestCase):
         self.assertTrue(syft["required"])
         self.assertIsInstance(syft["probe"], list)
 
+    def test_requirements_declare_mmdc_as_optional(self):
+        data = json.loads((PLUGIN / "requirements.json").read_text(encoding="utf-8"))
+        mmdc = next(t for t in data["tools"] if t["name"] == "mmdc")
+        self.assertFalse(mmdc["required"])
+        self.assertIsInstance(mmdc["probe"], list)
+
     def test_readme_documents_the_plugin(self):
         text = (REPO / "README.md").read_text(encoding="utf-8")
         self.assertIn("### dependency-model", text)
         self.assertIn("Fifteen plugins", text)
-        for category in CATEGORIES:
-            with self.subTest(category=category):
-                self.assertIn(f"**{category}**", text)
+        for skill in ALL_SKILLS:
+            with self.subTest(skill=skill):
+                self.assertIn(f"**{skill}**", text)
 
 
 if __name__ == "__main__":

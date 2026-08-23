@@ -151,15 +151,18 @@ the `docs/journeys.md` written by `/itest:design`.
 - **security** — Enumerate the secrets and permissions the system requires, recording what each credential is named and where it is read — never its value.
 - **platform** — Enumerate the declared OS and cloud resources: CPU, memory, disk, GPU, architecture, runtime versions, and managed services.
 - **network** — Enumerate the names, hosts, and ports that must resolve and connect, inbound and outbound, with how each name is expected to resolve.
+- **synthesize** — Gather the six discovery skills' output into one merged inventory and dependency graph, and derive which dependencies carry a failure-relevant health condition. Emits the `synthesis` contract.
+- **report** — Render the `synthesis` contract into `docs/dependencies.md`: a human-readable inventory summary, health definitions, Mermaid dependency graph, cycles, and assumptions.
 
 Static and read-only: nothing is executed, resolved, or probed, because these
 skills run on a developer's machine or in CI rather than inside the environment
 the code runs in — a measured latency or a resolved hostname would be
 confidently wrong. Each dependency carries the timeout, retry, fallback, and
 health-check declarations found for it; a `null` means no declaration was found,
-never that the behaviour is confirmed absent. All six emit the same
-`discovery` envelope with one category populated, so their output merges by key
-union. Requires `syft`; seeded by the `profile:topology` contract.
+never that the behaviour is confirmed absent. The six discovery skills emit the
+same `discovery` envelope with one category populated, so their output merges
+by key union; `synthesize` and `report` consume that merged output. Requires
+`syft`; seeded by the `profile:topology` contract.
 
 ---
 

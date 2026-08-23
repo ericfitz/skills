@@ -31,6 +31,16 @@
         "macos": "xcode-select --install",
         "docs": "https://git-scm.com/downloads"
       }
+    },
+    {
+      "name": "mmdc",
+      "required": false,
+      "why": "the report skill verifies its generated Mermaid renders when it is available",
+      "probe": ["npx", "--version"],
+      "install": {
+        "macos": "npm install -g @mermaid-js/mermaid-cli",
+        "docs": "https://github.com/mermaid-js/mermaid-cli#installation"
+      }
     }
   ]
 }
