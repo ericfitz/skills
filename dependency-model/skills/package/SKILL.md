@@ -64,13 +64,31 @@ the six discovery skills already produced this output for the same target, read
    only the `**/<name>` glob form actually removes that contamination; the
    root-anchored form leaves it in.
 
-3. For each syft artifact, emit one dependency:
+3. Run `pkglifecycle.py` against the same syft JSON to derive `lifecycle`:
+
+       uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/pkglifecycle.py <path> --syft-json <file>
+
+   Use `python3` in place of `uv run --script` if `uv` is unavailable. Set
+   each dependency's `lifecycle` from the returned map, keyed by syft
+   artifact id.
+
+   **syft cannot answer this itself** — it reports Python dev and runtime
+   dependencies from one lockfile with identical metadata, and drops npm
+   `devDependencies` from the catalogue entirely. Do not try to infer it from
+   the artifact's `type` or `locations`.
+
+   For every entry in the returned `unresolved` list, record one assumption
+   naming the ecosystem and that its packages defaulted to `run`.
+
+4. For each syft artifact, emit one dependency:
    - `id` is `package:<name>-<full-version-slug>`, e.g. `package:pgx-v5-5.5.0` —
      the full resolved version, not just the major, so the same package
      pinned at two versions in two lockfiles gets two distinct ids instead
      of colliding. Stable across runs.
    - `name`, `details.version`, `details.purl`, `details.ecosystem` come
      straight from the artifact.
+   - `lifecycle` comes from the `pkglifecycle.py` map built in step 3 — never
+     inferred from syft's own fields.
    - `evidence` is `locations[].path` — **a bare file path, no line number.**
      syft reports file-level locations only; do not invent a line.
    - `details.resolution` is your judgment from the location it was catalogued
@@ -80,16 +98,16 @@ the six discovery skills already produced this output for the same target, read
      project owns, false when it is only reachable through another package,
      null when you cannot tell.
    - `details.pinned` is true when the version is exact, false for a range.
-4. Read syft's `artifactRelationships` and fill `details.depends_on[]` from the
+5. Read syft's `artifactRelationships` and fill `details.depends_on[]` from the
    `dependency-of` edges, mapping syft artifact ids to your `package:` ids.
    Ignore `contains` and `evident-by`.
-5. Set `resilience` on every package entry: all four facts `null` and
+6. Set `resilience` on every package entry: all four facts `null` and
    `on_path: ["build"]`. A library declaration carries no timeout or retry of
    its own; the code that calls it does, and that belongs to `service`.
-6. Link `related_ids` to `service` entries where a package is unmistakably a
+7. Link `related_ids` to `service` entries where a package is unmistakably a
    client for a discovered service, and say so in an assumption if the link is
    an inference rather than a fact.
-7. Emit the full envelope, then a short prose summary: package count by
+8. Emit the full envelope, then a short prose summary: package count by
    ecosystem, how many are direct, and how many are pinned.
 
 ## Rules
@@ -99,6 +117,8 @@ the six discovery skills already produced this output for the same target, read
   category carries `file:line`.
 - `null` in `resilience` means no declaration was found — never that the
   behaviour is confirmed absent.
+- `lifecycle` has two values and never a third. It records which environment
+  must contain the dependency, and it does **not** determine health.
 - If syft returns zero artifacts for a repository that plainly has manifests,
   that is a `failed` status with an assumption, not a `discovered` empty list.
 - An empty list with `status: "discovered"` is a legitimate finding for a

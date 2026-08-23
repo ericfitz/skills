@@ -82,13 +82,16 @@ the six discovery skills already produced this output for the same target, read
     the rule.
 11. If the index's `coverage.skipped` is non-empty, record one assumption per
     skipped language naming it and what went unscanned.
-12. Emit the full envelope, then a short prose summary.
+12. Set `lifecycle` to `run` on every dependency — these are needed while the service runs.
+13. Emit the full envelope, then a short prose summary.
 
 ## Rules
 
 - Read-only; an unconfirmable claim becomes an assumption, never a probe.
 - `null` in `resilience` means no declaration was found — never that the
   behaviour is confirmed absent.
+- `lifecycle` has two values and never a third. It records which environment
+  must contain the dependency, and it does **not** determine health.
 - An empty `dependencies` list with `status: "discovered"` is a legitimate finding
   for a pure library or CLI. A scan that could not complete is `failed`.
 - `service` records the thing depended on; `network` records the path used to

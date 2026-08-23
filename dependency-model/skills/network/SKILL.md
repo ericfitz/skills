@@ -65,8 +65,9 @@ the six discovery skills already produced this output for the same target, read
    same file where the endpoint is used, exactly as `service` does.
 8. If the scan's `coverage.skipped` is non-empty, record one assumption per
    skipped language, naming the language and what went unscanned.
-9. Emit the full envelope, then a short prose summary: entry count by
-   `direction`, and how many carry no declared resolution mechanism.
+9. Set `lifecycle` to `run` on every dependency — these are needed while the service runs.
+10. Emit the full envelope, then a short prose summary: entry count by
+    `direction`, and how many carry no declared resolution mechanism.
 
 ## Rules
 
@@ -84,6 +85,8 @@ the six discovery skills already produced this output for the same target, read
   `security` category.
 - `null` in `resilience` means no declaration was found — never that the
   behaviour is confirmed absent.
+- `lifecycle` has two values and never a third. It records which environment
+  must contain the dependency, and it does **not** determine health.
 - An empty `dependencies` list with `status: "discovered"` is a legitimate finding
   for a project this category does not apply to. A scan that could not complete
   is `failed`.

@@ -59,7 +59,8 @@ the six discovery skills already produced this output for the same target, read
     key is read.
 11. If the scan's `coverage.skipped` is non-empty, record one assumption per
     skipped language, naming the language and what went unscanned.
-12. Emit the full envelope, then a short prose summary: key count, how many are
+12. Set `lifecycle` to `run` on every dependency — these are needed while the service runs.
+13. Emit the full envelope, then a short prose summary: key count, how many are
     required, and how many carry no declared default.
 
 ## Rules
@@ -71,6 +72,8 @@ the six discovery skills already produced this output for the same target, read
   copy the value.
 - `null` in `resilience` means no declaration was found — never that the
   behaviour is confirmed absent.
+- `lifecycle` has two values and never a third. It records which environment
+  must contain the dependency, and it does **not** determine health.
 - An empty `dependencies` list with `status: "discovered"` is a legitimate finding
   for a project this category does not apply to. A scan that could not complete
   is `failed`.
