@@ -63,6 +63,30 @@ pyyaml = "^6.0"
 pytest = "^8.0"
 """
 
+LEGACY_POETRY_PYPROJECT = """\
+[tool.poetry]
+name = "x"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.0"
+
+[tool.poetry.dev-dependencies]
+black = "^24.0"
+"""
+
+# Spec-invalid pyproject.toml shapes: valid TOML, but not a shape the poetry
+# pass expects. classify_roots must return {} for these, not raise.
+INVALID_POETRY_SHAPES = {
+    "tool_is_a_string": 'tool = "x"\n',
+    "poetry_is_a_string": '[tool]\npoetry = "x"\n',
+    "group_dev_is_a_string": '[tool.poetry.group]\ndev = "x"\n',
+    "dependencies_is_an_array_of_tables": (
+        '[[tool.poetry.dependencies]]\nname = "requests"\n'
+    ),
+}
+
 
 class TestClassifyRoots(unittest.TestCase):
     def test_pyproject_splits_project_from_dev(self):
@@ -123,6 +147,26 @@ class TestClassifyRoots(unittest.TestCase):
             self.assertEqual(roots["pyyaml"], "run")
             self.assertEqual(roots["pytest"], "build")
             self.assertNotIn("python", roots)  # a version constraint, not a package
+
+    def test_legacy_poetry_dev_dependencies_spelling_is_build(self):
+        """Pre-1.2 Poetry used [tool.poetry.dev-dependencies], not
+        [tool.poetry.group.dev.dependencies]. Missing this spelling is the
+        same silent-miss class as F2, one spelling over: black would default
+        to run end to end via propagate's unreachable-artifact fallback."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"pyproject.toml": LEGACY_POETRY_PYPROJECT})
+            roots = pkglifecycle.classify_roots(Path(root))
+            self.assertEqual(roots["requests"], "run")
+            self.assertEqual(roots["black"], "build")
+
+    def test_invalid_poetry_shapes_do_not_raise(self):
+        """Spec-invalid but syntactically valid TOML must degrade to an empty
+        result, not crash classify_roots. A crash is worse than an empty
+        result -- nothing above classify_roots catches it."""
+        for label, text in INVALID_POETRY_SHAPES.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                root = build_repo(tmp, {"pyproject.toml": text})
+                self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
 
     def test_repo_nested_under_a_skip_dir_name_is_still_walked(self):
         """SKIP_DIRS must be tested against the path relative to the scanned

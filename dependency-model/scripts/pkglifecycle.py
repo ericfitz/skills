@@ -40,6 +40,14 @@ def _name(raw):
     return _SPECIFIER.sub("", str(raw)).strip().lower()
 
 
+def _as_dict(value):
+    # A TOML table always has string keys, so once a value is confirmed to be
+    # a dict, iterating its keys is safe. Spec-invalid shapes (a table
+    # redefined as a string, or as an array of tables) fall back to {}
+    # instead of raising further down.
+    return value if isinstance(value, dict) else {}
+
+
 def _load_toml(path):
     try:
         with open(path, "rb") as handle:
@@ -67,13 +75,19 @@ def _pyproject(path, out):
     # instead; a pyproject.toml can carry only these, so they need their own
     # pass rather than falling through to unresolved_ecosystems (pyproject.toml
     # is already claimed by MANIFESTS, so that path never fires for it).
-    poetry = (data.get("tool") or {}).get("poetry") or {}
-    for dep in poetry.get("dependencies") or {}:
+    # Guarded with _as_dict throughout: a spec-invalid shape (e.g. "tool" as a
+    # string, or [[tool.poetry.dependencies]] as an array of tables) must
+    # yield an empty result here, not an AttributeError out of classify_roots.
+    poetry = _as_dict(_as_dict(data.get("tool")).get("poetry"))
+    for dep in _as_dict(poetry.get("dependencies")):
         if dep.lower() != "python":  # a version constraint, not a package
             out[_name(dep)] = RUN
-    for group in (poetry.get("group") or {}).values():
-        for dep in (group.get("dependencies") or {}):
+    for group in _as_dict(poetry.get("group")).values():
+        for dep in _as_dict(_as_dict(group).get("dependencies")):
             out.setdefault(_name(dep), BUILD)
+    # Legacy pre-1.2 spelling; Poetry 1.2 renamed this to [tool.poetry.group.dev].
+    for dep in _as_dict(poetry.get("dev-dependencies")):
+        out.setdefault(_name(dep), BUILD)
 
 
 def _package_json(path, out):
