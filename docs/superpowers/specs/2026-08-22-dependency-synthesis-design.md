@@ -97,13 +97,44 @@ reverse does not hold. `npm ci --omit=dev` is the operator that drops the differ
 
 | Category | `lifecycle` |
 |---|---|
-| `package` | from the manifest section it was declared in: `[project] dependencies`, npm `dependencies`, Go `require` → `run`; `[dependency-groups] dev`, npm `devDependencies`, a test-only extra → `build` |
+| `package` | derived — see below |
 | `service`, `network`, `config`, `security` | `run` — needed while the service runs |
 | `platform` | per `details.kind`: `cpu`/`memory`/`disk`/`gpu`/`cloud-service` → `run`; `arch`/`os`/`runtime-version` → `build` |
 
-`package` is the only category that must read something to decide, and what it reads
-is already in front of it — syft records the manifest each artifact came from. A test
-pins the other categories' constants and `platform`'s split by `details.kind`.
+**syft cannot answer this, and fails differently per ecosystem.** Verified 2026-08-22
+with syft 1.51.0:
+
+- **Python/uv** — `pyyaml` (a `[project]` dependency) and `pytest`/`ruff`
+  (`[dependency-groups] dev`) are all reported from `/uv.lock` with identical
+  `metadataType: python-uv-lock-entry` and identical metadata keys. Indistinguishable.
+- **npm** — a `devDependencies` entry is **silently dropped** from the catalogue
+  entirely. Only runtime dependencies and the root package appear, so `lifecycle`
+  would never legitimately be `build`.
+
+So the `package` skill derives it in two steps, from inputs it already holds:
+
+1. **Classify declared roots by reading the manifest**, which is ordinary static
+   evidence-reading. `pyproject.toml` `[project] dependencies` vs
+   `[dependency-groups] dev` and `[project.optional-dependencies]`; `package.json`
+   `dependencies` vs `devDependencies`; `Cargo.toml` `[dependencies]` vs
+   `[dev-dependencies]`; `go.mod` has no dev concept, so all `run`. `tomllib` is
+   stdlib from Python 3.11, so TOML needs no dependency.
+2. **Propagate to transitives over syft's `dependency-of` edges**, which the skill
+   already reads to populate `depends_on`. A package reachable only from `build`
+   roots is `build`; one reachable from any `run` root is `run`.
+
+**Edge direction is load-bearing and easy to invert.** In syft's
+`artifactRelationships`, a `dependency-of` edge `{parent: A, child: B}` means *A is a
+dependency of B*. To walk from a root outward to what it pulls in, follow edges where
+`child` is the current node and take the `parent`. Confirmed against this repo:
+`pytest` appears as `child` on 5 edges — its own dependencies — and as `parent` on
+none, correct for a dev root nothing depends on.
+
+**Unresolvable ecosystems default to `run`, with an assumption recorded** naming the
+ecosystem. A package syft found is, absent evidence otherwise, part of what is
+installed; and for npm specifically anything syft reports is necessarily runtime.
+
+A test pins the other categories' constants and `platform`'s split by `details.kind`.
 
 Note that `lifecycle` does **not** determine health (D2). Most libraries are `run`
 under npm semantics and still contribute no health condition, because they cannot
@@ -251,6 +282,7 @@ truncation would read as "this is the whole graph."
 dependency-model/
   scripts/depgraph.py                    merge, edges, cycles, mermaid
   scripts/depgraphlib/                   testable modules
+  scripts/pkglifecycle.py                LAYER 1: manifest roots + edge propagation
   references/contracts/
     synthesis.schema.json                the layer-2 contract
     examples/synthesis.example.json
@@ -332,6 +364,7 @@ needed."
 | Test | Asserts |
 |---|---|
 | `tests/test_depgraph_*.py` | `depgraphlib` against fixture envelopes: key-union merge, both edge kinds, cycle detection, Mermaid emission, node-cap degradation |
+| `tests/test_pkglifecycle.py` | manifest parsing per ecosystem (pyproject, package.json, Cargo.toml, go.mod), transitive propagation, edge direction, unknown-ecosystem default |
 | `tests/test_dependency_model_contracts.py` (extended) | the synthesis schema and its example; `conditions[]` accepts all three kinds and a `null` expectation |
 | `tests/test_dependency_model_coupling.py` (extended) | the two new skills state the `null` discipline, name their own contract, and reach into no other plugin by path |
 
@@ -342,9 +375,10 @@ a choice that would otherwise erode silently:
 2. `lifecycle` admits exactly `build` and `run`, so a `both` cannot reappear; the
    constants are pinned for `service`/`network`/`config`/`security`, and
    `platform`'s split by `details.kind` is pinned (D3).
-3. The `package` skill maps manifest section to `lifecycle` — a `[project]`
-   dependency and an npm `dependencies` entry are `run`; a `[dependency-groups] dev`
-   and an npm `devDependencies` entry are `build` (D3).
+3. `pkglifecycle.py` classifies declared roots per ecosystem and propagates
+   correctly over `dependency-of` edges — including the **edge direction**, since
+   inverting it inverts every classification silently; and an unparseable ecosystem
+   defaults to `run` with an assumption rather than guessing `build` (D3).
 4. A `status: "failed"` category propagates as failed through the merge.
 5. `expectation: null` is legal and documented as "no declaration found" (D7).
 
