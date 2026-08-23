@@ -73,6 +73,8 @@ flowchart LR
     x_sec["security"]
     x_plat["platform"]
     x_net["network"]
+    x_synth["synthesize"]
+    x_report["report"]
   end
 
   gh["github:create-issue"]
@@ -120,6 +122,14 @@ flowchart LR
 
   x_svc -. "related_ids" .-> x_net
   x_cfg -. "related_ids" .-> x_svc
+
+  x_pkg -- "discovery" --> x_synth
+  x_svc -- "discovery" --> x_synth
+  x_cfg -- "discovery" --> x_synth
+  x_sec -- "discovery" --> x_synth
+  x_plat -- "discovery" --> x_synth
+  x_net -- "discovery" --> x_synth
+  x_synth -- "synthesis" --> x_report
 
   envchk -. "requirements.json" .-> profile
   envchk -. "requirements.json" .-> itest
@@ -201,12 +211,16 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `security` | The credential and permission surface — what each secret is named and where it is read, never its value | `discovery` contract, `security` category | `topology`, `depscan.py` index |
 | `platform` | Declared OS and cloud resources — CPU, memory, disk, GPU, architecture, runtime versions, managed services | `discovery` contract, `platform` category | `topology`, `depscan.py` index |
 | `network` | The names, hosts, and ports that must resolve and connect, inbound and outbound | `discovery` contract, `network` category | `topology`, `depscan.py` index |
+| `synthesize` | Merges the six discovery contracts into one inventory and graph, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts |
+| `report` | Renders the `synthesis` contract into a human-readable document — inventory by category, health definitions, dependency graph, cycles, and assumptions | `docs/dependencies.md` | `synthesis` contract |
 
-All six emit the same `discovery` envelope with exactly one key under `categories`
-populated, so merging them is a key union rather than a transform. There is no
-orchestrator in this layer by decision: the report skill in #49 must gather all six
-contracts to render anything, so it becomes the orchestrator, and building one here
-would mean building it twice.
+All six discovery skills emit the same `discovery` envelope with exactly one key
+under `categories` populated, so merging them is a key union rather than a
+transform. `synthesize` is this layer's orchestrator: it gathers all six
+contracts, merges them via `depgraph.py` into one inventory and graph, and
+derives the health view from the merged inventory's resilience facts, emitting
+the `synthesis` contract. `report` renders that contract into
+`docs/dependencies.md`, adding no facts of its own.
 
 ### dev
 
