@@ -2,26 +2,44 @@
 
 Turns the merged `{"categories": {...}}` document into a graph document:
 one node per discovered dependency, one edge per relationship between them,
-and the cycles found in the depends_on graph.
+and the cycles found in the depends_on graph. That cycle list is not an
+exhaustive enumeration of every simple cycle in the graph — see
+`_find_cycles` for why.
 """
+
+
+class InvalidDependencyError(ValueError):
+    """A dependency entry in the merged inventory is missing a field
+    (`id`, `name`, or `lifecycle`) the graph requires."""
+
+
+def _require(d, field, category):
+    try:
+        return d[field]
+    except KeyError as exc:
+        raise InvalidDependencyError(
+            f"dependency in category {category!r} is missing required "
+            f"field {field!r}: {d!r}") from exc
 
 
 def _build_nodes(merged):
     nodes = []
     for category, block in merged.get("categories", {}).items():
         for d in block.get("dependencies") or []:
-            nodes.append({"id": d["id"], "name": d["name"],
-                          "category": category, "lifecycle": d["lifecycle"]})
+            nodes.append({"id": _require(d, "id", category),
+                          "name": _require(d, "name", category),
+                          "category": category,
+                          "lifecycle": _require(d, "lifecycle", category)})
     nodes.sort(key=lambda n: n["id"])
     return nodes
 
 
 def _build_edges(merged, known_ids):
     edges = set()
-    for block in merged.get("categories", {}).values():
+    for category, block in merged.get("categories", {}).items():
         for d in block.get("dependencies") or []:
-            source = d["id"]
-            lifecycle = d["lifecycle"]
+            source = _require(d, "id", category)
+            lifecycle = _require(d, "lifecycle", category)
             for target in d.get("details", {}).get("depends_on") or []:
                 if target in known_ids:
                     edges.add((source, target, "depends_on", lifecycle))
@@ -52,6 +70,12 @@ def _find_cycles(node_ids, adjacency):
 
     Uses an explicit stack rather than recursion: a real package graph is
     deep enough to blow Python's recursion limit.
+
+    Not an exhaustive enumeration of every simple cycle: a global-visited
+    DFS back-edge walk reports one representative cycle per exploration, not
+    every simple cycle through a node. Complete enumeration would need
+    Tarjan SCC + Johnson's algorithm; the cycles reported here are real, but
+    the list is not guaranteed complete.
     """
     cycles = []
     seen_cycles = set()
@@ -90,7 +114,7 @@ def _find_cycles(node_ids, adjacency):
                 index_stack.pop()
                 path_set.discard(node)
 
-    cycles.sort(key=lambda c: c[0])
+    cycles.sort(key=tuple)
     return cycles
 
 

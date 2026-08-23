@@ -9,8 +9,9 @@ Gather the six discovery envelopes for a repository, merge them into one
 inventory and graph, and derive the health view: which dependencies carry a
 condition that can be stated with evidence. Emits the `synthesis` contract.
 
-**This skill never executes anything.** It reads the six discovery envelopes
-and `depgraph.py`'s output; nothing is resolved, probed, or run.
+**This skill executes nothing against the target system.** It reads the six
+discovery envelopes and `depgraph.py`'s output; nothing is resolved, probed,
+or run against the target.
 
 Contract: `${CLAUDE_PLUGIN_ROOT}/references/contracts/synthesis.schema.json`
 Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/synthesis.example.json`
@@ -96,7 +97,7 @@ each skill by name and take its envelope.
 - An empty `health` list is a legitimate finding for a system with no
   service-shaped dependencies. A `failed` category is a different finding
   from an empty one and must never be collapsed into it.
-- No criticality, ranking, or blast-radius judgment. `required_for[]` records
+- No criticality, ranking, or blast radius judgment. `required_for[]` records
   which callers need a condition met, not how important any of them are — that
   judgment belongs to a later layer.
 - Invoke the six discovery skills, and `profile:topology`, by name — never by

@@ -94,6 +94,56 @@ class TestCycles(unittest.TestCase):
                             dep("package:b-2", "b", "build", depends=["package:a-1"])])
         self.assertEqual(build_graph(m)["cycles"], build_graph(m)["cycles"])
 
+    def test_a_symmetric_relates_to_pair_is_not_reported_as_a_cycle(self):
+        """A2: cycle detection walks the depends_on adjacency only.
+        related_ids links are routinely symmetric, so walking the combined
+        edge set would report a 2-cycle for every service<->network
+        association -- noise that would drown any real depends_on cycle."""
+        g = build_graph(merged(
+            service=[dep("service:pg", "pg", related=["network:x"])],
+            network=[dep("network:x", "x", related=["service:pg"])]))
+        self.assertEqual({e["kind"] for e in g["edges"]}, {"relates_to"})
+        self.assertEqual(len(g["edges"]), 2)
+        self.assertEqual(g["cycles"], [])
+
+
+class TestInvalidDependency(unittest.TestCase):
+    def test_missing_lifecycle_raises_invalid_dependency_not_a_keyerror(self):
+        from depgraphlib.graph import InvalidDependencyError
+
+        bad = {"id": "service:pg", "name": "postgres",
+               "evidence": [], "related_ids": [], "details": {}}
+        with self.assertRaises(InvalidDependencyError):
+            build_graph(merged(service=[bad]))
+
+    def test_cli_reports_a_missing_lifecycle_as_a_clean_exit_2_not_a_traceback(self):
+        """A4: depgraph.py's own docstring documents only exit 0 and exit 2.
+        A dependency missing a required field must fail the same clean way
+        an unreadable envelope does, not crash with an uncaught KeyError."""
+        import io
+        import json
+        import tempfile
+        from contextlib import redirect_stderr
+
+        import depgraph
+
+        bad = {"id": "service:pg", "name": "postgres",
+               "evidence": [], "related_ids": [], "details": {}}
+        envelope = {"contract_version": "1.0.0", "target": "/r",
+                   "categories": {"service": {"status": "discovered",
+                                              "dependencies": [bad],
+                                              "assumptions": []}}}
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(envelope, f)
+            path = f.name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+
+        buf = io.StringIO()
+        with redirect_stderr(buf):
+            code = depgraph.main([path, "--indent", "0"])
+        self.assertEqual(code, 2)
+        self.assertIn("error", json.loads(buf.getvalue()))
+
 
 class TestCliOutputShape(unittest.TestCase):
     def test_contract_bound_keys_match_the_synthesis_contract(self):

@@ -14,14 +14,15 @@ Usage:
 
 Exit codes:
     0  graph document emitted
-    2  an input envelope was unreadable (missing or invalid JSON)
+    2  an input envelope was unreadable (missing or invalid JSON), or a
+       dependency entry is missing a required field (id, name, or lifecycle)
 """
 
 import argparse
 import json
 import sys
 
-from depgraphlib.graph import build_graph
+from depgraphlib.graph import InvalidDependencyError, build_graph
 from depgraphlib.merge import merge_envelopes
 from depgraphlib.mermaid import to_mermaid
 
@@ -47,7 +48,12 @@ def main(argv=None):
             return 2
 
     merged = merge_envelopes(loaded)
-    graph = build_graph(merged)
+    try:
+        graph = build_graph(merged)
+    except InvalidDependencyError as exc:
+        json.dump({"error": f"invalid dependency: {exc}"}, sys.stderr)
+        sys.stderr.write("\n")
+        return 2
     document = {"inventory": merged, "graph": graph, "mermaid": to_mermaid(graph)}
 
     indent = args.indent if args.indent > 0 else None

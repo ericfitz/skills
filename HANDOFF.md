@@ -85,14 +85,14 @@ context. Several matter more than their label suggests; the three below especial
 
 ## Findings a fresh session should not have to rediscover
 
-**A design question left open for the user, deliberately.** The T3 review flagged that
-`platform`'s `runtime-version` / `arch` / `os` → `build` is in tension with `definitions.md`:
-`lifecycle` records *which environment must contain* a dependency, and all three are
-constraints on the **runtime** environment. `build` only reads coherently when the artifact
-bakes the runtime in. I did not change it — the user approved D3's mapping table, and
-`CLAUDE.md` says never to silently change an approved architectural decision. **The user was
-told and has not yet answered.** If they want it changed it touches the spec's D3 table,
-`platform/SKILL.md`, and T11's pinning test.
+**A design question left open for the user has since been decided.** The T3 review flagged
+that `platform`'s `runtime-version` / `arch` / `os` → `build` was in tension with
+`definitions.md`: `lifecycle` records *which environment must contain* a dependency, and all
+three are constraints on the **runtime** environment. The user's ruling: `platform` is `run`
+for every `details.kind`. That collapses the per-kind split entirely — all eight
+`details.kind` values are `run`, and `package` is left as the only category with a derived
+`lifecycle`. Applied in the catch-up fix wave, across the spec's D3 table, `platform/SKILL.md`,
+this plan's Task 3 text, and T11's pinning test.
 
 **The PEP 621 manifest pass is unguarded** (`pkglifecycle.py`). `project = "x"` raises
 AttributeError; `[project] dependencies = 5` raises TypeError; and `dependencies = "requests"`

@@ -139,29 +139,33 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
                 assert_phrase_in(self, "legitimate finding", text)
 
     def test_no_skill_promises_criticality_or_remediation(self):
-        banned = ("criticality", "blast radius", "remediation",
-                  "monitoring gap", "chaos test")
+        # Patterns, not plain substrings: "blast radius" and "blast-radius"
+        # are the same promise (C1), and "rank"/"ranking" are the same
+        # promise too (C2).
+        banned = (r"criticality", r"blast[- ]radius", r"remediation",
+                  r"monitoring gap", r"chaos test", r"\brank(?:ing)?\b")
         # Word-boundary patterns: a bare substring match ("not " inside
         # "cannot ", "never" inside "whenever") would count prose as a
         # disclaimer that never disclaimed anything.
         disclaim_markers = (r"\bno\b", r"\bnot\b", r"\bnever\b", r"\bdo not\b")
         for skill in SKILLS:
             text = body(skill).lower()
-            for word in banned:
-                with self.subTest(skill=skill.parent.name, word=word):
+            for pattern in banned:
+                with self.subTest(skill=skill.parent.name, pattern=pattern):
                     # Allowed only where every occurrence sits in a line that
                     # disclaims it — a single disclaiming line must not give
                     # cover to a later line that promises the word outright.
                     # (Scoped per physical line by design, not the phrase
                     # helper above: a disclaimer and the word it disclaims
                     # are expected to sit together, so line boundaries here
-                    # are meaningful rather than incidental wrapping.)
+                    # are meaningful rather than incidental wrapping, and
+                    # collapse_ws must not be used here for the same reason.)
                     for line in text.splitlines():
-                        if word not in line:
+                        if not re.search(pattern, line):
                             continue
                         self.assertTrue(
                             any(re.search(pat, line) for pat in disclaim_markers),
-                            f"{skill.parent.name} promises {word!r}: {line}")
+                            f"{skill.parent.name} promises {pattern!r}: {line}")
 
 
 class TestSecuritySkillCarriesTheCredentialRule(unittest.TestCase):
@@ -188,21 +192,18 @@ class TestLifecycleInstructions(unittest.TestCase):
     """Spec pin: an unenforced classification is how two skills come to
     disagree about the same entry."""
 
-    RUN_CONSTANT: ClassVar[list[str]] = ["service", "network", "config", "security"]
+    RUN_CONSTANT: ClassVar[list[str]] = [
+        "service", "network", "config", "security", "platform"]
 
-    def test_the_four_constant_categories_say_run(self):
+    def test_the_constant_categories_say_run(self):
+        """D3 (user correction): arch, os, and runtime-version constrain the
+        runtime environment, not the build environment, so every
+        `details.kind` on a platform entry is `run` too -- platform joins
+        the other constant categories rather than splitting by kind."""
         for category in self.RUN_CONSTANT:
             text = body(skill_path(category))
             with self.subTest(skill=category):
                 self.assertRegex(text, r"`lifecycle`[^\n]*`run`")
-
-    def test_platform_states_the_split_by_details_kind(self):
-        text = body(skill_path("platform"))
-        assert_phrase_in(self, "details.kind", text)
-        for kind in ("cpu", "memory", "disk", "gpu", "cloud-service",
-                     "arch", "os", "runtime-version"):
-            with self.subTest(kind=kind):
-                assert_phrase_in(self, kind, text)
 
     def test_package_defers_to_pkglifecycle_and_says_syft_cannot(self):
         text = body(skill_path("package"))

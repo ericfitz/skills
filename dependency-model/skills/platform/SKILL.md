@@ -63,8 +63,10 @@ the six discovery skills already produced this output for the same target, read
    stage the figure applies to.
 8. If the scan's `coverage.skipped` is non-empty, record one assumption per
    skipped language, naming the language and what went unscanned.
-9. Set `lifecycle` from `details.kind`: `cpu`, `memory`, `disk`, `gpu`, and
-   `cloud-service` are `run`; `arch`, `os`, and `runtime-version` are `build`.
+9. Set `lifecycle` to `run` on every platform entry, whatever `details.kind`
+   is — a CPU, memory, disk, or GPU limit, a cloud service, an architecture,
+   an OS, or a `runtime-version` floor all constrain the environment the
+   system runs in, not merely where it was built.
 10. Emit the full envelope, then a short prose summary: figure count by `kind`,
     and which components carry no declared limit at all.
 

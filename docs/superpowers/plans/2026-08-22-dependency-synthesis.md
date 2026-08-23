@@ -608,7 +608,7 @@ Add a procedure step, after the syft run and before emitting dependencies:
 Each gains one procedure line stating the constant it sets:
 
 - `service`, `network`, `config`, `security`: "Set `lifecycle` to `run` on every dependency — these are needed while the service runs."
-- `platform`: "Set `lifecycle` from `details.kind`: `cpu`, `memory`, `disk`, `gpu`, and `cloud-service` are `run`; `arch`, `os`, and `runtime-version` are `build`."
+- `platform`: "Set `lifecycle` to `run` on every platform entry, whatever `details.kind` is — a CPU, memory, disk, or GPU limit, a cloud service, an architecture, an OS, or a `runtime-version` floor all constrain the environment the system runs in, not merely where it was built."
 
 Each of the six also states, in its Rules: "`lifecycle` has two values and never a third. It records which environment must contain the dependency, and it does **not** determine health."
 
@@ -1104,7 +1104,7 @@ Nodes: one per dependency, carrying `id`, `name`, `category`, `lifecycle`, sorte
 
 Edges: `depends_on` from `details.depends_on[]` (lifecycle taken from the source node); `relates_to` from `related_ids[]`. **Drop any edge whose target id is not a known node** — a dangling edge in a graph #49 says is the deliverable is worse than a missing one. Deduplicate, then sort by `(from, to, kind)`.
 
-Cycles: iterative depth-first search over the combined edge set, using an explicit stack (not recursion — a deep package graph would blow Python's recursion limit). Emit each cycle once, with its member ids in a deterministic rotation (rotate so the lexicographically smallest id is first) so two runs agree.
+Cycles: iterative depth-first search over the `depends_on` edges only (not the combined edge set — `related_ids` links are routinely symmetric, so walking them too would report a 2-cycle for every service↔network association and drown any real finding), using an explicit stack (not recursion — a deep package graph would blow Python's recursion limit). Emit each cycle once, with its member ids in a deterministic rotation (rotate so the lexicographically smallest id is first) so two runs agree.
 
 - [ ] **Step 4: Wire into the CLI, run tests, commit**
 

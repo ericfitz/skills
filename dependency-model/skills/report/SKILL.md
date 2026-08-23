@@ -52,7 +52,10 @@ path.
      never that a bound is confirmed absent), `required_for`, and
      `evidence`.
    - **Dependency graph**: see step 3.
-   - **Cycles**: list each entry in `graph.cycles`, or state there are none.
+   - **Cycles**: list each cycle detected in `graph.cycles`, or state there
+     are none. `graph.cycles` is not an exhaustive enumeration of every
+     simple cycle in the graph — say so, rather than presenting the list as
+     complete.
    - **Assumptions**: list every `assumptions[]` entry — `claim` and
      `why_unconfirmed`.
 
@@ -99,7 +102,7 @@ path.
   A category whose `status` is `failed` is a different finding and must be
   stated as failed, never rendered as if it were an empty discovered list.
 - The report is a rendering. It adds no facts the contract does not carry —
-  no criticality, ranking, or blast-radius judgment, and no health state
+  no criticality, ranking, or blast radius judgment, and no health state
   beyond what `health[]` already states.
 - Never invoke another plugin's script by path; obtain the contract from
   `synthesize` by name.

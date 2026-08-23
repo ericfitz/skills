@@ -99,7 +99,7 @@ reverse does not hold. `npm ci --omit=dev` is the operator that drops the differ
 |---|---|
 | `package` | derived — see below |
 | `service`, `network`, `config`, `security` | `run` — needed while the service runs |
-| `platform` | per `details.kind`: `cpu`/`memory`/`disk`/`gpu`/`cloud-service` → `run`; `arch`/`os`/`runtime-version` → `build` |
+| `platform` | `run` for every `details.kind` — a CPU/memory/disk/GPU limit, a cloud service, an architecture, an OS, and a `runtime-version` floor all constrain the environment the system runs in, not merely where it was built |
 
 **syft cannot answer this, and fails differently per ecosystem.** Verified 2026-08-22
 with syft 1.51.0:
@@ -134,7 +134,9 @@ none, correct for a dev root nothing depends on.
 ecosystem. A package syft found is, absent evidence otherwise, part of what is
 installed; and for npm specifically anything syft reports is necessarily runtime.
 
-A test pins the other categories' constants and `platform`'s split by `details.kind`.
+A test pins the other categories' constants — `service`, `network`, `config`,
+`security`, and `platform` all pin to `run` — leaving `package` as the only
+category with a derived `lifecycle`.
 
 Note that `lifecycle` does **not** determine health (D2). Most libraries are `run`
 under npm semantics and still contribute no health condition, because they cannot
@@ -373,8 +375,8 @@ a choice that would otherwise erode silently:
 
 1. The synthesis schema contains no `healthy`/`degraded`/`unhealthy` enum (D9).
 2. `lifecycle` admits exactly `build` and `run`, so a `both` cannot reappear; the
-   constants are pinned for `service`/`network`/`config`/`security`, and
-   `platform`'s split by `details.kind` is pinned (D3).
+   constants are pinned for `service`/`network`/`config`/`security`/`platform`,
+   all of them `run` (D3).
 3. `pkglifecycle.py` classifies declared roots per ecosystem and propagates
    correctly over `dependency-of` edges — including the **edge direction**, since
    inverting it inverts every classification silently; and an unparseable ecosystem
