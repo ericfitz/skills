@@ -66,7 +66,7 @@ flowchart LR
     d_dedupe["dedupe"]
   end
 
-  subgraph depmodel["dependency-model — dependency discovery"]
+  subgraph depmodel["dependency-model — dependency discovery and synthesis"]
     x_pkg["package"]
     x_svc["service"]
     x_cfg["config"]
@@ -150,12 +150,14 @@ and produces none; it is a preflight, not a stage.
 second gate: `journeys` and the `itest` discovery skills read the documentary record
 from its contract rather than re-reading the documents.
 
-`itest:design` is the only orchestrator in the marketplace. It runs the two gates in
-sequence, fans the remaining five phases out concurrently, holds a human confirmation
-gate, and emits the `scenario` contract. Its durable side effect is `docs/journeys.md` —
-the confirmed journey set, with the `profile:journeys` contract in a fenced JSON block at
-the end. That file is the handoff to `openapi:arazzo`, which is why the arazzo skill can
-skip discovery entirely.
+`itest:design` is the only orchestrator in the marketplace that spans plugins — it
+orchestrates skills in both `profile` and `itest`, where `loc:backfill` and
+`dependency-model:synthesize` each orchestrate only within their own plugin. It runs
+the two gates in sequence, fans the remaining five phases out concurrently, holds a
+human confirmation gate, and emits the `scenario` contract. Its durable side effect is
+`docs/journeys.md` — the confirmed journey set, with the `profile:journeys` contract in
+a fenced JSON block at the end. That file is the handoff to `openapi:arazzo`, which is
+why the arazzo skill can skip discovery entirely.
 
 `profile:topology` is the seed for all six `dependency-model` discovery skills — the same
 refinement-tier relationship `stack` has to `topology`, and the same one-way direction
@@ -211,12 +213,12 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `security` | The credential and permission surface — what each secret is named and where it is read, never its value | `discovery` contract, `security` category | `topology`, `depscan.py` index |
 | `platform` | Declared OS and cloud resources — CPU, memory, disk, GPU, architecture, runtime versions, managed services | `discovery` contract, `platform` category | `topology`, `depscan.py` index |
 | `network` | The names, hosts, and ports that must resolve and connect, inbound and outbound | `discovery` contract, `network` category | `topology`, `depscan.py` index |
-| `synthesize` | Merges the six discovery contracts into one inventory and graph, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts |
+| `synthesize` | Merges the six discovery contracts into one inventory and graph, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts, `depgraph.py` |
 | `report` | Renders the `synthesis` contract into a human-readable document — inventory by category, health definitions, dependency graph, cycles, and assumptions | `docs/dependencies.md` | `synthesis` contract |
 
 All six discovery skills emit the same `discovery` envelope with exactly one key
 under `categories` populated, so merging them is a key union rather than a
-transform. `synthesize` is this layer's orchestrator: it gathers all six
+transform. `synthesize` is `dependency-model`'s orchestrator: it gathers all six
 contracts, merges them via `depgraph.py` into one inventory and graph, and
 derives the health view from the merged inventory's resilience facts, emitting
 the `synthesis` contract. `report` renders that contract into
@@ -255,7 +257,7 @@ These have no cross-plugin edges. Internal orchestration is noted where it exist
 | Generate an Arazzo workflow spec | `/itest:design` | `/openapi:init`, then `/openapi:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
 | Fuzz an API | `/cats:init` | `/cats:run`, then `/cats:analyze`; `/cats:fp` to suppress confirmed false positives |
 | Find dead code and duplication | `/dev:sem-annotate` | `/dev:dedupe`; `/dev:sem-auto` to keep markers fresh afterwards |
-| Audit a system's deployment shape and dependencies | `/profile:stack` | `/profile:topology` |
+| Audit a system's deployment shape and dependencies | `/profile:stack` | `/profile:topology`, then `/dependency-model:synthesize` and `/dependency-model:report` |
 | Update dependencies | `/deps:bump` | — |
 | Confirm the tooling is installed | `/env:check` | `--fix` for declared remedies |
 
