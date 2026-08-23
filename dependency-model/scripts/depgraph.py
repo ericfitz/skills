@@ -21,6 +21,7 @@ import argparse
 import json
 import sys
 
+from depgraphlib.graph import build_graph
 from depgraphlib.merge import merge_envelopes
 
 
@@ -44,8 +45,11 @@ def main(argv=None):
             sys.stderr.write("\n")
             return 2
 
+    merged = merge_envelopes(loaded)
+    document = {"inventory": merged, "graph": build_graph(merged)}
+
     indent = args.indent if args.indent > 0 else None
-    print(json.dumps(merge_envelopes(loaded), indent=indent, sort_keys=True))
+    print(json.dumps(document, indent=indent, sort_keys=True))
     return 0
 
 
