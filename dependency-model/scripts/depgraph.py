@@ -1,0 +1,53 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""Merge dependency-model discovery envelopes into a single graph document.
+
+Read-only: this reads envelope JSON files and merges them in memory. It
+resolves no names, opens no sockets, boots no containers, and runs no build.
+
+Usage:
+    uv run --script depgraph.py ENVELOPE.json [...] [--indent N]
+    python3 depgraph.py ENVELOPE.json [...] [--indent N]   # fallback; no deps
+
+Exit codes:
+    0  graph document emitted
+    2  an input envelope was unreadable (missing or invalid JSON)
+"""
+
+import argparse
+import json
+import sys
+
+from depgraphlib.merge import merge_envelopes
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="depgraph.py",
+        description="Merge dependency-model discovery envelopes into a graph document.")
+    parser.add_argument("envelopes", nargs="+", metavar="ENVELOPE.json",
+                        help="discovery envelope JSON files to merge")
+    parser.add_argument("--indent", type=int, default=2,
+                        help="JSON indent; 0 for compact output")
+    args = parser.parse_args(argv)
+
+    loaded = []
+    for path in args.envelopes:
+        try:
+            with open(path, encoding="utf-8") as f:
+                loaded.append(json.load(f))
+        except (OSError, json.JSONDecodeError) as exc:
+            json.dump({"error": f"unreadable envelope: {path}: {exc}"}, sys.stderr)
+            sys.stderr.write("\n")
+            return 2
+
+    indent = args.indent if args.indent > 0 else None
+    print(json.dumps(merge_envelopes(loaded), indent=indent, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

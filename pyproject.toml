@@ -52,7 +52,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
 # inventorylib and depscanlib are invoked by path from their plugins' scripts
 # dirs, not installed; without this, isort treats them as third-party in the
 # test modules.
-known-first-party = ["inventorylib", "depscanlib"]
+known-first-party = ["inventorylib", "depscanlib", "depgraphlib"]
 
 [tool.ruff.lint.per-file-ignores]
 # E501: fixtures embed YAML/JSON documents as single-line "a\nb\n" literals
