@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:synthesis contract",
+  "description": "The envelope `synthesize` emits: the merged discovery inventory plus the graph and health view derived from it. report, #50, and #51 consume this. Judgment about which conditions matter belongs to those consumers, not to this contract.",
+  "type": "object",
+  "required": ["contract_version", "target", "inventory", "graph", "health", "assumptions"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "target": {
+      "type": "string",
+      "description": "Absolute path of the repository this was synthesized from."
+    },
+    "inventory": {
+      "type": "object",
+      "required": ["categories"],
+      "description": "The discovery envelopes for this target, merged by key union across whichever discovery skills ran.",
+      "properties": {
+        "categories": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "config": { "$ref": "config.schema.json" },
+            "network": { "$ref": "network.schema.json" },
+            "package": { "$ref": "package.schema.json" },
+            "platform": { "$ref": "platform.schema.json" },
+            "security": { "$ref": "security.schema.json" },
+            "service": { "$ref": "service.schema.json" }
+          }
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges", "cycles"],
+      "description": "The dependency graph derived from the inventory: one node per discovered dependency, one edge per relationship between them.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "category", "lifecycle"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Same id as the corresponding inventory dependency, '<category>:<slug>'."
+              },
+              "name": { "type": "string" },
+              "category": {
+                "enum": ["config", "network", "package", "platform", "security", "service"]
+              },
+              "lifecycle": { "enum": ["build", "run"] }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to", "kind", "lifecycle"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "kind": {
+                "enum": ["depends_on", "relates_to"],
+                "description": "depends_on: one dependency requires another to function, e.g. a package's transitive dependency. relates_to: two dependencies are the same real-world thing seen from different categories, e.g. a service and the network port that reaches it -- the correlation `related_ids` already carries, made explicit as an edge."
+              },
+              "lifecycle": { "enum": ["build", "run"] }
+            }
+          }
+        },
+        "cycles": {
+          "type": "array",
+          "description": "Each entry is a list of node ids forming one cycle in the depends_on graph. Empty when none were found.",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "health": {
+      "type": "array",
+      "description": "One entry per service-shaped dependency that carries failure-relevant conditions, gathered from the inventory's resilience facts and related dependencies. No entry means no conditions were found, not that the dependency is fine.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["service_id", "conditions"],
+        "properties": {
+          "service_id": {
+            "type": "string",
+            "description": "The graph node id this health entry describes."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "subject_id", "expectation", "required_for", "evidence"],
+              "properties": {
+                "kind": {
+                  "enum": ["presence", "bound", "upstream_health"],
+                  "description": "presence: subject_id must exist/resolve, e.g. a network path or a config key. bound: subject_id carries a declared limit, e.g. a timeout or retry count. upstream_health: subject_id's own health entry feeds this one, e.g. a service that depends on another service. Uniform on purpose: a consumer that ANDed two special-cased lists (a 'requires' list and a 'bounds' list) would be encoding a met/unmet-AND-within/outside binary that real systems don't have a middle for. That vocabulary is deliberately not defined here -- see the contract's no-state-vocabulary rule."
+                },
+                "subject_id": {
+                  "type": "string",
+                  "description": "The id this condition is about -- a graph node id, or another identifier the evidence points at."
+                },
+                "expectation": {
+                  "type": ["object", "null"],
+                  "description": "The declaration found in the repository, or null. null means no declaration was found -- it never means no bound is needed. Whether an unbounded request-path dependency is a real gap is a judgment for a later layer, not this contract.",
+                  "required": ["value", "evidence"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "value": { "type": "string" },
+                    "evidence": { "type": "array", "items": { "type": "string" } }
+                  }
+                },
+                "required_for": {
+                  "type": "array",
+                  "description": "Ids of the functions or components that need this condition met, from static evidence. Records which callers depend on it, never how important any of them are; may be empty when no caller could be established.",
+                  "items": { "type": "string" }
+                },
+                "evidence": {
+                  "type": "array",
+                  "description": "Locations that prove this condition exists, as 'file:line'.",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

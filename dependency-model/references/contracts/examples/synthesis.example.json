@@ -1,0 +1,180 @@
+{
+  "contract_version": "1.0.0",
+  "target": "/abs/path/to/repo",
+  "inventory": {
+    "categories": {
+      "service": {
+        "status": "discovered",
+        "dependencies": [
+          {
+            "id": "service:postgres-primary",
+            "name": "postgres",
+            "lifecycle": "run",
+            "evidence": ["docker-compose.yml:12", "internal/db/pool.go:41"],
+            "related_ids": ["network:postgres-5432", "config:database-url"],
+            "resilience": {
+              "timeout": { "value": "5s", "evidence": ["internal/db/pool.go:44"] },
+              "retry": null,
+              "fallback": null,
+              "health_check": { "description": "pg_isready", "evidence": ["docker-compose.yml:19"] },
+              "on_path": ["startup", "request"]
+            },
+            "details": {
+              "kind": "database",
+              "protocol": "postgres",
+              "client_library": "github.com/jackc/pgx/v5",
+              "managed_by": "compose",
+              "config_keys": ["DATABASE_URL"]
+            }
+          }
+        ],
+        "assumptions": [
+          {
+            "claim": "postgres is also the production database, not only the local compose one",
+            "why_unconfirmed": "no production manifest is committed; DATABASE_URL is supplied externally"
+          }
+        ]
+      },
+      "network": {
+        "status": "discovered",
+        "dependencies": [
+          {
+            "id": "network:postgres-5432",
+            "name": "postgres:5432",
+            "lifecycle": "run",
+            "evidence": ["docker-compose.yml:15"],
+            "related_ids": ["service:postgres-primary"],
+            "resilience": {
+              "timeout": null,
+              "retry": null,
+              "fallback": null,
+              "health_check": null,
+              "on_path": ["startup", "request"]
+            },
+            "details": {
+              "kind": "port",
+              "value": "postgres:5432",
+              "direction": "outbound",
+              "protocol": "tcp",
+              "resolution_mechanism": null
+            }
+          }
+        ],
+        "assumptions": []
+      },
+      "package": {
+        "status": "discovered",
+        "dependencies": [
+          {
+            "id": "package:pgx-v5-5.5.0",
+            "name": "github.com/jackc/pgx/v5",
+            "lifecycle": "build",
+            "evidence": ["go.mod"],
+            "related_ids": ["service:postgres-primary"],
+            "resilience": {
+              "timeout": null,
+              "retry": null,
+              "fallback": null,
+              "health_check": null,
+              "on_path": ["build"]
+            },
+            "details": {
+              "ecosystem": "go",
+              "package_manager": "go-modules",
+              "purl": "pkg:golang/github.com/jackc/pgx/v5",
+              "version": "5.5.0",
+              "version_constraint": "v5.5.0",
+              "pinned": true,
+              "resolution": "locked",
+              "direct": true,
+              "depends_on": ["package:puddle-v2-2.2.1"]
+            }
+          },
+          {
+            "id": "package:puddle-v2-2.2.1",
+            "name": "github.com/jackc/puddle/v2",
+            "lifecycle": "build",
+            "evidence": ["go.mod"],
+            "related_ids": [],
+            "resilience": {
+              "timeout": null,
+              "retry": null,
+              "fallback": null,
+              "health_check": null,
+              "on_path": ["build"]
+            },
+            "details": {
+              "ecosystem": "go",
+              "package_manager": "go-modules",
+              "purl": "pkg:golang/github.com/jackc/puddle/v2",
+              "version": "2.2.1",
+              "version_constraint": "v2.2.1",
+              "pinned": true,
+              "resolution": "locked",
+              "direct": false,
+              "depends_on": []
+            }
+          }
+        ],
+        "assumptions": [
+          {
+            "claim": "the locked version is the one actually deployed",
+            "why_unconfirmed": "no build manifest for the deployed artifact is committed alongside go.sum"
+          }
+        ]
+      }
+    }
+  },
+  "graph": {
+    "nodes": [
+      { "id": "service:postgres-primary", "name": "postgres", "category": "service", "lifecycle": "run" },
+      { "id": "network:postgres-5432", "name": "postgres:5432", "category": "network", "lifecycle": "run" },
+      { "id": "package:pgx-v5-5.5.0", "name": "github.com/jackc/pgx/v5", "category": "package", "lifecycle": "build" },
+      { "id": "package:puddle-v2-2.2.1", "name": "github.com/jackc/puddle/v2", "category": "package", "lifecycle": "build" },
+      { "id": "package:a-1.0.0", "name": "a", "category": "package", "lifecycle": "build" },
+      { "id": "package:b-2.0.0", "name": "b", "category": "package", "lifecycle": "build" }
+    ],
+    "edges": [
+      { "from": "package:pgx-v5-5.5.0", "to": "package:puddle-v2-2.2.1", "kind": "depends_on", "lifecycle": "build" },
+      { "from": "package:a-1.0.0", "to": "package:b-2.0.0", "kind": "depends_on", "lifecycle": "build" },
+      { "from": "package:b-2.0.0", "to": "package:a-1.0.0", "kind": "depends_on", "lifecycle": "build" },
+      { "from": "service:postgres-primary", "to": "network:postgres-5432", "kind": "relates_to", "lifecycle": "run" },
+      { "from": "package:pgx-v5-5.5.0", "to": "service:postgres-primary", "kind": "relates_to", "lifecycle": "run" }
+    ],
+    "cycles": [["package:a-1.0.0", "package:b-2.0.0"]]
+  },
+  "health": [
+    {
+      "service_id": "service:postgres-primary",
+      "conditions": [
+        {
+          "kind": "presence",
+          "subject_id": "network:postgres-5432",
+          "expectation": null,
+          "required_for": ["component:api"],
+          "evidence": ["docker-compose.yml:12"]
+        },
+        {
+          "kind": "bound",
+          "subject_id": "service:postgres-primary",
+          "expectation": { "value": "5s", "evidence": ["internal/db/pool.go:44"] },
+          "required_for": ["component:api"],
+          "evidence": ["internal/db/pool.go:44"]
+        },
+        {
+          "kind": "upstream_health",
+          "subject_id": "network:postgres-5432",
+          "expectation": null,
+          "required_for": ["component:api"],
+          "evidence": ["docker-compose.yml:12", "docker-compose.yml:15"]
+        }
+      ]
+    }
+  ],
+  "assumptions": [
+    {
+      "claim": "the api component is the only caller of postgres-primary on the request path",
+      "why_unconfirmed": "no call-graph evidence beyond the static import of the pgx client was collected"
+    }
+  ]
+}

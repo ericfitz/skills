@@ -55,7 +55,8 @@ class TestContractFilesExist(unittest.TestCase):
     def test_every_expected_schema_is_present(self):
         names = sorted(p.name for p in CONTRACTS.glob("*.schema.json"))
         expected = sorted(
-            ["dependency-core.schema.json", "discovery.schema.json"]
+            ["dependency-core.schema.json", "discovery.schema.json",
+             "synthesis.schema.json"]
             + [f"{c}.schema.json" for c in CATEGORIES])
         self.assertEqual(names, expected)
 
@@ -309,6 +310,58 @@ class TestLifecycle(unittest.TestCase):
         svc = load(EXAMPLES / "service.example.json")
         self.assertEqual(
             svc["categories"]["service"]["dependencies"][0]["lifecycle"], "run")
+
+
+class TestSynthesisContract(unittest.TestCase):
+    def test_schema_and_example_exist_and_validate(self):
+        schema = load(CONTRACTS / "synthesis.schema.json")
+        instance = load(EXAMPLES / "synthesis.example.json")
+        self.assertEqual(validate(instance, schema, base_dir=CONTRACTS), [])
+
+    def test_requires_the_four_parts(self):
+        schema = load(CONTRACTS / "synthesis.schema.json")
+        for field in ("contract_version", "target", "inventory", "graph", "health",
+                      "assumptions"):
+            self.assertIn(field, schema["required"])
+
+    def test_edge_kinds_are_exactly_two(self):
+        schema = load(CONTRACTS / "synthesis.schema.json")
+        edge = schema["properties"]["graph"]["properties"]["edges"]["items"]
+        self.assertEqual(edge["properties"]["kind"]["enum"],
+                         ["depends_on", "relates_to"])
+
+    def test_condition_kinds_are_the_three_documented(self):
+        schema = load(CONTRACTS / "synthesis.schema.json")
+        cond = (schema["properties"]["health"]["items"]
+                ["properties"]["conditions"]["items"])
+        self.assertEqual(cond["properties"]["kind"]["enum"],
+                         ["presence", "bound", "upstream_health"])
+
+    def test_expectation_accepts_null(self):
+        """null means no declaration was found -- never 'no bound needed'."""
+        schema = load(CONTRACTS / "synthesis.schema.json")
+        cond = (schema["properties"]["health"]["items"]
+                ["properties"]["conditions"]["items"])
+        self.assertIn("null", cond["properties"]["expectation"]["type"])
+
+    def test_example_carries_a_null_expectation_and_a_declared_one(self):
+        instance = load(EXAMPLES / "synthesis.example.json")
+        expectations = [c["expectation"]
+                        for h in instance["health"] for c in h["conditions"]]
+        self.assertIn(None, expectations)
+        self.assertTrue(any(e is not None for e in expectations))
+
+
+class TestNoStateVocabulary(unittest.TestCase):
+    """D9: states that are not encoded cannot be encoded wrongly. Defining
+    `degraded` later must cost nothing in this schema."""
+
+    def test_no_schema_declares_a_health_state_enum(self):
+        for path in sorted(CONTRACTS.glob("*.schema.json")):
+            text = path.read_text(encoding="utf-8")
+            for state in ('"healthy"', '"degraded"', '"unhealthy"'):
+                with self.subTest(schema=path.name, state=state):
+                    self.assertNotIn(state, text)
 
 
 if __name__ == "__main__":
