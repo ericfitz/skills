@@ -61,5 +61,27 @@ class TestRunningDiscovery(unittest.TestCase):
         self.assertIn("python3", text)
 
 
+class TestDefinitions(unittest.TestCase):
+    def test_definitions_exists(self):
+        self.assertTrue((REFERENCES / "definitions.md").exists())
+
+    def test_states_the_two_senses_and_the_superset_relation(self):
+        text = (REFERENCES / "definitions.md").read_text(encoding="utf-8").lower()
+        self.assertIn("build", text)
+        self.assertIn("run", text)
+        self.assertIn("superset", text)
+        self.assertIn("devdependencies", text)
+
+    def test_states_the_failability_test_for_health(self):
+        text = (REFERENCES / "definitions.md").read_text(encoding="utf-8").lower()
+        self.assertIn("fail independently while the process is up", text)
+
+    def test_carries_the_taxonomy_as_prose_and_marks_it_undefined(self):
+        text = (REFERENCES / "definitions.md").read_text(encoding="utf-8").lower()
+        for word in ("healthy", "degraded", "unhealthy"):
+            self.assertIn(word, text)
+        self.assertIn("not yet technically defined", text)
+
+
 if __name__ == "__main__":
     unittest.main()
