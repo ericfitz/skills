@@ -114,6 +114,56 @@
               "direct": false,
               "depends_on": []
             }
+          },
+          {
+            "id": "package:a-1.0.0",
+            "name": "a",
+            "lifecycle": "build",
+            "evidence": ["go.mod"],
+            "related_ids": [],
+            "resilience": {
+              "timeout": null,
+              "retry": null,
+              "fallback": null,
+              "health_check": null,
+              "on_path": ["build"]
+            },
+            "details": {
+              "ecosystem": "go",
+              "package_manager": "go-modules",
+              "purl": "pkg:golang/example.com/a",
+              "version": "1.0.0",
+              "version_constraint": "v1.0.0",
+              "pinned": true,
+              "resolution": "locked",
+              "direct": false,
+              "depends_on": ["package:b-2.0.0"]
+            }
+          },
+          {
+            "id": "package:b-2.0.0",
+            "name": "b",
+            "lifecycle": "build",
+            "evidence": ["go.mod"],
+            "related_ids": [],
+            "resilience": {
+              "timeout": null,
+              "retry": null,
+              "fallback": null,
+              "health_check": null,
+              "on_path": ["build"]
+            },
+            "details": {
+              "ecosystem": "go",
+              "package_manager": "go-modules",
+              "purl": "pkg:golang/example.com/b",
+              "version": "2.0.0",
+              "version_constraint": "v2.0.0",
+              "pinned": true,
+              "resolution": "locked",
+              "direct": false,
+              "depends_on": ["package:a-1.0.0"]
+            }
           }
         ],
         "assumptions": [

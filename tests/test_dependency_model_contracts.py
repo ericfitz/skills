@@ -351,6 +351,26 @@ class TestSynthesisContract(unittest.TestCase):
         self.assertIn(None, expectations)
         self.assertTrue(any(e is not None for e in expectations))
 
+    def test_graph_nodes_and_health_subjects_resolve_to_inventory(self):
+        """A consumer that joins a graph node to its inventory dependency --
+        to reach its resilience facts, say -- must not KeyError. Scoped to
+        graph.nodes and health[].conditions[].subject_id only: related_ids
+        is deliberately out of scope, since layer 1 already tolerates an
+        unresolved related_ids entry elsewhere."""
+        instance = load(EXAMPLES / "synthesis.example.json")
+        inventory_ids = {
+            dep["id"]
+            for category in instance["inventory"]["categories"].values()
+            for dep in category["dependencies"]
+        }
+        for node in instance["graph"]["nodes"]:
+            with self.subTest(node=node["id"]):
+                self.assertIn(node["id"], inventory_ids)
+        for entry in instance["health"]:
+            for condition in entry["conditions"]:
+                with self.subTest(subject=condition["subject_id"]):
+                    self.assertIn(condition["subject_id"], inventory_ids)
+
 
 class TestNoStateVocabulary(unittest.TestCase):
     """D9: states that are not encoded cannot be encoded wrongly. Defining
