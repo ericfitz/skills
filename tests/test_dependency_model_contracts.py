@@ -280,5 +280,36 @@ class TestContractStaysInItsLayer(unittest.TestCase):
                     self.assertNotIn(word, text)
 
 
+class TestLifecycle(unittest.TestCase):
+    """Two values only. The build environment is a strict superset of the
+    runtime environment, so a runtime dependency is present at build BECAUSE
+    it is a runtime dependency -- `both` would record the containment twice."""
+
+    def test_core_requires_lifecycle_with_exactly_two_values(self):
+        core = load(CONTRACTS / "dependency-core.schema.json")
+        self.assertIn("lifecycle", core["required"])
+        self.assertEqual(core["properties"]["lifecycle"]["enum"], ["build", "run"])
+
+    def test_no_schema_admits_a_both_value(self):
+        for path in sorted(CONTRACTS.glob("*.schema.json")):
+            with self.subTest(schema=path.name):
+                self.assertNotIn('"both"', path.read_text(encoding="utf-8"))
+
+    def test_every_example_dependency_declares_lifecycle(self):
+        for category in CATEGORIES:
+            instance = load(EXAMPLES / f"{category}.example.json")
+            for dep in instance["categories"][category]["dependencies"]:
+                with self.subTest(category=category, dep=dep["id"]):
+                    self.assertIn(dep["lifecycle"], ("build", "run"))
+
+    def test_package_example_is_build_and_service_example_is_run(self):
+        pkg = load(EXAMPLES / "package.example.json")
+        self.assertEqual(
+            pkg["categories"]["package"]["dependencies"][0]["lifecycle"], "build")
+        svc = load(EXAMPLES / "service.example.json")
+        self.assertEqual(
+            svc["categories"]["service"]["dependencies"][0]["lifecycle"], "run")
+
+
 if __name__ == "__main__":
     unittest.main()

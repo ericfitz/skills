@@ -10,6 +10,7 @@
         {
           "id": "package:pgx-v5-5.5.0",
           "name": "github.com/jackc/pgx/v5",
+          "lifecycle": "build",
           "evidence": ["go.mod"],
           "related_ids": ["service:postgres-primary"],
           "resilience": {

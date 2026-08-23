@@ -10,6 +10,7 @@
         {
           "id": "platform:api-memory-limit",
           "name": "api memory limit",
+          "lifecycle": "run",
           "evidence": ["deploy/k8s/api-deployment.yaml:27"],
           "related_ids": [],
           "resilience": {

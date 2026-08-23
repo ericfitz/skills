@@ -10,6 +10,7 @@
         {
           "id": "config:database-url",
           "name": "DATABASE_URL",
+          "lifecycle": "run",
           "evidence": ["internal/db/pool.go:38", "docker-compose.yml:14"],
           "related_ids": ["service:postgres-primary"],
           "resilience": {

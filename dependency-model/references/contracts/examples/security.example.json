@@ -10,6 +10,7 @@
         {
           "id": "security:postgres-db-password",
           "name": "POSTGRES_PASSWORD",
+          "lifecycle": "run",
           "evidence": ["deploy/k8s/secrets.yaml:8", "internal/db/pool.go:41"],
           "related_ids": ["service:postgres-primary", "config:database-url"],
           "resilience": {

@@ -3,13 +3,17 @@
   "title": "dependency-model shared dependency core",
   "description": "Fields every discovered dependency carries, whatever its category. Referenced by each category schema as the dependencies[] item; the category adds its own details object on top.",
   "type": "object",
-  "required": ["id", "name", "evidence", "resilience", "details"],
+  "required": ["id", "name", "lifecycle", "evidence", "resilience", "details"],
   "properties": {
     "id": {
       "type": "string",
       "description": "Stable identifier, '<category>:<slug>'. Stable across runs so a consumer can key a graph on it."
     },
     "name": { "type": "string" },
+    "lifecycle": {
+      "enum": ["build", "run"],
+      "description": "Which environment must contain this dependency. run: shipped in the runtime artifact (npm dependencies). build: needed only to build and test, absent at runtime (npm devDependencies). The build environment is a strict superset of the runtime one, so there is no third value. This does NOT determine health: most libraries are run and still contribute no health condition, because they cannot fail while the process is up."
+    },
     "evidence": {
       "type": "array",
       "description": "Locations that prove this dependency exists, as 'file:line'. The package category carries a bare file path instead: syft reports file-level locations only.",

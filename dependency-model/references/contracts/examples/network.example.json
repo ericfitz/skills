@@ -10,6 +10,7 @@
         {
           "id": "network:postgres-5432",
           "name": "postgres:5432",
+          "lifecycle": "run",
           "evidence": ["docker-compose.yml:15"],
           "related_ids": ["service:postgres-primary"],
           "resilience": {
