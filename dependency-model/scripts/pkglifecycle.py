@@ -63,6 +63,18 @@ def _pyproject(path, out):
         for dep in deps:
             out.setdefault(_name(dep), BUILD)
 
+    # Poetry predates PEP 621 [project] and uses its own [tool.poetry] tables
+    # instead; a pyproject.toml can carry only these, so they need their own
+    # pass rather than falling through to unresolved_ecosystems (pyproject.toml
+    # is already claimed by MANIFESTS, so that path never fires for it).
+    poetry = (data.get("tool") or {}).get("poetry") or {}
+    for dep in poetry.get("dependencies") or {}:
+        if dep.lower() != "python":  # a version constraint, not a package
+            out[_name(dep)] = RUN
+    for group in (poetry.get("group") or {}).values():
+        for dep in (group.get("dependencies") or {}):
+            out.setdefault(_name(dep), BUILD)
+
 
 def _package_json(path, out):
     try:
@@ -122,8 +134,12 @@ SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "vendor", "dist",
 
 
 def _walk(root):
-    for path in Path(root).rglob("*"):
-        if path.is_file() and not any(p in SKIP_DIRS for p in path.parts):
+    root = Path(root)
+    for path in root.rglob("*"):
+        # Test against the path *relative to root*: an ancestor directory
+        # named e.g. "build" (a CI checkout under /build/, a repo under
+        # /target/) must not silently prune the whole walk.
+        if path.is_file() and not any(p in SKIP_DIRS for p in path.relative_to(root).parts):
             yield path
 
 

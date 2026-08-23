@@ -50,6 +50,19 @@ go 1.23
 require github.com/jackc/pgx/v5 v5.5.0
 """
 
+POETRY_PYPROJECT = """\
+[tool.poetry]
+name = "x"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pyyaml = "^6.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+"""
+
 
 class TestClassifyRoots(unittest.TestCase):
     def test_pyproject_splits_project_from_dev(self):
@@ -98,6 +111,30 @@ class TestClassifyRoots(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"pyproject.toml": "[project\nbroken"})
             self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_poetry_pyproject_splits_dependencies_from_dev_group(self):
+        """Poetry predates PEP 621 and has no [project] table at all; a
+        pyproject.toml can carry only [tool.poetry.*]. Since pyproject.toml is
+        already claimed by MANIFESTS, unresolved_ecosystems can never flag
+        this -- classify_roots must parse it directly or the gap is silent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"pyproject.toml": POETRY_PYPROJECT})
+            roots = pkglifecycle.classify_roots(Path(root))
+            self.assertEqual(roots["pyyaml"], "run")
+            self.assertEqual(roots["pytest"], "build")
+            self.assertNotIn("python", roots)  # a version constraint, not a package
+
+    def test_repo_nested_under_a_skip_dir_name_is_still_walked(self):
+        """SKIP_DIRS must be tested against the path relative to the scanned
+        root, not the absolute path: a checkout under /build/ or /target/ (or
+        any ancestor named like a SKIP_DIRS entry) must not silently prune
+        the whole walk and no-op the feature."""
+        with tempfile.TemporaryDirectory() as tmp:
+            nested = Path(tmp) / "build" / "myrepo"
+            root = build_repo(nested, {"pyproject.toml": PYPROJECT})
+            roots = pkglifecycle.classify_roots(Path(root))
+            self.assertEqual(roots["pyyaml"], "run")
+            self.assertEqual(roots["pytest"], "build")
 
 
 class TestPropagate(unittest.TestCase):
