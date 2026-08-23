@@ -23,6 +23,7 @@ import sys
 
 from depgraphlib.graph import build_graph
 from depgraphlib.merge import merge_envelopes
+from depgraphlib.mermaid import to_mermaid
 
 
 def main(argv=None):
@@ -46,7 +47,8 @@ def main(argv=None):
             return 2
 
     merged = merge_envelopes(loaded)
-    document = {"inventory": merged, "graph": build_graph(merged)}
+    graph = build_graph(merged)
+    document = {"inventory": merged, "graph": graph, "mermaid": to_mermaid(graph)}
 
     indent = args.indent if args.indent > 0 else None
     print(json.dumps(document, indent=indent, sort_keys=True))

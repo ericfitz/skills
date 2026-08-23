@@ -96,10 +96,14 @@ class TestCycles(unittest.TestCase):
 
 
 class TestCliOutputShape(unittest.TestCase):
-    def test_top_level_keys_match_the_synthesis_contract(self):
-        """depgraph.py's own keys must already appear under the same names and
-        nesting synthesis.schema.json uses, so the synthesize skill that adds
-        contract_version/target/health/assumptions is purely additive."""
+    def test_contract_bound_keys_match_the_synthesis_contract(self):
+        """depgraph.py's contract-bound keys -- inventory and graph -- must
+        already appear under the same names and nesting synthesis.schema.json
+        uses, so the synthesize skill that adds contract_version/target/
+        health/assumptions is purely additive. mermaid is a deliberate extra:
+        a working-document rendering the report skill consumes, which the
+        contract itself does not carry (D4 keeps presentation out of the
+        artifact #50 and #51 consume)."""
         import io
         import json
         import tempfile
@@ -121,7 +125,7 @@ class TestCliOutputShape(unittest.TestCase):
             depgraph.main([path, "--indent", "0"])
         out = json.loads(buf.getvalue())
 
-        self.assertEqual(set(out), {"inventory", "graph"})
+        self.assertEqual(set(out), {"inventory", "graph", "mermaid"})
         self.assertEqual(out["inventory"]["categories"]["service"]["dependencies"],
                          [dep("service:pg", "postgres")])
 
