@@ -87,6 +87,19 @@ INVALID_POETRY_SHAPES = {
     ),
 }
 
+# Same class of defect (I7), one pass above the poetry pass: PEP 621
+# [project] shapes that are valid TOML but not what the pass expects.
+# classify_roots must return {} for these, not raise or silently classify
+# individual characters as package names.
+INVALID_PEP621_SHAPES = {
+    "project_is_a_string": 'project = "x"\n',
+    "dependencies_is_an_int": '[project]\nname = "x"\ndependencies = 5\n',
+}
+
+PEP621_DEPENDENCIES_IS_A_BARE_STRING = (
+    '[project]\nname = "x"\ndependencies = "requests"\n'
+)
+
 
 class TestClassifyRoots(unittest.TestCase):
     def test_pyproject_splits_project_from_dev(self):
@@ -167,6 +180,27 @@ class TestClassifyRoots(unittest.TestCase):
             with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
                 root = build_repo(tmp, {"pyproject.toml": text})
                 self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_invalid_pep621_shapes_do_not_raise(self):
+        """I7: the PEP 621 [project] pass sits directly above the poetry pass
+        guarded in dcac573 for the identical reason -- leaving it unguarded
+        while poetry is guarded is not defensible on any reading. One
+        malformed manifest anywhere in the walked tree must not abort
+        classification for the whole repository."""
+        for label, text in INVALID_PEP621_SHAPES.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                root = build_repo(tmp, {"pyproject.toml": text})
+                self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
+
+    def test_pep621_dependencies_as_a_bare_string_is_not_silently_classified(self):
+        """The worst of the three shapes: `dependencies = "requests"` never
+        raises, so an unguarded pass silently classifies the characters
+        r/e/q/u/s/t as individual `run` roots -- garbage rather than a loud
+        failure. Guarded, the string is rejected as a non-list and the
+        result is empty."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build_repo(tmp, {"pyproject.toml": PEP621_DEPENDENCIES_IS_A_BARE_STRING})
+            self.assertEqual(pkglifecycle.classify_roots(Path(root)), {})
 
     def test_repo_nested_under_a_skip_dir_name_is_still_walked(self):
         """SKIP_DIRS must be tested against the path relative to the scanned

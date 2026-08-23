@@ -49,7 +49,7 @@ the six discovery skills already produced this output for the same target, read
    `.venv`); syft's own exclusion syntax only matches a glob, so each bare
    name must be rewritten to a `**/<name>` glob, quoted, before it is passed:
 
-       syft scan dir:<path> -o syft-json --quiet --exclude '**/node_modules' --exclude '**/.venv' ...
+       syft scan dir:<path> -o syft-json --quiet --exclude '**/node_modules' --exclude '**/.venv' ... > /tmp/syft.json
 
    Do not pass the bare name (`--exclude '.venv'`) or a root-anchored path
    (`--exclude './.venv'`): the bare form makes syft error out with no valid
@@ -66,7 +66,7 @@ the six discovery skills already produced this output for the same target, read
 
 3. Run `pkglifecycle.py` against the same syft JSON to derive `lifecycle`:
 
-       uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/pkglifecycle.py <path> --syft-json <file>
+       uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/pkglifecycle.py <path> --syft-json /tmp/syft.json
 
    Use `python3` in place of `uv run --script` if `uv` is unavailable. Set
    each dependency's `lifecycle` from the returned map, keyed by syft

@@ -12,7 +12,7 @@
     "name": { "type": "string" },
     "lifecycle": {
       "enum": ["build", "run"],
-      "description": "Which environment must contain this dependency. run: shipped in the runtime artifact (npm dependencies). build: needed only to build and test, absent at runtime (npm devDependencies). The build environment is a strict superset of the runtime one, so there is no third value. This does NOT determine health: most libraries are run and still contribute no health condition, because they cannot fail while the process is up."
+      "description": "Which environment must contain this dependency. run: shipped in the runtime artifact (npm dependencies). build: needed only to build and test, absent at runtime (npm devDependencies). The build environment is a strict superset of the runtime one, so there is no third value. This does NOT determine health: most libraries are run and still contribute no health condition, because they cannot fail while the process is up. references/definitions.md argues all three of these points at length -- keep the two in step; a change to one without the other is a stale claim in whichever was not updated."
     },
     "evidence": {
       "type": "array",

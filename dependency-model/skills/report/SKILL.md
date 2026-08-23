@@ -33,7 +33,8 @@ path.
 1. Obtain the contract. Take the `synthesis` contract you were handed, or
    invoke `synthesize` by name and take the contract it emits.
 
-2. Write `docs/dependencies.md` with these sections, in order:
+2. Assemble the sections of `docs/dependencies.md`, in order — the document
+   itself is written after step 3's verification, not here:
    - **Inventory summary**, one subsection per category present in
      `inventory.categories`. For a category whose `status` is `discovered`,
      list its dependencies — name, lifecycle, evidence — or state plainly
@@ -43,7 +44,11 @@ path.
      category failed and why, if the contract's assumptions say why — never
      describe a failed category's empty list as "no dependencies"; a failed
      scan and an empty result are different findings, and this document is
-     the last place a reader can still tell them apart.
+     the last place a reader can still tell them apart. For any of the six
+     categories absent from `inventory.categories` entirely — no skill ran
+     for it — name it and state plainly that no discovery ran, never that it
+     has none: an absent category is a third state, distinct from both an
+     empty discovered list and a failed scan.
    - **Health definitions**: reproduce the taxonomy from `definitions.md`
      (healthy, unhealthy, degraded — stated as prose intent, not yet
      technically defined), then list each `health[]` entry's `service_id`
@@ -68,7 +73,7 @@ path.
        PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/scripts python3 -c "
        import json
        from depgraphlib.mermaid import to_mermaid
-       contract = json.load(open('CONTRACT.json'))
+       contract = json.load(open('CONTRACT.json'))  # substitute the path the contract was saved to
        print(json.dumps(to_mermaid(contract['graph'])))
        "
 
@@ -84,7 +89,9 @@ path.
    fence.mmd -o /tmp/dependencies-graph.svg` on the fence's source — verify
    the fence renders before writing the document. If `mmdc` cannot be run
    (no network, `npx` unavailable), say so plainly in the graph section: the
-   diagram was not render-verified.
+   diagram was not render-verified. Only now, with every section assembled
+   and the graph verified (or its unverified status noted), write
+   `docs/dependencies.md`.
 
 5. Publish the document as an Artifact only when asked to; do not publish
    one by default.

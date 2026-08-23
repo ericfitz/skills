@@ -36,7 +36,7 @@
       "name": "mmdc",
       "required": false,
       "why": "the report skill verifies its generated Mermaid renders when it is available",
-      "probe": ["npx", "--version"],
+      "probe": ["mmdc", "--version"],
       "install": {
         "macos": "npm install -g @mermaid-js/mermaid-cli",
         "docs": "https://github.com/mermaid-js/mermaid-cli#installation"

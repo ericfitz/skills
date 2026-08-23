@@ -140,10 +140,10 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
 
     def test_no_skill_promises_criticality_or_remediation(self):
         # Patterns, not plain substrings: "blast radius" and "blast-radius"
-        # are the same promise (C1), and "rank"/"ranking" are the same
-        # promise too (C2).
+        # are the same promise (C1), and "rank"/"ranking"/"ranked"/"ranks"
+        # are the same promise too (C2).
         banned = (r"criticality", r"blast[- ]radius", r"remediation",
-                  r"monitoring gap", r"chaos test", r"\brank(?:ing)?\b")
+                  r"monitoring gap", r"chaos test", r"\brank(?:s|ing|ed)?\b")
         # Word-boundary patterns: a bare substring match ("not " inside
         # "cannot ", "never" inside "whenever") would count prose as a
         # disclaimer that never disclaimed anything.

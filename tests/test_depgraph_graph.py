@@ -144,6 +144,62 @@ class TestInvalidDependency(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("error", json.loads(buf.getvalue()))
 
+    def _run_cli_with_envelope(self, envelope):
+        """Write envelope to a temp file, run depgraph.main over it, and
+        return (exit_code, stderr_text)."""
+        import io
+        import json
+        import tempfile
+        from contextlib import redirect_stderr
+
+        import depgraph
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(envelope, f)
+            path = f.name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+
+        buf = io.StringIO()
+        with redirect_stderr(buf):
+            code = depgraph.main([path, "--indent", "0"])
+        return code, buf.getvalue()
+
+    def test_a_bare_string_dependency_is_exit_2_not_a_traceback(self):
+        """I6: this shape crashes in merge.py before build_graph's own
+        InvalidDependencyError ever runs, so widening _require alone would
+        not catch it."""
+        import json
+
+        envelope = {"contract_version": "1.0.0", "target": "/r",
+                   "categories": {"service": {"status": "discovered",
+                                              "dependencies": ["just-a-string"],
+                                              "assumptions": []}}}
+        code, err = self._run_cli_with_envelope(envelope)
+        self.assertEqual(code, 2)
+        self.assertIn("error", json.loads(err))
+
+    def test_a_null_details_object_is_exit_2_not_a_traceback(self):
+        import json
+
+        bad = {"id": "service:pg", "name": "postgres", "lifecycle": "run",
+               "evidence": [], "related_ids": [], "details": None}
+        envelope = {"contract_version": "1.0.0", "target": "/r",
+                   "categories": {"service": {"status": "discovered",
+                                              "dependencies": [bad],
+                                              "assumptions": []}}}
+        code, err = self._run_cli_with_envelope(envelope)
+        self.assertEqual(code, 2)
+        self.assertIn("error", json.loads(err))
+
+    def test_a_non_dict_category_value_is_exit_2_not_a_traceback(self):
+        import json
+
+        envelope = {"contract_version": "1.0.0", "target": "/r",
+                   "categories": {"service": "oops"}}
+        code, err = self._run_cli_with_envelope(envelope)
+        self.assertEqual(code, 2)
+        self.assertIn("error", json.loads(err))
+
 
 class TestCliOutputShape(unittest.TestCase):
     def test_contract_bound_keys_match_the_synthesis_contract(self):

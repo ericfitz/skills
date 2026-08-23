@@ -67,7 +67,10 @@
                 "enum": ["depends_on", "relates_to"],
                 "description": "depends_on: one dependency requires another to function, e.g. a package's transitive dependency. relates_to: two dependencies are the same real-world thing seen from different categories, e.g. a service and the network port that reaches it -- the correlation `related_ids` already carries, made explicit as an edge."
               },
-              "lifecycle": { "enum": ["build", "run"] }
+              "lifecycle": {
+                "enum": ["build", "run"],
+                "description": "The source node's (`from`) lifecycle, propagated onto the edge -- not a constant per `kind`. A package depended on only at build time produces a `build` edge; one that ships at runtime produces `run`, whatever the edge's `kind`."
+              }
             }
           }
         },

@@ -68,7 +68,7 @@
           {
             "id": "package:pgx-v5-5.5.0",
             "name": "github.com/jackc/pgx/v5",
-            "lifecycle": "build",
+            "lifecycle": "run",
             "evidence": ["go.mod"],
             "related_ids": ["service:postgres-primary"],
             "resilience": {
@@ -93,7 +93,7 @@
           {
             "id": "package:puddle-v2-2.2.1",
             "name": "github.com/jackc/puddle/v2",
-            "lifecycle": "build",
+            "lifecycle": "run",
             "evidence": ["go.mod"],
             "related_ids": [],
             "resilience": {
@@ -177,19 +177,20 @@
   },
   "graph": {
     "nodes": [
-      { "id": "service:postgres-primary", "name": "postgres", "category": "service", "lifecycle": "run" },
       { "id": "network:postgres-5432", "name": "postgres:5432", "category": "network", "lifecycle": "run" },
-      { "id": "package:pgx-v5-5.5.0", "name": "github.com/jackc/pgx/v5", "category": "package", "lifecycle": "build" },
-      { "id": "package:puddle-v2-2.2.1", "name": "github.com/jackc/puddle/v2", "category": "package", "lifecycle": "build" },
       { "id": "package:a-1.0.0", "name": "a", "category": "package", "lifecycle": "build" },
-      { "id": "package:b-2.0.0", "name": "b", "category": "package", "lifecycle": "build" }
+      { "id": "package:b-2.0.0", "name": "b", "category": "package", "lifecycle": "build" },
+      { "id": "package:pgx-v5-5.5.0", "name": "github.com/jackc/pgx/v5", "category": "package", "lifecycle": "run" },
+      { "id": "package:puddle-v2-2.2.1", "name": "github.com/jackc/puddle/v2", "category": "package", "lifecycle": "run" },
+      { "id": "service:postgres-primary", "name": "postgres", "category": "service", "lifecycle": "run" }
     ],
     "edges": [
-      { "from": "package:pgx-v5-5.5.0", "to": "package:puddle-v2-2.2.1", "kind": "depends_on", "lifecycle": "build" },
+      { "from": "network:postgres-5432", "to": "service:postgres-primary", "kind": "relates_to", "lifecycle": "run" },
       { "from": "package:a-1.0.0", "to": "package:b-2.0.0", "kind": "depends_on", "lifecycle": "build" },
       { "from": "package:b-2.0.0", "to": "package:a-1.0.0", "kind": "depends_on", "lifecycle": "build" },
-      { "from": "service:postgres-primary", "to": "network:postgres-5432", "kind": "relates_to", "lifecycle": "run" },
-      { "from": "package:pgx-v5-5.5.0", "to": "service:postgres-primary", "kind": "relates_to", "lifecycle": "run" }
+      { "from": "package:pgx-v5-5.5.0", "to": "package:puddle-v2-2.2.1", "kind": "depends_on", "lifecycle": "run" },
+      { "from": "package:pgx-v5-5.5.0", "to": "service:postgres-primary", "kind": "relates_to", "lifecycle": "run" },
+      { "from": "service:postgres-primary", "to": "network:postgres-5432", "kind": "relates_to", "lifecycle": "run" }
     ],
     "cycles": [["package:a-1.0.0", "package:b-2.0.0"]]
   },

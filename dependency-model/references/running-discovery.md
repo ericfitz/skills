@@ -1,7 +1,11 @@
 # Running discovery
 
 The sequence for producing a complete `dependency-model` picture of a repository:
-one seed contract, one scan, six independent skills reading the same scan output.
+one seed contract, one scan, six independent skills reading the same scan
+output, then `synthesize` and `report` to merge that output into a graph and
+health view and render it. This page covers the six-skill layer; see
+`skills/synthesize/SKILL.md` and `skills/report/SKILL.md` for the two steps
+after it.
 
 ## The sequence
 
@@ -66,7 +70,10 @@ picture is a **key union under `categories`**: take the single populated key
 from each envelope and union them into one `categories` object. No conflict
 resolution is needed because no two skills ever populate the same key, and no
 transform is needed because every skill's single-category output is already
-valid against the shared envelope schema on its own.
+valid against the shared envelope schema on its own. `scripts/depgraph.py`
+implements exactly this union, plus the typed-edge graph and cycle detection
+built on top of it; `synthesize` invokes it rather than re-deriving the merge
+in prose.
 
 ## `exclusions[]` is the single source of truth
 

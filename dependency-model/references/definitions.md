@@ -56,6 +56,11 @@ presence is entirely explained by, and adds no information beyond, the
 run-time need. `run` already implies "and also present at build." `both` would
 be a duplicate fact wearing a third label.
 
+`dependency-core.schema.json`'s `lifecycle` property description restates the
+superset claim, the no-`both` conclusion, and lifecycle-is-not-health in
+miniature — keep the two in step; a change to one without the other is a
+stale claim in whichever file was not updated.
+
 ## 2. What counts for health
 
 **Healthy** means: the service in production has all of its environment and
@@ -78,6 +83,7 @@ The filter is **not** build-vs-run, and it is **not** category. It is:
 | A credential (expires, gets revoked, gets rotated out from under the process) | |
 | A resource limit (memory, disk, connection pool exhausts while running) | |
 | Remote configuration (a flag service, a config server, changes after startup) | |
+| A network path (a hostname stops resolving, a port stops accepting connections, after the process is already up) | |
 | A dynamically loaded package (resolved reflectively or on demand, so its absence or breakage surfaces only when the load is attempted — after the process is already up) | |
 
 The last row of the "can" column is the one that's easy to miss, and the whole
@@ -118,9 +124,9 @@ with evidence:
   about it after startup that could change — and it self-excludes.
 - A dynamically loaded package produces a `presence` condition, citing the
   `file:line` of the site that performs the load.
-- A service, credential, resource limit, or remote-config value produces
-  whatever condition (`presence`, a metric bound, and so on) its own reference
-  page defines.
+- A service, credential, resource limit, remote-config value, or network path
+  produces whatever condition (`presence`, a metric bound, and so on) its own
+  reference page defines.
 
 If no condition with evidence can be written down for a dependency, it does
 not belong in the health definition — not because it was excluded by category

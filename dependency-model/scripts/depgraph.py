@@ -16,6 +16,8 @@ Exit codes:
     0  graph document emitted
     2  an input envelope was unreadable (missing or invalid JSON), or a
        dependency entry is missing a required field (id, name, or lifecycle)
+       or is otherwise malformed (e.g. a bare string instead of an object,
+       or a category value that isn't a dict)
 """
 
 import argparse
@@ -47,10 +49,16 @@ def main(argv=None):
             sys.stderr.write("\n")
             return 2
 
-    merged = merge_envelopes(loaded)
     try:
+        merged = merge_envelopes(loaded)
         graph = build_graph(merged)
-    except InvalidDependencyError as exc:
+    except (InvalidDependencyError, TypeError, AttributeError) as exc:
+        # Envelopes are produced by LLM agents; a malformed shape (a bare
+        # string where a dependency object belongs, a null details object, a
+        # category value that isn't a dict) is the realistic failure mode.
+        # Some of these crash in merge_envelopes before build_graph's own
+        # InvalidDependencyError ever gets a chance to fire, so both calls
+        # share this one handler.
         json.dump({"error": f"invalid dependency: {exc}"}, sys.stderr)
         sys.stderr.write("\n")
         return 2

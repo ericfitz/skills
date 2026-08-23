@@ -48,6 +48,14 @@ def _as_dict(value):
     return value if isinstance(value, dict) else {}
 
 
+def _as_list(value):
+    # A dependency array is spec-valid only as a list. A spec-invalid shape
+    # (an int, or a bare string -- which iterates as individual characters
+    # rather than raising) must not silently produce garbage roots; fall
+    # back to [] the same way _as_dict falls back to {}.
+    return value if isinstance(value, list) else []
+
+
 def _load_toml(path):
     try:
         with open(path, "rb") as handle:
@@ -60,12 +68,12 @@ def _pyproject(path, out):
     data = _load_toml(path)
     if not data:
         return
-    project = data.get("project") or {}
-    for dep in project.get("dependencies") or []:
+    project = _as_dict(data.get("project"))
+    for dep in _as_list(project.get("dependencies")):
         out[_name(dep)] = RUN
     # An extra ships when selected; it is not a dev tool.
-    for deps in (project.get("optional-dependencies") or {}).values():
-        for dep in deps:
+    for deps in _as_dict(project.get("optional-dependencies")).values():
+        for dep in _as_list(deps):
             out.setdefault(_name(dep), RUN)
     for deps in (data.get("dependency-groups") or {}).values():
         for dep in deps:

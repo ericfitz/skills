@@ -325,8 +325,17 @@ rather than a transform.
 **`graph`** — nodes and typed edges:
 
 - `depends_on`, from `package.details.depends_on[]` — syft's `dependency-of` edges,
-  package to package, `lifecycle: build`
-- `relates_to`, from `related_ids[]` — cross-category links, `lifecycle: run`
+  package to package
+- `relates_to`, from `related_ids[]` — cross-category links
+
+**Superseded during implementation:** this section originally specified a constant
+`lifecycle` per edge `kind` (`build` for `depends_on`, `run` for `relates_to`).
+`graph.py` instead propagates the source node's own `lifecycle` onto each edge, and
+that is the rule that ships. A constant `build` on every `depends_on` edge would
+carry no information and would contradict D3's per-package lifecycle derivation —
+a `run`-lifecycle package's edges should read `run`, not a fixed `build` regardless
+of what the package actually is. This is an approved supersession, recorded here so
+a future reader does not "fix" `graph.py` back toward the constant mapping.
 
 Keeping the two kinds distinct is what makes the graph answerable in both senses of
 "dependency": a consumer asking what must be reachable at runtime filters to `run`

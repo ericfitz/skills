@@ -52,13 +52,18 @@ each skill by name and take its envelope.
 3. For each service-shaped dependency in the merged inventory, derive its
    `conditions[]`. Which dependencies contribute a condition is decided by
    the failability test in `definitions.md` — not by `lifecycle` and not by
-   category: a dependency enters a health definition iff it can fail independently while the process is up, and a condition can be stated about it with evidence.
-   That set includes a service, a credential, a resource limit, remote
-   configuration, and a dynamically loaded package. A bundled library
-   produces no such condition and self-excludes. A dynamically loaded
-   package — a reflectively resolved JDBC driver, an `importlib` plugin, a
-   `dlopen`ed `.so` — produces a `presence` condition citing the `file:line`
-   of its loading site.
+   category: a dependency enters a health definition iff it can fail
+   independently while the process is up, and a condition can be stated
+   about it with evidence. That set includes a service, a credential, a
+   resource limit, remote configuration, a network path, and a dynamically
+   loaded package. A bundled library produces no such condition and
+   self-excludes. A dynamically loaded package — a reflectively resolved
+   JDBC driver, an `importlib` plugin, a `dlopen`ed `.so` — produces a
+   `presence` condition citing the `file:line` of its loading site **when
+   one appears in the evidence this skill can read**. Nothing in layer 1
+   today records that a package is dynamically loaded, or where; when no
+   loading site appears, the package contributes no condition and an
+   assumption is recorded naming the gap.
 
 4. Assign `kind` per condition: `presence` when the condition is that the
    subject must exist or resolve (a network path reaching, a dynamically
@@ -91,7 +96,7 @@ each skill by name and take its envelope.
 
 ## Rules
 
-- Read-only. Nothing is resolved, probed, or run.
+- Read-only. Nothing is resolved, probed, or run at runtime.
 - `null` in `expectation` means no declaration was found — never that a bound
   is confirmed absent or unnecessary.
 - An empty `health` list is a legitimate finding for a system with no
