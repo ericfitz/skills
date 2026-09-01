@@ -14,10 +14,10 @@ dependencies = [
 # Heavy NLP stack used only by writing/skills/boring. Not needed to run the
 # test suite; install with `uv sync --extra boring` when working on that tree.
 boring = [
-    "spacy>=3.7",
+    "spacy>=3.8.16",
     "proselint>=0.14",
     "textstat>=0.7",
-    "pypdf>=6.15.0",
+    "pypdf>=6.16.2",
     "python-docx>=1.1",
     # The en_core_web_sm model is not on PyPI. Pinning it here keeps the
     # model and spaCy in lockstep, which is the drift SKILL.md warns about.
@@ -30,7 +30,7 @@ en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/dow
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.12",
+    "ruff>=0.16.5",
 ]
 
 # This repo is a collection of standalone script trees, not an installable
