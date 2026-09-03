@@ -12,17 +12,61 @@ from ..gitfiles import changed_files
 _OUTDATED = re.compile(r"^(\S+)\s+(\S+)\s+\[(\S+)\]")
 
 
-def parse_outdated(text: str) -> list:
+def parse_outdated(text: str, required: dict | None = None) -> list:
+    """Parse `go list -m -u all`. With `required` (see required_modules), keep only
+    modules go.mod itself requires: `all` also lists the whole build graph, and
+    `go get` on a graph-only module adds it to go.mod as a new indirect require."""
     recs = []
     for line in text.splitlines():
         m = _OUTDATED.match(line.strip())
         if not m:
             continue
         name, cur, lat = m.group(1), m.group(2), m.group(3)
+        if required is not None and name not in required:
+            continue
         recs.append(c.UpdateRecord(name=name, current=cur, latest=lat, wanted=lat,
-                                   bump=classify_bump(cur, lat), kind="direct",
+                                   bump=classify_bump(cur, lat),
+                                   kind=required[name] if required else "direct",
                                    location="go.mod", ecosystem="go"))
     return recs
+
+
+def required_modules(gomod_text: str) -> dict:
+    """{module path: "direct" | "indirect"} for every require entry in go.mod."""
+    out, in_block = {}, False
+    for line in gomod_text.splitlines():
+        s = line.strip()
+        if s.startswith("require ("):
+            in_block = True
+            continue
+        if in_block and s == ")":
+            in_block = False
+            continue
+        if not (in_block or s.startswith("require ")):
+            continue
+        toks = s.split("//")[0].split()
+        if toks and toks[0] == "require":
+            toks = toks[1:]
+        if len(toks) >= 2 and toks[1].startswith("v"):
+            out[toks[0]] = "indirect" if "// indirect" in s else "direct"
+    return out
+
+
+def _workspace_gomods(root: Path) -> list:
+    """go.mod files to read: the root one plus each go.work `use` dir, if any."""
+    mods, in_use = [root / "go.mod"], False
+    work = root / "go.work"
+    for line in work.read_text().splitlines() if work.exists() else []:
+        s = line.strip()
+        if s.startswith("use ("):
+            in_use = True
+        elif in_use and s == ")":
+            in_use = False
+        elif s.startswith("use "):
+            mods.append(root / s[4:].strip() / "go.mod")
+        elif in_use and s and not s.startswith("//"):
+            mods.append(root / s / "go.mod")
+    return [m for m in mods if m.exists()]
 
 
 def replace_targets(gomod_text: str) -> set:
@@ -108,7 +152,10 @@ def handle(verb, argv):
         return {"warnings": []}  # go refreshes via `go list`; no aggressive clean
     if verb == "outdated":
         out = _run(["go", "list", "-m", "-u", "all"])
-        return parse_outdated(out.stdout)
+        required = {}
+        for gomod in _workspace_gomods(root):
+            required.update(required_modules(gomod.read_text()))
+        return parse_outdated(out.stdout, required)
     if verb == "audit":
         if shutil.which("govulncheck") is None:
             return []

@@ -64,6 +64,37 @@ class TestGoOutdated(unittest.TestCase):
         self.assertNotIn("require", names)
 
 
+    def test_required_filters_graph_only_modules_and_labels_kind(self):
+        gomod = (
+            "module x\n"
+            "require github.com/gin-gonic/gin v1.10.0\n"
+            "require (\n"
+            "\tgolang.org/x/sys v0.21.0 // indirect\n"
+            ")\n"
+        )
+        required = go.required_modules(gomod)
+        self.assertEqual({"github.com/gin-gonic/gin": "direct", "golang.org/x/sys": "indirect"}, required)
+        text = (
+            "github.com/gin-gonic/gin v1.10.0 [v1.11.0]\n"
+            "golang.org/x/sys v0.21.0 [v0.22.0]\n"
+            "github.com/graph/only v1.0.0 [v1.1.0]\n"
+        )
+        recs = {r.name: r for r in go.parse_outdated(text, required)}
+        self.assertEqual({"github.com/gin-gonic/gin", "golang.org/x/sys"}, set(recs))
+        self.assertEqual(recs["github.com/gin-gonic/gin"].kind, "direct")
+        self.assertEqual(recs["golang.org/x/sys"].kind, "indirect")
+
+    def test_workspace_gomods_reads_go_work_use_dirs(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "go.mod").write_text("module x\n")
+            (root / "svc").mkdir()
+            (root / "svc" / "go.mod").write_text("module svc\n")
+            (root / "go.work").write_text("go 1.22\nuse (\n\t.\n\t./svc\n\t./missing\n)\n")
+            mods = go._workspace_gomods(root)
+            self.assertEqual([root / "go.mod", root / "go.mod", root / "svc" / "go.mod"], mods)
+
+
 class TestGoParseVuln(unittest.TestCase):
     def test_parse_vuln(self):
         text = (FIX / "govulncheck.json").read_text()
