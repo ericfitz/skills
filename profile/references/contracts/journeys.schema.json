@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:journeys contract",
+  "type": "object",
+  "required": ["contract_version", "candidates", "sources_read"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "actor", "narrative", "entry_point",
+                     "evidence", "business_criticality", "rank", "rationale"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "actor": { "type": "string" },
+          "narrative": { "type": "string" },
+          "entry_point": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "business_criticality": { "enum": ["critical", "high", "medium", "low"] },
+          "rank": { "type": "integer" },
+          "rationale": { "type": "string" },
+          "depends_on": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "sources_read": { "type": "array", "items": { "type": "string" } },
+    "surface_coverage": { "type": ["string", "null"] }
+  }
+}

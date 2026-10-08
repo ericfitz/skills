@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:platform category",
+  "description": "OS and cloud resources the system declares a need for. Every figure is a declared one; none was taken from a live system.",
+  "type": "object",
+  "required": ["status", "dependencies", "assumptions"],
+  "properties": {
+    "status": {
+      "enum": ["discovered", "not-applicable", "failed"],
+      "description": "discovered: the scan ran and this list is what it found, empty included. not-applicable: the category cannot apply to this project. failed: the scan could not complete, so an empty list proves nothing."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "dependency-core.schema.json",
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["kind", "declared_value"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["cpu", "memory", "disk", "gpu", "arch", "os", "runtime-version", "cloud-service"] },
+              "declared_value": { "type": "string" },
+              "source": { "enum": ["dockerfile", "compose", "kubernetes", "iac", "ci", "manifest", "docs"] },
+              "component": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

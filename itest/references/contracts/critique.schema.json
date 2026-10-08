@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "itest:critique contract",
+  "type": "object",
+  "required": ["contract_version", "assessed", "systemic_issues"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "assessed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "verdict", "issues", "recommendation"],
+        "properties": {
+          "path": { "type": "string" },
+          "verdict": { "enum": ["sound", "weak", "misleading"] },
+          "covers": { "type": "array", "items": { "type": "string" } },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "severity", "evidence"],
+              "properties": {
+                "type": {
+                  "enum": ["over-mocking", "implementation-detail-assertion",
+                           "non-determinism", "shared-mutable-state",
+                           "tautological-assertion", "assertion-free",
+                           "framework-not-system", "missing-failure-path"]
+                },
+                "severity": { "enum": ["high", "medium", "low"] },
+                "evidence": { "type": "string" }
+              }
+            }
+          },
+          "recommendation": { "enum": ["keep", "repair", "replace", "delete"] }
+        }
+      }
+    },
+    "systemic_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["summary", "affected_count"],
+        "properties": {
+          "summary": { "type": "string" },
+          "affected_count": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

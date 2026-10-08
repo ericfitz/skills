@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/refresh_gh_projects.py\"",
+            "shell": "bash",
+            "async": true,
+            "statusMessage": "Refreshing GitHub Project cache"
+          }
+        ]
+      }
+    ]
+  }
+}

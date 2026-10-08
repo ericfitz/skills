@@ -1,0 +1,37 @@
+{
+  "contract_version": "1.0.0",
+  "shape": "service-with-dependencies",
+  "components": [
+    { "name": "api", "role": "HTTP service", "evidence": ["cmd/api/main.go:1"] }
+  ],
+  "real_dependencies": [
+    {
+      "name": "postgres",
+      "kind": "database",
+      "how_started": "docker-compose service 'db'",
+      "config_source": "DATABASE_URL",
+      "evidence": ["docker-compose.yml:4"]
+    }
+  ],
+  "external_third_parties": [
+    { "name": "stripe", "used_for": "payment capture" }
+  ],
+  "config_mechanism": "environment variables",
+  "ports_and_endpoints": ["api:8080", "db:5432"],
+  "startup_sequence": ["db", "migrations", "api"],
+  "standup_notes": [
+    {
+      "component": "api",
+      "standup_difficulty": "moderate",
+      "config_needed": ["DATABASE_URL"],
+      "externally_reachable": true,
+      "evidence": ["docker-compose.yml:12"]
+    }
+  ],
+  "assumptions": [
+    {
+      "claim": "compose stack starts cleanly on a developer machine",
+      "why_unconfirmed": "discovery is read-only; nothing was executed"
+    }
+  ]
+}

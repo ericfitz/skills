@@ -1,0 +1,16 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "env",
+  "tools": [
+    {
+      "name": "uv",
+      "required": true,
+      "why": "the check skill runs env_check.py via `uv run`",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    }
+  ]
+}

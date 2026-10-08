@@ -1,0 +1,12 @@
+{
+  "contract_version": "1.0.0",
+  "primary_language": "go",
+  "languages": [{ "name": "go", "files": 42, "share": 0.875 }],
+  "package_managers": ["go"],
+  "runtimes": ["go1.22"],
+  "build_commands": ["go build ./..."],
+  "monorepo": { "is": false, "packages": [] },
+  "unknowns": [],
+  "confidence": "high",
+  "inventory": {}
+}

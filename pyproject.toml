@@ -1,0 +1,104 @@
+[project]
+name = "skills"
+version = "0.0.0"
+description = "Claude Code skills monorepo: per-tool script trees plus a shared test suite."
+requires-python = ">=3.11"
+
+# Runtime deps needed by the tool trees that the test suite exercises.
+# PyYAML: cats/scripts/catslib/{config,rules,runner}.py, loc/scripts/find_duplicate_localizations.py
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Heavy NLP stack used only by writing/skills/boring. Not needed to run the
+# test suite; install with `uv sync --extra boring` when working on that tree.
+boring = [
+    "spacy>=3.8.16",
+    "proselint>=0.14",
+    "textstat>=0.7",
+    "pypdf>=6.16.2",
+    "python-docx>=1.1",
+    # The en_core_web_sm model is not on PyPI. Pinning it here keeps the
+    # model and spaCy in lockstep, which is the drift SKILL.md warns about.
+    "en-core-web-sm",
+]
+
+[tool.uv.sources]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.16.5",
+]
+
+# This repo is a collection of standalone script trees, not an installable
+# library. Tell uv not to try to build/install it as a package.
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Ruff is the sole linter here: E/W/F cover pycodestyle+pyflakes (flake8),
+# I covers import sorting (isort). black/isort/flake8 are intentionally not
+# installed. UP/B/SIM/C4/RUF add modernization and correctness checks.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+
+[tool.ruff.lint.isort]
+# inventorylib and depscanlib are invoked by path from their plugins' scripts
+# dirs, not installed; without this, isort treats them as third-party in the
+# test modules.
+known-first-party = ["inventorylib", "depscanlib", "depgraphlib"]
+
+[tool.ruff.lint.per-file-ignores]
+# E501: fixtures embed YAML/JSON documents as single-line "a\nb\n" literals
+#   and stub callables as one-line lambdas. Wrapping them hides the data being
+#   asserted on. Production code is still held to line-length above.
+# E402/I001: test modules mutate sys.path before importing plugin scripts.
+"tests/**" = ["E501", "E402", "I001"]
+
+[tool.ty.environment]
+# ty is the project's type checker (mypy is not installed). Same per-tool
+# script dirs that pytest gets via pythonpath and that tests/__init__.py puts
+# on sys.path -- without these, every catslib/bumplib/... import is unresolved.
+extra-paths = [
+    "cats/scripts",
+    "deps/scripts",
+    "logseq/scripts",
+    "dev/scripts",
+    "dependency-model/scripts",
+    "tests",
+]
+
+[[tool.ty.overrides]]
+# The suites monkeypatch module-level functions with lambdas
+# (`sa.sem_blame = lambda ...`) to stub out the `sem`/`gh` CLIs. ty flags each
+# as an invalid assignment because the lambda's signature is not the declared
+# function type. That is the intended idiom here, not a defect.
+include = ["tests/**"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+
+[tool.ty.src]
+# writing/skills/boring depends on the optional `boring` extra (spaCy et al),
+# which a default `uv sync` does not install, so its imports are unresolvable
+# in the default environment. Check it with: uv run --extra boring ty check
+exclude = ["writing/skills/boring"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Makes the per-tool libs importable without the sys.path.insert() preamble
+# each test file currently carries. Existing preambles keep working; this
+# lets them be removed incrementally.
+pythonpath = [
+    "cats/scripts",
+    "deps/scripts",
+    "logseq/scripts",
+    "dev/scripts",
+    "tests",
+]

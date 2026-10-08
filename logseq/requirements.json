@@ -1,0 +1,45 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "logseq",
+  "tools": [
+    {
+      "name": "uv",
+      "required": false,
+      "why": "capture, from-obsidian, lint, organize, and query all invoke logseq-cli.py via `uv run`; each SKILL.md documents a python3 fallback when uv is unavailable",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    },
+    {
+      "name": "rg",
+      "required": false,
+      "why": "query's cheapest-first keyword-lookup tier runs rg directly over the graph path before falling back to logseq-cli.py scan",
+      "probe": ["rg", "--version"],
+      "install": {
+        "macos": "brew install ripgrep",
+        "docs": "https://github.com/BurntSushi/ripgrep#installation"
+      }
+    },
+    {
+      "name": "curl",
+      "required": false,
+      "why": "query's Datalog tier calls the local Logseq HTTP API directly with curl, only when resolve reports api_up: true",
+      "probe": ["curl", "--version"],
+      "install": {
+        "macos": "brew install curl",
+        "docs": "https://curl.se/download.html"
+      }
+    }
+  ],
+  "config": [
+    {
+      "path": ".config/logseq-skills/config.json",
+      "scope": "home",
+      "required": false,
+      "why": "graph resolution for every logseq skill (capture, from-obsidian, lint, organize, query); resolve auto-discovers and can write it when absent",
+      "remedy": "run any logseq skill once and follow its graph-resolution prompt (or pass --write-config after auto-discovery)"
+    }
+  ]
+}

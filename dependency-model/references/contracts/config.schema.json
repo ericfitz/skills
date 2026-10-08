@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dependency-model:config category",
+  "description": "Configuration the system must be supplied with in order to run.",
+  "type": "object",
+  "required": ["status", "dependencies", "assumptions"],
+  "properties": {
+    "status": {
+      "enum": ["discovered", "not-applicable", "failed"],
+      "description": "discovered: the scan ran and this list is what it found, empty included. not-applicable: the category cannot apply to this project. failed: the scan could not complete, so an empty list proves nothing."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "dependency-core.schema.json",
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["mechanism", "key"],
+            "additionalProperties": false,
+            "properties": {
+              "mechanism": { "enum": ["env", "file", "flag", "remote", "constant", "unknown"] },
+              "key": { "type": "string" },
+              "required": { "type": ["boolean", "null"] },
+              "default": { "type": ["string", "null"] },
+              "consumed_by": { "type": "array", "items": { "type": "string" } },
+              "validated": {
+                "type": ["boolean", "null"],
+                "description": "Whether the repository declares a validation or parse step for this key."
+              }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ericfitz/skills/blob/main/env/references/requirements.schema.json",
+  "title": "Plugin requirements declaration",
+  "description": "Sidecar <plugin>/requirements.json contract consumed by env_check.py. Declares external CLI tools, local config files, and auth state a plugin needs to run -- never a target repo's toolchain. See docs/superpowers/specs/2026-07-26-env-check-design.md, 'The declaration contract'.",
+  "type": "object",
+  "required": ["requirements_version", "plugin"],
+  "properties": {
+    "requirements_version": {
+      "type": "string",
+      "description": "Version of this schema the declaration was written against."
+    },
+    "plugin": {
+      "type": "string",
+      "description": "Must match the plugin's directory name (the parent of this file)."
+    },
+    "tools": {
+      "type": "array",
+      "description": "External CLI tools the plugin's own skills/scripts invoke.",
+      "items": {
+        "type": "object",
+        "required": ["name", "required", "why", "probe"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The executable name, for display."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "true = hard requirement, drives the exit code; false = optional, only degrades a capability."
+          },
+          "why": {
+            "type": "string",
+            "description": "Names the consuming skill(s). 'Missing gh' is a checklist; 'missing gh -- needed by backlog and create-issue' is actionable."
+          },
+          "probe": {
+            "type": "array",
+            "description": "argv array executed with shell=False. Never a shell string.",
+            "items": { "type": "string" }
+          },
+          "version_pattern": {
+            "type": "string",
+            "description": "Regex with one capture group, applied to the probe's stdout to extract a version string."
+          },
+          "min_version": {
+            "type": "string",
+            "description": "Minimum acceptable version, compared against the value version_pattern extracts."
+          },
+          "install": {
+            "type": "object",
+            "description": "Exact install commands, keyed by platform, plus a docs pointer. --fix runs only the command for the detected platform verbatim; never composes one.",
+            "properties": {
+              "macos": { "type": "string" },
+              "linux": { "type": "string" },
+              "windows": { "type": "string" },
+              "docs": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "array",
+      "description": "Local config files the plugin's skills read (e.g. the .local/ convention).",
+      "items": {
+        "type": "object",
+        "required": ["path", "scope", "required", "why", "remedy"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path relative to the scope root."
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["repo", "home"],
+            "description": "Whether path is relative to the target repo root or the user's home directory."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "true = hard requirement; false = absence degrades a capability rather than breaking it."
+          },
+          "why": {
+            "type": "string",
+            "description": "Names the consuming skill(s)."
+          },
+          "remedy": {
+            "type": "string",
+            "description": "What to run or do to produce this file."
+          }
+        }
+      }
+    },
+    "auth": {
+      "type": "array",
+      "description": "Authenticated CLI sessions the plugin's skills depend on.",
+      "items": {
+        "type": "object",
+        "required": ["name", "probe", "why", "remedy"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The service or account being authenticated, for display."
+          },
+          "probe": {
+            "type": "array",
+            "description": "argv array executed with shell=False. Records exit status and a one-line summary only -- never token values.",
+            "items": { "type": "string" }
+          },
+          "why": {
+            "type": "string",
+            "description": "Names the consuming skill(s)."
+          },
+          "remedy": {
+            "type": "string",
+            "description": "The login command to run."
+          }
+        }
+      }
+    }
+  }
+}

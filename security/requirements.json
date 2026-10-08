@@ -1,0 +1,26 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "security",
+  "tools": [
+    {
+      "name": "curl",
+      "required": false,
+      "why": "vet-plugin's GitHub-hosted-repo quick-vet commands (repo stats, file listing, SKILL.md fetch)",
+      "probe": ["curl", "--version"],
+      "install": {
+        "macos": "brew install curl",
+        "docs": "https://curl.se/download.html"
+      }
+    },
+    {
+      "name": "jq",
+      "required": false,
+      "why": "vet-plugin's quick-vet commands pipe curl's GitHub API responses through jq",
+      "probe": ["jq", "--version"],
+      "install": {
+        "macos": "brew install jq",
+        "docs": "https://jqlang.org/download/"
+      }
+    }
+  ]
+}

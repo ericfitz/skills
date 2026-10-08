@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "itest scenario set — the handoff seam to a build phase",
+  "type": "object",
+  "required": ["contract_version", "boundary", "scenarios"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "boundary": {
+      "type": "object",
+      "required": ["description", "rationale", "real", "stubbed"],
+      "properties": {
+        "description": { "type": "string" },
+        "rationale": { "type": "string" },
+        "real": { "type": "array", "items": { "type": "string" } },
+        "stubbed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "journey_id", "title", "priority", "boundary",
+                     "provenance", "requirement_ids", "preconditions", "steps",
+                     "assertions", "dependencies", "isolation", "placement",
+                     "runner_invocation", "open_assumptions"],
+        "properties": {
+          "id": { "type": "string" },
+          "journey_id": { "type": ["string", "null"] },
+          "title": { "type": "string" },
+          "priority": { "enum": ["p0", "p1", "p2"] },
+          "est_cost": { "enum": ["low", "medium", "high"] },
+          "boundary": { "type": "string" },
+          "provenance": { "enum": ["journey", "requirement", "both"] },
+          "requirement_ids": { "type": "array", "items": { "type": "string" } },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["state", "method", "via", "assert_established"],
+              "properties": {
+                "state": { "type": "string" },
+                "method": { "enum": ["compose", "inject"] },
+                "via": { "type": "string" },
+                "assert_established": { "type": "string" },
+                "rationale": { "type": "string" }
+              }
+            }
+          },
+          "steps": { "type": "array", "items": { "type": "string" } },
+          "assertions": { "type": "array", "items": { "type": "string" } },
+          "negative_assertions": { "type": "array", "items": { "type": "string" } },
+          "dependencies": {
+            "type": "object",
+            "required": ["real", "stubbed"],
+            "properties": {
+              "real": { "type": "array", "items": { "type": "string" } },
+              "stubbed": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "isolation": {
+            "type": "object",
+            "required": ["strategy", "cleanup"],
+            "properties": {
+              "strategy": {
+                "enum": ["transaction-rollback", "truncate", "namespacing",
+                         "ephemeral-container", "delete-via-api", "none"]
+              },
+              "cleanup": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "determinism_controls": { "type": "array", "items": { "type": "string" } },
+          "fixtures_to_reuse": { "type": "array", "items": { "type": "string" } },
+          "new_helpers_needed": { "type": "array", "items": { "type": "string" } },
+          "placement": {
+            "type": "object",
+            "required": ["file_path", "naming", "marker_or_tag"],
+            "properties": {
+              "file_path": { "type": "string" },
+              "naming": { "type": "string" },
+              "marker_or_tag": { "type": ["string", "null"] }
+            }
+          },
+          "runner_invocation": { "type": "string" },
+          "open_assumptions": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

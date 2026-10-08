@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "itest:state contract",
+  "type": "object",
+  "required": ["contract_version", "writable_stores", "id_generation", "assumptions"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "writable_stores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "direct_write_possible", "how", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "direct_write_possible": { "type": "boolean" },
+          "how": { "type": ["string", "null"] },
+          "schema_source": { "type": ["string", "null"] },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "builders_and_factories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "produces"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "produces": { "type": "string" }
+        }
+      }
+    },
+    "seed_tooling": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "invocation"],
+        "properties": {
+          "name": { "type": "string" },
+          "invocation": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "test_only_endpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["endpoint", "purpose", "guarded_by"],
+        "properties": {
+          "endpoint": { "type": "string" },
+          "purpose": { "type": "string" },
+          "guarded_by": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "id_generation": {
+      "type": "object",
+      "required": ["origin"],
+      "properties": {
+        "origin": { "enum": ["client", "server", "mixed", "unknown"] },
+        "implications": { "type": ["string", "null"] }
+      }
+    },
+    "teardown_affordances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["strategy", "available"],
+        "properties": {
+          "strategy": {
+            "enum": ["transaction-rollback", "truncate", "namespacing",
+                     "ephemeral-container", "delete-via-api", "none"]
+          },
+          "available": { "type": "boolean" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "why_unconfirmed"],
+        "properties": {
+          "claim": { "type": "string" },
+          "why_unconfirmed": { "type": "string" }
+        }
+      }
+    }
+  }
+}

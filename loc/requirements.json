@@ -1,0 +1,26 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "loc",
+  "tools": [
+    {
+      "name": "uv",
+      "required": true,
+      "why": "analyze and coverage run the bundled check-i18n.py analyzer via `uv run`, and backfill runs both check-i18n.py (through analyze) and find_duplicate_localizations.py the same way",
+      "probe": ["uv", "--version"],
+      "install": {
+        "macos": "brew install uv",
+        "docs": "https://docs.astral.sh/uv/getting-started/installation/"
+      }
+    },
+    {
+      "name": "jq",
+      "required": false,
+      "why": "backfill's Step 1 dedupe path rewrites duplicate-value keys across every non-master locale file with a jq filter",
+      "probe": ["jq", "--version"],
+      "install": {
+        "macos": "brew install jq",
+        "docs": "https://jqlang.org/download/"
+      }
+    }
+  ]
+}

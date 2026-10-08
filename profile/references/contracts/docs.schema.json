@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "profile:docs contract",
+  "type": "object",
+  "required": ["contract_version", "sources_available", "unavailable_sources",
+               "corpus", "requirements", "coverage_confidence"],
+  "properties": {
+    "contract_version": { "type": "string" },
+    "sources_available": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "locator", "capability_used"],
+        "properties": {
+          "kind": { "enum": ["in-repo", "local-path", "external"] },
+          "locator": { "type": "string" },
+          "capability_used": { "type": "string" }
+        }
+      }
+    },
+    "unavailable_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["locator", "reason", "suggested_remedy"],
+        "properties": {
+          "locator": { "type": "string" },
+          "reason": { "type": "string" },
+          "suggested_remedy": { "type": "string" }
+        }
+      }
+    },
+    "corpus": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "locator", "doc_type", "title", "authority", "read"],
+        "properties": {
+          "id": { "type": "string" },
+          "locator": { "type": "string" },
+          "doc_type": {
+            "enum": ["prd", "requirements", "spec", "design", "architecture",
+                     "adr", "runbook", "api_reference", "user_guide",
+                     "tutorial", "readme", "changelog", "unknown"]
+          },
+          "title": { "type": "string" },
+          "last_modified": { "type": ["string", "null"] },
+          "authority": { "enum": ["normative", "descriptive", "historical", "unknown"] },
+          "read": { "enum": ["full", "skimmed"] }
+        }
+      }
+    },
+    "deferred": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["locator", "doc_type", "rank", "why_deferred"],
+        "properties": {
+          "locator": { "type": "string" },
+          "doc_type": {
+            "enum": ["prd", "requirements", "spec", "design", "architecture",
+                     "adr", "runbook", "api_reference", "user_guide",
+                     "tutorial", "readme", "changelog", "unknown"]
+          },
+          "rank": { "type": "integer" },
+          "why_deferred": { "type": "string" }
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "modality", "source_refs", "confidence"],
+        "properties": {
+          "id": { "type": "string" },
+          "statement": { "type": "string" },
+          "modality": { "enum": ["must", "should", "may"] },
+          "actors": { "type": "array", "items": { "type": "string" } },
+          "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+          "preconditions_stated": { "type": "array", "items": { "type": "string" } },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["corpus_id", "anchor"],
+              "properties": {
+                "corpus_id": { "type": "string" },
+                "anchor": { "type": "string" }
+              }
+            }
+          },
+          "staleness": {
+            "type": "object",
+            "properties": {
+              "last_modified": { "type": ["string", "null"] },
+              "version_refs": { "type": "array", "items": { "type": "string" } },
+              "stated_status": { "type": ["string", "null"] }
+            }
+          },
+          "confidence": { "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "journey_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["narrative", "source_refs"],
+        "properties": {
+          "narrative": { "type": "string" },
+          "actor": { "type": ["string", "null"] },
+          "entry_point_hint": { "type": ["string", "null"] },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["corpus_id", "anchor"],
+              "properties": {
+                "corpus_id": { "type": "string" },
+                "anchor": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["term", "definition"],
+        "properties": {
+          "term": { "type": "string" },
+          "definition": { "type": "string" },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["corpus_id", "anchor"],
+              "properties": {
+                "corpus_id": { "type": "string" },
+                "anchor": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "domain_invariants": { "type": "array", "items": { "type": "string" } },
+    "open_questions": { "type": "array", "items": { "type": "string" } },
+    "coverage_confidence": { "enum": ["high", "partial", "low"] }
+  }
+}

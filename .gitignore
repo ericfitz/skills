@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+.envrc
+.ruff_cache/
+
+# Built skill output — produced by copying the skill src into a
+# distributable tree. Regenerated; not tracked.
+writing/skills/boring/dist/
+
+# IDE local state
+.vscode/
+
+# Agent-created git worktrees must never be committed (stray gitlinks)
+.claude/worktrees/
+
+# Machine-local, non-tracked config and cache (per the .local/ convention):
+# e.g. sem-scope.json, sem.db, project caches, and SDD progress/reports.
+.local/
+
+# subagent-driven-development scratch workspace
+.superpowers/
+
+HANDOFF.md

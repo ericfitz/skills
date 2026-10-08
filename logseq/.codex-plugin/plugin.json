@@ -1,0 +1,9 @@
+{
+  "name": "logseq",
+  "version": "1.0.0",
+  "description": "Interact with a local classic (file-based) Logseq graph: capture notes/TODOs into journals or pages, answer questions from the graph, lint it for consistency, merge/restructure pages, and import notes from an Obsidian vault. Hybrid access: reads files directly, writes via the Logseq local HTTP API when the app is running, file fallback otherwise.",
+  "author": {
+    "name": "efitz"
+  },
+  "skills": "./skills/"
+}
