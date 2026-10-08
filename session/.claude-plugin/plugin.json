@@ -1,0 +1,5 @@
+{
+  "name": "session",
+  "version": "1.0.0",
+  "description": "Session continuity toolkit: write a machine-local HANDOFF.md holding only current state (handoff) and resume from it by checking it against live repo facts, reporting drift, and stopping before any work starts (continue). A SessionStart hook reminds Claude to run continue when a HANDOFF.md exists."
+}

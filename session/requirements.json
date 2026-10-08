@@ -1,0 +1,54 @@
+{
+  "requirements_version": "1.0.0",
+  "plugin": "session",
+  "tools": [
+    {
+      "name": "git",
+      "required": true,
+      "why": "repo-state.sh (used by continue and handoff) and the SessionStart hint read branch, upstream, worktree and dirty-file facts from git",
+      "probe": ["git", "--version"],
+      "install": {
+        "macos": "brew install git",
+        "docs": "https://git-scm.com/downloads"
+      }
+    },
+    {
+      "name": "perl",
+      "required": true,
+      "why": "repo-state.sh bounds gh calls and .local/state-checks.sh with a perl alarm timeout (no GNU timeout on macOS)",
+      "probe": ["perl", "-e", "exit 0"],
+      "install": {
+        "macos": "brew install perl",
+        "docs": "https://www.perl.org/get.html"
+      }
+    },
+    {
+      "name": "python3",
+      "required": false,
+      "why": "repo-state.sh and the SessionStart hint parse JSON with python3; without it open-PR and CI details are omitted and the hint stays silent",
+      "probe": ["python3", "--version"],
+      "install": {
+        "macos": "brew install python",
+        "docs": "https://www.python.org/downloads/"
+      }
+    },
+    {
+      "name": "gh",
+      "required": false,
+      "why": "repo-state.sh reports open PRs and main CI status for continue and handoff; without gh it reports GITHUB: unavailable",
+      "probe": ["gh", "--version"],
+      "install": {
+        "macos": "brew install gh",
+        "docs": "https://cli.github.com"
+      }
+    }
+  ],
+  "auth": [
+    {
+      "name": "GitHub (gh)",
+      "probe": ["gh", "auth", "status"],
+      "why": "repo-state.sh needs an authenticated gh to list open PRs and CI runs; without it continue and handoff mark those facts unverified",
+      "remedy": "gh auth login"
+    }
+  ]
+}

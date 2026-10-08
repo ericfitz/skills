@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal agent-skills marketplace (`efitz-skills`). Fifteen plugins,
+efitz's personal agent-skills marketplace (`efitz-skills`). Sixteen plugins,
 each bundling one or more skills, installable into **Claude Code** or
 **OpenAI Codex CLI** — the repo carries native manifests for both harnesses.
 Invoke a skill as `/<plugin>:<skill>`.
@@ -163,6 +163,13 @@ never that the behaviour is confirmed absent. The six discovery skills emit the
 same `discovery` envelope with one category populated, so their output merges
 by key union; `synthesize` and `report` consume that merged output. Requires
 `syft`; seeded by the `profile:topology` contract.
+
+### session — session continuity
+
+- **handoff** — End or checkpoint a session: rewrite a machine-local, untracked `HANDOFF.md` holding only current state, route long-lived knowledge to CLAUDE.md, ADRs or agentbus memory, and report everything not yet landed. Never commits, pushes, or deploys.
+- **continue** — Resume from `HANDOFF.md`: compare it with live repo facts (branch, dirty files, worktrees, open PRs, main CI, optional `.local/state-checks.sh` deployed versions), report drift, propose the next action, and stop without starting work.
+
+A SessionStart hook prints a one-line reminder to run `continue` when the repo has a `HANDOFF.md`. Requires `git` and `perl`; `gh` and agentbus are optional.
 
 ---
 

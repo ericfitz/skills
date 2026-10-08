@@ -120,6 +120,14 @@
         "source": "local",
         "path": "./openapi"
       }
+    },
+    {
+      "name": "session",
+      "category": "productivity",
+      "source": {
+        "source": "local",
+        "path": "./session"
+      }
     }
   ]
 }

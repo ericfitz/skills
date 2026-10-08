@@ -55,6 +55,7 @@ declare -a PLUGINS=(
   "openapi:development:arazzo,init"
   "env:development:check"
   "dependency-model:development:config,network,package,platform,report,security,service,synthesize"
+  "session:productivity:continue,handoff"
 )
 
 # Guard against this array going stale again: it must name every plugin dir.

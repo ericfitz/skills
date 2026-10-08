@@ -286,7 +286,7 @@ class TestRegistration(unittest.TestCase):
     def test_readme_documents_the_plugin(self):
         text = (REPO / "README.md").read_text(encoding="utf-8")
         self.assertIn("### dependency-model", text)
-        self.assertIn("Fifteen plugins", text)
+        self.assertIn("Sixteen plugins", text)
         for skill in ALL_SKILLS:
             with self.subTest(skill=skill):
                 self.assertIn(f"**{skill}**", text)

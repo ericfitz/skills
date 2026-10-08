@@ -256,6 +256,7 @@ These have no cross-plugin edges. Internal orchestration is noted where it exist
 | `ui` | `vrt` | Reads `.local/repos.json` when present, else falls back to `gh` defaults |
 | `writing` | `boring` | Bundles a deterministic analyzer |
 | `env` | `check` | Reads every plugin's `requirements.json` |
+| `session` | `continue`, `handoff` | Share the bundled `repo-state.sh`; `handoff` writes a machine-local `HANDOFF.md` that `continue` reads; a SessionStart hook prompts `continue` |
 
 ## Entry points
 
