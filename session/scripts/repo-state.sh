@@ -8,11 +8,13 @@
 # .local/state-checks.sh is looked up in the worktree root first, then in the main
 # checkout (.local/ is untracked, so a linked worktree does not have it).
 # REPO_STATE_TIMEOUT (default 30s) bounds gh calls and .local/state-checks.sh.
+# REPO_STATE_GH (default gh) names the gh command; the self-test uses it to simulate no gh.
 # Bash 3.2 compatible (macOS /bin/bash). Run with --self-test to check.
 
 set -uo pipefail
 
 TIMEOUT="${REPO_STATE_TIMEOUT:-30}"
+GH="${REPO_STATE_GH:-gh}"   # the gh command; the self-test points it at a missing name
 ROOT=""
 MAIN_ROOT=""   # the main checkout; differs from ROOT inside a linked worktree
 DEFAULT=""
@@ -47,10 +49,10 @@ default_branch() {
 }
 
 gather_github() {
-  command -v gh >/dev/null 2>&1 || { GH_STATUS="gh not installed"; return 0; }
+  command -v "$GH" >/dev/null 2>&1 || { GH_STATUS="gh not installed"; return 0; }
   git remote get-url origin >/dev/null 2>&1 || { GH_STATUS="no origin remote"; return 0; }
-  with_timeout "$TIMEOUT" gh auth status >/dev/null 2>&1 || { GH_STATUS="gh not authenticated or no network"; return 0; }
-  PRS_JSON=$(with_timeout "$TIMEOUT" gh pr list --author @me --state open \
+  with_timeout "$TIMEOUT" "$GH" auth status >/dev/null 2>&1 || { GH_STATUS="gh not authenticated or no network"; return 0; }
+  PRS_JSON=$(with_timeout "$TIMEOUT" "$GH" pr list --author @me --state open \
     --json number,headRefName,title,statusCheckRollup 2>/dev/null) || { GH_STATUS="gh pr list failed"; PRS_JSON="[]"; }
 }
 
@@ -154,7 +156,7 @@ for pr in prs:
     echo "MAIN CI: unavailable (no $DEFAULT commit)"
     return 0
   }
-  run=$(with_timeout "$TIMEOUT" gh run list --commit "$sha" --limit 100 \
+  run=$(with_timeout "$TIMEOUT" "$GH" run list --commit "$sha" --limit 100 \
     --json status,conclusion,workflowName,createdAt,event 2>/dev/null) || {
     echo "MAIN CI: unavailable (gh run list failed)"
     return 0
@@ -256,8 +258,9 @@ selftest() {
   bin="$tmp/bin"
   mkdir -p "$bin"
   ln -s "$(command -v git)" "$bin/git"
-  # gh is deliberately absent from PATH; only git, perl, python3 and coreutils remain
-  export PATH="$bin:/usr/bin:/bin" GIT_CONFIG_GLOBAL=/dev/null REPO_STATE_TIMEOUT=1
+  # gh is deliberately unusable: REPO_STATE_GH names a missing command, because PATH alone
+  # cannot hide a gh installed in /usr/bin (as on GitHub-hosted runners)
+  export REPO_STATE_GH=gh-absent-for-self-test PATH="$bin:/usr/bin:/bin" GIT_CONFIG_GLOBAL=/dev/null REPO_STATE_TIMEOUT=1
 
   gitc() { git -c user.name=t -c user.email=t@t -c commit.gpgsign=false "$@"; }
   check() { # check <label> <expected substring> <text>
@@ -328,6 +331,7 @@ selftest() {
   out=$(cd "$tmp/wt" && bash "$self"); check wt-none "STATE-CHECKS: not configured" "$out"
 
   # stubbed gh: success path and failure paths
+  unset REPO_STATE_GH
   mkdir "$tmp/ghbin"
   cat >"$tmp/ghbin/gh" <<'GH'
 #!/bin/bash
