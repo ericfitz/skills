@@ -46,21 +46,25 @@ def parse_prs(json_text: str) -> c.Context:
     return c.Context(pullRequests=prs)
 
 
-def open_pr_cmd(branch, title, body):
+def open_pr_cmd(branch, base, title, body):
     """Return an argv list for creating a pull request.
 
     Title and body are passed as separate args, never shell-interpolated,
     so a PR title containing shell metacharacters cannot inject.
 
     Args:
-        branch: Target branch for PR (head ref)
+        branch: Head ref (the bump branch)
+        base: Base branch the PR targets (the repo's resolved default branch).
+            Required; there is deliberately no default.
         title: PR title
         body: PR body
 
     Returns:
         List form argv for subprocess
     """
-    return ["gh", "pr", "create", "--base", "main", "--head", branch,
+    if not base:
+        raise ValueError("open_pr_cmd: base branch is required")
+    return ["gh", "pr", "create", "--base", base, "--head", branch,
             "--title", title, "--body", body]
 
 
@@ -81,11 +85,43 @@ def _run(args):
     return subprocess.run(args, capture_output=True, text=True)
 
 
+def resolve_default_branch():
+    """Resolve the repository's default branch; never guess.
+
+    Tries `git symbolic-ref --short refs/remotes/origin/HEAD` (strip the `origin/`
+    prefix), then `gh repo view --json defaultBranchRef`.
+
+    Returns:
+        {"ok": True, "branch": str, "source": str} or {"ok": False, "output": str}
+        naming every attempt and why it failed.
+    """
+    tried = []
+    r = _run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+    out = r.stdout.strip()
+    if r.returncode == 0 and out.startswith("origin/") and len(out) > len("origin/"):
+        return {"ok": True, "branch": out[len("origin/"):], "source": "origin/HEAD"}
+    tried.append("git symbolic-ref --short refs/remotes/origin/HEAD: "
+                 + (r.stderr.strip() or out or "no usable output"))
+    if shutil.which("gh") is None:
+        tried.append("gh repo view: gh not installed")
+    else:
+        r = _run(["gh", "repo", "view", "--json", "defaultBranchRef",
+                  "--jq", ".defaultBranchRef.name"])
+        out = r.stdout.strip()
+        if r.returncode == 0 and out:
+            return {"ok": True, "branch": out, "source": "gh repo view"}
+        tried.append("gh repo view --json defaultBranchRef: "
+                     + (r.stderr.strip() or out or "no usable output"))
+    return {"ok": False, "output": "Could not resolve the default branch. Tried: "
+            + "; ".join(tried)
+            + ". Fix with `git remote set-head origin --auto` or `gh auth login`."}
+
+
 def handle(verb, argv):
     """Main entry point for GitHub codehost operations.
 
     Args:
-        verb: Operation verb (detect, alerts, prs, open-pr, pr-status, merge-pr)
+        verb: Operation verb (detect, alerts, prs, default-branch, open-pr, pr-status, merge-pr)
         argv: Arguments for the verb
 
     Returns:
@@ -117,14 +153,19 @@ def handle(verb, argv):
         # Check if gh is installed for write operations
         if shutil.which("gh") is None:
             return {"ok": False, "output": "gh not installed"}
-        branch, title, body = argv[0], argv[1], argv[2]
-        r = _run(open_pr_cmd(branch, title, body))
+        if len(argv) != 4 or not argv[1]:
+            return {"ok": False, "output": "open-pr requires: <branch> <base> <title> <body>"}
+        branch, base, title, body = argv
+        r = _run(open_pr_cmd(branch, base, title, body))
         # `gh pr create` prints the PR URL to stdout and the failure reason to stderr,
         # so on failure stdout is empty by construction. Append stderr only then: the
         # skill scrapes the URL out of `output` on success and gh may still emit
         # unrelated warnings on stderr in that case (#36).
         ok = r.returncode == 0
         return {"output": (r.stdout if ok else r.stdout + r.stderr).strip(), "ok": ok}
+
+    if verb == "default-branch":
+        return resolve_default_branch()
 
     if verb == "pr-status":
         # Check if gh is installed for read operations

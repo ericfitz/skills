@@ -82,37 +82,44 @@ Determine which non-ecosystem adapters to use. This mirrors `config.resolve_adap
 
 Record `HOST` (codeHost adapter) and `TRACKER` (issueTracker adapter) for later phases. `none` on either axis means the corresponding gather calls return empty shapes — no special-casing needed.
 
+Then resolve `BASE_BRANCH`, the repo's default branch. It is never assumed to be `main`.
+- `HOST` is `github`: `bump.py codeHost github default-branch` returns `{"ok": true, "branch": ..., "source": ...}`. It tries the `origin/HEAD` symbolic ref (minus `origin/`), then `gh repo view --json defaultBranchRef`.
+- Otherwise: read the `origin/HEAD` symbolic ref with `git symbolic-ref --short refs/remotes/origin/HEAD` and remove the `origin/` prefix.
+- If unresolved (`ok` is false, or the command fails): report the `output` verbatim (it names every attempt), ask the user which branch is the base, and do not continue until answered. Never fall back to `main` silently.
+
+Record `BASE_BRANCH` for Phases 2, 8, 9, and 11.
+
 ### Phase 2: Branch Management
 
 This phase decides **where** the bump happens and sets a mode later phases depend on:
 
-- **`MODE=pr`** — work on a fresh bump branch off `main`, integrated via a pull request (Phase 9). Used whenever the effective working base is `main` **and** `HOST` is `github`.
+- **`MODE=pr`** — work on a fresh bump branch off `$BASE_BRANCH`, integrated via a pull request (Phase 9). Used whenever the effective working base is `$BASE_BRANCH` **and** `HOST` is `github`.
 - **`MODE=direct`** — work committed directly to the current branch, no pull request.
 
 Record the chosen mode; Phases 7, 9, and 11 read it.
 
 1. Current branch: `git rev-parse --abbrev-ref HEAD`.
 
-2. If current branch is NOT `main`:
+2. If current branch is NOT `$BASE_BRANCH`:
    - Display: `Current branch: <branch-name>`.
-   - Ask: "You're not on main. Would you like to switch to main before bumping dependencies?"
+   - Ask: "You're not on <BASE_BRANCH>. Would you like to switch to <BASE_BRANCH> before bumping dependencies?"
    - **No** → set `MODE=direct`, continue on the current branch (no bump branch, no PR; commits land here).
    - **Yes**:
      a. Check uncommitted changes: `git status --porcelain`.
      b. If any: `git stash push -m "bump-auto-stash"`; record `STASH_APPLIED=true`.
-     c. `git checkout main && git pull`.
+     c. `git checkout "$BASE_BRANCH" && git pull`.
      d. Record `ORIGINAL_BRANCH=<branch-name>` for cleanup in Phase 11.
-     e. Effective base is now `main` — fall through to step 3.
+     e. Effective base is now `$BASE_BRANCH` — fall through to step 3.
 
-3. If on `main` (started there or just switched):
-   - `git pull` to bring main up to date.
-   - **If `HOST` is `github`** (from Phase 1): set `MODE=pr`. Create a dedicated bump branch so `main` is never modified directly:
+3. If on `$BASE_BRANCH` (started there or just switched):
+   - `git pull` to bring `$BASE_BRANCH` up to date.
+   - **If `HOST` is `github`** (from Phase 1): set `MODE=pr`. Create a dedicated bump branch so `$BASE_BRANCH` is never modified directly:
      ```bash
      BUMP_BRANCH="chore/bump-deps-$(date +%Y%m%d-%H%M%S)"
      git checkout -b "$BUMP_BRANCH"
      ```
-     Record `BUMP_BRANCH` for Phases 9 and 11. Display: `Working on bump branch: <BUMP_BRANCH> (will open a PR into main)`.
-   - **If `HOST` is not `github`:** a PR cannot be opened. Display: `Remote is not GitHub -- cannot open a pull request. Committing directly to main instead.` Set `MODE=direct`, continue on `main`.
+     Record `BUMP_BRANCH` for Phases 9 and 11. Display: `Working on bump branch: <BUMP_BRANCH> (will open a PR into <BASE_BRANCH>)`.
+   - **If `HOST` is not `github`:** a PR cannot be opened. Display: `Remote is not GitHub -- cannot open a pull request. Committing directly to <BASE_BRANCH> instead.` Set `MODE=direct`, continue on `$BASE_BRANCH`.
 
 ### Phase 3: Cache Refresh
 
@@ -268,7 +275,7 @@ bump.py ecosystem <eco> validate                   # -> {"build":"pass"/"fail", 
 Commits to the **current working branch** — the bump branch when `MODE=pr`, the user's branch when `MODE=direct`.
 
 **No-change guard:** if nothing was applied (or bisection reverted everything):
-- `MODE=pr`: do not create an empty PR. `git checkout main && git branch -D "$BUMP_BRANCH"`; record that no PR was opened; skip Phase 9; continue to Phases 10/11.
+- `MODE=pr`: do not create an empty PR. `git checkout "$BASE_BRANCH" && git branch -D "$BUMP_BRANCH"`; record that no PR was opened; skip Phase 9; continue to Phases 10/11.
 - `MODE=direct`: report nothing to update; continue to Phases 10/11.
 
 Otherwise:
@@ -306,7 +313,7 @@ If the push fails because of an inaccessible SSH key (e.g. a required physical t
 
 **Step 2 — Open the PR** (reuse the Phase 8 commit body as the PR body):
 ```bash
-bump.py codeHost <HOST> open-pr "$BUMP_BRANCH" "chore(deps): bump dependencies" "<commit message body>"
+bump.py codeHost <HOST> open-pr "$BUMP_BRANCH" "$BASE_BRANCH" "chore(deps): bump dependencies" "<commit message body>"
 ```
 Returns `{"ok": bool, "output": str}`. On failure `output` carries `gh`'s own error (stderr is appended only on the failure path). If `ok` is false: report `output` verbatim, leave the committed bump branch in place, and stop the PR flow (skip merge/cleanup). Choose the remedy from the message — a transient API error (HTTP 5xx) is worth one retry of `open-pr`; "already exists" means reuse the PR it names; suggest `gh auth login` only when the message indicates an auth problem or `gh` is missing. On success, capture the PR number/URL from `output` and display `Opened PR #<number>: <url>`.
 
@@ -334,9 +341,9 @@ If `ok` is false, report the error, leave the PR open and the branch in place, a
 
 **Step 6 — Local cleanup:**
 ```bash
-git checkout main && git pull && git branch -D "$BUMP_BRANCH"
+git checkout "$BASE_BRANCH" && git pull && git branch -D "$BUMP_BRANCH"
 ```
-`git pull` fast-forwards `main` to include the squash-merged commit; `-D` is required because the squash leaves the branch's individual commits unreachable. Record that the PR was merged for Phase 11.
+`git pull` fast-forwards `$BASE_BRANCH` to include the squash-merged commit; `-D` is required because the squash leaves the branch's individual commits unreachable. Record that the PR was merged for Phase 11.
 
 ### Phase 10: Plan for Remaining Updates
 
@@ -368,9 +375,9 @@ Note where no changelog was available.
 ### Phase 11: Cleanup and Final Report
 
 **Step 1 — Reconcile the bump branch (MODE=pr only).** By now the branch was already handled:
-- **PR merged** (Phase 9 Step 6): branch already deleted locally+remotely, `main` fast-forwarded, current branch is `main`.
+- **PR merged** (Phase 9 Step 6): branch already deleted locally+remotely, `$BASE_BRANCH` fast-forwarded, current branch is `$BASE_BRANCH`.
 - **PR left open** (Phase 9 Step 4): branch and PR remain on purpose — do **not** delete.
-- **No commit** (Phase 8 no-change guard): empty bump branch already deleted, current branch is `main`.
+- **No commit** (Phase 8 no-change guard): empty bump branch already deleted, current branch is `$BASE_BRANCH`.
 
 In `MODE=direct` there is no bump branch to reconcile.
 
@@ -438,7 +445,7 @@ The `Pull Request:` line reflects the actual outcome:
 7. **Python dependency formats**: the Python adapter adapts to `pyproject.toml`/`uv.lock` (uv) or `requirements.txt` (pip); `apply` uses `name==X.Y.Z` specs and reports the files it changed.
 8. **Commit message**: lists every updated package with old→new versions, grouped by ecosystem; security fixes called out separately with CVE identifiers.
 9. **Branch restore order**: always checkout `ORIGINAL_BRANCH` **first**, then `git stash pop`, so stashed changes land on the correct branch.
-10. **Main is never bumped directly (on GitHub repos)**: when the base is `main` and `HOST` is `github`, the bump runs on `chore/bump-deps-<timestamp>` and integrates only via PR. `main` changes solely by merging that PR. Only a non-GitHub remote (no PR mechanism) preserves the direct-to-main path.
+10. **The default branch is never bumped directly (on GitHub repos)**: when the base is `$BASE_BRANCH` (the repo's resolved default branch, never assumed to be `main`) and `HOST` is `github`, the bump runs on `chore/bump-deps-<timestamp>` and integrates only via PR. `$BASE_BRANCH` changes solely by merging that PR. Only a non-GitHub remote (no PR mechanism) preserves the direct-to-default-branch path.
 11. **Squash merge + force delete**: the PR is squash-merged; the branch's original commits become unreachable, so local deletion needs `git branch -D` (`-d` would refuse).
 12. **Automatic merge, conservative on failure**: a ready PR is squash-merged without confirmation; a not-ready PR is never merged — branch and PR are left in place and the user is told why.
 

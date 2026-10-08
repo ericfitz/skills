@@ -34,7 +34,7 @@ class TestGitHubCodeHost(unittest.TestCase):
 
     def test_open_pr_cmd_passes_title_as_arg(self):
         # title with shell metacharacters must appear as its own list element, unescaped
-        cmd = gh.open_pr_cmd("bump-x", "bump; rm -rf /", "body")
+        cmd = gh.open_pr_cmd("bump-x", "main", "bump; rm -rf /", "body")
         self.assertIn("bump; rm -rf /", cmd)
         self.assertEqual(cmd[0:2], ["gh", "pr"])
 
@@ -63,7 +63,7 @@ class TestOpenPrSurfacesStderr(unittest.TestCase):
         with mock.patch("bumplib.codehosts.github.shutil.which", return_value="/usr/bin/gh"), \
                 mock.patch("bumplib.codehosts.github._run",
                            return_value=mock.Mock(returncode=rc, stdout=stdout, stderr=stderr)):
-            return gh.handle("open-pr", ["bump-x", "title", "body"])
+            return gh.handle("open-pr", ["bump-x", "main", "title", "body"])
 
     def test_failure_includes_stderr(self):
         err = 'a pull request for branch "bump-x" into branch "main" already exists:\n' \
@@ -82,6 +82,87 @@ class TestOpenPrSurfacesStderr(unittest.TestCase):
                               "Warning: 1 uncommitted change\n")
         self.assertTrue(result["ok"])
         self.assertEqual(result["output"], "https://github.com/o/r/pull/857")
+
+
+class TestOpenPrBase(unittest.TestCase):
+    """#86: the PR base must be the caller-supplied default branch, never a literal."""
+
+    def test_base_is_supplied_value(self):
+        cmd = gh.open_pr_cmd("bump-x", "develop", "t", "b")
+        self.assertEqual(cmd[cmd.index("--base") + 1], "develop")
+        self.assertNotIn("main", cmd)
+
+    def test_base_is_required(self):
+        with self.assertRaises(TypeError):
+            gh.open_pr_cmd("bump-x", "t", "b")  # the old 3-arg form
+
+    def test_empty_base_rejected(self):
+        with self.assertRaises(ValueError):
+            gh.open_pr_cmd("bump-x", "", "t", "b")
+
+    def test_open_pr_verb_passes_base(self):
+        with mock.patch("bumplib.codehosts.github.shutil.which", return_value="/usr/bin/gh"), \
+                mock.patch("bumplib.codehosts.github._run",
+                           return_value=mock.Mock(returncode=0, stdout="u\n", stderr="")) as run:
+            gh.handle("open-pr", ["bump-x", "trunk", "t", "b"])
+        argv = run.call_args[0][0]
+        self.assertEqual(argv[argv.index("--base") + 1], "trunk")
+
+    def test_open_pr_verb_without_base_is_error(self):
+        with mock.patch("bumplib.codehosts.github.shutil.which", return_value="/usr/bin/gh"), \
+                mock.patch("bumplib.codehosts.github._run") as run:
+            result = gh.handle("open-pr", ["bump-x", "t", "b"])
+        self.assertFalse(result["ok"])
+        run.assert_not_called()
+
+
+class TestDefaultBranch(unittest.TestCase):
+    """#86: resolve origin/HEAD first, then gh; never silently default to main."""
+
+    @staticmethod
+    def _run_factory(responses):
+        def fake(args):
+            key = args[0] if args[0] == "git" else "gh"
+            rc, out, err = responses[key]
+            return mock.Mock(returncode=rc, stdout=out, stderr=err)
+        return fake
+
+    def _handle(self, responses, gh_present=True):
+        with mock.patch("bumplib.codehosts.github.shutil.which",
+                        return_value="/usr/bin/gh" if gh_present else None), \
+                mock.patch("bumplib.codehosts.github._run", self._run_factory(responses)):
+            return gh.handle("default-branch", [])
+
+    def test_origin_head(self):
+        r = self._handle({"git": (0, "origin/develop\n", ""), "gh": (1, "", "unused")})
+        self.assertEqual(r, {"ok": True, "branch": "develop", "source": "origin/HEAD"})
+
+    def test_origin_head_branch_with_slash(self):
+        r = self._handle({"git": (0, "origin/release/2.x\n", ""), "gh": (1, "", "")})
+        self.assertEqual(r["branch"], "release/2.x")
+
+    def test_gh_fallback(self):
+        r = self._handle({"git": (128, "", "fatal: not a symbolic ref"),
+                          "gh": (0, "trunk\n", "")})
+        self.assertEqual(r, {"ok": True, "branch": "trunk", "source": "gh repo view"})
+
+    def test_unresolvable_is_error_naming_attempts(self):
+        r = self._handle({"git": (128, "", "fatal: not a symbolic ref"),
+                          "gh": (1, "", "not authenticated")})
+        self.assertFalse(r["ok"])
+        self.assertNotIn("branch", r)
+        self.assertIn("refs/remotes/origin/HEAD", r["output"])
+        self.assertIn("gh repo view", r["output"])
+        self.assertIn("not authenticated", r["output"])
+
+    def test_gh_missing_is_error(self):
+        r = self._handle({"git": (128, "", "fatal"), "gh": (0, "x", "")}, gh_present=False)
+        self.assertFalse(r["ok"])
+        self.assertIn("gh not installed", r["output"])
+
+    def test_gh_empty_output_is_error(self):
+        r = self._handle({"git": (128, "", "fatal"), "gh": (0, "\n", "")})
+        self.assertFalse(r["ok"])
 
 
 if __name__ == "__main__":

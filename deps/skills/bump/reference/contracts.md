@@ -195,7 +195,8 @@ Adapters: `github`, or `none` (special case).
 | `detect` | dict | `{"present": bool}` — detects if the repository is hosted on this code host (e.g., GitHub via `git remote get-url origin`). For `none`: `{"present": false}` |
 | `alerts` | list | `[Advisory, ...]` — list of security alerts from the code host (e.g., Dependabot alerts); empty if code host not detected or no alerts. Returns `[]` if tool (gh) not installed |
 | `prs` | Context | `Context(pullRequests=[...])` — dependency-related PRs; empty list if no PRs or tool not installed |
-| `open-pr` | dict | `{"ok": bool, "output": str}` — creates a new PR; `ok` is true if successful. argv: `[branch, title, body]` |
+| `default-branch` | dict | `{"ok": true, "branch": str, "source": str}` resolved from `origin/HEAD`, else `gh repo view`; `{"ok": false, "output": str}` naming each attempt if unresolvable (never defaults to `main`). argv: `[]` |
+| `open-pr` | dict | `{"ok": bool, "output": str}` — creates a new PR; `ok` is true if successful. argv: `[branch, base, title, body]`; `base` is the resolved default branch and is required |
 | `pr-status` | dict | PR status information; shape depends on code host. GitHub returns `{"state": ..., "mergeable": ..., "mergeStateStatus": ..., "reviewDecision": ...}` on success. On error (tool missing or command fails): `{"error": "error message"}`. argv: `[pr_number]` |
 | `merge-pr` | dict | `{"ok": bool, "output": str}` — merges and deletes the PR. argv: `[pr_number]` |
 

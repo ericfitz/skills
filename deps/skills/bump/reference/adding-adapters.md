@@ -94,7 +94,7 @@ def handle(verb, argv):
 
 ### Code Host Verbs
 
-Required: `detect`, `alerts`, `prs`, `open-pr`, `pr-status`, `merge-pr`.
+Required: `detect`, `alerts`, `prs`, `default-branch`, `open-pr`, `pr-status`, `merge-pr`.
 
 ### Tracker Verbs
 
@@ -109,7 +109,7 @@ Every verb must return **exactly** the shape defined in `contracts.md` for that 
 - Use `c.UpdateRecord(...)` for ecosystem `outdated` results
 - Use `c.Advisory(...)` for audit/alert results
 - Use `c.Context(...)` for tracker/codeHost context results
-- Use dict for `detect`, `open-pr`, `pr-status`, `merge-pr`, `validate`, `cache-clear`
+- Use dict for `detect`, `default-branch`, `open-pr`, `pr-status`, `merge-pr`, `validate`, `cache-clear`
 - Use list `[]` for empty `outdated` or `audit` results
 
 **Do not** add extra fields or invent new shapes. The orchestrator and categorizer depend on precise contracts.
