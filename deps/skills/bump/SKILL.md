@@ -129,7 +129,7 @@ For each detected ecosystem, clear stale package metadata so checks hit the late
 bump.py ecosystem <eco> cache-clear
 ```
 
-Returns `{"warnings": [...]}` (no-op for Go). **Config override:** if `.bump-config.json` sets `ecosystems.<eco>.cacheClear` to a non-empty string, run that shell command **instead** of the CLI call (the CLI only runs the adapter default).
+For Node this runs `pnpm store prune`, deletes the `metadata*` directories in pnpm's cache dir (the registry metadata `pnpm outdated` reads `latest` from), and runs `npm cache clean --force`. Returns `{"warnings": [...]}` (no-op for Go). **Config override:** if `.bump-config.json` sets `ecosystems.<eco>.cacheClear` to a non-empty string, run that shell command **instead** of the CLI call (the CLI only runs the adapter default).
 
 Display: `Cache refreshed for: <list of ecosystems>`.
 

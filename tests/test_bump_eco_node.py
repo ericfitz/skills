@@ -303,5 +303,84 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.assertNotIn("error", res)
 
 
+class TestPnpmMetadataCache(unittest.TestCase):
+    """Issue #87: cache-clear must remove pnpm's registry metadata cache."""
+
+    def _cache(self, tmp):
+        cache = Path(tmp) / "pnpm"
+        for name in ("metadata-v1.3", "metadata-full-v1.3", "store"):
+            (cache / name / "registry.npmjs.org").mkdir(parents=True)
+            (cache / name / "registry.npmjs.org" / "marked.json").write_text("{}")
+        return cache
+
+    def test_clear_removes_metadata_dirs_only(self):
+        with TemporaryDirectory() as tmp:
+            cache = self._cache(tmp)
+            removed = node.clear_pnpm_metadata(cache)
+            self.assertEqual(sorted(removed), ["metadata-full-v1.3", "metadata-v1.3"])
+            self.assertFalse((cache / "metadata-v1.3").exists())
+            self.assertFalse((cache / "metadata-full-v1.3").exists())
+            self.assertTrue((cache / "store" / "registry.npmjs.org" / "marked.json").exists())
+
+    def test_clear_ignores_metadata_named_file(self):
+        with TemporaryDirectory() as tmp:
+            cache = self._cache(tmp)
+            (cache / "metadata-note.txt").write_text("keep")
+            node.clear_pnpm_metadata(cache)
+            self.assertTrue((cache / "metadata-note.txt").exists())
+
+    def test_clear_does_not_follow_symlink(self):
+        with TemporaryDirectory() as tmp:
+            cache = self._cache(tmp)
+            outside = Path(tmp) / "outside"
+            outside.mkdir()
+            (outside / "f").write_text("keep")
+            (cache / "metadata-evil").symlink_to(outside, target_is_directory=True)
+            node.clear_pnpm_metadata(cache)
+            self.assertTrue((outside / "f").exists())
+
+    def test_clear_missing_cache_dir_is_noop(self):
+        with TemporaryDirectory() as tmp:
+            self.assertEqual(node.clear_pnpm_metadata(Path(tmp) / "nope"), [])
+
+    def test_clear_rejects_bad_paths(self):
+        for bad in (None, "", Path(""), Path("relative/pnpm"), Path("/")):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                node.clear_pnpm_metadata(bad)
+
+    def test_default_dir_linux_xdg_and_home(self):
+        self.assertEqual(node.pnpm_cache_dir({"XDG_CACHE_HOME": "/x"}, "linux", Path("/h")), Path("/x/pnpm"))
+        self.assertEqual(node.pnpm_cache_dir({}, "linux", Path("/h")), Path("/h/.cache/pnpm"))
+
+    def test_default_dir_macos(self):
+        self.assertEqual(node.pnpm_cache_dir({}, "darwin", Path("/h")), Path("/h/Library/Caches/pnpm"))
+
+    def test_handle_cache_clear_clears_metadata_and_runs_clis(self):
+        with TemporaryDirectory() as tmp:
+            cache = self._cache(tmp)
+            with mock.patch("bumplib.ecosystems.node.shutil.which", return_value="/bin/x"), \
+                 mock.patch("bumplib.ecosystems.node._run") as run, \
+                 mock.patch("bumplib.ecosystems.node.detect", return_value={"packageManager": "pnpm"}), \
+                 mock.patch("bumplib.ecosystems.node.pnpm_cache_dir", return_value=cache):
+                out = node.handle("cache-clear", [])
+            self.assertEqual(out, {"warnings": []})
+            self.assertFalse((cache / "metadata-v1.3").exists())
+            self.assertTrue((cache / "store").exists())
+            cmds = [c.args[0] for c in run.call_args_list]
+            self.assertIn(["pnpm", "store", "prune"], cmds)
+            self.assertIn(["npm", "cache", "clean", "--force"], cmds)
+
+    def test_handle_cache_clear_bad_dir_warns_and_deletes_nothing(self):
+        with TemporaryDirectory() as tmp:
+            cache = self._cache(tmp)
+            with mock.patch("bumplib.ecosystems.node.shutil.which", return_value="/bin/x"), \
+                 mock.patch("bumplib.ecosystems.node._run"), \
+                 mock.patch("bumplib.ecosystems.node.detect", return_value={"packageManager": "pnpm"}), \
+                 mock.patch("bumplib.ecosystems.node.pnpm_cache_dir", return_value=Path("relative")):
+                out = node.handle("cache-clear", [])
+            self.assertEqual(len(out["warnings"]), 1)
+            self.assertTrue((cache / "metadata-v1.3").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

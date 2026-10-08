@@ -1,8 +1,10 @@
 """Node ecosystem adapter (pnpm / npm)."""
 import json
+import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from .. import contracts as c
@@ -257,6 +259,50 @@ def _run_shell(cmd):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 
+def pnpm_cache_dir(env=None, platform=None, home=None):
+    """Platform-default pnpm cache dir (`pnpm cache dir` does not exist in every pnpm).
+
+    Honors the `cache-dir` setting via npm_config_cache_dir, then XDG_CACHE_HOME on Linux.
+    """
+    env = os.environ if env is None else env
+    platform = sys.platform if platform is None else platform
+    home = Path.home() if home is None else home
+    if env.get("npm_config_cache_dir"):
+        return Path(env["npm_config_cache_dir"])
+    if platform == "darwin":
+        return home / "Library" / "Caches" / "pnpm"
+    if platform.startswith("win"):
+        return Path(env.get("LOCALAPPDATA") or home / "AppData" / "Local") / "pnpm-cache"
+    return Path(env.get("XDG_CACHE_HOME") or home / ".cache") / "pnpm"
+
+
+def clear_pnpm_metadata(cache_dir):
+    """Delete every `metadata*` subdirectory of pnpm's cache dir; return the names removed.
+
+    pnpm outdated reads `latest` from these registry-metadata dirs, which
+    `pnpm store prune` does not touch (issue #87). Nothing else is deleted.
+    """
+    if not cache_dir or not str(cache_dir):
+        raise ValueError("pnpm cache dir is empty")
+    cache = Path(cache_dir)
+    if not cache.is_absolute() or cache.parent == cache:
+        raise ValueError(f"refusing unsafe pnpm cache dir: {cache_dir!r}")
+    if not cache.is_dir():
+        return []
+    removed = []
+    for child in sorted(cache.iterdir()):
+        if not child.name.startswith("metadata"):
+            continue
+        if child.is_symlink():
+            child.unlink()
+        elif child.is_dir():
+            shutil.rmtree(child)
+        else:
+            continue
+        removed.append(child.name)
+    return removed
+
+
 def handle(verb, argv):
     root = Path(".")
     mgr = detect(root).get("packageManager", "npm")
@@ -265,11 +311,18 @@ def handle(verb, argv):
     if verb == "cache-clear":
         # registry metadata can be stale in either cache -- always clear both, each
         # guarded so a missing binary is skipped rather than fatal.
+        warnings = []
         if shutil.which("pnpm"):
             _run(["pnpm", "store", "prune"])
+            # `store prune` leaves registry metadata (what `pnpm outdated` reads) stale.
+            try:
+                clear_pnpm_metadata(pnpm_cache_dir())
+            except (ValueError, OSError) as e:
+                warnings.append(f"pnpm metadata cache not cleared: {e}")
         if shutil.which("npm"):
+            # clears the whole _cacache, including packuments (metadata); nothing extra needed.
             _run(["npm", "cache", "clean", "--force"])
-        return {"warnings": []}
+        return {"warnings": warnings}
     if verb == "outdated":
         if shutil.which(mgr) is None:
             return []
