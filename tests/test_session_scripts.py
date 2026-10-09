@@ -87,6 +87,15 @@ class TestSessionSkills(unittest.TestCase):
         self.assertIn("WAITING ON ERIC:", cont)  # legacy heading still accepted
         self.assertNotIn("WAITING ON ERIC:", handoff)
 
+    def test_continue_hands_off_to_backlog(self):
+        cont = (PLUGIN / "skills" / "continue" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("github:backlog", cont)
+        self.assertIn("No queued work", cont)
+        self.assertIn("unavailable: github plugin not installed", cont)
+        backlog = REPO / "github" / "skills" / "backlog" / "SKILL.md"
+        self.assertTrue(backlog.is_file(), f"{backlog} missing: continue invokes github:backlog")
+        self.assertRegex(backlog.read_text(encoding="utf-8"), r"(?m)^name: backlog$")
+
     def test_scripts_resolved_via_plugin_root(self):
         for skill in ("continue", "handoff"):
             with self.subTest(skill=skill):

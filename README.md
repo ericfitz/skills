@@ -167,9 +167,9 @@ by key union; `synthesize` and `report` consume that merged output. Requires
 ### session — session continuity
 
 - **handoff** — End or checkpoint a session: rewrite a machine-local, untracked `HANDOFF.md` holding only current state, route long-lived knowledge to CLAUDE.md, ADRs or agentbus memory, and report everything not yet landed. Never commits, pushes, or deploys.
-- **continue** — Resume from `HANDOFF.md`: compare it with live repo facts (branch, dirty files, worktrees, open PRs, main CI, optional `.local/state-checks.sh` deployed versions), report drift, propose the next action, and stop without starting work.
+- **continue** — Resume from `HANDOFF.md`: compare it with live repo facts (branch, dirty files, worktrees, open PRs, main CI, optional `.local/state-checks.sh` deployed versions), report drift, propose the next action, and stop without starting work. When the handoff queues no work and there is no drift, it hands off to `github:backlog` to recommend the next issue.
 
-A SessionStart hook prints a one-line reminder to run `continue` when the repo has a `HANDOFF.md`. Requires `git` and `perl`; `gh` and agentbus are optional.
+A SessionStart hook prints a one-line reminder to run `continue` when the repo has a `HANDOFF.md`. Requires `git` and `perl`; `gh`, agentbus and the `github` plugin are optional.
 
 ---
 

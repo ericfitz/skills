@@ -1,13 +1,14 @@
 ---
 name: continue
-description: Use at the start of a session when HANDOFF.md exists, when asked to /continue, or on phrasing like "resume from handoff", "pick up where we left off", "where were we", or "what's next in this repo". Reads HANDOFF.md, checks it against the real repo state, reports drift, and proposes the next action. It never starts work. Not for a plain "continue" or "keep going" mid-task.
+description: Use at the start of a session when HANDOFF.md exists, when asked to /continue, or on phrasing like "resume from handoff", "pick up where we left off", "where were we", or "what's next in this repo". Reads HANDOFF.md, checks it against the real repo state, reports drift, and proposes the next action, or runs github:backlog when nothing is queued. It never starts work. Not for a plain "continue" or "keep going" mid-task.
 ---
 
 # /continue
 
 Start the session from the current state, not from memory. HANDOFF.md says what the last
 session believed; `repo-state.sh` says what is true now. The job is to report both, flag every
-difference, and stop.
+difference, and stop. When the handoff queues no work, hand off to `github:backlog`, which
+recommends an issue and stops at its own confirmation question.
 
 ## Bundled Script Location
 
@@ -63,14 +64,29 @@ root, and use that absolute path.
      exact `Approve: <action and target>` line to send. Read the handoff's `WAITING ON USER:`
      section; also accept the legacy heading `WAITING ON ERIC:` in existing handoff files.
    - **Proposed next action:** one item, taken from HANDOFF.md NEXT unless drift changes it.
+     When step 6 applies, it is "run `/github:backlog`".
 
-6. **Stop and wait for the user. Do not start work.** If the user's first message already gave
-   a different instruction, follow it instead of the proposal.
+6. **No queued work: run the backlog.** No queued work means all of these hold:
+   - HANDOFF.md IN FLIGHT is empty or "none" (or HANDOFF.md is missing in both places);
+   - HANDOFF.md NEXT is empty, "none", or only says to pick an item from the backlog or issue list;
+   - the Drift line is "none". Drift means unrecorded work exists, so propose handling it instead.
+   WAITING ON USER items do not block this step; they stay on their summary line.
+   When all hold and the `github:backlog` skill is in the available-skills list, print the
+   summary, then invoke `github:backlog` by name and follow it. It ends by asking which issue to
+   work on; that question is where this session stops. If the skill is not available, propose
+   from NEXT as usual and append "(`/github:backlog` unavailable: github plugin not installed)"
+   to the Proposed next action line. If the user's first message already gave a different
+   instruction, skip this step.
+
+7. **Stop and wait for the user. Do not start work.** If the user's first message already gave
+   a different instruction, follow it instead of the proposal. After step 6 the stop is
+   `github:backlog`'s own confirmation question.
 
 ## Rules
 
 - Read-only: `/continue` never edits files, commits, pushes, deploys or sends agentbus
-  messages other than the protocol's registration.
+  messages other than the protocol's registration. The step 6 handoff to `github:backlog`
+  only reads issues; any work begins only after the user confirms an issue there.
 - Facts beat HANDOFF.md. When they disagree, the fact goes in State and the disagreement goes
   in Drift.
 - Keep it short. Detail belongs in the next step, after the user chooses it.
