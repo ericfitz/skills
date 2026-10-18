@@ -34,6 +34,48 @@ class TestNodes(unittest.TestCase):
         self.assertEqual([n["id"] for n in g["nodes"]], ["service:a", "service:b"])
 
 
+def used_by(*component_ids):
+    return [{"component_id": c, "evidence": ["main.go:1"]} for c in component_ids]
+
+
+def service_used_by(id_, name, *component_ids):
+    d = dep(id_, name)
+    d["details"]["used_by"] = used_by(*component_ids)
+    return d
+
+
+class TestUsedBy(unittest.TestCase):
+    def test_used_by_becomes_component_edge(self):
+        graph, unresolved = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:api")]),
+            [{"name": "api"}])
+        self.assertIn({"from": "component:api", "to": "service:pg",
+                       "kind": "depends_on", "lifecycle": "run"}, graph["edges"])
+        self.assertEqual(unresolved, [])
+
+    def test_used_by_unknown_component_is_unresolved(self):
+        graph, unresolved = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:ghost")]),
+            [{"name": "api"}])
+        self.assertEqual(graph["edges"], [])
+        self.assertEqual(unresolved, [{"from": "service:pg", "to": "component:ghost",
+                                       "kind": "used_by"}])
+
+    def test_used_by_duplicates_collapse(self):
+        graph, _ = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:api", "component:api"),
+                            service_used_by("service:redis", "redis", "component:api")]),
+            [{"name": "api"}])
+        pairs = [(e["from"], e["to"]) for e in graph["edges"]]
+        self.assertEqual(sorted(pairs), [("component:api", "service:pg"),
+                                         ("component:api", "service:redis")])
+        again, _ = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:api"),
+                            service_used_by("service:pg2", "pg2", "component:api")]),
+            [{"name": "api"}])
+        self.assertEqual(len(again["edges"]), 2)
+
+
 class TestEdges(unittest.TestCase):
     def test_depends_on_edges_come_from_package_details(self):
         g = build_graph(merged(package=[

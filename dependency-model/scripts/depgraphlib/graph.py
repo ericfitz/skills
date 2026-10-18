@@ -119,6 +119,12 @@ def _build_edges(merged, nodes):
                     unresolved.add((source, target, kind))
                 else:
                     edges.add((source, node, kind, lifecycle))
+            for use in d.get("details", {}).get("used_by") or []:
+                node = resolve(use["component_id"])
+                if node is None:
+                    unresolved.add((source, use["component_id"], "used_by"))
+                else:
+                    edges.add((node, source, "depends_on", "run"))
     return ([{"from": f, "to": t, "kind": k, "lifecycle": lc}
              for f, t, k, lc in sorted(edges, key=lambda e: (e[0], e[1], e[2]))],
             [{"from": f, "to": t, "kind": k} for f, t, k in sorted(unresolved)])

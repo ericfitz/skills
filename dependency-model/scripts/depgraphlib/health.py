@@ -9,7 +9,10 @@ exactly where layer 1 records nothing: a dynamically loaded package has no
 loading-site field, so every package is treated as bundled and the skill
 records that gap.
 
-Judgment stays in the skill: `required_for` is always empty here.
+`required_for` is filled from the graph: a service anchor's conditions name the
+components with a depends_on edge to it (the service skill's `used_by`); a
+component's own conditions name that component. Judgment stays in the skill,
+which may add ids static evidence supports.
 """
 
 KIND_RANK = {"presence": 0, "bound": 1, "upstream_health": 2}
@@ -140,6 +143,14 @@ def derive_health(document):
                     frontier.append(n)
         neighbors[anchor] = reached
 
+    required_for = {}
+    for anchor in anchors:
+        users = {anchor} if nodes[anchor]["category"] == "component" else set()
+        users |= {e["from"] for e in document["graph"]["edges"]
+                  if e["kind"] == "depends_on" and e["to"] == anchor
+                  and e["from"] in nodes and nodes[e["from"]]["category"] == "component"}
+        required_for[anchor] = sorted(users)
+
     health, linked = [], set()
     for anchor in sorted(anchors):
         conditions = _own_bounds(deps[anchor]) if anchor in deps else []
@@ -152,8 +163,10 @@ def derive_health(document):
         for c in conditions:
             unique.setdefault(_sort_key(c), c)
         if unique:
-            health.append({"service_id": anchor,
-                           "conditions": [unique[k] for k in sorted(unique)]})
+            ordered = [unique[k] for k in sorted(unique)]
+            for c in ordered:
+                c["required_for"] = list(required_for[anchor])
+            health.append({"service_id": anchor, "conditions": ordered})
 
     unattached = sorted(i for i, d in deps.items()
                         if i not in anchors and i not in linked

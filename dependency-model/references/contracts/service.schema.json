@@ -30,6 +30,19 @@
                 "type": "array",
                 "description": "Configuration key names (e.g. an env var name like DATABASE_URL) that point at this service. The matching config: id, if one exists, belongs in related_ids, not here.",
                 "items": { "type": "string" }
+              },
+              "used_by": {
+                "type": "array",
+                "description": "First-party components whose code or deployment manifests use this service. component_id is a component: id from the topology contract; evidence is file:line strings. Omit when no component can be tied to the service.",
+                "items": {
+                  "type": "object",
+                  "required": ["component_id", "evidence"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "component_id": { "type": "string" },
+                    "evidence": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+                  }
+                }
               }
             }
           }

@@ -43,6 +43,34 @@ class ValidateCliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("unexpected property 'mermaid'", result.stdout)
 
+    def service_doc_with(self, used_by):
+        doc = json.loads((EXAMPLES / "service.example.json").read_text())
+        doc["categories"]["service"]["dependencies"][0]["details"]["used_by"] = used_by
+        return doc
+
+    def run_doc(self, doc):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "doc.json"
+            path.write_text(json.dumps(doc))
+            return run("discovery", path)
+
+    def test_min_items_rejects_empty_evidence(self):
+        result = self.run_doc(self.service_doc_with(
+            [{"component_id": "component:api", "evidence": []}]))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("at least 1", result.stdout)
+
+    def test_used_by_extra_property_rejected(self):
+        result = self.run_doc(self.service_doc_with(
+            [{"component_id": "component:api", "evidence": ["a.go:1"], "role": "x"}]))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("unexpected property 'role'", result.stdout)
+
+    def test_used_by_valid_entry_accepted(self):
+        result = self.run_doc(self.service_doc_with(
+            [{"component_id": "component:api", "evidence": ["a.go:1"]}]))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_unknown_contract(self):
         self.assertEqual(run("nope", EXAMPLES / "service.example.json").returncode, 2)
 

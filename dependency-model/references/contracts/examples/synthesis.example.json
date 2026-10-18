@@ -27,7 +27,8 @@
               "protocol": "postgres",
               "client_library": "github.com/jackc/pgx/v5",
               "managed_by": "compose",
-              "config_keys": ["DATABASE_URL"]
+              "config_keys": ["DATABASE_URL"],
+              "used_by": [{ "component_id": "component:api", "evidence": ["cmd/api/main.go:30"] }]
             }
           }
         ],
@@ -189,6 +190,7 @@
       { "id": "service:postgres-primary", "name": "postgres", "category": "service", "lifecycle": "run" }
     ],
     "edges": [
+      { "from": "component:api", "to": "service:postgres-primary", "kind": "depends_on", "lifecycle": "run" },
       { "from": "network:postgres-5432", "to": "service:postgres-primary", "kind": "relates_to", "lifecycle": "run" },
       { "from": "package:a-1.0.0", "to": "package:b-2.0.0", "kind": "depends_on", "lifecycle": "build" },
       { "from": "package:b-2.0.0", "to": "package:a-1.0.0", "kind": "depends_on", "lifecycle": "build" },
@@ -207,7 +209,7 @@
           "kind": "upstream_health",
           "subject_id": "service:postgres-primary",
           "expectation": null,
-          "required_for": [],
+          "required_for": ["component:api"],
           "evidence": ["docker-compose.yml:12", "internal/db/pool.go:41"]
         }
       ]

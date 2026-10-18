@@ -122,12 +122,12 @@ each skill by name and take its envelope.
 4. Take the script's `health[]` as the base. **Never change or drop** a
    condition's `kind`, `subject_id`, `expectation`, or `evidence`, and never
    drop a condition or entry. You may only:
-   - Fill `required_for[]` (the script leaves it empty) with the ids of
-     components or functions that static evidence connects to the condition
-     — a `component:<slug>` id from `components[]`, an entry point, a
-     consuming file. Leave it empty
-     when nothing static connects it. It records which callers need the
-     condition met, never how important any of them are.
+   - Extend `required_for[]`. The script fills it from the service
+     skill's `used_by` (the component-to-service `depends_on` edges); add ids
+     of components or functions that static evidence also connects to the
+     condition — a `component:<slug>` id from `components[]`, an entry point,
+     a consuming file — and never remove one. It records which callers need
+     the condition met, never how important any of them are.
    - Add a `presence` condition for a dynamically loaded package — a
      reflectively resolved JDBC driver, an `importlib` plugin, a `dlopen`ed
      `.so` — citing the `file:line` of its loading site, **only when one

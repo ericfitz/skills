@@ -115,6 +115,11 @@ the evidence.
 10. Link `related_ids` to the `network:` entry for the host and port this
     service is reached on. Both categories record it; `categories.md` has
     the rule, and its "Ids" section says how to build each id.
+    Also set `details.used_by`: for each first-party component (a
+    `component:` id from the topology contract) whose code or deployment
+    manifests use this service, one `{"component_id", "evidence"}` entry with
+    at least one `file:line` of the use. Omit the field when no component can
+    be tied to the service; never guess one.
 11. If the index's `coverage.skipped` is non-empty, record one assumption per
     skipped language naming it and what went unscanned.
 12. Set `lifecycle` to `run` on every dependency — these are needed while the service runs.
