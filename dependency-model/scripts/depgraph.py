@@ -33,7 +33,7 @@ import argparse
 import json
 import sys
 
-from depgraphlib.graph import InvalidDependencyError, link_graph
+from depgraphlib.graph import InvalidDependencyError, dedupe_components, link_graph
 from depgraphlib.ids import assign_ids
 from depgraphlib.merge import MixedProvenanceError, merge_envelopes
 from depgraphlib.mermaid import to_mermaid
@@ -64,7 +64,7 @@ def main(argv=None):
     topology = loaded.pop() if args.topology else {}
 
     try:
-        topo_components = topology.get("components") or []
+        topo_components = dedupe_components(topology.get("components"))
         ids = assign_ids([c["name"] for c in topo_components], "component")
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
         json.dump({"error": f"component ids: {exc}"}, sys.stderr)

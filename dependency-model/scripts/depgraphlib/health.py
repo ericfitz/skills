@@ -145,11 +145,13 @@ def derive_health(document):
 
     required_for = {}
     for anchor in anchors:
-        users = {anchor} if nodes[anchor]["category"] == "component" else set()
-        users |= {e["from"] for e in document["graph"]["edges"]
-                  if e["kind"] == "depends_on" and e["to"] == anchor
-                  and e["from"] in nodes and nodes[e["from"]]["category"] == "component"}
-        required_for[anchor] = sorted(users)
+        if nodes[anchor]["category"] == "component":
+            required_for[anchor] = [anchor]
+            continue
+        required_for[anchor] = sorted(
+            e["from"] for e in document["graph"]["edges"]
+            if e["kind"] == "depends_on" and e["to"] == anchor
+            and e["from"] in nodes and nodes[e["from"]]["category"] == "component")
 
     health, linked = [], set()
     for anchor in sorted(anchors):

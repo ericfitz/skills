@@ -75,6 +75,26 @@ class TestUsedBy(unittest.TestCase):
             [{"name": "api"}])
         self.assertEqual(len(again["edges"]), 2)
 
+    def test_used_by_non_component_node_is_unresolved(self):
+        graph, unresolved = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "service:redis"),
+                            dep("service:redis", "redis")]),
+            [{"name": "api"}])
+        self.assertEqual(graph["edges"], [])
+        self.assertEqual(unresolved, [{"from": "service:pg", "to": "service:redis",
+                                       "kind": "used_by"}])
+
+    def test_used_by_read_only_for_services(self):
+        d = dep("config:x", "x")
+        d["details"]["used_by"] = used_by("component:api")
+        graph, unresolved = link_graph(merged(config=[d]), [{"name": "api"}])
+        self.assertEqual(graph["edges"], [])
+        self.assertEqual(unresolved, [])
+
+    def test_duplicate_component_names_give_one_node(self):
+        nodes = component_nodes([{"name": "api"}, {"name": "api"}])
+        self.assertEqual([n["id"] for n in nodes], ["component:api"])
+
 
 class TestEdges(unittest.TestCase):
     def test_depends_on_edges_come_from_package_details(self):

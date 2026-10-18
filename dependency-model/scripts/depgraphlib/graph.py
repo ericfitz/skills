@@ -29,11 +29,22 @@ def _require(d, field, category):
             f"field {field!r}: {d!r}") from exc
 
 
+def dedupe_components(components):
+    """The topology's components with repeated names collapsed to the first,
+    so the graph and ids.json agree on one node per name."""
+    seen, unique = set(), []
+    for c in components or []:
+        if c["name"] not in seen:
+            seen.add(c["name"])
+            unique.append(c)
+    return unique
+
+
 def component_nodes(components):
     """Graph nodes for the topology contract's first-party components. They
     are not dependencies, so they never enter the inventory; category
     `component`, lifecycle `run` (the component is the running thing)."""
-    components = components or []
+    components = dedupe_components(components)
     ids = assign_ids([c["name"] for c in components], "component")
     return [{"id": ids[c["name"]], "name": c["name"],
              "category": "component", "lifecycle": "run"} for c in components]
@@ -106,6 +117,7 @@ def _resolver(nodes):
 
 def _build_edges(merged, nodes):
     resolve = _resolver(nodes)
+    component_ids = {n["id"] for n in nodes if n["category"] == "component"}
     edges, unresolved = set(), set()
     for category, block in merged.get("categories", {}).items():
         for d in block.get("dependencies") or []:
@@ -119,12 +131,18 @@ def _build_edges(merged, nodes):
                     unresolved.add((source, target, kind))
                 else:
                     edges.add((source, node, kind, lifecycle))
+            if category != "service":
+                continue
             for use in d.get("details", {}).get("used_by") or []:
-                node = resolve(use["component_id"])
-                if node is None:
-                    unresolved.add((source, use["component_id"], "used_by"))
-                else:
+                if not isinstance(use, dict):
+                    raise InvalidDependencyError(
+                        f"used_by entry of {source!r} is not an object: {use!r}")
+                target = _require(use, "component_id", category)
+                node = resolve(target)
+                if node in component_ids:
                     edges.add((node, source, "depends_on", "run"))
+                else:
+                    unresolved.add((source, target, "used_by"))
     return ([{"from": f, "to": t, "kind": k, "lifecycle": lc}
              for f, t, k, lc in sorted(edges, key=lambda e: (e[0], e[1], e[2]))],
             [{"from": f, "to": t, "kind": k} for f, t, k in sorted(unresolved)])

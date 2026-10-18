@@ -194,6 +194,16 @@ class TestRequiredFor(unittest.TestCase):
         for c in entry["conditions"]:
             self.assertEqual(c["required_for"], ["component:api"])
 
+    def test_component_anchor_required_for_only_itself(self):
+        r = derive_health(document(
+            dep("service:pg", used_by=used("component:api")),
+            dep("service:cache", used_by=used("component:api")),
+            components=("api", "worker")))
+        for h in r["health"]:
+            if h["service_id"] == "component:api":
+                for c in h["conditions"]:
+                    self.assertEqual(c["required_for"], ["component:api"])
+
     def test_component_gets_upstream_health_on_used_service(self):
         r = derive_health(document(
             dep("service:pg", used_by=used("component:api")), components=("api",)))

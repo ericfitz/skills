@@ -51,5 +51,37 @@ class TopologyErrorsTest(unittest.TestCase):
         self.assertEqual(json.loads(out)["components"][0]["id"], "component:migrate-dbtool")
 
 
+class UsedByErrorsTest(unittest.TestCase):
+    def run_with(self, used_by):
+        envelope = {"categories": {"service": {"status": "discovered", "assumptions": [],
+            "dependencies": [{"id": "service:pg", "name": "pg", "lifecycle": "run",
+                              "details": {"used_by": used_by}}]}}}
+        with tempfile.TemporaryDirectory() as d:
+            env = Path(d, "env.json")
+            env.write_text(json.dumps(envelope))
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = depgraph.main([str(env)])
+        return code, err.getvalue()
+
+    def test_bare_string_entry_rejected(self):
+        code, err = self.run_with(["component:api"])
+        self.assertEqual(code, 2)
+        self.assertIn("error", json.loads(err))
+
+    def test_missing_component_id_rejected(self):
+        code, err = self.run_with([{"evidence": ["a:1"]}])
+        self.assertEqual(code, 2)
+        self.assertIn("component_id", json.loads(err)["error"])
+
+    def test_duplicate_component_names_agree_with_ids(self):
+        code, out, _ = run({"components": [{"name": "api"}, {"name": "api"}]})
+        self.assertEqual(code, 0)
+        doc = json.loads(out)
+        self.assertEqual(len(doc["components"]), 1)
+        self.assertEqual(len([n for n in doc["graph"]["nodes"]
+                              if n["category"] == "component"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

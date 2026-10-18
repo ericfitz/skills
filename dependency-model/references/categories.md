@@ -102,7 +102,7 @@ same moment, so the slug has to be derivable from the evidence alone:
   `network:postgres-5432`.
 - **`config:`** the key name slugged: `TMI_NATS_URL` is `config:tmi-nats-url`.
 - **`component:`** the system's own first-party components, slugged from
-  `components[].name` in the topology contract: `component:tmiserver`,
+  `components[].name` in the topology contract: `component:tmi-server`,
   `component:tooling-clis`. Not a category and never an inventory entry —
   `synthesize` adds these nodes from the topology — but the id to write in
   `related_ids` when an entry belongs to one of the system's own parts (an
@@ -128,8 +128,12 @@ they are a component's own listener. Read it before writing any id.
   alone.
 
 Write the id this rule produces even when the target entry is not yet
-visible to you. `depgraph.py` matches ids ignoring case and treating `_` and
-`-` as equal, and lists every link that still matches no node under
+visible to you. `depgraph.py` resolves a written id in this order: exact match;
+canonical match (case-insensitive, `_` and `-` equal); `service:<x>` to
+`component:<x>`; the re-slugged id part against nodes in the same category;
+the re-slugged id part against those nodes' slugged names. The first step
+that finds any candidate decides, and several candidates mean the link is
+unresolved. It lists every link that still matches no node under
 `unresolved`; `synthesize` reconciles those. A link is never silently lost.
 
 ## Never a duplicate

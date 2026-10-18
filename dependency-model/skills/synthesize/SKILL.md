@@ -81,6 +81,9 @@ each skill by name and take its envelope.
      component's `component:<slug>` id the same way.
    - Otherwise leave it and record an assumption naming both ids and why
      no node matched. Never invent a node to satisfy a link.
+   An entry with kind `used_by` is fixed by rewriting
+   `details.used_by[].component_id` in the saved service envelope, under the
+   same rules as the other rewrites.
    Re-run depgraph.py over the rewritten envelopes and take its output. An
    `unresolved` list that is still non-empty is fine once every remaining
    entry has its assumption; `unresolved` itself is not carried into the
