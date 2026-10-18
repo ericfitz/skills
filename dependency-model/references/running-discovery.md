@@ -51,8 +51,9 @@ same machine never overwrite each other's output.
 Skills run concurrently in that one run dir, so each writes its scratch files
 (helper scripts, drafts, intermediates) to its own `<run_dir>/work/<skill>/`
 and nothing else. `<run_dir>` itself holds only the envelopes and shared
-inputs: `depscan.json`, `syft.json` (written by `package`, read-only for
-everyone else), `snapshot/`.
+inputs: `depscan.json`, `topology.json` and `ids.json` (steps 2 and 3),
+`stack.json` (on the `synthesize` path), `syft.json` (written by `package`,
+read-only for everyone else), `snapshot/`.
 
 ## Filtering findings by path class
 

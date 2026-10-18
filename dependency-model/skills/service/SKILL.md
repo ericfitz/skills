@@ -66,7 +66,9 @@ use the ids it lists for the components and services the topology names (rule:
 
 2. Seed from the `topology` contract's `real_dependencies` and
    `external_third_parties`. These are coarse by design — refine them, do not
-   simply copy them.
+   simply copy them. But each topology-named service stays one entry under its
+   `ids.json` id: put finer detail inside that entry, and add a separate service
+   only for something the topology does not name.
 3. Read every file under the index's `files.compose`, `files.k8s`, and
    `files.iac` for service declarations: images, chart dependencies, managed-
    service resources.

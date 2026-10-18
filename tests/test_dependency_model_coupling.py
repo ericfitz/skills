@@ -303,6 +303,11 @@ class TestSharedIdList(unittest.TestCase):
         self.assertIn("never shorten", text)
         self.assertNotIn("a stable slug built from the service's name and role", text)
 
+    def test_service_keeps_topology_named_services_whole(self):
+        text = collapse_ws(body(skill_path("service")))
+        self.assertIn("each topology-named service stays one entry", text)
+        self.assertIn("only for something the topology does not name", text)
+
     def test_synthesize_runs_idmap(self):
         text = body(skill_path("synthesize"))
         self.assertIn("idmap.py", text)
@@ -310,6 +315,7 @@ class TestSharedIdList(unittest.TestCase):
 
     def test_running_discovery_order(self):
         text = (PLUGIN / "references" / "running-discovery.md").read_text(encoding="utf-8")
+        text = text[text.index("## The sequence"):]
         scan = text.index("depscan.py")
         topology = text.index("profile:topology", scan)
         idmap = text.index("idmap.py", topology)
