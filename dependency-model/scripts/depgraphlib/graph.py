@@ -10,7 +10,9 @@ exhaustive enumeration of every simple cycle in the graph — see
 `_find_cycles` for why.
 """
 
-from depgraphlib.ids import assign_ids, slug  # noqa: F401  (slug re-exported)
+import contextlib
+
+from depgraphlib.ids import assign_ids, slug
 
 
 class InvalidDependencyError(ValueError):
@@ -55,15 +57,32 @@ def canonical_id(id_):
     return id_.lower().replace("_", "-")
 
 
-def _resolver(known_ids):
-    """Map a written target id to a node id: exact match first, then a
-    canonical match when exactly one node has that canonical form, then
-    `service:<x>` to `component:<x>`: the system's own listener is not a
-    service (categories.md, worked adjudications), so a skill that wrote
-    `service:tmiserver` meant the first-party component."""
+def _category_and_rest(id_):
+    category, _, rest = id_.partition(":")
+    return category, rest
+
+
+def _resolver(nodes):
+    """Map a written target id to a node id. In order: exact match; canonical
+    match; `service:<x>` to `component:<x>` (the system's own listener is not
+    a service: categories.md, worked adjudications); the re-slugged id part
+    against every node's re-slugged id part; the re-slugged id part against
+    every node's slugged name. Each step needs exactly one candidate, and the
+    re-slug and name steps look only at nodes in the target's category. A
+    target whose id part cannot be slugged is left unresolved."""
+    known_ids = {n["id"] for n in nodes}
     by_canonical = {}
-    for i in known_ids:
-        by_canonical.setdefault(canonical_id(i), []).append(i)
+    by_reslug = {}
+    by_name = {}
+    for n in nodes:
+        by_canonical.setdefault(canonical_id(n["id"]), []).append(n["id"])
+        category, rest = _category_and_rest(n["id"])
+        for index, text in ((by_reslug, rest), (by_name, n["name"])):
+            with contextlib.suppress(ValueError):
+                index.setdefault((category, slug(text)), []).append(n["id"])
+
+    def unique(candidates):
+        return candidates[0] if candidates and len(set(candidates)) == 1 else None
 
     def resolve(target, _retry=True):
         if target in known_ids:
@@ -72,13 +91,20 @@ def _resolver(known_ids):
         if len(matches) == 1:
             return matches[0]
         if _retry and target.startswith("service:"):
-            return resolve("component:" + target[len("service:"):], _retry=False)
-        return None
+            found = resolve("component:" + target[len("service:"):], _retry=False)
+            if found:
+                return found
+        category, rest = _category_and_rest(target)
+        try:
+            key = (category, slug(rest))
+        except ValueError:
+            return None
+        return unique(by_reslug.get(key, [])) or unique(by_name.get(key, []))
     return resolve
 
 
-def _build_edges(merged, known_ids):
-    resolve = _resolver(known_ids)
+def _build_edges(merged, nodes):
+    resolve = _resolver(nodes)
     edges, unresolved = set(), set()
     for category, block in merged.get("categories", {}).items():
         for d in block.get("dependencies") or []:
@@ -174,10 +200,9 @@ def link_graph(merged, components=None):
     node; it is not part of the contract, and synthesize reconciles it.
     """
     nodes = _build_nodes(merged, components)
-    known_ids = {n["id"] for n in nodes}
-    edges, unresolved = _build_edges(merged, known_ids)
+    edges, unresolved = _build_edges(merged, nodes)
     adjacency = _depends_on_adjacency(edges)
-    cycles = _find_cycles(known_ids, adjacency)
+    cycles = _find_cycles({n["id"] for n in nodes}, adjacency)
     return {"nodes": nodes, "edges": edges, "cycles": cycles}, unresolved
 
 

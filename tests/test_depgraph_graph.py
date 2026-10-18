@@ -1,4 +1,5 @@
 # tests/test_depgraph_graph.py
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -270,6 +271,102 @@ class TestInvalidDependency(unittest.TestCase):
         code, err = self._run_cli_with_envelope(envelope)
         self.assertEqual(code, 2)
         self.assertIn("error", json.loads(err))
+
+
+TMI_STILL_UNRESOLVED = [
+    "config:tmi-oracle-wallet-zip",
+    "config:tns-admin",
+    "network:accounts.google.com-443",
+    "network:localhost-6379",
+    "network:localhost-6379",
+    "network:localhost-8080",
+    "service:arbitrary-http(s)-urls-and-webhook-receivers",
+    "service:github-oauth",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-oauth",
+    "service:microsoft-oauth",
+    "service:openai",
+    "service:openai",
+    "service:openai",
+]
+
+
+class TestFallbackMatching(unittest.TestCase):
+    def test_reslug_match(self):
+        g, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats")],
+            config=[dep("config:tmi-nats-url", "TMI_NATS_URL",
+                        related=["service:nats-(jetstream)"])]))
+        self.assertEqual(unresolved, [])
+        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]],
+                         [("config:tmi-nats-url", "service:nats")])
+
+    def test_name_match(self):
+        g, unresolved = link_graph(merged(
+            service=[dep("service:gdrive", "Google Drive / Google Workspace APIs")],
+            config=[dep("config:drive-enabled", "DRIVE_ENABLED",
+                        related=["service:google-drive-google-workspace-apis"])]))
+        self.assertEqual(unresolved, [])
+        self.assertEqual([e["to"] for e in g["edges"]], ["service:gdrive"])
+
+    def test_ambiguous_fallback_stays_unresolved(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats"), dep("service:nats-server", "nats"),
+                     dep("service:nats-(tls)", "other")],
+            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]))
+        self.assertEqual(unresolved, [{"from": "config:c",
+                                       "to": "service:nats-(jetstream)",
+                                       "kind": "relates_to"}])
+
+    def test_ambiguous_name_match_stays_unresolved(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:a", "Google Drive"), dep("service:b", "google-drive")],
+            config=[dep("config:c", "C", related=["service:google-drive"])]))
+        self.assertEqual(len(unresolved), 1)
+
+    def test_fallbacks_never_cross_categories(self):
+        _, unresolved = link_graph(merged(
+            config=[dep("config:nats", "nats"),
+                    dep("config:c", "C", related=["service:nats-(jetstream)"])]))
+        self.assertEqual(unresolved, [{"from": "config:c",
+                                       "to": "service:nats-(jetstream)",
+                                       "kind": "relates_to"}])
+
+    def test_unsluggable_target_is_unresolved(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats")],
+            config=[dep("config:c", "C", related=["service:()"])]))
+        self.assertEqual(len(unresolved), 1)
+
+    def test_tmi_regression(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures" / "dependency_model"
+                              / "tmi_links.json").read_text())
+        out_links = {}
+        for link in fixture["links"]:
+            out_links.setdefault(link["from"], []).append(link)
+        cats = {}
+        for node in fixture["nodes"]:
+            if node["category"] == "component":
+                continue
+            related = [x["to"] for x in out_links.get(node["id"], [])
+                       if x["kind"] == "relates_to"]
+            depends = [x["to"] for x in out_links.get(node["id"], [])
+                       if x["kind"] == "depends_on"]
+            cats.setdefault(node["category"], []).append(
+                dep(node["id"], node["name"], related=related, depends=depends or None))
+        components = [{"name": n["name"]} for n in fixture["nodes"]
+                      if n["category"] == "component"]
+        _, unresolved = link_graph(merged(**cats), components)
+        self.assertEqual(len(fixture["links"]) - len(unresolved), 26)
+        self.assertEqual(sorted(u["to"] for u in unresolved), TMI_STILL_UNRESOLVED)
 
 
 class TestCliOutputShape(unittest.TestCase):
