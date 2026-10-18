@@ -36,7 +36,9 @@ below was made by Claude under that instruction, not by the user; each is easy t
    (`uv.lock` at the root, `writing/skills/boring/uv.lock` nested). This replaces
    `uv sync --frozen` + `uv pip list --outdated`: it needs no venv per project, cannot
    be fooled by the PEP 723 ephemeral env (#28) or venv/lock drift (#37), and gives the
-   direct/transitive split #57 asked for. The text format is used because
+   direct/transitive split #57 asked for. `uv tree` prints `(latest: ...)` only on a package's first
+   appearance, so depth is the minimum over all appearances and `latest` comes from
+   whichever one carries it. The text format is used because
    `--format json` is marked experimental by uv 0.13. A failing `uv tree` warns on
    stderr and yields no records for that project. pip mode is unchanged.
 4. **Transitive Python records stay auto-applicable.** `uv lock --upgrade-package` on
@@ -58,11 +60,14 @@ below was made by Claude under that instruction, not by the user; each is easy t
    A step not declared is `"skipped"` with `<step>_output` saying none is declared.
    `"skipped"` never triggers bisect.
 7. **Renamed Go modules are found in `outdated`, not in `apply`.** For every outdated
-   record, one batched `go list -m -json <mod>@<latest> ...` call returns each target's
-   cached `GoMod` path; its `module` line is compared with the requested path (the
+   record, one batched `go list -m -e -json=Path,Version,GoMod,Error <mod>@<latest> ...` call
+   returns each target's cached `GoMod` path (`-e` keeps one bad spec from aborting the
+   batch; the field list avoids extracting the source zip, which plain `-json` does); its `module` line is compared with the requested path (the
    proxy-served `.mod` file only: no source zip). On a mismatch the record gets
    `meta.renamedTo` (the declared path) and `meta.lastVersionWithPath` (the highest
-   version above current whose `.mod` still declares the old path, or `""`), found
+   release (no prerelease) above current and below latest whose `.mod` still declares
+   the old path, or `""`; a deprecation stub such as crypto11 v1.6.7 counts, since it
+   is fetchable under the old path), found
    with `go list -m -versions` and a second batched `go list -m -json`. A `go list`
    failure leaves the record unchanged. Categorize routes any record with
    `meta.renamedTo` to Needs Plan, before the security, major or safe checks:
