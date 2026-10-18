@@ -1,0 +1,96 @@
+{
+  "components": [
+    {
+      "name": "tmi-server",
+      "evidence": "cmd/server/main.go:2289"
+    },
+    {
+      "name": "tmi-server-oracle",
+      "evidence": "Dockerfile.server-oracle:209"
+    },
+    {
+      "name": "tmi-component-controller",
+      "evidence": "cmd/component-controller/main.go:55"
+    },
+    {
+      "name": "tmi-extractor",
+      "evidence": "cmd/extractor/main.go"
+    },
+    {
+      "name": "tmi-chunk-embed",
+      "evidence": "cmd/chunkembed/main.go"
+    },
+    {
+      "name": "tmi-rotator",
+      "evidence": "deployments/k8s/dev/rotator.yml:49"
+    },
+    {
+      "name": "migrate / dbtool / genconfig / worker-probe / dedup-group-members",
+      "evidence": "cmd/migrate/main.go"
+    },
+    {
+      "name": "wstest",
+      "evidence": "wstest/go.mod:1"
+    }
+  ],
+  "real_dependencies": [
+    {
+      "name": "postgres",
+      "evidence": "deployments/k8s/dev/docker-desktop/postgres.yml:52"
+    },
+    {
+      "name": "oracle-adb",
+      "evidence": "go.mod:20"
+    },
+    {
+      "name": "redis",
+      "evidence": "deployments/k8s/dev/redis.yml:33"
+    },
+    {
+      "name": "nats (JetStream)",
+      "evidence": "deployments/k8s/platform/nats.yml:51"
+    },
+    {
+      "name": "kubernetes platform add-ons (cert-manager, internal PKI, Reloader, KEDA; Calico on kind)",
+      "evidence": "scripts/lib/deploy.py:463"
+    },
+    {
+      "name": "AWS Secrets Manager",
+      "evidence": "internal/config/config.go:341"
+    }
+  ],
+  "external_third_parties": [
+    {
+      "name": "OpenAI API",
+      "evidence": "Timmy LLM chat (gpt-5.5) and text embeddings (text-embedding-3-large) from server and tmi-chunk-embed"
+    },
+    {
+      "name": "OAuth 2.0 / OIDC identity providers (env-discovered; Google, GitHub, Microsoft etc.)",
+      "evidence": "user login; the built-in 'tmi' provider is a dev/test-only stand-in"
+    },
+    {
+      "name": "SAML identity providers",
+      "evidence": "enterprise SSO login (crewjam/saml)"
+    },
+    {
+      "name": "Google Drive / Google Workspace APIs",
+      "evidence": "importing document content into threat models"
+    },
+    {
+      "name": "Microsoft Graph (OneDrive/SharePoint)",
+      "evidence": "delegated document content source"
+    },
+    {
+      "name": "Atlassian Confluence",
+      "evidence": "delegated document content source"
+    },
+    {
+      "name": "Arbitrary HTTP(S) URLs and webhook receivers",
+      "evidence": "HTTP content source fetches and outbound webhook delivery (SSRF-allowlisted)"
+    },
+    {
+      "name": "AWS (EKS, RDS, ECR, ALB, ACM, Route 53, CloudWatch, CloudTrail, SNS)",
+      "evidence": "aws-public / aws-persistent hosting environment"
+    }
+  ]
+}
