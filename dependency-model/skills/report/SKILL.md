@@ -93,8 +93,13 @@ path.
        "
 
    This returns `{"mermaid": ..., "degraded": ..., "node_count": ...,
-   "reason": ...}`. When `degraded` is `false`, embed `mermaid` in a
-   ` ```mermaid ` fence. **When `degraded` is `true`, do not emit a fence at
+   "reason": ..., "view": ..., "collapsed": ...}`. When `degraded` is
+   `false`, embed `mermaid` in a ` ```mermaid ` fence. When `view` is
+   `"collapsed"` the graph was over the node cap, so the fence shows every
+   component and service plus one rolled-up node per other category: state
+   above the fence that it is a collapsed view, which categories were rolled
+   up and how many nodes each holds (from `collapsed`), and that the full
+   graph is in the contract. **When `degraded` is `true`, do not emit a fence at
    all** — a truncated or absent diagram rendered as if complete would read
    as "this is the whole graph." Instead, state in prose, in the graph
    section, that the graph exceeded the node cap, the `node_count`, and the
