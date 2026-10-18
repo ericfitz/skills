@@ -54,7 +54,7 @@ Aliases: `py` → python; `npm`/`pnpm`/`js`/`ts` → node.
    bump.py ecosystem python detect
    bump.py ecosystem node detect
    ```
-   Keep every ecosystem whose `detect` returns `present: true`. The dict also carries `packageManager` (e.g. `uv`/`pip`, `pnpm`/`npm`; empty for Go) and, for Go, `workspace` (true when `go.work` exists). If an explicit ecosystem arg was given, run only that one.
+   Keep every ecosystem whose `detect` returns `present: true`. The dict also carries `packageManager` (e.g. `uv`/`pip`, `pnpm`/`npm`; empty for Go) and, for Go, `workspace` (true when `go.work` exists). It also carries `projects`: `[{"dir": <repo-relative dir, "." for the root>, "members": [<dirs whose manifests belong to it>]}]`, the independently locked units this run covers (Python/uv: one per tracked `uv.lock`, so a nested uv project such as `writing/skills/boring` is its own project; Go and Node: the root plus its workspace directories). Keep every ecosystem's `projects` for Phase 5. If an explicit ecosystem arg was given, run only that one.
 
 3. If an argument was given but that ecosystem's `detect` reports `present: false`:
    - Display which ecosystems WERE detected, then: `Ecosystem "<arg>" not detected in this project.` and exit.
@@ -64,6 +64,7 @@ Aliases: `py` → python; `npm`/`pnpm`/`js`/`ts` → node.
    Detected ecosystems:
      Go (go.mod)
      Python/uv (pyproject.toml + uv.lock)
+       projects: ., writing/skills/boring
      Node/pnpm (pnpm-lock.yaml)
 
    Processing all ecosystems.
@@ -143,6 +144,8 @@ bump.py ecosystem <eco> outdated    # -> [UpdateRecord, ...]
 bump.py ecosystem <eco> audit       # -> [Advisory, ...]
 ```
 
+Both cover **every** project `detect` listed. Python/uv `outdated` reads each project's `uv.lock` (`uv tree --outdated --frozen --all-groups`, no venv needed) and sets each record's `location` to that project's lockfile and `kind` to `direct` (declared by the project) or `transitive` (reached through another package); `audit` sets each advisory's `location` the same way.
+
 **Once, shared across ecosystems** (using `HOST`/`TRACKER` from Phase 1):
 ```bash
 bump.py codeHost   <HOST>    alerts   # -> [Advisory, ...]  (Dependabot; [] if gh missing/none)
@@ -152,7 +155,7 @@ bump.py issueTracker <TRACKER> issues # -> Context(issues=[...])
 
 If `HOST`/`TRACKER` is `none`, these return empty shapes — no error, nothing to skip.
 
-**Merge advisories:** the full advisory set = (union of every ecosystem's `audit`) ∪ (`codeHost alerts`). Pass them all to `categorize` unmerged: it merges advisories per package itself (highest fixed version, first known current version, every id) and keeps an advisory from a nested project's manifest separate from the root one. Keep the issues/PRs context for the plan and to flag complications in Phase 5.
+**Merge advisories:** the full advisory set = (union of every ecosystem's `audit`) ∪ (`codeHost alerts`). Pass them all to `categorize` unmerged: it merges advisories per package itself (highest fixed version, first known current version, every id) and keeps an advisory from a project this run does not cover separate from the covered ones. Keep the issues/PRs context for the plan and to flag complications in Phase 5.
 
 ### Phase 5: Categorize and Display
 
@@ -173,16 +176,20 @@ echo '{
   "updates":        [ ...every ecosystem'\''s outdated records... ],
   "advisories":     [ ...merged advisories from Phase 4... ],
   "exclude":        [ ...pinned package names... ],
-  "replaceTargets": [ ...go replace target module paths... ]
+  "replaceTargets": [ ...go replace target module paths... ],
+  "projects":       [ ...every ecosystem'\''s detect.projects, merged by dir... ]
 }' | bump.py categorize
 ```
+
+`projects` is optional (default: the root project alone, which treats a manifest in any subdirectory as a separate project this run does not cover). Categorize matches each advisory to the update record of its **own** project, so two projects locking one package at different versions are judged separately, and adds a `project` key to every item; Phase 7 groups on it.
 
 `bump.py categorize` reads the payload JSON from stdin (optional `--root DIR`, default `.`), merges disk exclusions/holds, and prints a `Categories` value with four buckets: `securityFixes`, `safe`, `needsPlan`, `skipped` (each an UpdateRecord with an added `reason`, and `advisory` when one applies). See `reference/contracts.md`.
 
 **Categorization rules.** The rules below marked *(CLI)* are mechanically enforced by `bump.py categorize` from bump level, exclude globs, holds, replace targets, and pins. Rules marked *(judgment)* are not implemented by the categorizer — they are applied by you, the skill, when reading gathered issues/Dependabot context/changelogs, and should route a package into Needs Plan manually even though the CLI would otherwise call it safe:
 - **Security Fix** (auto-apply) *(CLI)*: patch/minor bump that resolves an advisory, not excluded/held/pinned. Major security fixes go to Needs Plan. An advisory on a package with no update record (a transitive dependency) becomes a `kind: "transitive"` record from the advisory's current and fixed versions and is bucketed by the same rules.
-- **Advisories the CLI cannot act on** *(CLI)*: no fixed version, no known current version (Dependabot does not report one; `bump` is `"unknown"`), or a manifest in a subdirectory (a separate project this run does not cover, named in the reason) all go to Needs Plan. No advisory is dropped.
+- **Advisories the CLI cannot act on** *(CLI)*: no fixed version, no known current version (Dependabot does not report one; `bump` is `"unknown"`), or a manifest in a directory no detected project covers (a separate project this run does not cover, named in the reason) all go to Needs Plan. No advisory is dropped.
 - **Safe Update** (auto-apply) *(CLI)*: patch or minor bump, not excluded/held/pinned, not a major, not a replace target.
+- **Renamed Go module** (Needs Plan) *(CLI)*: `ecosystem go outdated` reads each outdated module's target `go.mod` and marks a record whose `module` line differs from the requested path (`meta.renamedTo`, plus `meta.lastVersionWithPath`, the last version still under the old path or `""`). Go cannot fetch the new versions under the old path, so the record goes to Needs Plan, whatever its bump level, security advisory attached. The reason names the old path, new path and latest version; offer `lastVersionWithPath` as an attainable target and the new import path as the manual migration. Never auto-apply it.
 - **Needs Plan** (never auto-apply): major bumps, excluded/held/pinned packages, and major security fixes are routed here by the CLI *(CLI)*; additionally, treat a package as Needs Plan yourself *(judgment)* when GitHub issues or Dependabot context indicate complications the categorizer can't see.
 - **Skipped** *(CLI)*: replace-directive targets, up-to-date packages, and advisories whose current version is already at or past the fix.
 
@@ -241,25 +248,27 @@ Apply the auto-apply buckets (security fixes first, then safe updates) per ecosy
 - **Node:** `name@X.Y.Z` (scoped: `@scope/name@X.Y.Z`)
 - **Python (uv):** `name==X.Y.Z` (pip variant accepts the same spec form)
 
+**Group by ecosystem and item `project`.** Each (ecosystem, project) pair is one apply/validate unit: pass `--project <dir>` with the items' `project` value (`.` for the root; Python/uv is the only ecosystem with other values, Go and Node accept only `.`). A bump never mixes projects in one `apply`, and each unit is validated and bisected on its own.
+
 **Apply all at once, then validate:**
 ```bash
-bump.py ecosystem <eco> apply <spec> <spec> ...   # -> {"applied":[...], "filesModified":[...]}
-bump.py ecosystem <eco> validate                   # -> {"build":"pass"/"fail", "build_output":..., "test":..., "lint":...}
+bump.py ecosystem <eco> apply --project <dir> <spec> <spec> ...   # -> {"applied":[...], "filesModified":[...]}  (paths repo-relative)
+bump.py ecosystem <eco> validate --project <dir>                   # -> {"build":"pass"/"fail", "build_output":..., "test":..., "lint":...}
 ```
-`validate` returns per-step `pass`/`fail` plus truncated `_output` (Go/Node run build+test+lint; Python runs test+lint only — no build step). **Config override:** if `.bump-config.json` sets `ecosystems.<eco>.{build,test,lint}` commands, run those shell commands directly instead of `validate` (the CLI's `validate` uses only the adapter defaults).
+`validate` returns per-step `pass`/`fail` plus truncated `_output` (Go/Node run build+test+lint; Python runs test+lint only — no build step). Python/uv runs only what the project declares: a step whose tool the project's `pyproject.toml` does not name (pytest, ruff) comes back `"skipped"` with `<step>_output` saying none is declared. `"skipped"` is neither a pass nor a failure: report it, never bisect on it. **Config override:** if `.bump-config.json` sets `ecosystems.<eco>.{build,test,lint}` commands, run those shell commands directly instead of `validate` (the CLI's `validate` uses only the adapter defaults).
 
-**If `apply` returns an `error` field:** nothing was durably applied (the tree may hold partial changes). Run `git checkout -- .` to reset, record every spec in the batch as problematic with the error tail, and fall through to the one-at-a-time re-apply below to isolate which spec (if any) can land — a spec whose solo `apply` also errors is recorded with its error and skipped. Never proceed to validate or commit on an `error` result.
+**If `apply` returns an `error` field:** nothing was durably applied (the tree may hold partial changes). Run `git checkout -- .` to reset, record every spec in the batch as problematic with the error tail, and fall through to the one-at-a-time re-apply below to isolate which spec (if any) can land — a spec whose solo `apply` also errors is recorded with its error and skipped. Never proceed to validate or commit on an `error` result. If the Go result carries `renamed` (`[{"required": old, "declared": new}]`), the failure is a module rename that `outdated` did not catch: record that package as Renamed (Needs Plan) with both paths instead of re-applying it alone.
 
-**If build and test both pass:** proceed to Phase 8 (Commit). (A lint-only failure does **not** trigger bisect — see below.)
+**If neither build nor test is `fail`:** proceed to Phase 8 (Commit). (A lint-only failure does **not** trigger bisect — see below; a `skipped` step is not a failure.)
 
-**If build or test fails — bisect:**
+**If build or test is `fail` — bisect (that project only):**
 1. Revert everything: `git checkout -- .`.
 2. Re-apply updates ONE AT A TIME in priority order (security fixes, then patch, then minor). For each single spec:
    ```bash
-   bump.py ecosystem <eco> apply <one spec>
-   bump.py ecosystem <eco> validate
+   bump.py ecosystem <eco> apply --project <dir> <one spec>
+   bump.py ecosystem <eco> validate --project <dir>
    ```
-   - If build and test pass: **keep** it, move on.
+   - If neither build nor test is `fail`: **keep** it, move on.
    - If either fails: **revert that spec** (`git checkout -- .` then re-apply the kept set, or re-apply the good subset), record it as problematic, move on.
 3. Report:
    ```
@@ -281,7 +290,7 @@ Commits to the **current working branch** — the bump branch when `MODE=pr`, th
 
 Otherwise:
 
-1. **Stage** manifests + lockfiles using the `filesModified` lists from successful `apply` results (these are git-verified; an `apply` that returned `error` contributes nothing): `go.mod go.sum pyproject.toml uv.lock requirements.txt package.json pnpm-lock.yaml package-lock.json` and any `requirements/*.txt`.
+1. **Stage** manifests + lockfiles using the `filesModified` lists from successful `apply` results, across every project (these are git-verified and repo-relative, e.g. `writing/skills/boring/uv.lock`; an `apply` that returned `error` contributes nothing). Stage exactly those paths; do not glob manifest names, which would miss or over-reach in a nested project.
 2. **Compose** a detailed message listing every updated package grouped by ecosystem, security fixes called out with CVE/severity, and a "Reverted (caused build/test failures)" section if bisect dropped any:
    ```
    chore(deps): bump dependencies
@@ -440,8 +449,8 @@ The `Pull Request:` line reflects the actual outcome:
 
 ## Implementation Notes
 
-1. **Transitive dependencies**: `outdated` lists direct dependencies; transitive vulnerabilities surface through `audit`/`alerts`, and `categorize` turns each into a `transitive` record (see Phase 5). The Python/uv audit exports every extra and dependency group, so a package reached only through an optional extra is audited too. For Node, transitive versions can also be pinned via overrides.
-2. **Lockfiles**: `go.sum`, `pnpm-lock.yaml`, `package-lock.json`, `uv.lock` change as a result of `apply` (see `filesModified`) and must be committed.
+1. **Transitive dependencies**: Python/uv `outdated` lists transitive packages too (`kind: "transitive"`, applied as a lockfile refresh within their dependents' constraints); for the other ecosystems `outdated` lists direct dependencies and transitive vulnerabilities surface through `audit`/`alerts`, and `categorize` turns each into a `transitive` record (see Phase 5). The Python/uv audit exports every extra and dependency group, so a package reached only through an optional extra is audited too. For Node, transitive versions can also be pinned via overrides.
+2. **Lockfiles**: `go.sum`, `pnpm-lock.yaml`, `package-lock.json`, `uv.lock` (one per Python project) change as a result of `apply` (see `filesModified`) and must be committed.
 3. **Go replace directives**: always skipped — pass replace-target module paths as `replaceTargets` so the categorizer routes them to Skipped. Never auto-modify them.
 4. **Go workspaces**: when `detect` reports `workspace: true` (`go.work`), the Go adapter's `outdated`/`audit`/`apply` operate across the workspace.
 5. **Coordinated ecosystem updates**: some packages must move together (e.g. Angular core + router). Group them in the Phase 10 plan (identified via exclusion patterns).

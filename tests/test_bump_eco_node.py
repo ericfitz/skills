@@ -1,4 +1,5 @@
 import json
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -86,15 +87,19 @@ class TestDepIndex(unittest.TestCase):
         self._tmp = TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        _write(self.root / "package.json",
-               {"name": "monorepo", "workspaces": ["packages/*"],
-                "devDependencies": {"eslint": "^10.3.0"}})
-        _write(self.root / "packages" / "viewer" / "package.json",
-               {"name": "@mono/viewer", "dependencies": {"three": "^0.184.0"},
-                "devDependencies": {"jsdom": "^29.0.0"}})
+        _write(
+            self.root / "package.json",
+            {"name": "monorepo", "workspaces": ["packages/*"], "devDependencies": {"eslint": "^10.3.0"}},
+        )
+        _write(
+            self.root / "packages" / "viewer" / "package.json",
+            {"name": "@mono/viewer", "dependencies": {"three": "^0.184.0"}, "devDependencies": {"jsdom": "^29.0.0"}},
+        )
         # must be ignored: vendored copies are not declarations
-        _write(self.root / "node_modules" / "undici" / "package.json",
-               {"name": "undici", "dependencies": {"never-declared": "^1.0.0"}})
+        _write(
+            self.root / "node_modules" / "undici" / "package.json",
+            {"name": "undici", "dependencies": {"never-declared": "^1.0.0"}},
+        )
 
     def test_indexes_root_and_workspace_manifests(self):
         idx = node.dep_index(self.root)
@@ -114,8 +119,12 @@ class TestDepIndex(unittest.TestCase):
         self.assertIn("eslint", node.dep_index(self.root))
 
     def test_kind_and_location_from_index(self):
-        recs = {r.name: r for r in node.parse_outdated(
-            (FIX / "npm_outdated_workspaces.json").read_text(), "npm", node.dep_index(self.root))}
+        recs = {
+            r.name: r
+            for r in node.parse_outdated(
+                (FIX / "npm_outdated_workspaces.json").read_text(), "npm", node.dep_index(self.root)
+            )
+        }
         self.assertEqual(recs["three"].kind, "direct")
         self.assertEqual(recs["three"].location, "packages/viewer/package.json")
         self.assertEqual(recs["three"].meta["declaredRange"], "^0.184.0")
@@ -124,8 +133,7 @@ class TestDepIndex(unittest.TestCase):
         self.assertEqual(recs["undici"].location, "package.json")
 
     def test_no_index_keeps_legacy_direct_assumption(self):
-        recs = {r.name: r for r in node.parse_outdated(
-            (FIX / "npm_outdated_workspaces.json").read_text(), "npm")}
+        recs = {r.name: r for r in node.parse_outdated((FIX / "npm_outdated_workspaces.json").read_text(), "npm")}
         self.assertEqual(recs["undici"].kind, "direct")
 
 
@@ -154,8 +162,18 @@ class TestSemverRange(unittest.TestCase):
 
     def test_unknown_forms_are_none_not_false(self):
         """None means 'cannot prove' -- callers must stay conservative, never guess."""
-        for rng in ("*", "1.x", "latest", ">=1.2.3", "^1 || ^2", "workspace:*",
-                    "file:../local", "github:o/r", "", "1.2.3-beta.1"):
+        for rng in (
+            "*",
+            "1.x",
+            "latest",
+            ">=1.2.3",
+            "^1 || ^2",
+            "workspace:*",
+            "file:../local",
+            "github:o/r",
+            "",
+            "1.2.3-beta.1",
+        ):
             self.assertIsNone(node.satisfies("2.0.0", rng), rng)
         self.assertIsNone(node.satisfies("not-a-version", "^1.0.0"))
 
@@ -183,17 +201,22 @@ class TestApply(unittest.TestCase):
         self._tmp = TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        _write(self.root / "package.json",
-               {"name": "monorepo", "devDependencies": {"eslint": "^10.3.0"}})
-        _write(self.root / "packages" / "viewer" / "package.json",
-               {"name": "@mono/viewer", "dependencies": {"three": "^0.184.0"},
-                "devDependencies": {"@types/three": "^0.184.0"}})
+        _write(self.root / "package.json", {"name": "monorepo", "devDependencies": {"eslint": "^10.3.0"}})
+        _write(
+            self.root / "packages" / "viewer" / "package.json",
+            {
+                "name": "@mono/viewer",
+                "dependencies": {"three": "^0.184.0"},
+                "devDependencies": {"@types/three": "^0.184.0"},
+            },
+        )
         (self.root / "package-lock.json").write_text("{}")
         self.calls = []
         self.enterContext(mock.patch("bumplib.ecosystems.node.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.node._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.node.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.node.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
@@ -215,8 +238,7 @@ class TestApply(unittest.TestCase):
 
     def test_dev_dependency_keeps_its_save_flag(self):
         node.handle("apply", ["@types/three@0.185.4"])
-        self.assertIn(["npm", "install", "-w", "packages/viewer", "-D", "@types/three@^0.185.4"],
-                      self.calls)
+        self.assertIn(["npm", "install", "-w", "packages/viewer", "-D", "@types/three@^0.185.4"], self.calls)
 
     def test_transitive_and_bare_specs_stay_on_update(self):
         node.handle("apply", ["undici@7.29.0", "eslint"])
@@ -224,8 +246,7 @@ class TestApply(unittest.TestCase):
 
     def test_files_modified_reports_real_manifests(self):
         res = node.handle("apply", ["three@0.185.1", "eslint@10.8.0"])
-        self.assertEqual(res["filesModified"],
-                         ["package-lock.json", "package.json", "packages/viewer/package.json"])
+        self.assertEqual(res["filesModified"], ["package-lock.json", "package.json", "packages/viewer/package.json"])
         self.assertEqual(res["applied"], ["three@0.185.1", "eslint@10.8.0"])
 
     def test_mixed_batch_splits_between_install_and_update(self):
@@ -262,15 +283,15 @@ class TestApplyReportsFailure(unittest.TestCase):
         self._tmp = TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        _write(self.root / "package.json",
-               {"name": "monorepo", "devDependencies": {"eslint": "^10.3.0"}})
+        _write(self.root / "package.json", {"name": "monorepo", "devDependencies": {"eslint": "^10.3.0"}})
         (self.root / "package-lock.json").write_text("{}")
         self.calls = []
         self.fail_on = None
         self.enterContext(mock.patch("bumplib.ecosystems.node.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.node._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.node.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.node.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
@@ -358,10 +379,12 @@ class TestPnpmMetadataCache(unittest.TestCase):
     def test_handle_cache_clear_clears_metadata_and_runs_clis(self):
         with TemporaryDirectory() as tmp:
             cache = self._cache(tmp)
-            with mock.patch("bumplib.ecosystems.node.shutil.which", return_value="/bin/x"), \
-                 mock.patch("bumplib.ecosystems.node._run") as run, \
-                 mock.patch("bumplib.ecosystems.node.detect", return_value={"packageManager": "pnpm"}), \
-                 mock.patch("bumplib.ecosystems.node.pnpm_cache_dir", return_value=cache):
+            with (
+                mock.patch("bumplib.ecosystems.node.shutil.which", return_value="/bin/x"),
+                mock.patch("bumplib.ecosystems.node._run") as run,
+                mock.patch("bumplib.ecosystems.node.detect", return_value={"packageManager": "pnpm"}),
+                mock.patch("bumplib.ecosystems.node.pnpm_cache_dir", return_value=cache),
+            ):
                 out = node.handle("cache-clear", [])
             self.assertEqual(out, {"warnings": []})
             self.assertFalse((cache / "metadata-v1.3").exists())
@@ -373,13 +396,64 @@ class TestPnpmMetadataCache(unittest.TestCase):
     def test_handle_cache_clear_bad_dir_warns_and_deletes_nothing(self):
         with TemporaryDirectory() as tmp:
             cache = self._cache(tmp)
-            with mock.patch("bumplib.ecosystems.node.shutil.which", return_value="/bin/x"), \
-                 mock.patch("bumplib.ecosystems.node._run"), \
-                 mock.patch("bumplib.ecosystems.node.detect", return_value={"packageManager": "pnpm"}), \
-                 mock.patch("bumplib.ecosystems.node.pnpm_cache_dir", return_value=Path("relative")):
+            with (
+                mock.patch("bumplib.ecosystems.node.shutil.which", return_value="/bin/x"),
+                mock.patch("bumplib.ecosystems.node._run"),
+                mock.patch("bumplib.ecosystems.node.detect", return_value={"packageManager": "pnpm"}),
+                mock.patch("bumplib.ecosystems.node.pnpm_cache_dir", return_value=Path("relative")),
+            ):
                 out = node.handle("cache-clear", [])
             self.assertEqual(len(out["warnings"]), 1)
             self.assertTrue((cache / "metadata-v1.3").exists())
+
+
+class TestNodeProjects(unittest.TestCase):
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name).resolve()
+        self.addCleanup(self._tmp.cleanup)
+        old = os.getcwd()
+        os.chdir(self.root)
+        self.addCleanup(os.chdir, old)
+
+    def test_detect_has_one_root_project_with_the_walked_workspaces(self):
+        _write(self.root / "package.json", {"name": "mono"})
+        _write(self.root / "packages" / "viewer" / "package.json", {"name": "viewer"})
+        _write(self.root / "node_modules" / "x" / "package.json", {"name": "x"})
+        self.assertEqual(node.handle("detect", [])["projects"], [{"dir": ".", "members": [".", "packages/viewer"]}])
+
+    def test_single_package_root(self):
+        _write(self.root / "package.json", {"name": "solo"})
+        self.assertEqual(node.handle("detect", [])["projects"], [{"dir": ".", "members": ["."]}])
+
+    def test_absent_node_has_no_projects(self):
+        self.assertNotIn("projects", node.handle("detect", []))
+
+    def test_other_projects_are_rejected_before_anything_runs(self):
+        _write(self.root / "package.json", {"name": "mono"})
+        with (
+            mock.patch("bumplib.ecosystems.node._run") as run,
+            mock.patch("bumplib.ecosystems.node._run_shell") as shell,
+        ):
+            for verb in ("apply", "validate"):
+                for bad in ("packages/viewer", "..", "/tmp"):
+                    with self.subTest(verb=verb, bad=bad), self.assertRaises(ValueError):
+                        node.handle(verb, ["--project", bad, "eslint@10.8.0"])
+            run.assert_not_called()
+            shell.assert_not_called()
+
+    def test_project_dot_is_accepted_and_is_not_a_spec(self):
+        _write(self.root / "package.json", {"name": "mono", "devDependencies": {"eslint": "^10.3.0"}})
+        (self.root / "package-lock.json").write_text("{}")
+        with (
+            mock.patch(
+                "bumplib.ecosystems.node._run", return_value=mock.Mock(returncode=0, stdout="", stderr="")
+            ) as run,
+            mock.patch("bumplib.ecosystems.node.changed_files", return_value=[]),
+        ):
+            res = node.handle("apply", ["--project", ".", "eslint@10.8.0"])
+        self.assertEqual(res["applied"], ["eslint@10.8.0"])
+        self.assertIn(["npm", "update", "eslint"], [c.args[0] for c in run.call_args_list])
 
 
 if __name__ == "__main__":

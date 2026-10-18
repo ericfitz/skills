@@ -1,0 +1,17 @@
+{
+	"Path": "github.com/google/cel-go",
+	"Version": "v0.32.0",
+	"GoMod": "/home/user/go/pkg/mod/cache/download/github.com/google/cel-go/@v/v0.32.0.mod"
+}
+{
+	"Path": "github.com/ThalesGroup/crypto11",
+	"Version": "v1.6.8",
+	"GoMod": "/home/user/go/pkg/mod/cache/download/github.com/!thales!group/crypto11/@v/v1.6.8.mod"
+}
+{
+	"Path": "github.com/bogus/nope",
+	"Version": "v1.0.0",
+	"Error": {
+		"Err": "github.com/bogus/nope@v1.0.0: invalid version"
+	}
+}

@@ -1,3 +1,4 @@
+import contextlib
 import io
 import os
 import unittest
@@ -9,15 +10,13 @@ from bumplib.ecosystems import python as py
 
 BASE = Path(__file__).resolve().parents[1]
 FIX = BASE / "tests" / "fixtures" / "bump"
-
-
-def _make_venv(root, posix=True):
-    """Create the marker files that identify a project virtualenv."""
-    d = root / ".venv" / ("bin" if posix else "Scripts")
-    d.mkdir(parents=True)
-    exe = d / ("python" if posix else "python.exe")
-    exe.write_text("")
-    return exe
+UV = {"packageManager": "uv", "present": True, "projects": [{"dir": ".", "members": ["."]}]}
+NESTED = "writing/skills/boring"
+TWO = {
+    "packageManager": "uv",
+    "present": True,
+    "projects": [{"dir": ".", "members": ["."]}, {"dir": NESTED, "members": [NESTED]}],
+}
 
 
 class TestPython(unittest.TestCase):
@@ -32,249 +31,371 @@ class TestPython(unittest.TestCase):
 
     def test_audit_missing_binary_uv(self):
         """Regression test: audit verb should return [] when uv binary is missing (uv manager)."""
-        # Mock detect to return uv manager
-        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None), \
-                mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
-            mock_detect.return_value = {"packageManager": "uv"}
-            result = py.handle("audit", [])
-            self.assertEqual(result, [])
+        with (
+            mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None),
+            mock.patch("bumplib.ecosystems.python.detect", return_value=UV),
+        ):
+            self.assertEqual(py.handle("audit", []), [])
 
     def test_audit_missing_binary_pip(self):
         """Regression test: audit verb should return [] when pip-audit binary is missing (pip manager)."""
-        # Mock detect to return pip manager
-        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None), \
-                mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
-            mock_detect.return_value = {"packageManager": "pip"}
-            result = py.handle("audit", [])
-            self.assertEqual(result, [])
+        with (
+            mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None),
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip"}),
+        ):
+            self.assertEqual(py.handle("audit", []), [])
 
 
-class TestProjectEnvironmentTargeting(unittest.TestCase):
-    """The verbs must inspect the PROJECT environment, never the ambient one.
+class TestParseTreeOutdated(unittest.TestCase):
+    """`uv tree --outdated --frozen --all-groups` text, recorded from this repo's two
+    projects (root, and writing/skills/boring) on 2026-10-18; the synthetic file is
+    hand-built for shapes the real trees do not currently contain."""
 
-    bump.py carries a PEP 723 header, so `uv run bump.py` executes it in an isolated
-    ephemeral environment. `uv pip list --outdated` inherits that environment and reports
-    on it -- an env with nothing installed -- so `outdated` returned [] for every uv
-    project no matter how many packages were actually stale.
-    """
+    def _recs(self, name, location="uv.lock"):
+        return {r.name: r for r in py.parse_tree_outdated((FIX / f"uv_tree_outdated_{name}.txt").read_text(), location)}
 
-    def setUp(self):
-        self._tmp = TemporaryDirectory()
-        self.root = Path(self._tmp.name)
-        self.addCleanup(self._tmp.cleanup)
-        (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
-        self.calls = []
-        self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
-        self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
+    def test_depth_one_is_direct_deeper_is_transitive(self):
+        recs = self._recs("boring")
+        self.assertEqual((recs["spacy"].current, recs["spacy"].latest), ("3.8.14", "3.8.16"))
+        self.assertEqual(recs["spacy"].kind, "direct")
+        self.assertEqual(recs["lxml"].kind, "transitive")  # depth 2
+        self.assertEqual(recs["markupsafe"].kind, "transitive")  # depth 3
 
-    def _path(self, p):
-        return self.root if str(p) == "." else Path(p)
+    def test_project_itself_and_legend_are_not_records(self):
+        recs = self._recs("boring")
+        self.assertNotIn("boring-analyzer", recs)
+        self.assertEqual(len(recs), 26)
+        for r in recs.values():
+            self.assertEqual((r.location, r.ecosystem, r.wanted), ("uv.lock", "python", r.latest))
 
-    def _record(self, args, env=None):
-        self.calls.append(list(args))
-        return mock.Mock(returncode=0, stdout="", stderr="")
+    def test_only_latest_annotated_lines_make_records(self):
+        """pytest/ruff carry `(group: dev)` but no `(latest: ...)`: up to date."""
+        recs = self._recs("root")
+        self.assertNotIn("pytest", recs)
+        self.assertNotIn("ruff", recs)
+        self.assertEqual(len(recs), 19)
 
-    def test_outdated_targets_project_venv(self):
-        """Regression: without --python this reads the ephemeral env and always sees []."""
-        exe = _make_venv(self.root)
-        py.handle("outdated", [])
-        self.assertEqual(self.calls[0][:5], ["uv", "pip", "list", "--outdated", "--format"])
-        self.assertIn("--python", self.calls[0])
-        self.assertEqual(self.calls[0][self.calls[0].index("--python") + 1], str(exe))
+    def test_versions_differ_per_project(self):
+        self.assertEqual(self._recs("root")["srsly"].current, "2.5.3")
+        self.assertEqual(self._recs("boring")["typing-extensions"].current, "4.15.0")
+        self.assertNotIn("typing-extensions", self._recs("root"))
 
-    def test_no_venv_with_lockfile_auto_syncs_then_targets_venv(self):
-        """#28: a fresh clone has uv.lock but no .venv; querying the ambient env returns
-        [] for every project. outdated must create the env, then ask it."""
-        (self.root / "uv.lock").write_text("")
-        exe_holder = {}
+    def test_nested_location_is_passed_through(self):
+        recs = self._recs("boring", f"{NESTED}/uv.lock")
+        self.assertEqual({r.location for r in recs.values()}, {f"{NESTED}/uv.lock"})
 
-        def record(args, env=None):
-            args = list(args)
-            self.calls.append(args)
-            if args[:2] == ["uv", "sync"]:
-                exe_holder["exe"] = _make_venv(self.root)
-            return mock.Mock(returncode=0, stdout="", stderr="")
+    def test_shallowest_appearance_wins_even_when_it_has_no_latest(self):
+        """uv prints `(latest: ...)` on the first appearance only; `shared` first shows
+        at depth 2 (annotated), then at depth 1 (not annotated): it is direct."""
+        self.assertEqual(self._recs("synthetic")["shared"].kind, "direct")
 
-        with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
-            py.handle("outdated", [])
-        self.assertEqual(self.calls[0][:2], ["uv", "sync"])
-        listing = self.calls[1]
-        self.assertIn("--python", listing)
-        self.assertEqual(listing[listing.index("--python") + 1], str(exe_holder["exe"]))
+    def test_combined_annotations(self):
+        recs = self._recs("synthetic")
+        self.assertEqual((recs["c"].latest, recs["c"].bump, recs["c"].kind), ("2.0.0", "major", "direct"))
+        self.assertEqual((recs["d"].latest, recs["d"].bump), ("3.2.0", "minor"))
+        self.assertEqual(recs["e"].kind, "transitive")
 
-    def test_no_venv_no_lockfile_skips_sync_and_strips_virtual_env(self):
-        """Lockless project: don't create an env, but never let the ephemeral
-        VIRTUAL_ENV answer 'what is installed?'."""
-        captured = {}
+    def test_extras_suffix_is_stripped_and_repeats_are_ignored(self):
+        recs = self._recs("synthetic")
+        self.assertIn("httpx", recs)
+        self.assertEqual(len(recs), 5)  # `a ... (*)` adds nothing
 
-        def record(args, env=None):
-            self.calls.append(list(args))
-            captured["env"] = env
-            return mock.Mock(returncode=0, stdout="", stderr="")
-
-        with mock.patch("bumplib.ecosystems.python._run", side_effect=record), \
-                mock.patch.dict(os.environ, {"VIRTUAL_ENV": "/ephemeral"}):
-            py.handle("outdated", [])
-        self.assertFalse(any(c[:2] == ["uv", "sync"] for c in self.calls))
-        self.assertNotIn("--python", self.calls[0])
-        self.assertIsNotNone(captured["env"])
-        self.assertNotIn("VIRTUAL_ENV", captured["env"])
-
-    def test_sync_failure_still_queries_without_virtual_env(self):
-        (self.root / "uv.lock").write_text("")
-
-        def record(args, env=None):
-            args = list(args)
-            self.calls.append(args)
-            rc = 1 if args[:2] == ["uv", "sync"] else 0
-            return mock.Mock(returncode=rc, stdout="", stderr="boom")
-
-        with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
-            py.handle("outdated", [])
-        self.assertNotIn("--python", self.calls[1])
-
-    def test_outdated_honors_uv_project_environment(self):
-        """uv's documented override for a non-.venv environment directory."""
-        d = self.root / "envs" / "prod" / "bin"
-        d.mkdir(parents=True)
-        (d / "python").write_text("")
-        with mock.patch.dict(os.environ, {"UV_PROJECT_ENVIRONMENT": "envs/prod"}):
-            py.handle("outdated", [])
-        self.assertEqual(self.calls[0][self.calls[0].index("--python") + 1], str(d / "python"))
-
-    def test_windows_layout_resolved(self):
-        exe = _make_venv(self.root, posix=False)
-        py.handle("outdated", [])
-        self.assertEqual(self.calls[0][self.calls[0].index("--python") + 1], str(exe))
-
-    def test_audit_runs_against_the_project(self):
-        """Same isolation defect: `uv run pip-audit` audited the ephemeral env."""
-        _make_venv(self.root)
-        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value="/usr/bin/uv"):
-            py.handle("audit", [])
-        self.assertIn("--project", self.calls[0])
-        self.assertEqual(self.calls[0][self.calls[0].index("--project") + 1], str(self.root))
-
-    def test_pip_manager_path_unchanged(self):
-        """Only the uv path was environment-ambiguous; plain pip must not gain flags."""
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
-            py.handle("outdated", [])
-        self.assertEqual(self.calls[0], ["pip", "list", "--outdated", "--format", "json"])
+    def test_empty_and_garbage_output(self):
+        self.assertEqual(py.parse_tree_outdated(""), [])
+        self.assertEqual(py.parse_tree_outdated("error: no lockfile\n"), [])
 
 
-class TestOutdatedReconcilesVenvWithLock(unittest.TestCase):
-    """#37: `uv pip list --outdated` answers for the venv, but uv.lock is what the project
-    declares. A venv behind the lock (any `git pull` that touched uv.lock) reports the
-    drift as phantom updates; a venv ahead of it hides real ones. So whenever a lockfile
-    exists, reconcile the environment to it first -- `--frozen`, so a read verb never
-    rewrites the lockfile -- and only then ask the environment."""
+class _Repo(unittest.TestCase):
+    """A real temp directory as cwd, with the subprocess boundary faked."""
+
+    manager = UV
 
     def setUp(self):
         self._tmp = TemporaryDirectory()
-        self.root = Path(self._tmp.name)
+        self.root = Path(self._tmp.name).resolve()
         self.addCleanup(self._tmp.cleanup)
-        (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
+        old = os.getcwd()
+        os.chdir(self.root)
+        self.addCleanup(os.chdir, old)
         self.calls = []
-        self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
+        self.responses = {}  # marker in argv -> (returncode, stdout)
+        self.cwds = []
         self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
-        self.sync_rc = 0
+        self.enterContext(mock.patch("bumplib.ecosystems.python._run_shell", side_effect=self._shell))
+        self.enterContext(mock.patch("bumplib.ecosystems.python.shutil.which", return_value="/bin/uv"))
+        self.enterContext(mock.patch("bumplib.ecosystems.python.detect", return_value=self.manager))
 
-    def _path(self, p):
-        return self.root if str(p) == "." else Path(p)
-
-    def _record(self, args, env=None):
+    def _record(self, args, env=None, cwd=None):
         args = list(args)
         self.calls.append(args)
-        rc = self.sync_rc if args[:2] == ["uv", "sync"] else 0
-        return mock.Mock(returncode=rc, stdout="", stderr="boom" if rc else "")
+        for marker, (rc, out) in self.responses.items():
+            if marker in args:
+                return mock.Mock(returncode=rc, stdout=out, stderr="boom" if rc else "")
+        return mock.Mock(returncode=0, stdout="{}", stderr="")
 
-    def test_existing_venv_with_lockfile_syncs_before_listing(self):
-        """The stale-venv case: venv present, lock present -> sync first, then list."""
-        exe = _make_venv(self.root)
-        (self.root / "uv.lock").write_text("")
+    def _shell(self, cmd, cwd=None):
+        self.calls.append(cmd)
+        self.cwds.append(cwd)
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+
+class TestOutdatedFromLockfile(_Repo):
+    """outdated reads each project's uv.lock through `uv tree`; no venv, no sync."""
+
+    manager = TWO
+
+    def setUp(self):
+        super().setUp()
+        self.responses["tree"] = (0, (FIX / "uv_tree_outdated_boring.txt").read_text())
+
+    def test_one_frozen_tree_call_per_project(self):
         py.handle("outdated", [])
-        self.assertEqual(self.calls[0][:2], ["uv", "sync"])
-        listing = self.calls[1]
-        self.assertEqual(listing[:5], ["uv", "pip", "list", "--outdated", "--format"])
-        self.assertEqual(listing[listing.index("--python") + 1], str(exe))
+        trees = [c for c in self.calls if c[:2] == ["uv", "tree"]]
+        self.assertEqual([t[t.index("--project") + 1] for t in trees], [".", NESTED])
+        for t in trees:
+            self.assertEqual(t[:5], ["uv", "tree", "--outdated", "--frozen", "--all-groups"])
 
-    def test_sync_is_frozen(self):
-        """A read verb must not rewrite uv.lock: plain `uv sync` re-resolves when
-        pyproject drifted from the lock, which would then show up in apply's
-        git-verified filesModified."""
-        _make_venv(self.root)
-        (self.root / "uv.lock").write_text("")
+    def test_never_syncs_or_lists_the_environment(self):
+        """#28/#37: no venv is created, read or reconciled."""
         py.handle("outdated", [])
-        self.assertIn("--frozen", self.calls[0])
+        self.assertFalse(any(c[:2] in (["uv", "sync"], ["uv", "pip"]) for c in self.calls))
 
-    def test_no_lockfile_does_not_sync(self):
-        _make_venv(self.root)
-        py.handle("outdated", [])
-        self.assertFalse(any(c[:2] == ["uv", "sync"] for c in self.calls))
-        self.assertEqual(self.calls[0][:2], ["uv", "pip"])
+    def test_locations_are_each_projects_lockfile(self):
+        recs = py.handle("outdated", [])
+        self.assertEqual({r.location for r in recs}, {"uv.lock", f"{NESTED}/uv.lock"})
+        self.assertEqual(sum(r.location == f"{NESTED}/uv.lock" for r in recs), 26)
 
-    def test_sync_failure_with_existing_venv_still_queries_it_and_warns(self):
-        exe = _make_venv(self.root)
-        (self.root / "uv.lock").write_text("")
-        self.sync_rc = 1
-        with mock.patch("bumplib.ecosystems.python.sys.stderr", new_callable=io.StringIO) as err:
-            py.handle("outdated", [])
-        listing = self.calls[1]
-        self.assertEqual(listing[listing.index("--python") + 1], str(exe))
-        self.assertIn("uv sync", err.getvalue())
+    def test_failed_tree_warns_and_only_drops_that_project(self):
+        calls = iter([(1, ""), (0, (FIX / "uv_tree_outdated_boring.txt").read_text())])
 
-    def test_pip_manager_never_syncs(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
+        def record(args, env=None, cwd=None):
+            rc, out = next(calls)
+            return mock.Mock(returncode=rc, stdout=out, stderr="no lock")
+
+        with (
+            mock.patch("bumplib.ecosystems.python._run", side_effect=record),
+            contextlib.redirect_stderr(io.StringIO()) as err,
+        ):
+            recs = py.handle("outdated", [])
+        self.assertEqual({r.location for r in recs}, {f"{NESTED}/uv.lock"})
+        self.assertIn("uv tree --outdated", err.getvalue())
+
+    def test_pip_manager_path_unchanged(self):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
             py.handle("outdated", [])
         self.assertEqual(self.calls, [["pip", "list", "--outdated", "--format", "json"]])
 
 
-class TestApplyReportsOnlyRealChanges(unittest.TestCase):
-    """#37: `uv lock --upgrade-package X` is a no-op when the lock already holds the
-    target, yet apply echoed every spec back in `applied`. A commit message built from
-    `applied` then claims a bump that did not happen. For uv the lockfile IS the evidence,
-    so an empty git-verified `filesModified` means nothing was applied."""
+class TestDetectProjects(unittest.TestCase):
+    """detect lists one project per tracked uv.lock."""
 
     def setUp(self):
         self._tmp = TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        self.enterContext(mock.patch("bumplib.ecosystems.python.Path",
-                                     side_effect=lambda p: self.root if str(p) == "." else Path(p)))
-        self.enterContext(mock.patch("bumplib.ecosystems.python._run",
-                                     return_value=mock.Mock(returncode=0, stdout="", stderr="")))
+
+    def _touch(self, *rels):
+        for rel in rels:
+            (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / rel).write_text("")
+
+    def _detect(self, git_files):
+        with (
+            mock.patch("bumplib.ecosystems.python.shutil.which", return_value="/bin/uv"),
+            mock.patch(
+                "bumplib.ecosystems.python._run", return_value=mock.Mock(returncode=0, stdout=git_files, stderr="")
+            ),
+        ):
+            return py.detect(self.root)
+
+    def test_one_project_per_tracked_lockfile_root_first(self):
+        self._touch("pyproject.toml", "uv.lock", f"{NESTED}/uv.lock")
+        got = self._detect(f"{NESTED}/uv.lock\nuv.lock\n")
+        self.assertEqual(got["projects"], [{"dir": ".", "members": ["."]}, {"dir": NESTED, "members": [NESTED]}])
+
+    def test_untracked_or_deleted_lockfiles_are_not_projects(self):
+        self._touch("pyproject.toml", "uv.lock")
+        got = self._detect("uv.lock\ngone/uv.lock\nxuv.lock\n")  # gone/ absent, xuv.lock a name clash
+        self.assertEqual(got["projects"], [{"dir": ".", "members": ["."]}])
+
+    def test_git_unavailable_falls_back_to_root_lock(self):
+        self._touch("pyproject.toml", "uv.lock", f"{NESTED}/uv.lock")
+        with (
+            mock.patch("bumplib.ecosystems.python.shutil.which", return_value="/bin/uv"),
+            mock.patch("bumplib.ecosystems.python._run", side_effect=OSError("no git")),
+        ):
+            got = py.detect(self.root)
+        self.assertEqual(got["projects"], [{"dir": ".", "members": ["."]}])
+
+    def test_pyproject_without_lock_is_a_root_project(self):
+        self._touch("pyproject.toml")
+        self.assertEqual(self._detect("")["projects"], [{"dir": ".", "members": ["."]}])
+
+    def test_pip_mode_has_the_root_project(self):
+        self._touch("requirements.txt")
+        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None):
+            got = py.detect(self.root)
+        self.assertEqual((got["packageManager"], got["projects"]), ("pip", [{"dir": ".", "members": ["."]}]))
+
+
+class TestApplyReportsOnlyRealChanges(_Repo):
+    """#37: `uv lock --upgrade-package X` is a no-op when the lock already holds the
+    target, yet apply echoed every spec back in `applied`. For uv the lockfile IS the
+    evidence, so an empty git-verified `filesModified` means nothing was applied."""
 
     def test_uv_noop_apply_reports_nothing_applied(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "uv", "present": True}), \
-                mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]):
+        with mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]):
             result = py.handle("apply", ["charset-normalizer==3.5.1"])
         self.assertEqual(result, {"applied": [], "filesModified": []})
 
     def test_uv_apply_with_lock_change_reports_specs(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "uv", "present": True}), \
-                mock.patch("bumplib.ecosystems.python.changed_files", return_value=["uv.lock"]):
+        with mock.patch("bumplib.ecosystems.python.changed_files", return_value=["uv.lock"]):
             result = py.handle("apply", ["requests==2.32.4"])
         self.assertEqual(result, {"applied": ["requests==2.32.4"], "filesModified": ["uv.lock"]})
 
     def test_pip_apply_unchanged(self):
         """pip install never edits requirements.txt, so an empty filesModified carries
         no signal there; keep echoing the specs."""
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}), \
-                mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]):
+        with (
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}),
+            mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]),
+        ):
             result = py.handle("apply", ["requests==2.32.4"])
         self.assertEqual(result["applied"], ["requests==2.32.4"])
 
 
-class TestAuditAgainstLockfile(unittest.TestCase):
+class TestApplyPerProject(_Repo):
+    manager = TWO
+
+    def test_default_project_is_the_root(self):
+        with mock.patch("bumplib.ecosystems.python.changed_files", return_value=["uv.lock"]) as cf:
+            py.handle("apply", ["requests==2.32.4"])
+        self.assertEqual(self.calls[0], ["uv", "lock", "--project", ".", "--upgrade-package", "requests"])
+        self.assertEqual(self.calls[1], ["uv", "sync", "--project", "."])
+        self.assertEqual(cf.call_args.args[0], ["pyproject.toml", "uv.lock"])
+
+    def test_nested_project_locks_there_and_reports_repo_relative_files(self):
+        locked = [f"{NESTED}/uv.lock"]
+        with mock.patch("bumplib.ecosystems.python.changed_files", return_value=locked) as cf:
+            res = py.handle("apply", ["--project", NESTED, "spacy==3.8.16"])
+        where = NESTED
+        self.assertEqual(self.calls[0], ["uv", "lock", "--project", where, "--upgrade-package", "spacy"])
+        self.assertEqual(self.calls[1], ["uv", "sync", "--project", where])
+        self.assertEqual(cf.call_args.args[0], [f"{NESTED}/pyproject.toml", f"{NESTED}/uv.lock"])
+        self.assertEqual(res, {"applied": ["spacy==3.8.16"], "filesModified": locked})
+
+    def test_flag_may_follow_the_specs_and_is_not_passed_on_as_a_spec(self):
+        with mock.patch("bumplib.ecosystems.python.changed_files", return_value=["x"]):
+            res = py.handle("apply", ["spacy==3.8.16", "--project", f"{NESTED}/"])
+        self.assertEqual(res["applied"], ["spacy==3.8.16"])
+        self.assertIn(NESTED, self.calls[0])
+
+    def test_unknown_project_is_rejected_before_anything_runs(self):
+        for bad in ("elsewhere", "../x", "/etc", NESTED + "/sub"):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                py.handle("apply", ["--project", bad, "x==1"])
+        with self.assertRaises(ValueError):
+            py.handle("validate", ["--project", "elsewhere"])
+        self.assertEqual(self.calls, [])
+
+    def test_malformed_project_flag_is_rejected(self):
+        with self.assertRaises(ValueError):
+            py.handle("apply", ["x==1", "--project"])
+        with self.assertRaises(ValueError):
+            py.handle("apply", ["--project", ".", "--project", NESTED])
+
+    def test_pip_accepts_only_the_root(self):
+        with (
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}),
+            mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]),
+        ):
+            self.assertEqual(py.handle("apply", ["--project", ".", "x==1"])["applied"], ["x==1"])
+            with self.assertRaises(ValueError):
+                py.handle("apply", ["--project", NESTED, "x==1"])
+
+
+class TestValidateRunsWhatIsDeclared(_Repo):
+    manager = TWO
+
+    def _pyproject(self, rel, text):
+        (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / rel).write_text(text)
+
+    def test_declared_tools_run_in_the_projects_directory(self):
+        self._pyproject(
+            f"{NESTED}/pyproject.toml", "[project]\nname='b'\n[dependency-groups]\ndev=['pytest>=8','ruff']\n"
+        )
+        res = py.handle("validate", ["--project", NESTED])
+        self.assertEqual((res["test"], res["lint"]), ("pass", "pass"))
+        self.assertEqual(self.calls, ["uv run pytest", "uv run ruff check ."])
+        self.assertEqual(self.cwds, [Path(NESTED)] * 2)
+
+    def test_undeclared_pytest_is_skipped_not_failed(self):
+        """boring declares ruff (a [tool.ruff] table) but no pytest."""
+        self._pyproject(f"{NESTED}/pyproject.toml", "[project]\nname='b'\n[tool.ruff]\nline-length=99\n")
+        res = py.handle("validate", ["--project", NESTED])
+        self.assertEqual((res["test"], res["lint"]), ("skipped", "pass"))
+        self.assertIn("no pytest declared", res["test_output"])
+        self.assertIn(f"{NESTED}/pyproject.toml", res["test_output"])
+        self.assertEqual(self.calls, ["uv run ruff check ."])
+
+    def test_missing_pyproject_skips_everything(self):
+        res = py.handle("validate", [])
+        self.assertEqual((res["test"], res["lint"]), ("skipped", "skipped"))
+        self.assertEqual(self.calls, [])
+
+    def test_failure_is_still_fail(self):
+        self._pyproject("pyproject.toml", "[tool.pytest.ini_options]\n[tool.ruff]\n")
+        with mock.patch(
+            "bumplib.ecosystems.python._run_shell", return_value=mock.Mock(returncode=1, stdout="x", stderr="")
+        ):
+            res = py.handle("validate", [])
+        self.assertEqual((res["test"], res["lint"]), ("fail", "fail"))
+
+    def test_pip_validate_keeps_running_both(self):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
+            res = py.handle("validate", [])
+        self.assertEqual((res["test"], res["lint"]), ("pass", "pass"))
+        self.assertEqual(self.calls, ["pytest", "ruff check ."])
+
+
+class TestDeclared(unittest.TestCase):
+    def _declared(self, text, tool):
+        with TemporaryDirectory() as td:
+            p = Path(td) / "pyproject.toml"
+            p.write_text(text)
+            return py.declared(p, tool)
+
+    def test_every_place_a_requirement_can_live(self):
+        for text in (
+            "[project]\ndependencies=['pytest>=8']\n",
+            "[project.optional-dependencies]\ntest=['PyTest']\n",
+            "[dependency-groups]\ndev=['pytest']\n",
+            "[tool.uv]\ndev-dependencies=['pytest[x]>=8; python_version>\"3\"']\n",
+            "[tool.pytest.ini_options]\naddopts='-q'\n",
+        ):
+            with self.subTest(text):
+                self.assertTrue(self._declared(text, "pytest"))
+
+    def test_lookalikes_and_absence(self):
+        for text in (
+            "[project]\ndependencies=['pytest-cov','mypytest']\n",
+            "[dependency-groups]\ndev=[{include-group='lint'}]\n",
+            "# pytest\n[project]\nname='pytest-fan'\n",
+            "not toml [",
+        ):
+            with self.subTest(text):
+                self.assertFalse(self._declared(text, "pytest"))
+        self.assertFalse(py.declared(Path("/nonexistent/pyproject.toml"), "ruff"))
+
+    def test_text_fallback_without_tomllib(self):
+        with mock.patch("bumplib.ecosystems.python.tomllib", None):
+            self.assertTrue(self._declared("[tool.ruff.lint]\nx=1\n", "ruff"))
+            self.assertTrue(self._declared("[dependency-groups]\ndev=['pytest>=8']\n", "pytest"))
+            self.assertFalse(self._declared("[project]\ndependencies=['pytest-cov']\n", "pytest"))
+
+
+class TestAuditAgainstLockfile(_Repo):
     """audit must read the LOCKFILE, never the installed environment.
 
     pip-audit's environment mode asks pip to enumerate installed distributions. In a
@@ -284,44 +405,19 @@ class TestAuditAgainstLockfile(unittest.TestCase):
     silently passes because it saw nothing is the failure mode worth engineering against.
     """
 
-    def setUp(self):
-        self._tmp = TemporaryDirectory()
-        self.root = Path(self._tmp.name)
-        self.addCleanup(self._tmp.cleanup)
-        (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
-        (self.root / "uv.lock").write_text("")
-        self.calls = []
-        self.responses = {}
-        self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.shutil.which", return_value="/bin/uv"))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
-        self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
+    def _export_call(self, n=0):
+        return [c for c in self.calls if "export" in c][n]
 
-    def _path(self, p):
-        return self.root if str(p) == "." else Path(p)
-
-    def _record(self, args):
-        args = list(args)
-        self.calls.append(args)
-        for marker, (rc, out) in self.responses.items():
-            if marker in args:
-                return mock.Mock(returncode=rc, stdout=out, stderr="")
-        return mock.Mock(returncode=0, stdout="{}", stderr="")
-
-    def _export_call(self):
-        return next(c for c in self.calls if "export" in c)
-
-    def _audit_call(self):
-        return next(c for c in self.calls if "pip-audit" in c)
+    def _audit_call(self, n=0):
+        return [c for c in self.calls if "pip-audit" in c][n]
 
     def test_exports_lockfile_to_pylock(self):
         py.handle("audit", [])
         exp = self._export_call()
         self.assertEqual(exp[:2], ["uv", "export"])
-        self.assertIn("--frozen", exp)                       # never re-resolve to audit
+        self.assertIn("--frozen", exp)  # never re-resolve to audit
         self.assertEqual(exp[exp.index("--format") + 1], "pylock.toml")
-        self.assertEqual(exp[exp.index("--project") + 1], str(self.root))
+        self.assertEqual(exp[exp.index("--project") + 1], ".")
 
     def test_export_includes_every_extra_and_group(self):
         """A package reached only through an optional extra (nltk via `boring`) is
@@ -350,15 +446,13 @@ class TestAuditAgainstLockfile(unittest.TestCase):
         """uv ignores a pylock.toml and silently re-resolves, so it must never land
         beside uv.lock where it could be mistaken for the source of truth."""
         py.handle("audit", [])
-        exp = self._export_call()
-        written = Path(exp[exp.index("-o") + 1])
-        self.assertNotIn(str(self.root), str(written))
+        written = Path(self._export_call()[self._export_call().index("-o") + 1])
+        self.assertNotIn(str(self.root), str(written.resolve()))
         self.assertFalse((self.root / "pylock.toml").exists())
 
     def test_advisories_parsed_from_audit_output(self):
         self.responses["pip-audit"] = (1, (FIX / "pip_audit.json").read_text())
         advs = py.handle("audit", [])
-        self.assertTrue(advs)
         self.assertTrue(any("PYSEC" in (a.ids[0] if a.ids else "") for a in advs))
 
     def test_export_failure_degrades_to_empty(self):
@@ -374,49 +468,55 @@ class TestAuditAgainstLockfile(unittest.TestCase):
         self.assertEqual(py.handle("audit", []), [])
 
     def test_pip_manager_path_unchanged(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
             py.handle("audit", [])
         self.assertEqual(self.calls, [["pip-audit", "--format", "json"]])
 
 
-class TestApplyReportsFailure(unittest.TestCase):
+class TestAuditEveryProject(_Repo):
+    manager = TWO
+
+    def test_each_project_is_exported_and_located_at_its_own_lockfile(self):
+        self.responses["pip-audit"] = (1, (FIX / "pip_audit.json").read_text())
+        advs = py.handle("audit", [])
+        exports = [c for c in self.calls if "export" in c]
+        self.assertEqual([e[e.index("--project") + 1] for e in exports], [".", NESTED])
+        per = len(advs) // 2
+        self.assertTrue(per)
+        self.assertEqual([a.location for a in advs], ["uv.lock"] * per + [f"{NESTED}/uv.lock"] * per)
+
+    def test_one_projects_failed_export_does_not_hide_the_other(self):
+        results = iter([(2, ""), (0, ""), (1, (FIX / "pip_audit.json").read_text())])
+
+        def record(args, env=None, cwd=None):
+            rc, out = next(results)
+            return mock.Mock(returncode=rc, stdout=out, stderr="")
+
+        with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
+            advs = py.handle("audit", [])
+        self.assertTrue(advs)
+        self.assertEqual({a.location for a in advs}, {f"{NESTED}/uv.lock"})
+
+
+class TestApplyReportsFailure(_Repo):
     """apply must surface a failed package-manager command, never report success (#32)."""
 
     def setUp(self):
-        self._tmp = TemporaryDirectory()
-        self.root = Path(self._tmp.name)
-        self.addCleanup(self._tmp.cleanup)
-        (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
-        self.calls = []
-        self.fail_on = None          # substring of argv marking the command that fails
-        self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
-        self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
-
-    def _path(self, p):
-        return self.root if str(p) == "." else Path(p)
-
-    def _record(self, args, env=None):
-        args = list(args)
-        self.calls.append(args)
-        if self.fail_on and self.fail_on in args:
-            return mock.Mock(returncode=1, stdout="", stderr="resolution is unsatisfiable")
-        return mock.Mock(returncode=0, stdout="", stderr="")
+        super().setUp()
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
 
     def test_uv_lock_failure_surfaces_error(self):
-        self.fail_on = "lock"
+        self.responses["lock"] = (1, "")
         res = py.handle("apply", ["tqdm==4.70.0"])
         self.assertEqual(res["applied"], [])
         self.assertEqual(res["filesModified"], [])
-        self.assertIn("unsatisfiable", res["error"])
-        self.assertFalse(any("sync" in c for c in self.calls))   # stops at first failure
+        self.assertIn("error", res)
+        self.assertFalse(any("sync" in c for c in self.calls))  # stops at first failure
 
     def test_uv_sync_failure_surfaces_error(self):
-        self.fail_on = "sync"
+        self.responses["sync"] = (1, "")
         res = py.handle("apply", ["tqdm==4.70.0"])
         self.assertEqual(res["applied"], [])
         self.assertIn("error", res)
@@ -428,9 +528,8 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.assertNotIn("error", res)
 
     def test_pip_install_failure_surfaces_error(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
-            self.fail_on = "install"
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
+            self.responses["install"] = (1, "")
             res = py.handle("apply", ["tqdm==4.70.0"])
         self.assertEqual(res["applied"], [])
         self.assertIn("error", res)

@@ -6,11 +6,16 @@ from bumplib import contracts as c
 
 def rec(name, current, latest, **kw):
     bump = cat.classify_bump(current, latest)
-    return c.UpdateRecord(name=name, current=current, latest=latest,
-                          wanted=kw.get("wanted", latest), bump=bump,
-                          kind=kw.get("kind", "direct"),
-                          location=kw.get("location", "manifest"),
-                          pinned=kw.get("pinned", False))
+    return c.UpdateRecord(
+        name=name,
+        current=current,
+        latest=latest,
+        wanted=kw.get("wanted", latest),
+        bump=bump,
+        kind=kw.get("kind", "direct"),
+        location=kw.get("location", "manifest"),
+        pinned=kw.get("pinned", False),
+    )
 
 
 class TestSemver(unittest.TestCase):
@@ -51,7 +56,7 @@ class TestSemver(unittest.TestCase):
         patch bump was reported as 'major'."""
         self.assertEqual(cat.classify_bump("1.2", "1.2.1"), "patch")
         self.assertEqual(cat.classify_bump("1.2", "1.3.0"), "minor")
-        self.assertEqual(cat.classify_bump("1.2.1", "1.2"), "none")   # downgrade
+        self.assertEqual(cat.classify_bump("1.2.1", "1.2"), "none")  # downgrade
 
     def test_classify_three_component_behavior_unchanged(self):
         """The widened parser must not move any version that already parsed."""
@@ -76,8 +81,9 @@ class TestCategorize(unittest.TestCase):
         self.assertEqual(out.safe[0]["reason"], "minor update")
 
     def test_security_patch(self):
-        adv = [c.Advisory(package="qs", ecosystem="node", severity="HIGH",
-                          current="6.14.1", fixed="6.14.2", ids=["CVE-1"])]
+        adv = [
+            c.Advisory(package="qs", ecosystem="node", severity="HIGH", current="6.14.1", fixed="6.14.2", ids=["CVE-1"])
+        ]
         out = cat.categorize([rec("qs", "6.14.1", "6.14.2")], adv, [], {}, set())
         self.assertEqual(len(out.securityFixes), 1)
 
@@ -87,32 +93,29 @@ class TestCategorize(unittest.TestCase):
         self.assertIn("Major", out.needsPlan[0]["reason"])
 
     def test_excluded_needs_plan(self):
-        out = cat.categorize([rec("@angular/core", "20.2.0", "20.3.0")], [],
-                             ["@angular/*"], {}, set())
+        out = cat.categorize([rec("@angular/core", "20.2.0", "20.3.0")], [], ["@angular/*"], {}, set())
         self.assertEqual(len(out.needsPlan), 1)
         self.assertIn("Excluded", out.needsPlan[0]["reason"])
 
     def test_pinned_needs_plan(self):
-        out = cat.categorize([rec("requests", "2.28.0", "2.29.0", pinned=True)], [],
-                             [], {}, set())
+        out = cat.categorize([rec("requests", "2.28.0", "2.29.0", pinned=True)], [], [], {}, set())
         self.assertEqual(out.needsPlan[0]["reason"], "pinned")
 
     def test_pinned_with_advisory_goes_to_plan_not_security(self):
-        adv = [c.Advisory(package="qs", ecosystem="node", severity="HIGH",
-                          current="6.14.1", fixed="6.14.2", ids=["CVE-1"])]
+        adv = [
+            c.Advisory(package="qs", ecosystem="node", severity="HIGH", current="6.14.1", fixed="6.14.2", ids=["CVE-1"])
+        ]
         out = cat.categorize([rec("qs", "6.14.1", "6.14.2", pinned=True)], adv, [], {}, set())
         self.assertEqual(len(out.securityFixes), 0)
         self.assertEqual(len(out.needsPlan), 1)
         self.assertEqual(out.needsPlan[0]["reason"], "pinned")
 
     def test_hold_needs_plan(self):
-        out = cat.categorize([rec("@antv/x6", "2.19.2", "2.20.0")], [], [],
-                             {"@antv/x6": "v3 breaking"}, set())
+        out = cat.categorize([rec("@antv/x6", "2.19.2", "2.20.0")], [], [], {"@antv/x6": "v3 breaking"}, set())
         self.assertIn("Hold", out.needsPlan[0]["reason"])
 
     def test_replace_target_skipped(self):
-        out = cat.categorize([rec("local/mod", "1.0.0", "1.1.0")], [], [], {},
-                             {"local/mod"})
+        out = cat.categorize([rec("local/mod", "1.0.0", "1.1.0")], [], [], {}, {"local/mod"})
         self.assertEqual(len(out.skipped), 1)
 
     def test_uptodate_skipped(self):
@@ -120,17 +123,24 @@ class TestCategorize(unittest.TestCase):
         self.assertEqual(len(out.skipped), 1)
 
     def test_major_security_goes_to_plan(self):
-        adv = [c.Advisory(package="pgx", ecosystem="go", severity="HIGH",
-                          current="4.18.3", fixed="5.0.0", ids=["CVE-9"])]
+        adv = [
+            c.Advisory(package="pgx", ecosystem="go", severity="HIGH", current="4.18.3", fixed="5.0.0", ids=["CVE-9"])
+        ]
         out = cat.categorize([rec("pgx", "4.18.3", "5.8.0")], adv, [], {}, set())
         self.assertEqual(len(out.needsPlan), 1)
         self.assertIn("Major security", out.needsPlan[0]["reason"])
 
 
-
 def adv(package, current="", fixed="", ids=(), location="", ecosystem="python", severity="HIGH"):
-    return c.Advisory(package=package, ecosystem=ecosystem, severity=severity, current=current,
-                      fixed=fixed, ids=list(ids), location=location)
+    return c.Advisory(
+        package=package,
+        ecosystem=ecosystem,
+        severity=severity,
+        current=current,
+        fixed=fixed,
+        ids=list(ids),
+        location=location,
+    )
 
 
 class TestAdvisoryWithoutUpdateRecord(unittest.TestCase):
@@ -141,26 +151,43 @@ class TestAdvisoryWithoutUpdateRecord(unittest.TestCase):
     def test_patch_fix_becomes_a_transitive_security_fix(self):
         out = cat.categorize([], [adv("urllib3", "2.7.0", "2.7.1", ids=["GHSA-1"])], [], {}, set())
         [item] = out.securityFixes
-        self.assertEqual((item["name"], item["current"], item["latest"], item["bump"], item["kind"]),
-                         ("urllib3", "2.7.0", "2.7.1", "patch", "transitive"))
+        self.assertEqual(
+            (item["name"], item["current"], item["latest"], item["bump"], item["kind"]),
+            ("urllib3", "2.7.0", "2.7.1", "patch", "transitive"),
+        )
         self.assertEqual(item["ecosystem"], "python")
         self.assertIn("GHSA-1", item["reason"])
         self.assertEqual(item["advisory"]["package"], "urllib3")
 
     def test_several_advisories_merge_to_the_highest_fix(self):
-        out = cat.categorize([], [adv("nltk", "3.10.0", "3.10.1", ids=["A"]),
-                                  adv("nltk", "", "3.10.3", ids=["B"], location="uv.lock"),
-                                  adv("nltk", "3.10.0", "3.10.2", ids=["A", "C"])],
-                             [], {}, set())
+        out = cat.categorize(
+            [],
+            [
+                adv("nltk", "3.10.0", "3.10.1", ids=["A"]),
+                adv("nltk", "", "3.10.3", ids=["B"], location="uv.lock"),
+                adv("nltk", "3.10.0", "3.10.2", ids=["A", "C"]),
+            ],
+            [],
+            {},
+            set(),
+        )
         [item] = out.securityFixes
         self.assertEqual((item["current"], item["latest"], item["bump"]), ("3.10.0", "3.10.3", "patch"))
         self.assertEqual(item["advisory"]["ids"], ["A", "B", "C"])
         self.assertEqual(out.needsPlan, [])
 
     def test_highest_severity_wins_the_merge(self):
-        out = cat.categorize([], [adv("a", "1.0.0", "1.0.1", severity="LOW"),
-                                  adv("a", "1.0.0", "1.0.1", severity="CRITICAL"),
-                                  adv("a", "1.0.0", "1.0.1", severity="")], [], {}, set())
+        out = cat.categorize(
+            [],
+            [
+                adv("a", "1.0.0", "1.0.1", severity="LOW"),
+                adv("a", "1.0.0", "1.0.1", severity="CRITICAL"),
+                adv("a", "1.0.0", "1.0.1", severity=""),
+            ],
+            [],
+            {},
+            set(),
+        )
         self.assertEqual(out.securityFixes[0]["advisory"]["severity"], "CRITICAL")
 
     def test_major_fix_needs_a_plan(self):
@@ -196,28 +223,36 @@ class TestAdvisoryWithoutUpdateRecord(unittest.TestCase):
         self.assertEqual(out.skipped[0]["reason"], "advisory already fixed (2.0.0 >= 1.9.0)")
 
     def test_nested_project_advisory_needs_a_plan_naming_the_location(self):
-        out = cat.categorize([], [adv("pypdf", "", "6.19.0", location="writing/skills/boring/uv.lock")],
-                             [], {}, set())
+        out = cat.categorize([], [adv("pypdf", "", "6.19.0", location="writing/skills/boring/uv.lock")], [], {}, set())
         [item] = out.needsPlan
         self.assertEqual(item["location"], "writing/skills/boring/uv.lock")
         self.assertIn("writing/skills/boring/uv.lock", item["reason"])
 
     def test_nested_and_root_advisories_on_one_package_stay_separate(self):
-        out = cat.categorize([], [adv("nltk", "3.10.0", "3.10.3", location="uv.lock"),
-                                  adv("nltk", "", "3.10.3", location="writing/skills/boring/uv.lock")],
-                             [], {}, set())
+        out = cat.categorize(
+            [],
+            [
+                adv("nltk", "3.10.0", "3.10.3", location="uv.lock"),
+                adv("nltk", "", "3.10.3", location="writing/skills/boring/uv.lock"),
+            ],
+            [],
+            {},
+            set(),
+        )
         self.assertEqual([i["location"] for i in out.securityFixes], ["uv.lock"])
         self.assertEqual([i["location"] for i in out.needsPlan], ["writing/skills/boring/uv.lock"])
 
     def test_nested_advisory_does_not_mark_a_root_update_as_a_security_fix(self):
-        out = cat.categorize([rec("pypdf", "6.20.0", "6.21.0")],
-                             [adv("pypdf", "", "6.19.0", location="sub/uv.lock")], [], {}, set())
+        out = cat.categorize(
+            [rec("pypdf", "6.20.0", "6.21.0")], [adv("pypdf", "", "6.19.0", location="sub/uv.lock")], [], {}, set()
+        )
         self.assertEqual([i["name"] for i in out.safe], ["pypdf"])
         self.assertEqual([i["location"] for i in out.needsPlan], ["sub/uv.lock"])
 
     def test_advisory_matching_an_update_record_is_not_duplicated(self):
-        out = cat.categorize([rec("qs", "6.14.1", "6.14.2")],
-                             [adv("qs", "6.14.1", "6.14.2", ecosystem="node")], [], {}, set())
+        out = cat.categorize(
+            [rec("qs", "6.14.1", "6.14.2")], [adv("qs", "6.14.1", "6.14.2", ecosystem="node")], [], {}, set()
+        )
         self.assertEqual(len(out.securityFixes), 1)
         self.assertEqual(out.needsPlan, [])
         self.assertEqual(out.securityFixes[0]["kind"], "direct")
@@ -228,6 +263,141 @@ class TestAdvisoryWithoutUpdateRecord(unittest.TestCase):
         second = cat.categorize([], list(reversed(advs)), [], {}, set())
         self.assertEqual([i["name"] for i in first.securityFixes], ["a", "b"])
         self.assertEqual(first, second)
+
+
+NESTED = "writing/skills/boring"
+TWO_PROJECTS = [{"dir": ".", "members": ["."]}, {"dir": NESTED, "members": [NESTED]}]
+
+
+class TestProjects(unittest.TestCase):
+    """Matching is per (project, package); every item carries its `project`."""
+
+    def test_two_projects_locking_one_package_at_different_versions(self):
+        """Each project's advisory matches only its own record: the root's nltk 3.10.0
+        needs the fix, the nested nltk 3.10.3 is already past it."""
+        updates = [
+            rec("nltk", "3.10.0", "3.10.4", location="uv.lock"),
+            rec("nltk", "3.10.3", "3.10.4", location=f"{NESTED}/uv.lock"),
+        ]
+        advs = [
+            adv("nltk", "3.10.0", "3.10.3", ids=["GHSA-r"], location="uv.lock"),
+            adv("nltk", "3.10.2", "3.10.3", ids=["GHSA-n"], location=f"{NESTED}/uv.lock"),
+        ]
+        out = cat.categorize(updates, advs, [], {}, set(), TWO_PROJECTS)
+        by_project = {i["project"]: i for i in out.securityFixes}
+        self.assertEqual(set(by_project), {".", NESTED})
+        self.assertEqual(by_project["."]["advisory"]["ids"], ["GHSA-r"])
+        self.assertEqual(by_project["."]["current"], "3.10.0")
+        self.assertEqual(by_project[NESTED]["advisory"]["ids"], ["GHSA-n"])
+        self.assertEqual(by_project[NESTED]["current"], "3.10.3")
+        self.assertEqual(out.safe + out.needsPlan, [])
+
+    def test_advisory_for_one_project_does_not_touch_the_others_record(self):
+        updates = [
+            rec("pypdf", "6.20.0", "6.21.0", location="uv.lock"),
+            rec("pypdf", "6.20.0", "6.21.0", location=f"{NESTED}/uv.lock"),
+        ]
+        advs = [adv("pypdf", "6.20.0", "6.21.0", location=f"{NESTED}/uv.lock")]
+        out = cat.categorize(updates, advs, [], {}, set(), TWO_PROJECTS)
+        self.assertEqual([(i["project"], i["name"]) for i in out.securityFixes], [(NESTED, "pypdf")])
+        self.assertEqual([(i["project"], i["name"]) for i in out.safe], [(".", "pypdf")])
+
+    def test_covered_nested_advisory_without_a_record_is_a_transitive_fix(self):
+        out = cat.categorize(
+            [], [adv("pypdf", "6.19.0", "6.21.0", location=f"{NESTED}/uv.lock")], [], {}, set(), TWO_PROJECTS
+        )
+        [item] = out.securityFixes
+        self.assertEqual((item["project"], item["kind"]), (NESTED, "transitive"))
+
+    def test_uncovered_directory_still_needs_a_plan(self):
+        out = cat.categorize([], [adv("pypdf", "", "6.19.0", location="other/uv.lock")], [], {}, set(), TWO_PROJECTS)
+        [item] = out.needsPlan
+        self.assertIn("separate project", item["reason"])
+        self.assertEqual(item["project"], "other")
+
+    def test_workspace_members_belong_to_their_project(self):
+        node = [{"dir": ".", "members": [".", "packages/viewer"]}]
+        out = cat.categorize(
+            [rec("qs", "6.14.1", "6.14.2", location="packages/viewer/package.json")],
+            [adv("qs", "6.14.1", "6.14.2", ecosystem="node", location="packages/viewer/package.json")],
+            [],
+            {},
+            set(),
+            node,
+        )
+        self.assertEqual([(i["project"], i["name"]) for i in out.securityFixes], [(".", "qs")])
+
+    def test_default_projects_reproduce_the_previous_behavior(self):
+        """No `projects`: only the root is covered, a subdirectory manifest is not."""
+        out = cat.categorize(
+            [rec("qs", "6.14.1", "6.14.2", location="package.json")],
+            [adv("qs", "6.14.1", "6.14.2", ecosystem="node"), adv("qs", "", "6.14.2", location="sub/package.json")],
+            [],
+            {},
+            set(),
+        )
+        self.assertEqual([(i["project"], i["name"]) for i in out.securityFixes], [(".", "qs")])
+        [nested] = out.needsPlan
+        self.assertIn("separate project", nested["reason"])
+
+    def test_every_item_carries_a_project(self):
+        out = cat.categorize(
+            [
+                rec("a", "1.0.0", "1.0.1", location=f"{NESTED}/uv.lock"),
+                rec("b", "1.0.0", "2.0.0"),
+                rec("c", "1.0.0", "1.0.0"),
+            ],
+            [],
+            [],
+            {},
+            set(),
+            TWO_PROJECTS,
+        )
+        items = out.safe + out.needsPlan + out.skipped
+        self.assertEqual({i["name"]: i["project"] for i in items}, {"a": NESTED, "b": ".", "c": "."})
+
+    def test_record_outside_every_member_keeps_its_own_directory(self):
+        out = cat.categorize(
+            [rec("a", "1.0.0", "1.0.1", location="elsewhere/uv.lock")], [], [], {}, set(), TWO_PROJECTS
+        )
+        self.assertEqual(out.safe[0]["project"], "elsewhere")
+
+
+class TestRenamed(unittest.TestCase):
+    def _renamed(self, name="github.com/google/cel-go", cur="v0.29.2", lat="v0.32.0", last="v0.31.0", **kw):
+        r = rec(name, cur, lat, **kw)
+        r.meta = {"renamedTo": "cel.dev/cel-go", "lastVersionWithPath": last}
+        return r
+
+    def test_renamed_goes_to_needs_plan_with_reason(self):
+        out = cat.categorize([self._renamed()], [], [], {}, set())
+        self.assertEqual(out.safe, [])
+        self.assertEqual(
+            out.needsPlan[0]["reason"],
+            "Renamed (github.com/google/cel-go -> cel.dev/cel-go at v0.32.0); v0.31.0 is the last version under the old path",
+        )
+
+    def test_renamed_without_old_path_version(self):
+        out = cat.categorize([self._renamed(last="")], [], [], {}, set())
+        self.assertTrue(out.needsPlan[0]["reason"].endswith("; no newer version keeps the old path"))
+
+    def test_renamed_keeps_advisory_and_beats_security_and_major(self):
+        adv = [
+            c.Advisory(
+                package="github.com/google/cel-go", ecosystem="go", severity="HIGH", current="", fixed="", ids=["GO-1"]
+            )
+        ]
+        out = cat.categorize([self._renamed(cur="v0.1.0")], adv, [], {}, set())
+        self.assertEqual(out.securityFixes, [])
+        self.assertEqual(out.needsPlan[0]["advisory"]["ids"], ["GO-1"])
+        self.assertTrue(out.needsPlan[0]["reason"].startswith("Renamed ("))
+
+    def test_renamed_replace_target_and_up_to_date_still_skipped(self):
+        out = cat.categorize([self._renamed()], [], [], {}, {"github.com/google/cel-go"})
+        self.assertEqual(out.skipped[0]["reason"], "replace directive")
+        same = self._renamed(cur="v0.32.0")
+        out = cat.categorize([same], [], [], {}, set())
+        self.assertEqual(out.skipped[0]["reason"], "up to date")
 
 
 if __name__ == "__main__":

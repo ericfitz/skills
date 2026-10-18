@@ -1,4 +1,5 @@
 """Node ecosystem adapter (pnpm / npm)."""
+
 import json
 import os
 import re
@@ -8,16 +9,20 @@ import sys
 from pathlib import Path
 
 from .. import contracts as c
+from .. import projects as proj
 from ..categorize import classify_bump
 from ..gitfiles import changed_files
 
 # Directories that never hold a workspace manifest. node_modules is the one that
 # matters -- without it the manifest walk would read every vendored package.json.
-_SKIP_DIRS = {"node_modules", "dist", "build", "out", "coverage",
-              "venv", "__pycache__", "vendor", "tmp"}
+_SKIP_DIRS = {"node_modules", "dist", "build", "out", "coverage", "venv", "__pycache__", "vendor", "tmp"}
 
-_DEP_FIELDS = (("dependencies", "prod"), ("devDependencies", "dev"),
-               ("optionalDependencies", "optional"), ("peerDependencies", "peer"))
+_DEP_FIELDS = (
+    ("dependencies", "prod"),
+    ("devDependencies", "dev"),
+    ("optionalDependencies", "optional"),
+    ("peerDependencies", "peer"),
+)
 
 
 def detect(root: Path) -> dict:
@@ -25,7 +30,13 @@ def detect(root: Path) -> dict:
     if not (root / "package.json").exists():
         return {"present": False, "ecosystem": "node"}
     mgr = "pnpm" if (root / "pnpm-lock.yaml").exists() else "npm"
-    return {"present": True, "ecosystem": "node", "packageManager": mgr}
+    members = [os.path.relpath(m.parent, root).replace(os.sep, "/") for m in _manifests(root)]
+    return {
+        "present": True,
+        "ecosystem": "node",
+        "packageManager": mgr,
+        "projects": proj.merge([{"dir": proj.ROOT, "members": members}]),
+    }
 
 
 def _manifests(root: Path, max_depth: int = 4):
@@ -71,7 +82,7 @@ def dep_index(root: Path) -> dict:
         try:
             pj = json.loads(man.read_text())
         except (OSError, ValueError):
-            continue          # an unreadable manifest must not sink the whole run
+            continue  # an unreadable manifest must not sink the whole run
         if not isinstance(pj, dict):
             continue
         rel_dir = man.parent.relative_to(root).as_posix()
@@ -104,7 +115,7 @@ def parse_outdated(json_text: str, manager: str, declared: dict | None = None) -
     data = json.loads(json_text or "{}")
     recs, seen = [], set()
     for name, info in data.items():
-        for entry in (info if isinstance(info, list) else [info]):
+        for entry in info if isinstance(info, list) else [info]:
             if not isinstance(entry, dict):
                 continue
             cur = entry.get("current", "") or ""
@@ -112,25 +123,33 @@ def parse_outdated(json_text: str, manager: str, declared: dict | None = None) -
             wanted = entry.get("wanted", lat) or lat
             key = (name, cur, lat)
             if key in seen:
-                continue          # several dependents agreeing is still one update
+                continue  # several dependents agreeing is still one update
             seen.add(key)
             decl = (declared or {}).get(name)
-            recs.append(c.UpdateRecord(
-                name=name, current=cur, latest=lat, wanted=wanted,
-                bump=classify_bump(cur, lat),
-                kind="direct" if (decl or declared is None) else "transitive",
-                location=(decl or {}).get("location") or "package.json",
-                ecosystem="node",
-                meta={"dependencyType": entry.get("dependencyType", "") or (decl or {}).get("type", ""),
-                      "declaredRange": (decl or {}).get("range", ""),
-                      "dependent": entry.get("dependent", "")}))
+            recs.append(
+                c.UpdateRecord(
+                    name=name,
+                    current=cur,
+                    latest=lat,
+                    wanted=wanted,
+                    bump=classify_bump(cur, lat),
+                    kind="direct" if (decl or declared is None) else "transitive",
+                    location=(decl or {}).get("location") or "package.json",
+                    ecosystem="node",
+                    meta={
+                        "dependencyType": entry.get("dependencyType", "") or (decl or {}).get("type", ""),
+                        "declaredRange": (decl or {}).get("range", ""),
+                        "dependent": entry.get("dependent", ""),
+                    },
+                )
+            )
     return recs
 
 
 def parse_audit(json_text: str, manager: str) -> list:
     data = json.loads(json_text or "{}")
     advs = []
-    if isinstance(data.get("advisories"), dict):   # pnpm / npm-v6 bulk shape
+    if isinstance(data.get("advisories"), dict):  # pnpm / npm-v6 bulk shape
         for adv in data["advisories"].values():
             if not isinstance(adv, dict) or "severity" not in adv:
                 continue
@@ -138,11 +157,18 @@ def parse_audit(json_text: str, manager: str) -> list:
             fixed = patched.lstrip("><= ").strip() if patched and patched != "<0.0.0" else ""
             findings = adv.get("findings") or []
             current = findings[0].get("version", "") if findings and isinstance(findings[0], dict) else ""
-            advs.append(c.Advisory(package=adv.get("module_name", ""), ecosystem="node",
-                                   severity=str(adv.get("severity", "")).upper(),
-                                   current=current, fixed=fixed,
-                                   ids=list(adv.get("cves") or []),
-                                   summary=adv.get("vulnerable_versions", ""), source="audit"))
+            advs.append(
+                c.Advisory(
+                    package=adv.get("module_name", ""),
+                    ecosystem="node",
+                    severity=str(adv.get("severity", "")).upper(),
+                    current=current,
+                    fixed=fixed,
+                    ids=list(adv.get("cves") or []),
+                    summary=adv.get("vulnerable_versions", ""),
+                    source="audit",
+                )
+            )
         return advs
     # npm v7+ shape
     vulns = data.get("vulnerabilities", {})
@@ -155,10 +181,18 @@ def parse_audit(json_text: str, manager: str) -> list:
         for via in v.get("via", []):
             if isinstance(via, dict) and via.get("url"):
                 ids.append(via["url"])
-        advs.append(c.Advisory(package=name, ecosystem="node",
-                               severity=v.get("severity", "").upper(),
-                               current="", fixed=fixed, ids=ids,
-                               summary=v.get("range", ""), source="audit"))
+        advs.append(
+            c.Advisory(
+                package=name,
+                ecosystem="node",
+                severity=v.get("severity", "").upper(),
+                current="",
+                fixed=fixed,
+                ids=ids,
+                summary=v.get("range", ""),
+                source="audit",
+            )
+        )
     return advs
 
 
@@ -198,7 +232,7 @@ def _bounds(rng: str):
     if not r or any(ch in r for ch in " |<>=,-+"):
         return None
     lo = _version(r)
-    if lo is None or _VER_RE.match(r).end() != len(r):   # 1.x, 1.2.3-beta.1, ...
+    if lo is None or _VER_RE.match(r).end() != len(r):  # 1.x, 1.2.3-beta.1, ...
         return None
     major, minor, patch = lo
     if op == "^":
@@ -207,7 +241,7 @@ def _bounds(rng: str):
     elif op == "~":
         hi = (major, minor + 1, 0)
     else:
-        hi = (major, minor, patch + 1)          # exact pin
+        hi = (major, minor, patch + 1)  # exact pin
     return lo, hi
 
 
@@ -305,9 +339,13 @@ def clear_pnpm_metadata(cache_dir):
 
 def handle(verb, argv):
     root = Path(".")
-    mgr = detect(root).get("packageManager", "npm")
+    det = detect(root)
+    mgr = det.get("packageManager", "npm")
     if verb == "detect":
-        return detect(root)
+        return det
+    if verb in ("apply", "validate"):
+        project, argv = proj.split_project(argv)
+        proj.require_root(project, "node")
     if verb == "cache-clear":
         # registry metadata can be stale in either cache -- always clear both, each
         # guarded so a missing binary is skipped rather than fatal.
@@ -342,8 +380,11 @@ def handle(verb, argv):
         def _checked(cmd):
             r = _run(cmd)
             if r.returncode != 0:
-                return {"applied": [], "filesModified": [],
-                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+                return {
+                    "applied": [],
+                    "filesModified": [],
+                    "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:],
+                }
             return None
 
         for spec in argv:
@@ -372,10 +413,13 @@ def handle(verb, argv):
         return {"applied": list(argv), "filesModified": changed_files(sorted(modified), cwd=root)}
     if verb == "validate":
         results = {}
-        cmds = (("build", f"{mgr} run build"), ("test", f"{mgr} test"),
-                ("lint", f"{mgr} run lint:all || {mgr} run lint"))
+        cmds = (
+            ("build", f"{mgr} run build"),
+            ("test", f"{mgr} test"),
+            ("lint", f"{mgr} run lint:all || {mgr} run lint"),
+        )
         for step, cmd in cmds:
-            r = _run_shell(cmd)          # trusted: mgr is 'pnpm'|'npm', not user data
+            r = _run_shell(cmd)  # trusted: mgr is 'pnpm'|'npm', not user data
             results[step] = "pass" if r.returncode == 0 else "fail"
             results[step + "_output"] = (r.stdout + r.stderr)[-4000:]
         return results
