@@ -158,7 +158,11 @@ def categorize(updates, advisories, exclude, holds, replace_targets, projects=No
             )
             continue
         excl = _excluded(rec, exclude, holds)
-        if rec.bump == c.BUMP_MAJOR:
+        if renamed := rec.meta.get("renamedTo"):
+            last = rec.meta.get("lastVersionWithPath") or ""
+            tail = f"{last} is the last version under the old path" if last else "no newer version keeps the old path"
+            out.needsPlan.append(_item(rec, f"Renamed ({rec.name} -> {renamed} at {rec.latest}); {tail}", adv, project))
+        elif rec.bump == c.BUMP_MAJOR:
             reason = "Major security fix" if adv else f"Major ({rec.current} -> {rec.latest})"
             out.needsPlan.append(_item(rec, reason, adv, project))
         elif excl:

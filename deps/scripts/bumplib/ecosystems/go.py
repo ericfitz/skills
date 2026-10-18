@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .. import contracts as c
 from .. import projects as proj
-from ..categorize import classify_bump
+from ..categorize import classify_bump, parse_semver
 from ..gitfiles import changed_files
 
 _OUTDATED = re.compile(r"^(\S+)\s+(\S+)\s+\[(\S+)\]")
@@ -150,6 +150,107 @@ def parse_vuln(json_text: str) -> list:
     return advs
 
 
+def parse_list_stream(json_text: str) -> dict:
+    """Parse `go list -m -e -json` over several args: concatenated JSON objects.
+    Returns {"path@version": GoMod file path}; a record with an error or without a
+    GoMod file is left out, so the caller treats it as unknown."""
+    out = {}
+    dec = json.JSONDecoder()
+    idx, n = 0, len(json_text)
+    while idx < n:
+        while idx < n and json_text[idx].isspace():
+            idx += 1
+        if idx >= n:
+            break
+        try:
+            obj, end = dec.raw_decode(json_text, idx)
+        except ValueError:
+            break
+        idx = end
+        if (
+            isinstance(obj, dict)
+            and obj.get("Path")
+            and obj.get("Version")
+            and obj.get("GoMod")
+            and not obj.get("Error")
+        ):
+            out[f"{obj['Path']}@{obj['Version']}"] = obj["GoMod"]
+    return out
+
+
+def module_line(gomod_text: str) -> str:
+    """The module path a go.mod declares, or "" when it has no readable module line."""
+    for line in gomod_text.splitlines():
+        s = line.split("//")[0].strip()
+        if s.startswith("module") and s[6:7] in (" ", "\t", "("):
+            toks = s[6:].strip().strip("()").strip().split()
+            return toks[0].strip('"`') if toks else ""
+    return ""
+
+
+def last_version_with_path(current: str, latest: str, candidates: list, declared: dict, path: str) -> str:
+    """Highest release above `current` (below `latest`) whose go.mod still declares
+    `path`; "" when none does. `declared` maps a version to its declared module path."""
+    cur, lat = parse_semver(current), parse_semver(latest)
+    keep = [v for v in candidates if "-" not in v and cur < parse_semver(v) < lat and declared.get(v) == path]
+    return max(keep, key=parse_semver, default="")
+
+
+def _declared_paths(specs: list) -> dict:
+    """{spec: declared module path} from the cached .mod of each `path@version`.
+    One batched `go list` (field-limited, so no source zip is fetched); specs it
+    cannot resolve are absent."""
+    if not specs:
+        return {}
+    r = _run(["go", "list", "-m", "-e", "-json=Path,Version,GoMod,Error", *specs])
+    out = {}
+    for spec, gomod in parse_list_stream(r.stdout).items():
+        try:
+            declared = module_line(Path(gomod).read_text())
+        except OSError:
+            continue
+        if declared:
+            out[spec] = declared
+    return out
+
+
+def _versions(name: str) -> list:
+    r = _run(["go", "list", "-m", "-versions", name])
+    toks = r.stdout.split()
+    return toks[1:] if r.returncode == 0 and toks[:1] == [name] else []
+
+
+def detect_renames(recs: list) -> None:
+    """Mark records whose latest version declares a different module path (meta.renamedTo)
+    and the last version still under the old path (meta.lastVersionWithPath).
+    Any lookup failure leaves the record unchanged."""
+    todo = [r for r in recs if r.bump != c.BUMP_NONE]
+    declared = _declared_paths([f"{r.name}@{r.latest}" for r in todo])
+    for r in todo:
+        new = declared.get(f"{r.name}@{r.latest}")
+        if not new or new == r.name:
+            continue
+        cands = [
+            v
+            for v in _versions(r.name)
+            if "-" not in v and parse_semver(r.current) < parse_semver(v) < parse_semver(r.latest)
+        ]
+        got = _declared_paths([f"{r.name}@{v}" for v in cands])
+        r.meta["renamedTo"] = new
+        r.meta["lastVersionWithPath"] = last_version_with_path(
+            r.current, r.latest, cands, {v: got.get(f"{r.name}@{v}") for v in cands}, r.name
+        )
+
+
+_RENAMED = re.compile(r"module declares its path as:\s*(\S+)\s+but was required as:\s*(\S+)")
+
+
+def parse_renamed(output: str) -> list:
+    """[{"required": Y, "declared": X}] from go's `module declares its path as: X
+    but was required as: Y` errors."""
+    return [{"required": m.group(2), "declared": m.group(1)} for m in _RENAMED.finditer(output)]
+
+
 def _run(args):
     """Safe: args is a list, no shell — metacharacters in package specs cannot inject."""
     return subprocess.run(args, capture_output=True, text=True)
@@ -181,7 +282,9 @@ def handle(verb, argv):
         required = {}
         for gomod in _workspace_gomods(root):
             required.update(required_modules(gomod.read_text()))
-        return parse_outdated(out.stdout, required)
+        recs = parse_outdated(out.stdout, required)
+        detect_renames(recs)
+        return recs
     if verb == "audit":
         if shutil.which("govulncheck") is None:
             return []
@@ -195,11 +298,11 @@ def handle(verb, argv):
         for cmd in steps:
             r = _run(cmd)
             if r.returncode != 0:
-                return {
-                    "applied": [],
-                    "filesModified": [],
-                    "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:],
-                }
+                text = (r.stdout + r.stderr)[-4000:]
+                res = {"applied": [], "filesModified": [], "error": f"{' '.join(cmd)}: " + text}
+                if renamed := parse_renamed(text):
+                    res["renamed"] = renamed
+                return res
         return {"applied": argv, "filesModified": changed_files(["go.mod", "go.sum"], cwd=root)}
     if verb == "validate":
         results = {}

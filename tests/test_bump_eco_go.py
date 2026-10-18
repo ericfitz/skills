@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from pathlib import Path
@@ -199,3 +200,98 @@ class TestGoProjects(_InTempDir):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGoRenames(unittest.TestCase):
+    def test_parse_list_stream_maps_specs_to_gomod_and_drops_errors(self):
+        got = go.parse_list_stream((FIX / "go_list_json_stream.txt").read_text())
+        self.assertEqual(set(got), {"github.com/google/cel-go@v0.32.0", "github.com/ThalesGroup/crypto11@v1.6.8"})
+        self.assertTrue(got["github.com/google/cel-go@v0.32.0"].endswith("v0.32.0.mod"))
+
+    def test_parse_list_stream_tolerates_garbage(self):
+        self.assertEqual(go.parse_list_stream(""), {})
+        self.assertEqual(go.parse_list_stream("not json"), {})
+
+    def test_module_line(self):
+        self.assertEqual(go.module_line((FIX / "go_mod_renamed.mod").read_text()), "cel.dev/cel-go")
+        self.assertEqual(go.module_line('// c\nmodule "a/b" // x\n'), "a/b")
+        self.assertEqual(go.module_line("go 1.20\n"), "")
+
+    def test_last_version_with_path(self):
+        declared = {"v0.30.0": "a/b", "v0.31.0": "a/b", "v0.32.0": "c/d", "v0.31.1-rc1": "a/b"}
+        cands = list(declared)
+        self.assertEqual(go.last_version_with_path("v0.29.0", "v0.32.0", cands, declared, "a/b"), "v0.31.0")
+        self.assertEqual(go.last_version_with_path("v0.31.0", "v0.32.0", cands, declared, "a/b"), "")
+
+    def _rec(self, name, cur, lat):
+        return go.parse_outdated(f"{name} {cur} [{lat}]\n")[0]
+
+    def _stub(self, declared_by_spec, versions):
+        tmp = TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+
+        def run(args):
+            if "-versions" in args:
+                return mock.Mock(returncode=0, stdout=f"{args[-1]} {' '.join(versions)}\n", stderr="")
+            out = []
+            for spec in args[args.index("-json=Path,Version,GoMod,Error") + 1 :]:
+                if spec in declared_by_spec:
+                    f = Path(tmp.name) / (spec.replace("/", "_") + ".mod")
+                    f.write_text(f"module {declared_by_spec[spec]}\n")
+                    path, ver = spec.split("@")
+                    out.append(json.dumps({"Path": path, "Version": ver, "GoMod": str(f)}))
+            return mock.Mock(returncode=0, stdout="\n".join(out), stderr="")
+
+        return mock.patch("bumplib.ecosystems.go._run", side_effect=run)
+
+    def test_rename_sets_meta_with_last_version_under_old_path(self):
+        rec = self._rec("github.com/google/cel-go", "v0.29.2", "v0.32.0")
+        declared = {
+            "github.com/google/cel-go@v0.32.0": "cel.dev/cel-go",
+            "github.com/google/cel-go@v0.30.0": "github.com/google/cel-go",
+            "github.com/google/cel-go@v0.31.0": "github.com/google/cel-go",
+        }
+        with self._stub(declared, ["v0.29.2", "v0.30.0", "v0.31.0", "v0.32.0"]):
+            go.detect_renames([rec])
+        self.assertEqual(rec.meta, {"renamedTo": "cel.dev/cel-go", "lastVersionWithPath": "v0.31.0"})
+
+    def test_rename_with_no_version_under_old_path(self):
+        rec = self._rec("github.com/google/cel-go", "v0.31.0", "v0.32.0")
+        with self._stub({"github.com/google/cel-go@v0.32.0": "cel.dev/cel-go"}, ["v0.31.0", "v0.32.0"]):
+            go.detect_renames([rec])
+        self.assertEqual(rec.meta["lastVersionWithPath"], "")
+
+    def test_same_path_and_lookup_failure_leave_record_unchanged(self):
+        same = self._rec("a/b", "v1.0.0", "v1.1.0")
+        unknown = self._rec("c/d", "v1.0.0", "v1.1.0")
+        with self._stub({"a/b@v1.1.0": "a/b"}, []):
+            go.detect_renames([same, unknown])
+        self.assertEqual(same.meta, {})
+        self.assertEqual(unknown.meta, {})
+
+    def test_go_list_failure_and_up_to_date_records_are_not_marked(self):
+        rec = self._rec("a/b", "v1.0.0", "v1.1.0")
+        done = self._rec("c/d", "v1.0.0", "v1.0.0")
+        with mock.patch(
+            "bumplib.ecosystems.go._run", return_value=mock.Mock(returncode=1, stdout="", stderr="boom")
+        ) as run:
+            go.detect_renames([rec, done])
+        self.assertEqual(rec.meta, {})
+        self.assertNotIn("c/d@v1.0.0", " ".join(run.call_args.args[0]))
+
+    def test_parse_renamed_from_issue_error(self):
+        text = (FIX / "go_get_renamed_error.txt").read_text()
+        self.assertEqual(
+            go.parse_renamed(text),
+            [{"required": "github.com/ThalesGroup/crypto11", "declared": "github.com/eclipse-keypont/crypto11"}],
+        )
+        self.assertEqual(go.parse_renamed("unknown revision"), [])
+
+    def test_apply_error_carries_renamed(self):
+        text = (FIX / "go_get_renamed_error.txt").read_text()
+        with (
+            mock.patch("bumplib.ecosystems.go._run", return_value=mock.Mock(returncode=1, stdout="", stderr=text)),
+        ):
+            res = go.handle("apply", ["github.com/ThalesGroup/crypto11@v1.6.8"])
+        self.assertEqual(res["renamed"][0]["declared"], "github.com/eclipse-keypont/crypto11")
+        self.assertEqual(res["applied"], [])

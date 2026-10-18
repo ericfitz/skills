@@ -363,5 +363,42 @@ class TestProjects(unittest.TestCase):
         self.assertEqual(out.safe[0]["project"], "elsewhere")
 
 
+class TestRenamed(unittest.TestCase):
+    def _renamed(self, name="github.com/google/cel-go", cur="v0.29.2", lat="v0.32.0", last="v0.31.0", **kw):
+        r = rec(name, cur, lat, **kw)
+        r.meta = {"renamedTo": "cel.dev/cel-go", "lastVersionWithPath": last}
+        return r
+
+    def test_renamed_goes_to_needs_plan_with_reason(self):
+        out = cat.categorize([self._renamed()], [], [], {}, set())
+        self.assertEqual(out.safe, [])
+        self.assertEqual(
+            out.needsPlan[0]["reason"],
+            "Renamed (github.com/google/cel-go -> cel.dev/cel-go at v0.32.0); v0.31.0 is the last version under the old path",
+        )
+
+    def test_renamed_without_old_path_version(self):
+        out = cat.categorize([self._renamed(last="")], [], [], {}, set())
+        self.assertTrue(out.needsPlan[0]["reason"].endswith("; no newer version keeps the old path"))
+
+    def test_renamed_keeps_advisory_and_beats_security_and_major(self):
+        adv = [
+            c.Advisory(
+                package="github.com/google/cel-go", ecosystem="go", severity="HIGH", current="", fixed="", ids=["GO-1"]
+            )
+        ]
+        out = cat.categorize([self._renamed(cur="v0.1.0")], adv, [], {}, set())
+        self.assertEqual(out.securityFixes, [])
+        self.assertEqual(out.needsPlan[0]["advisory"]["ids"], ["GO-1"])
+        self.assertTrue(out.needsPlan[0]["reason"].startswith("Renamed ("))
+
+    def test_renamed_replace_target_and_up_to_date_still_skipped(self):
+        out = cat.categorize([self._renamed()], [], [], {}, {"github.com/google/cel-go"})
+        self.assertEqual(out.skipped[0]["reason"], "replace directive")
+        same = self._renamed(cur="v0.32.0")
+        out = cat.categorize([same], [], [], {}, set())
+        self.assertEqual(out.skipped[0]["reason"], "up to date")
+
+
 if __name__ == "__main__":
     unittest.main()
