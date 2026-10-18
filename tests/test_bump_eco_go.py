@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -144,6 +145,56 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.assertEqual(res["applied"], ["github.com/foo/bar@v1.2.3"])
         self.assertEqual(res["filesModified"], ["go.mod", "go.sum"])
         self.assertNotIn("error", res)
+
+
+class _InTempDir(unittest.TestCase):
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.root = Path(self._tmp.name).resolve()
+        self.addCleanup(self._tmp.cleanup)
+        old = os.getcwd()
+        os.chdir(self.root)
+        self.addCleanup(os.chdir, old)
+
+    def _write(self, rel, text=""):
+        (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / rel).write_text(text)
+
+
+class TestGoProjects(_InTempDir):
+    def test_detect_reports_one_root_project(self):
+        self._write("go.mod", "module x\n")
+        self.assertEqual(go.handle("detect", [])["projects"], [{"dir": ".", "members": ["."]}])
+
+    def test_workspace_use_dirs_are_members(self):
+        self._write("go.mod", "module x\n")
+        self._write("go.work", "go 1.22\nuse (\n\t./svc\n\t./lib/util\n)\n")
+        self._write("svc/go.mod", "module y\n")
+        self._write("lib/util/go.mod", "module z\n")
+        self.assertEqual(go.handle("detect", [])["projects"], [{"dir": ".", "members": [".", "svc", "lib/util"]}])
+
+    def test_absent_go_has_no_projects(self):
+        self.assertNotIn("projects", go.handle("detect", []))
+
+    def test_other_projects_are_rejected_before_anything_runs(self):
+        self._write("go.mod", "module x\n")
+        with mock.patch("bumplib.ecosystems.go._run") as run, mock.patch("bumplib.ecosystems.go._run_shell") as shell:
+            for verb in ("apply", "validate"):
+                for bad in ("svc", "..", "/tmp"):
+                    with self.subTest(verb=verb, bad=bad), self.assertRaises(ValueError):
+                        go.handle(verb, ["--project", bad, "github.com/foo/bar@v1.2.3"])
+            run.assert_not_called()
+            shell.assert_not_called()
+
+    def test_project_dot_is_accepted_and_is_not_a_spec(self):
+        self._write("go.mod", "module x\n")
+        with (
+            mock.patch("bumplib.ecosystems.go._run", return_value=mock.Mock(returncode=0, stdout="", stderr="")) as run,
+            mock.patch("bumplib.ecosystems.go.changed_files", return_value=["go.mod"]),
+        ):
+            res = go.handle("apply", ["github.com/foo/bar@v1.2.3", "--project", "."])
+        self.assertEqual(res["applied"], ["github.com/foo/bar@v1.2.3"])
+        self.assertEqual(run.call_args_list[0].args[0], ["go", "get", "github.com/foo/bar@v1.2.3"])
 
 
 if __name__ == "__main__":

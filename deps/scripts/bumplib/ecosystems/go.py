@@ -1,12 +1,14 @@
 """Go ecosystem adapter."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
 from pathlib import Path
 
 from .. import contracts as c
+from .. import projects as proj
 from ..categorize import classify_bump
 from ..gitfiles import changed_files
 
@@ -164,7 +166,14 @@ def handle(verb, argv):
     root = Path(".")
     if verb == "detect":
         present = (root / "go.mod").exists()
-        return {"present": present, "ecosystem": "go", "packageManager": "", "workspace": (root / "go.work").exists()}
+        out = {"present": present, "ecosystem": "go", "packageManager": "", "workspace": (root / "go.work").exists()}
+        if present:
+            members = [os.path.relpath(m.parent, root).replace(os.sep, "/") for m in _workspace_gomods(root)]
+            out["projects"] = proj.merge([{"dir": proj.ROOT, "members": [proj.ROOT, *members]}])
+        return out
+    if verb in ("apply", "validate"):
+        project, argv = proj.split_project(argv)
+        proj.require_root(project, "go")
     if verb == "cache-clear":
         return {"warnings": []}  # go refreshes via `go list`; no aggressive clean
     if verb == "outdated":

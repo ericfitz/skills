@@ -27,10 +27,12 @@ Represents a dependency update opportunity.
 | `wanted` | string | yes | Desired version to upgrade to (often same as `latest`) |
 | `bump` | string | yes | Semver bump class: "major", "minor", "patch", or "none" (from `classify_bump`); "unknown" on a record `categorize` synthesized from an advisory with no known current version |
 | `kind` | string | yes | Dependency kind: "direct", "transitive", or other ecosystem-specific value |
-| `location` | string | yes | File where the dependency is declared (e.g., "pyproject.toml", "go.mod", "package.json") |
+| `location` | string | yes | File where the dependency is declared or locked, repo-relative POSIX (e.g., "uv.lock", "go.mod", "package.json", "writing/skills/boring/uv.lock"). Python/uv: the owning project's `uv.lock` |
 | `pinned` | boolean | no | (default: false) Whether the package is pinned and cannot be upgraded |
 | `ecosystem` | string | no | (default: "") Ecosystem name for context (e.g., "python", "go", "node") |
 | `meta` | dict | no | (default: {}) Ecosystem-specific metadata (e.g., `{"dependencyType": "dev"}` for Node) |
+
+For Python/uv, `outdated` reads each project's lockfile, so `location` is that project's `uv.lock` and `kind` is `"direct"` for a package at depth 1 of `uv tree` (a package seen at several depths takes its shallowest) and `"transitive"` below it.
 
 For Node, `location` is the workspace manifest that actually declares the package (e.g.
 `packages/viewer/package.json`), `kind` is `"transitive"` for anything no manifest declares, and
@@ -46,7 +48,7 @@ tell an in-range target from one that needs the manifest widened.
   "ecosystem": "python",
   "kind": "direct",
   "latest": "2.31.0",
-  "location": "pyproject.toml",
+  "location": "uv.lock",
   "meta": {},
   "name": "requests",
   "pinned": false,
@@ -68,7 +70,7 @@ Represents a security vulnerability found by audit tools.
 | `ids` | list | no | (default: []) List of CVE/advisory IDs (e.g., ["CVE-2024-1234", "GHSA-xxxx-yyyy-zzzz"]) |
 | `summary` | string | no | (default: "") Human-readable description of the vulnerability |
 | `source` | string | no | (default: "") Source of the advisory (e.g., "pip-audit", "govulncheck", "dependabot", "audit") |
-| `location` | string | no | (default: "") Manifest or lockfile the advisory was found in, relative to the repo root (Python/uv audit: `uv.lock`; Dependabot: the alert's `manifest_path`). A path in a subdirectory marks a separate project the run does not cover |
+| `location` | string | no | (default: "") Manifest or lockfile the advisory was found in, relative to the repo root (Python/uv audit: the project's `uv.lock`, e.g. `writing/skills/boring/uv.lock`; Dependabot: the alert's `manifest_path`). A path whose directory no detected project covers marks a separate project the run does not cover |
 
 **Example Advisory (JSON):**
 ```json
@@ -115,9 +117,13 @@ Represents a collection of issues or pull requests in the code-host or issue-tra
 }
 ```
 
+### Projects
+
+An independently locked unit of a repository: `{"dir": <repo-relative POSIX dir, "." for the root>, "members": [<dirs whose manifests belong to it>]}`. Each ecosystem's `detect` reports its own list (`projects`), and `categorize` takes their union, merged by `dir`, as the optional payload key `projects` (default `[{"dir": ".", "members": ["."]}]`). A location belongs to the project whose `dir` equals its parent directory, else whose `members` list it; an advisory with no such project is "a separate project this run does not cover" and goes to Needs Plan.
+
 ### Categories
 
-Represents the outcome of the categorization pass: buckets for security fixes, safe updates, updates needing a plan, and skipped updates.
+Represents the outcome of the categorization pass: buckets for security fixes, safe updates, updates needing a plan, and skipped updates. Every item is an UpdateRecord plus `reason`, `advisory` (or null) and `project` (the owning project's `dir`, which the skill groups `apply`/`validate` on).
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -174,12 +180,12 @@ Adapters: `python`, `go`, `node`, or `none` (special case).
 
 | Verb | Return Shape | Notes |
 |------|--------------|-------|
-| `detect` | dict | Detects if the ecosystem is present. When `present: true`, includes `ecosystem`, `packageManager` (string, may be empty for Go). When `present: false`, returns only `{"present": false, "ecosystem": "<name>"}` (packageManager omitted). Optional `workspace` field for Go (indicates go.work). For `none`: `{"present": false}` |
+| `detect` | dict | Detects if the ecosystem is present. When `present: true`, includes `ecosystem`, `packageManager` (string, may be empty for Go) and `projects` (see Projects: Python/uv one per tracked `uv.lock`, Python/pip, Go and Node the root; Go and Node list their workspace directories as `members`). When `present: false`, returns only `{"present": false, "ecosystem": "<name>"}` (packageManager omitted). Optional `workspace` field for Go (indicates go.work). For `none`: `{"present": false}` |
 | `cache-clear` | dict | `{"warnings": []}` — clears package manager cache (no-op for some managers like Go) |
-| `outdated` | list | `[UpdateRecord, ...]` — list of available updates; empty if no updates or if ecosystem not detected. Python/uv: when `uv.lock` exists the adapter first runs `uv sync --frozen` so the queried environment matches the lockfile (a stale venv otherwise reports phantom updates, a venv ahead of the lock hides real ones); `--frozen` guarantees the lockfile itself is never rewritten by this read verb, and a failed sync is warned on stderr and the existing environment queried as-is |
-| `audit` | list | `[Advisory, ...]` — list of security vulnerabilities; empty if tool not installed or no vulns found. Python/uv audits the **lockfile**, not the installed environment: it exports `uv.lock` to a throwaway PEP 751 `pylock.toml` and runs `pip-audit --locked` on that. Environment mode cannot be trusted here — pip enumerates nothing inside a uv-created venv, so pip-audit scans an empty set and reports success. A project with no current `uv.lock` therefore audits as `[]` (`--frozen` never re-resolves to audit). Never commit the exported `pylock.toml`: uv treats it as an output only, and given one in place of `uv.lock` it silently re-resolves from `pyproject.toml`. |
-| `apply` | dict | `{"applied": [spec, ...], "filesModified": [path, ...]}` on success — `filesModified` is verified against `git status` and lists only files that actually changed. Python/uv: when `filesModified` is empty (the lockfile already held every target) `applied` is `[]` too, so a commit message built from `applied` never claims a bump that did not happen. On any underlying package-manager command failing, returns `{"applied": [], "filesModified": [], "error": "<failed command>: <output tail>"}` — the working tree may hold partial changes from earlier commands in the batch; callers must treat `error` as "nothing durably applied" and revert before retrying. Pass fully-qualified specs (`name@X.Y.Z`); a bare name still works but only permits a within-range move. Node honors the version: a declared dependency whose target is provably outside its range is installed into its own workspace so the manifest range widens, while bare names, transitive packages and unrecognized range forms stay on `update` and touch only the lockfile. |
-| `validate` | dict | Returns `{"<step>": "pass"/"fail", "<step>_output": "..."}` for each step. **Per-ecosystem shapes differ:** Go and Node include `build`, `test`, `lint` (all three); Python includes only `test` and `lint` (no build step). Output keys are literally `build_output`, `test_output`, `lint_output` for applicable steps. |
+| `outdated` | list | `[UpdateRecord, ...]` — list of available updates; empty if no updates or if ecosystem not detected. Python/uv: runs `uv tree --outdated --frozen --all-groups` in every project and parses its text output (uv 0.13 marks `--format json` experimental). It reads the lockfile and the index, never an environment, so it needs no venv, cannot be fooled by the PEP 723 ephemeral env or a venv that drifted from the lock, and never rewrites `uv.lock`. A failing `uv tree` is warned on stderr and yields no records for that project only |
+| `audit` | list | `[Advisory, ...]` — list of security vulnerabilities; empty if tool not installed or no vulns found. Python/uv audits every project's **lockfile**, not the installed environment, and sets each advisory's `location` to that project's `uv.lock`: it exports `uv.lock` to a throwaway PEP 751 `pylock.toml` and runs `pip-audit --locked` on that. Environment mode cannot be trusted here — pip enumerates nothing inside a uv-created venv, so pip-audit scans an empty set and reports success. A project with no current `uv.lock` therefore audits as `[]` (`--frozen` never re-resolves to audit). Never commit the exported `pylock.toml`: uv treats it as an output only, and given one in place of `uv.lock` it silently re-resolves from `pyproject.toml`. |
+| `apply` | dict | `{"applied": [spec, ...], "filesModified": [path, ...]}` on success. Takes `--project DIR` (default `.`; repo-relative): Python/uv runs `uv lock` and `uv sync` with `--project DIR` and reports `filesModified` repo-relative (e.g. `writing/skills/boring/uv.lock`); a `DIR` that `detect` did not list is a `ValueError`, and Go/Node accept only `.`. `filesModified` is verified against `git status` and lists only files that actually changed. Python/uv: when `filesModified` is empty (the lockfile already held every target) `applied` is `[]` too, so a commit message built from `applied` never claims a bump that did not happen. On any underlying package-manager command failing, returns `{"applied": [], "filesModified": [], "error": "<failed command>: <output tail>"}` — the working tree may hold partial changes from earlier commands in the batch; callers must treat `error` as "nothing durably applied" and revert before retrying. Pass fully-qualified specs (`name@X.Y.Z`); a bare name still works but only permits a within-range move. Node honors the version: a declared dependency whose target is provably outside its range is installed into its own workspace so the manifest range widens, while bare names, transitive packages and unrecognized range forms stay on `update` and touch only the lockfile. |
+| `validate` | dict | Returns `{"<step>": "pass"/"fail"/"skipped", "<step>_output": "..."}` for each step. Takes `--project DIR` like `apply`. Python/uv runs pytest only when the project's `pyproject.toml` names pytest (a dependency, extra, group or `[tool.pytest...]` table) and ruff only when it names ruff; an undeclared step is `"skipped"` with the output saying none is declared, and `"skipped"` never triggers bisect. **Per-ecosystem shapes differ:** Go and Node include `build`, `test`, `lint` (all three); Python includes only `test` and `lint` (no build step). Output keys are literally `build_output`, `test_output`, `lint_output` for applicable steps. |
 
 **Example invocation & output:**
 ```bash

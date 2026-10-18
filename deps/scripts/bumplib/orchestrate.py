@@ -6,7 +6,7 @@ These functions spawn no subprocesses; they only merge already-gathered data
 
 from pathlib import Path
 
-from . import categorize, config
+from . import categorize, config, projects
 from . import contracts as c
 
 
@@ -19,6 +19,8 @@ def categorize_payload(payload: dict, root: Path | str = ".") -> c.Categories:
       exclude:        [glob pattern, ...]          (optional; pinned names, etc.)
       holds:          {name: reason}               (optional)
       replaceTargets: [name, ...]                  (optional; Go replace targets)
+      projects:       [{dir, members}, ...]        (optional; every ecosystem's detect.projects;
+                                                    default: one root project)
 
     Disk exclusions/holds (CLAUDE.md '## Bump Exclusions' + .bump-config.json,
     via config.merged_exclusions) are merged with anything passed in.
@@ -29,4 +31,5 @@ def categorize_payload(payload: dict, root: Path | str = ".") -> c.Categories:
     exclude = list(disk_excl) + list(payload.get("exclude", []))
     holds = {**disk_holds, **payload.get("holds", {})}
     replace_targets = set(payload.get("replaceTargets", []))
-    return categorize.categorize(updates, advisories, exclude, holds, replace_targets)
+    merged = projects.merge(payload.get("projects") or projects.DEFAULT)
+    return categorize.categorize(updates, advisories, exclude, holds, replace_targets, merged)

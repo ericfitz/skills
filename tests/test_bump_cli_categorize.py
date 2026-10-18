@@ -98,6 +98,58 @@ class TestCategorizePayload(unittest.TestCase):
             self.assertIn("react", names)
             self.assertEqual(len(out.safe), 0)
 
+    def _categorize(self, payload):
+        with tempfile.TemporaryDirectory() as td:
+            return orchestrate.categorize_payload(payload, root=td)
+
+    def test_payload_without_projects_defaults_to_the_root(self):
+        payload = {
+            "updates": [_rec("qs", "6.14.1", "6.14.2", "patch", location="package.json")],
+            "advisories": [
+                {
+                    "package": "qs",
+                    "ecosystem": "node",
+                    "severity": "HIGH",
+                    "current": "6.14.1",
+                    "fixed": "6.14.2",
+                    "ids": ["CVE-1"],
+                    "location": "sub/package.json",
+                }
+            ],
+        }
+        out = self._categorize(payload)
+        self.assertEqual([(i["name"], i["project"]) for i in out.safe], [("qs", ".")])
+        self.assertEqual([i["project"] for i in out.needsPlan], ["sub"])
+        self.assertEqual(self._categorize({**payload, "projects": []}), out)
+
+    def test_projects_from_several_ecosystems_merge_by_dir(self):
+        payload = {
+            "updates": [
+                _rec("nltk", "3.10.0", "3.10.1", "patch", location="sub/uv.lock"),
+                _rec("qs", "6.14.1", "6.14.2", "patch", location="web/package.json"),
+            ],
+            "advisories": [],
+            "projects": [
+                {"dir": ".", "members": ["."]},
+                {"dir": "sub", "members": ["sub"]},
+                {"dir": ".", "members": [".", "web"]},
+            ],
+        }
+        out = self._categorize(payload)
+        self.assertEqual({i["name"]: i["project"] for i in out.safe}, {"nltk": "sub", "qs": "."})
+
+    def test_unrecognized_projects_shapes_are_rejected(self):
+        for bad in (
+            "sub",
+            {"dir": "."},
+            [{"dir": "."}],
+            [{"dir": 1, "members": []}],
+            [{"dir": ".", "members": "."}],
+            ["sub"],
+        ):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                self._categorize({"updates": [], "advisories": [], "projects": bad})
+
     def test_cli_categorize_dispatch(self):
         import importlib
         import io

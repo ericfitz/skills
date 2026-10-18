@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from .. import contracts as c
+from .. import projects as proj
 from ..categorize import classify_bump
 from ..gitfiles import changed_files
 
@@ -29,7 +30,13 @@ def detect(root: Path) -> dict:
     if not (root / "package.json").exists():
         return {"present": False, "ecosystem": "node"}
     mgr = "pnpm" if (root / "pnpm-lock.yaml").exists() else "npm"
-    return {"present": True, "ecosystem": "node", "packageManager": mgr}
+    members = [os.path.relpath(m.parent, root).replace(os.sep, "/") for m in _manifests(root)]
+    return {
+        "present": True,
+        "ecosystem": "node",
+        "packageManager": mgr,
+        "projects": proj.merge([{"dir": proj.ROOT, "members": members}]),
+    }
 
 
 def _manifests(root: Path, max_depth: int = 4):
@@ -332,9 +339,13 @@ def clear_pnpm_metadata(cache_dir):
 
 def handle(verb, argv):
     root = Path(".")
-    mgr = detect(root).get("packageManager", "npm")
+    det = detect(root)
+    mgr = det.get("packageManager", "npm")
     if verb == "detect":
-        return detect(root)
+        return det
+    if verb in ("apply", "validate"):
+        project, argv = proj.split_project(argv)
+        proj.require_root(project, "node")
     if verb == "cache-clear":
         # registry metadata can be stale in either cache -- always clear both, each
         # guarded so a missing binary is skipped rather than fatal.

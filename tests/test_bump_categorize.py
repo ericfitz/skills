@@ -265,5 +265,103 @@ class TestAdvisoryWithoutUpdateRecord(unittest.TestCase):
         self.assertEqual(first, second)
 
 
+NESTED = "writing/skills/boring"
+TWO_PROJECTS = [{"dir": ".", "members": ["."]}, {"dir": NESTED, "members": [NESTED]}]
+
+
+class TestProjects(unittest.TestCase):
+    """Matching is per (project, package); every item carries its `project`."""
+
+    def test_two_projects_locking_one_package_at_different_versions(self):
+        """Each project's advisory matches only its own record: the root's nltk 3.10.0
+        needs the fix, the nested nltk 3.10.3 is already past it."""
+        updates = [
+            rec("nltk", "3.10.0", "3.10.4", location="uv.lock"),
+            rec("nltk", "3.10.3", "3.10.4", location=f"{NESTED}/uv.lock"),
+        ]
+        advs = [
+            adv("nltk", "3.10.0", "3.10.3", ids=["GHSA-r"], location="uv.lock"),
+            adv("nltk", "3.10.2", "3.10.3", ids=["GHSA-n"], location=f"{NESTED}/uv.lock"),
+        ]
+        out = cat.categorize(updates, advs, [], {}, set(), TWO_PROJECTS)
+        by_project = {i["project"]: i for i in out.securityFixes}
+        self.assertEqual(set(by_project), {".", NESTED})
+        self.assertEqual(by_project["."]["advisory"]["ids"], ["GHSA-r"])
+        self.assertEqual(by_project["."]["current"], "3.10.0")
+        self.assertEqual(by_project[NESTED]["advisory"]["ids"], ["GHSA-n"])
+        self.assertEqual(by_project[NESTED]["current"], "3.10.3")
+        self.assertEqual(out.safe + out.needsPlan, [])
+
+    def test_advisory_for_one_project_does_not_touch_the_others_record(self):
+        updates = [
+            rec("pypdf", "6.20.0", "6.21.0", location="uv.lock"),
+            rec("pypdf", "6.20.0", "6.21.0", location=f"{NESTED}/uv.lock"),
+        ]
+        advs = [adv("pypdf", "6.20.0", "6.21.0", location=f"{NESTED}/uv.lock")]
+        out = cat.categorize(updates, advs, [], {}, set(), TWO_PROJECTS)
+        self.assertEqual([(i["project"], i["name"]) for i in out.securityFixes], [(NESTED, "pypdf")])
+        self.assertEqual([(i["project"], i["name"]) for i in out.safe], [(".", "pypdf")])
+
+    def test_covered_nested_advisory_without_a_record_is_a_transitive_fix(self):
+        out = cat.categorize(
+            [], [adv("pypdf", "6.19.0", "6.21.0", location=f"{NESTED}/uv.lock")], [], {}, set(), TWO_PROJECTS
+        )
+        [item] = out.securityFixes
+        self.assertEqual((item["project"], item["kind"]), (NESTED, "transitive"))
+
+    def test_uncovered_directory_still_needs_a_plan(self):
+        out = cat.categorize([], [adv("pypdf", "", "6.19.0", location="other/uv.lock")], [], {}, set(), TWO_PROJECTS)
+        [item] = out.needsPlan
+        self.assertIn("separate project", item["reason"])
+        self.assertEqual(item["project"], "other")
+
+    def test_workspace_members_belong_to_their_project(self):
+        node = [{"dir": ".", "members": [".", "packages/viewer"]}]
+        out = cat.categorize(
+            [rec("qs", "6.14.1", "6.14.2", location="packages/viewer/package.json")],
+            [adv("qs", "6.14.1", "6.14.2", ecosystem="node", location="packages/viewer/package.json")],
+            [],
+            {},
+            set(),
+            node,
+        )
+        self.assertEqual([(i["project"], i["name"]) for i in out.securityFixes], [(".", "qs")])
+
+    def test_default_projects_reproduce_the_previous_behavior(self):
+        """No `projects`: only the root is covered, a subdirectory manifest is not."""
+        out = cat.categorize(
+            [rec("qs", "6.14.1", "6.14.2", location="package.json")],
+            [adv("qs", "6.14.1", "6.14.2", ecosystem="node"), adv("qs", "", "6.14.2", location="sub/package.json")],
+            [],
+            {},
+            set(),
+        )
+        self.assertEqual([(i["project"], i["name"]) for i in out.securityFixes], [(".", "qs")])
+        [nested] = out.needsPlan
+        self.assertIn("separate project", nested["reason"])
+
+    def test_every_item_carries_a_project(self):
+        out = cat.categorize(
+            [
+                rec("a", "1.0.0", "1.0.1", location=f"{NESTED}/uv.lock"),
+                rec("b", "1.0.0", "2.0.0"),
+                rec("c", "1.0.0", "1.0.0"),
+            ],
+            [],
+            [],
+            {},
+            set(),
+            TWO_PROJECTS,
+        )
+        items = out.safe + out.needsPlan + out.skipped
+        self.assertEqual({i["name"]: i["project"] for i in items}, {"a": NESTED, "b": ".", "c": "."})
+
+    def test_record_outside_every_member_keeps_its_own_directory(self):
+        out = cat.categorize(
+            [rec("a", "1.0.0", "1.0.1", location="elsewhere/uv.lock")], [], [], {}, set(), TWO_PROJECTS
+        )
+        self.assertEqual(out.safe[0]["project"], "elsewhere")
+
+
 if __name__ == "__main__":
     unittest.main()

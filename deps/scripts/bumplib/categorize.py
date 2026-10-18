@@ -2,9 +2,9 @@
 
 import re
 from dataclasses import asdict
-from pathlib import PurePosixPath
 
 from . import contracts as c
+from . import projects as proj
 
 _SEMVER = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 # Fallbacks for releases that carry fewer than three components. PyPI is full of them
@@ -63,20 +63,15 @@ def _excluded(rec, exclude, holds):
     return None
 
 
-def _item(rec, reason, advisory=None):
+def _item(rec, reason, advisory=None, project=proj.ROOT):
     d = asdict(rec)
     d["reason"] = reason
+    d["project"] = project
     d["advisory"] = asdict(advisory) if advisory else None
     return d
 
 
 _SEVERITY_RANK = {"LOW": 1, "MODERATE": 2, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-
-
-def _nested(location: str) -> bool:
-    """A manifest in a subdirectory belongs to a separate project, which the ecosystem
-    adapters (rooted at the project directory) neither list nor apply to."""
-    return PurePosixPath(location or ".").parent != PurePosixPath(".")
 
 
 def _merge(advs) -> c.Advisory:
@@ -99,7 +94,7 @@ def _merge(advs) -> c.Advisory:
     )
 
 
-def _place_advisory(out, adv, nested, exclude, holds):
+def _place_advisory(out, adv, project, covered, exclude, holds):
     """Bucket an advisory no update record matched. It becomes a `transitive` record
     (current from the advisory, latest = its fix) so that it is applied or planned
     like any other update instead of disappearing."""
@@ -115,48 +110,65 @@ def _place_advisory(out, adv, nested, exclude, holds):
         location=adv.location,
         ecosystem=adv.ecosystem,
     )
-    if nested:
-        out.needsPlan.append(_item(rec, f"advisory in {adv.location}, a separate project this run does not cover", adv))
+    if not covered:
+        out.needsPlan.append(
+            _item(rec, f"advisory in {adv.location}, a separate project this run does not cover", adv, project)
+        )
     elif not adv.fixed:
-        out.needsPlan.append(_item(rec, "security advisory with no fixed version", adv))
+        out.needsPlan.append(_item(rec, "security advisory with no fixed version", adv, project))
     elif not adv.current:
-        out.needsPlan.append(_item(rec, f"current version unknown; fixed in {adv.fixed}", adv))
+        out.needsPlan.append(_item(rec, f"current version unknown; fixed in {adv.fixed}", adv, project))
     elif bump == c.BUMP_NONE:
-        out.skipped.append(_item(rec, f"advisory already fixed ({adv.current} >= {adv.fixed})", adv))
+        out.skipped.append(_item(rec, f"advisory already fixed ({adv.current} >= {adv.fixed})", adv, project))
     elif excl := _excluded(rec, exclude, holds):
-        out.needsPlan.append(_item(rec, excl, adv))
+        out.needsPlan.append(_item(rec, excl, adv, project))
     elif bump == c.BUMP_MAJOR:
-        out.needsPlan.append(_item(rec, f"Major security fix ({adv.current} -> {adv.fixed})", adv))
+        out.needsPlan.append(_item(rec, f"Major security fix ({adv.current} -> {adv.fixed})", adv, project))
     else:
         sev = adv.ids[0] if adv.ids else adv.severity
-        out.securityFixes.append(_item(rec, f"transitive security fix ({sev})", adv))
+        out.securityFixes.append(_item(rec, f"transitive security fix ({sev})", adv, project))
 
 
-def categorize(updates, advisories, exclude, holds, replace_targets) -> c.Categories:
+def categorize(updates, advisories, exclude, holds, replace_targets, projects=None) -> c.Categories:
+    """Bucket updates and advisories. A package is matched per project: two projects
+    locking the same package at different versions each get their own advisory.
+
+    `projects` (see projects.py) defaults to one root project, which treats every
+    manifest in a subdirectory as a separate project this run does not cover."""
+    projects = projects or proj.DEFAULT
     groups = {}
     for a in advisories:
-        groups.setdefault((a.package, a.location if _nested(a.location) else ""), []).append(a)
+        owner = proj.resolve(a.location, projects)
+        # An uncovered location keeps its own group, apart from other locations.
+        key = (a.package, proj.parent_of(a.location), a.location) if owner is None else (a.package, owner, "")
+        groups.setdefault(key, []).append(a)
     merged = {key: _merge(advs) for key, advs in groups.items()}
-    adv_index = {pkg: a for (pkg, nested), a in merged.items() if not nested}
+    adv_index = {(pkg, project): a for (pkg, project, loc), a in merged.items() if not loc}
     out = c.Categories()
+    recorded = set()
     for rec in updates:
-        adv = adv_index.get(rec.name)
+        # An adapter only emits records for projects it covers, so a record outside
+        # every member keeps its own directory as its project.
+        project = proj.resolve(rec.location, projects) or proj.parent_of(rec.location)
+        recorded.add((rec.name, project))
+        adv = adv_index.get((rec.name, project))
         if rec.name in replace_targets or rec.bump == c.BUMP_NONE:
-            out.skipped.append(_item(rec, "replace directive" if rec.name in replace_targets else "up to date", adv))
+            out.skipped.append(
+                _item(rec, "replace directive" if rec.name in replace_targets else "up to date", adv, project)
+            )
             continue
         excl = _excluded(rec, exclude, holds)
         if rec.bump == c.BUMP_MAJOR:
             reason = "Major security fix" if adv else f"Major ({rec.current} -> {rec.latest})"
-            out.needsPlan.append(_item(rec, reason, adv))
+            out.needsPlan.append(_item(rec, reason, adv, project))
         elif excl:
-            out.needsPlan.append(_item(rec, excl, adv))
+            out.needsPlan.append(_item(rec, excl, adv, project))
         elif adv:
             sev = adv.ids[0] if adv.ids else adv.severity
-            out.securityFixes.append(_item(rec, f"security fix ({sev})", adv))
+            out.securityFixes.append(_item(rec, f"security fix ({sev})", adv, project))
         else:
-            out.safe.append(_item(rec, f"{rec.bump} update"))
-    recorded = {rec.name for rec in updates}
-    for (pkg, nested), adv in sorted(merged.items()):
-        if nested or pkg not in recorded:
-            _place_advisory(out, adv, bool(nested), exclude, holds)
+            out.safe.append(_item(rec, f"{rec.bump} update", project=project))
+    for (pkg, project, loc), adv in sorted(merged.items()):
+        if loc or (pkg, project) not in recorded:
+            _place_advisory(out, adv, project, not loc, exclude, holds)
     return out
