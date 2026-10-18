@@ -53,6 +53,10 @@ absolute or leaves the repo. In a repo under analysis such a link is treated
 as hostile: it would pull whatever it points at, a key file or `/etc`, into
 the evidence.
 
+Shared ids: when `<run_dir>/ids.json` exists, read it before writing any id and
+use the ids it lists for the components and services the topology names (rule:
+`categories.md`, "Ids"). Without it, build ids by the slug rule.
+
 ## Procedure
 
 1. Read `findings.host_port_literals` and `findings.url_literals` (the URL is
@@ -70,7 +74,8 @@ the evidence.
    containerPorts: `kind`, `name`, `ports`, `file:line`), and `files.compose` and `files.k8s` for published ports, services, and
    ingress; `files.iac` for security groups, egress rules, and DNS records; and
    proxy configuration wherever it lives.
-3. Set `id` to `network:<slug>` and `name` to the literal being recorded (e.g.
+3. Set `id` to `network:<slug>` (by the `categories.md` rule; a link to a listed
+   service or component uses its `ids.json` id) and `name` to the literal being recorded (e.g.
    `postgres:5432`).
 4. Set `details.kind` and `details.direction` from what the declaration is: a
    published container port is `port` / `inbound`; a connection string host is

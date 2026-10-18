@@ -152,7 +152,7 @@ the `docs/journeys.md` written by `/itest:design`.
 - **platform** — Enumerate the declared OS and cloud resources: CPU, memory, disk, GPU, architecture, runtime versions, and managed services.
 - **network** — Enumerate the names, hosts, and ports that must resolve and connect, inbound and outbound, with how each name is expected to resolve.
 - **synthesize** — Gather the six discovery skills' output into one merged inventory and dependency graph, and derive which dependencies carry a failure-relevant health condition. Emits the `synthesis` contract.
-- **report** — Render the `synthesis` contract into `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run): a human-readable inventory summary, health definitions, Mermaid dependency graph, cycles, and assumptions.
+- **report** — Render the `synthesis` contract into `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`): a human-readable inventory summary, health definitions, Mermaid dependency graph, cycles, and assumptions.
 
 Static and read-only: nothing is executed, resolved, or probed, because these
 skills run on a developer's machine or in CI rather than inside the environment

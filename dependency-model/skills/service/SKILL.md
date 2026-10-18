@@ -56,6 +56,10 @@ absolute or leaves the repo. In a repo under analysis such a link is treated
 as hostile: it would pull whatever it points at, a key file or `/etc`, into
 the evidence.
 
+Shared ids: when `<run_dir>/ids.json` exists, read it before writing any id and
+use the ids it lists for the components and services the topology names (rule:
+`categories.md`, "Ids"). Without it, build ids by the slug rule.
+
 ## Procedure
 
 1. Read the index from `<run_dir>/depscan.json`.
@@ -76,10 +80,12 @@ the evidence.
    the like) inside `uv.lock`, `package-lock.json`, `go.sum`, or a similar
    lockfile is a build-time artifact source, not a service the running
    system depends on — it belongs to `package`, not here.
-5. For each service identified, set `id` to `service:<slug>` — a stable slug
-   built from the service's name and role (e.g. `service:postgres-primary`,
-   `service:stripe-api`) — and `name` to the service's plain name (e.g.
-   `postgres`, `stripe`). Set `evidence` to the `file:line` locations that
+5. For each service identified, set `id` to `service:<slug>`. A service the
+   topology names takes exactly its `ids.json` id (when the file exists) and you
+   never shorten or rename it. One the topology does not name is slugged from the
+   service's name by the rule in `categories.md` (e.g. `service:stripe-api`), with
+   a suffix only when the repository distinguishes two instances. Set `name` to
+   the service's plain name (e.g. `postgres`, `stripe`). Set `evidence` to the `file:line` locations that
    show this service exists: the compose/k8s/iac declaration line, the
    url/host-port literal's line, or the client-construction line — the
    schema requires `id`, `name`, and `evidence`, and none of them is implied

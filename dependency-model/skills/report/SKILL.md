@@ -1,6 +1,6 @@
 ---
 name: report
-description: Render the dependency-model synthesis contract into a human-readable document — an inventory summary by category, the health definitions, the Mermaid dependency graph, cycles, and assumptions. Read-only. Use when a system's dependency and health picture needs to be handed to a reader rather than a downstream contract consumer. Writes docs/dependencies.md, or <run_dir>/dependencies.md for a --ref run so the checked-out tree is untouched.
+description: Render the dependency-model synthesis contract into a human-readable document — an inventory summary by category, the health definitions, the Mermaid dependency graph, cycles, and assumptions. Read-only. Use when a system's dependency and health picture needs to be handed to a reader rather than a downstream contract consumer. Writes docs/dependencies.md, or <run_dir>/dependencies.md for a --ref run so the checked-out tree is untouched, or the file named by --out.
 ---
 
 # report
@@ -22,7 +22,13 @@ Mermaid renderer: `${CLAUDE_PLUGIN_ROOT}/scripts/depgraphlib/mermaid.py`
 
 ## Usage
 
-    /dependency-model:report [path] [--ref <branch>]
+    /dependency-model:report [path] [--ref <branch>] [--out <file.md>]
+
+`--out` writes the document to that file instead of either default below.
+A relative path resolves against the caller's working directory. Before
+rendering anything, reject an `--out` that does not end in `.md` or whose
+parent directory does not exist, with a message naming the path. An existing
+file there is overwritten, as the defaults are.
 
 Bootstrap: if you were not handed a `synthesis` contract, invoke `synthesize`
 by name, passing the same `--ref`, and take the contract it emits. `synthesize` in turn invokes
@@ -111,7 +117,8 @@ path.
    (no network, `npx` unavailable), say so plainly in the graph section: the
    diagram was not render-verified. Only now, with every section assembled
    and the graph verified (or its unverified status noted), write the
-   document:
+   document. With `--out`, write it to that path, whatever kind of run
+   this is. Otherwise:
    - **Working-tree run** (the contract has no `ref`): write
      `docs/dependencies.md` in the target repo.
    - **`--ref` run** (the contract carries `ref`): write

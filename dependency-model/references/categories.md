@@ -112,6 +112,21 @@ same moment, so the slug has to be derivable from the evidence alone:
 - **`security:`, `platform:`, `package:`** as the owning skill defines them;
   links into these categories are rare.
 
+**Shared id list.** When a topology contract exists, `idmap.py` writes
+`<run_dir>/ids.json` from it: the id of every component and every service the
+topology names, plus a `skipped` list of topology services left out because
+they are a component's own listener. Read it before writing any id.
+
+- The service skill emits each topology-named service under exactly its
+  `ids.json` id and never shortens or renames it. It may emit services the
+  topology does not name, slugged by the rule above.
+- Every skill writes a link to a topology-named service or component using its
+  `ids.json` id, never a re-slug of a different spelling of the name.
+- A service that is plainly part of a listed one (Google OAuth inside the OIDC
+  providers entry) links to the listed id rather than inventing a finer one.
+- Without a topology contract there is no `ids.json`; the slug rule applies
+  alone.
+
 Write the id this rule produces even when the target entry is not yet
 visible to you. `depgraph.py` matches ids ignoring case and treating `_` and
 `-` as equal, and lists every link that still matches no node under

@@ -29,6 +29,10 @@ run `depscan.py` once first (it prints the run dir; the scan gives
 `scan_root`), then invoke `profile:topology` (which invokes `profile:stack`)
 on `scan_root` — with `--ref` that is the snapshot, not the live tree — and
 save their contracts to `<run_dir>/stack.json` and `<run_dir>/topology.json`,
+then write the shared id list the six skills read:
+
+    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/idmap.py <run_dir>/topology.json --write
+
 then invoke the six discovery skills **by name** — `/dependency-model:service`,
 `/dependency-model:package`, `/dependency-model:config`,
 `/dependency-model:security`, `/dependency-model:platform`,
