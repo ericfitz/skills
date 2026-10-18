@@ -31,7 +31,8 @@ import argparse
 import json
 import sys
 
-from depgraphlib.graph import InvalidDependencyError, link_graph, slug
+from depgraphlib.graph import InvalidDependencyError, link_graph
+from depgraphlib.ids import assign_ids
 from depgraphlib.merge import MixedProvenanceError, merge_envelopes
 from depgraphlib.mermaid import to_mermaid
 
@@ -60,10 +61,17 @@ def main(argv=None):
             return 2
     topology = loaded.pop() if args.topology else {}
 
+    topo_components = topology.get("components") or []
     try:
-        components = [{"id": f"component:{slug(c['name'])}", "name": c["name"],
+        ids = assign_ids([c["name"] for c in topo_components], "component")
+    except (ValueError, TypeError, KeyError) as exc:
+        json.dump({"error": f"component ids: {exc}"}, sys.stderr)
+        sys.stderr.write("\n")
+        return 2
+    try:
+        components = [{"id": ids[c["name"]], "name": c["name"],
                        "role": c.get("role"), "evidence": list(c.get("evidence") or [])}
-                      for c in topology.get("components") or []]
+                      for c in topo_components]
         merged = merge_envelopes(loaded)
         graph, unresolved = link_graph(merged, components)
     except MixedProvenanceError as exc:

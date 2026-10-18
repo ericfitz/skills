@@ -10,6 +10,8 @@ exhaustive enumeration of every simple cycle in the graph — see
 `_find_cycles` for why.
 """
 
+from depgraphlib.ids import assign_ids, slug  # noqa: F401  (slug re-exported)
+
 
 class InvalidDependencyError(ValueError):
     """A dependency entry in the merged inventory is missing a field
@@ -25,18 +27,14 @@ def _require(d, field, category):
             f"field {field!r}: {d!r}") from exc
 
 
-def slug(name):
-    """The id slug rule from references/categories.md (Ids): lowercase; `_`,
-    spaces and `/` become `-`; `.` stays."""
-    return name.lower().replace("_", "-").replace(" ", "-").replace("/", "-")
-
-
 def component_nodes(components):
     """Graph nodes for the topology contract's first-party components. They
     are not dependencies, so they never enter the inventory; category
     `component`, lifecycle `run` (the component is the running thing)."""
-    return [{"id": f"component:{slug(c['name'])}", "name": c["name"],
-             "category": "component", "lifecycle": "run"} for c in components or []]
+    components = components or []
+    ids = assign_ids([c["name"] for c in components], "component")
+    return [{"id": ids[c["name"]], "name": c["name"],
+             "category": "component", "lifecycle": "run"} for c in components]
 
 
 def _build_nodes(merged, components=None):

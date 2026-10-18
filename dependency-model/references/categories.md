@@ -83,15 +83,22 @@ Every id is `<category>:<slug>`. The discovery skills run in parallel, and each
 writes `related_ids` pointing at entries another skill is creating at the
 same moment, so the slug has to be derivable from the evidence alone:
 
-- **Slug form.** Lowercase; `_`, spaces and `/` become `-`; `.` stays
-  (`network:metadata-169.254.169.254`).
+- **Slug form.** Lowercase; remove every balanced parenthesized group
+  (parentheses included); replace each run of characters other than `a-z`,
+  `0-9` and `.` with one `-`; trim leading and trailing `-`. `nats (JetStream)`
+  is `nats`; `OAuth 2.0 / OIDC identity providers (env-discovered; Google, GitHub,
+  Microsoft etc.)` is `oauth-2.0-oidc-identity-providers`; `migrate / dbtool /
+  genconfig` is `migrate-dbtool-genconfig`; `TMI_NATS_URL` is `tmi-nats-url`;
+  `metadata 169.254.169.254` is `metadata-169.254.169.254`. A name that is
+  wholly a parenthesized group keeps its text (`(JetStream)` is `jetstream`);
+  an unbalanced `(` or `)` is punctuation.
 - **`service:`** the name the service already has, in this order: its
   `name` in the topology contract's `real_dependencies[]` or
   `external_third_parties[]`, then its compose or Kubernetes service name,
   then the product name (`service:postgres`, `service:nats`). Add a suffix
   only when the repository itself distinguishes two instances.
 - **`network:`** `<host>-<port>` of the declared endpoint, host slugged:
-  `network:postgres-5432`, `network:api-openai-com-443`.
+  `network:postgres-5432`.
 - **`config:`** the key name slugged: `TMI_NATS_URL` is `config:tmi-nats-url`.
 - **`component:`** the system's own first-party components, slugged from
   `components[].name` in the topology contract: `component:tmiserver`,

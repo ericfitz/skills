@@ -6,7 +6,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
 
-from depgraphlib.graph import build_graph, link_graph, slug
+from depgraphlib.graph import build_graph, component_nodes, link_graph, slug
 
 
 def dep(id_, name, lifecycle="run", related=None, depends=None):
@@ -91,6 +91,10 @@ class TestEdges(unittest.TestCase):
 
 class TestComponents(unittest.TestCase):
     """#83: first-party components from the topology contract are graph nodes."""
+
+    def test_component_ids_use_assign_ids(self):
+        nodes = component_nodes([{"name": "migrate / dbtool"}])
+        self.assertEqual(nodes[0]["id"], "component:migrate-dbtool")
 
     def test_slug_follows_the_categories_md_rule(self):
         self.assertEqual(slug("tooling CLIs"), "tooling-clis")
