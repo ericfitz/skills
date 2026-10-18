@@ -9,22 +9,30 @@ after it.
 
 ## The sequence
 
-1. **Invoke `profile:topology`** to get the seed contract. It supplies
-   `real_dependencies` and `external_third_parties` as starting evidence for the
-   `service` category, and establishes the repo's deployment shape that several
-   categories' evidence should be read against.
-2. **Run `depscan.py` once** against the target repository. Every one of the six
-   skills reads this same output; the scan is not re-run per skill.
-3. **Run the six skills — in any order, or concurrently** — each reading the same
-   scan output and emitting its own envelope with exactly one category populated.
-   No skill depends on another skill's output; only on the shared scan and the
-   seed contract from step 1.
+1. **Run `depscan.py` once** against the target repository. Every one of the
+   six skills reads this same output; the scan is not re-run per skill. It
+   creates the run dir and prints it.
+2. **Invoke `profile:topology`** on the scan's `scan_root` and save its contract
+   to `<run_dir>/topology.json`. It supplies `real_dependencies` and
+   `external_third_parties` as starting evidence for the `service` category, and
+   establishes the repo's deployment shape that several categories' evidence
+   should be read against.
+3. **Run `idmap.py --write`** over `<run_dir>/topology.json`. It writes
+   `<run_dir>/ids.json`, the one list of component and service ids every skill
+   uses (`categories.md`, "Ids"). Without a topology contract there is no
+   `ids.json`, and the skills fall back to the slug rule.
+4. **Run the six skills — in any order, or concurrently** — each reading the same
+   scan output and `ids.json` and emitting its own envelope with exactly one
+   category populated. No skill depends on another skill's output; only on the
+   shared scan, the seed contract from step 2, and the id list from step 3.
 
 ## Commands
 
 ```bash
 uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <repo> [--ref <branch>] --write
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/depscan.py <repo> [--ref <branch>] --write   # fallback, no deps
+# then profile:topology on scan_root, saved to <run_dir>/topology.json, then:
+uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/idmap.py <run_dir>/topology.json --write
 ```
 
 Use the `uv run --script` form when `uv` is available — it resolves the script's
@@ -43,8 +51,9 @@ same machine never overwrite each other's output.
 Skills run concurrently in that one run dir, so each writes its scratch files
 (helper scripts, drafts, intermediates) to its own `<run_dir>/work/<skill>/`
 and nothing else. `<run_dir>` itself holds only the envelopes and shared
-inputs: `depscan.json`, `syft.json` (written by `package`, read-only for
-everyone else), `snapshot/`.
+inputs: `depscan.json`, `topology.json` and `ids.json` (steps 2 and 3),
+`stack.json` (on the `synthesize` path), `syft.json` (written by `package`,
+read-only for everyone else), `snapshot/`.
 
 ## Filtering findings by path class
 

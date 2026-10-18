@@ -1,4 +1,5 @@
 # tests/test_depgraph_graph.py
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -6,7 +7,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
 
-from depgraphlib.graph import build_graph, link_graph, slug
+from depgraphlib.graph import build_graph, component_nodes, link_graph, slug
 
 
 def dep(id_, name, lifecycle="run", related=None, depends=None):
@@ -31,6 +32,68 @@ class TestNodes(unittest.TestCase):
     def test_nodes_are_sorted_by_id(self):
         g = build_graph(merged(service=[dep("service:b", "b"), dep("service:a", "a")]))
         self.assertEqual([n["id"] for n in g["nodes"]], ["service:a", "service:b"])
+
+
+def used_by(*component_ids):
+    return [{"component_id": c, "evidence": ["main.go:1"]} for c in component_ids]
+
+
+def service_used_by(id_, name, *component_ids):
+    d = dep(id_, name)
+    d["details"]["used_by"] = used_by(*component_ids)
+    return d
+
+
+class TestUsedBy(unittest.TestCase):
+    def test_used_by_becomes_component_edge(self):
+        graph, unresolved = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:api")]),
+            [{"name": "api"}])
+        self.assertIn({"from": "component:api", "to": "service:pg",
+                       "kind": "depends_on", "lifecycle": "run"}, graph["edges"])
+        self.assertEqual(unresolved, [])
+
+    def test_used_by_unknown_component_is_unresolved(self):
+        graph, unresolved = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:ghost")]),
+            [{"name": "api"}])
+        self.assertEqual(graph["edges"], [])
+        self.assertEqual(unresolved, [{"from": "service:pg", "to": "component:ghost",
+                                       "kind": "used_by"}])
+
+    def test_used_by_duplicates_collapse(self):
+        graph, _ = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:api", "component:api"),
+                            service_used_by("service:redis", "redis", "component:api")]),
+            [{"name": "api"}])
+        pairs = [(e["from"], e["to"]) for e in graph["edges"]]
+        self.assertEqual(sorted(pairs), [("component:api", "service:pg"),
+                                         ("component:api", "service:redis")])
+        again, _ = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "component:api"),
+                            service_used_by("service:pg2", "pg2", "component:api")]),
+            [{"name": "api"}])
+        self.assertEqual(len(again["edges"]), 2)
+
+    def test_used_by_non_component_node_is_unresolved(self):
+        graph, unresolved = link_graph(
+            merged(service=[service_used_by("service:pg", "pg", "service:redis"),
+                            dep("service:redis", "redis")]),
+            [{"name": "api"}])
+        self.assertEqual(graph["edges"], [])
+        self.assertEqual(unresolved, [{"from": "service:pg", "to": "service:redis",
+                                       "kind": "used_by"}])
+
+    def test_used_by_read_only_for_services(self):
+        d = dep("config:x", "x")
+        d["details"]["used_by"] = used_by("component:api")
+        graph, unresolved = link_graph(merged(config=[d]), [{"name": "api"}])
+        self.assertEqual(graph["edges"], [])
+        self.assertEqual(unresolved, [])
+
+    def test_duplicate_component_names_give_one_node(self):
+        nodes = component_nodes([{"name": "api"}, {"name": "api"}])
+        self.assertEqual([n["id"] for n in nodes], ["component:api"])
 
 
 class TestEdges(unittest.TestCase):
@@ -91,6 +154,10 @@ class TestEdges(unittest.TestCase):
 
 class TestComponents(unittest.TestCase):
     """#83: first-party components from the topology contract are graph nodes."""
+
+    def test_component_ids_use_assign_ids(self):
+        nodes = component_nodes([{"name": "migrate / dbtool"}])
+        self.assertEqual(nodes[0]["id"], "component:migrate-dbtool")
 
     def test_slug_follows_the_categories_md_rule(self):
         self.assertEqual(slug("tooling CLIs"), "tooling-clis")
@@ -266,6 +333,159 @@ class TestInvalidDependency(unittest.TestCase):
         code, err = self._run_cli_with_envelope(envelope)
         self.assertEqual(code, 2)
         self.assertIn("error", json.loads(err))
+
+
+TMI_RESOLVED = [
+    ("config:oauth-providers-<id>-<field>", "service:oauth-oidc-providers"),
+    ("config:saml-providers-<id>-<field>", "service:saml-idps"),
+    ("config:tmi-content-source-microsoft-application-object-id", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-client-id", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-enabled", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-picker-origin", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-tenant-id", "service:microsoft-graph"),
+    ("config:tmi-extraction-async-enabled", "service:nats"),
+    ("config:tmi-job-ack-wait", "service:nats"),
+    ("config:tmi-nats-creds", "service:nats"),
+    ("config:tmi-nats-tls-ca-file", "service:nats"),
+    ("config:tmi-nats-tls-cert-file", "service:nats"),
+    ("config:tmi-nats-tls-key-file", "service:nats"),
+    ("config:tmi-nats-tls-server-name", "service:nats"),
+    ("config:tmi-nats-url", "service:nats"),
+    ("config:tmi-saml-enabled", "service:saml-idps"),
+    ("config:tmi-worker-heartbeat-subject", "service:nats"),
+    ("network:api.github.com-443", "service:oauth-oidc-providers"),
+    ("network:graph.microsoft.com-443", "service:microsoft-graph"),
+    ("network:login.microsoftonline.com-443", "service:oauth-oidc-providers"),
+    ("network:nats-service-host-4222", "service:nats"),
+    ("network:nats.tmi-platform.svc-4222", "service:nats"),
+    ("network:nats.tmi-platform.svc-8222", "service:nats"),
+    ("network:oauth2.googleapis.com-443", "service:oauth-oidc-providers"),
+    ("network:openidconnect.googleapis.com-443", "service:oauth-oidc-providers"),
+    ("network:www.googleapis.com-443", "service:oauth-oidc-providers"),
+]
+
+
+TMI_STILL_UNRESOLVED = [
+    "config:tmi-oracle-wallet-zip",
+    "config:tns-admin",
+    "network:accounts.google.com-443",
+    "network:localhost-6379",
+    "network:localhost-6379",
+    "network:localhost-8080",
+    "service:arbitrary-http(s)-urls-and-webhook-receivers",
+    "service:github-oauth",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-drive---google-workspace-apis",
+    "service:google-oauth",
+    "service:microsoft-oauth",
+    "service:openai",
+    "service:openai",
+    "service:openai",
+]
+
+
+class TestFallbackMatching(unittest.TestCase):
+    def test_reslug_match(self):
+        g, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats")],
+            config=[dep("config:tmi-nats-url", "TMI_NATS_URL",
+                        related=["service:nats-(jetstream)"])]))
+        self.assertEqual(unresolved, [])
+        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]],
+                         [("config:tmi-nats-url", "service:nats")])
+
+    def test_name_match(self):
+        g, unresolved = link_graph(merged(
+            service=[dep("service:gdrive", "Google Drive / Google Workspace APIs")],
+            config=[dep("config:drive-enabled", "DRIVE_ENABLED",
+                        related=["service:google-drive-google-workspace-apis"])]))
+        self.assertEqual(unresolved, [])
+        self.assertEqual([e["to"] for e in g["edges"]], ["service:gdrive"])
+
+    def test_ambiguous_fallback_stays_unresolved(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats"), dep("service:nats-server", "nats"),
+                     dep("service:nats-(tls)", "other")],
+            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]))
+        self.assertEqual(unresolved, [{"from": "config:c",
+                                       "to": "service:nats-(jetstream)",
+                                       "kind": "relates_to"}])
+
+    def test_ambiguous_name_match_stays_unresolved(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:a", "Google Drive"), dep("service:b", "google-drive")],
+            config=[dep("config:c", "C", related=["service:google-drive"])]))
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:google-drive",
+                                       "kind": "relates_to"}])
+
+    def test_ambiguous_reslug_does_not_fall_through_to_name(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:nats", "other"), dep("service:nats-(tls)", "other2"),
+                     dep("service:x", "nats")],
+            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]))
+        self.assertEqual([u["to"] for u in unresolved], ["service:nats-(jetstream)"])
+
+    def test_ambiguous_canonical_does_not_fall_through_to_reslug(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:Nats_X", "a"), dep("service:nats-x", "b"),
+                     dep("service:nats-x-(tls)", "c")],
+            config=[dep("config:c", "C", related=["service:NATS-X"])]))
+        self.assertEqual([u["to"] for u in unresolved], ["service:NATS-X"])
+
+    def test_component_retry_does_not_fuzzy_match_components(self):
+        g, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats")],
+            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]),
+            [{"name": "nats"}])
+        self.assertEqual(unresolved, [])
+        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]],
+                         [("config:c", "service:nats")])
+
+    def test_fallbacks_never_cross_categories(self):
+        _, unresolved = link_graph(merged(
+            config=[dep("config:nats", "nats"),
+                    dep("config:c", "C", related=["service:nats-(jetstream)"])]))
+        self.assertEqual(unresolved, [{"from": "config:c",
+                                       "to": "service:nats-(jetstream)",
+                                       "kind": "relates_to"}])
+
+    def test_unsluggable_target_is_unresolved(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats")],
+            config=[dep("config:c", "C", related=["service:()"])]))
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:()",
+                                       "kind": "relates_to"}])
+
+    def test_tmi_regression(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures" / "dependency_model"
+                              / "tmi_links.json").read_text())
+        out_links = {}
+        for link in fixture["links"]:
+            out_links.setdefault(link["from"], []).append(link)
+        cats = {}
+        for node in fixture["nodes"]:
+            if node["category"] == "component":
+                continue
+            related = [x["to"] for x in out_links.get(node["id"], [])
+                       if x["kind"] == "relates_to"]
+            depends = [x["to"] for x in out_links.get(node["id"], [])
+                       if x["kind"] == "depends_on"]
+            cats.setdefault(node["category"], []).append(
+                dep(node["id"], node["name"], related=related, depends=depends or None))
+        components = [{"name": n["name"]} for n in fixture["nodes"]
+                      if n["category"] == "component"]
+        graph, unresolved = link_graph(merged(**cats), components)
+        resolved = sorted((e["from"], e["to"]) for e in graph["edges"])
+        self.assertEqual(len(resolved), 26)
+        self.assertEqual(resolved, TMI_RESOLVED)
+        self.assertEqual(sorted(u["to"] for u in unresolved), TMI_STILL_UNRESOLVED)
 
 
 class TestCliOutputShape(unittest.TestCase):

@@ -113,6 +113,10 @@ def validate(instance, schema, path="$", base_dir=None):
                 errors.extend(
                     validate(instance[name], extra, f"{path}.{name}"))
 
+    if isinstance(instance, list) and len(instance) < schema.get("minItems", 0):
+        n = schema["minItems"]
+        errors.append(f"{path}: expected at least {n} item{'' if n == 1 else 's'}")
+
     if isinstance(instance, list) and "items" in schema:
         for index, item in enumerate(instance):
             errors.extend(

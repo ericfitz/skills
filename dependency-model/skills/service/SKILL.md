@@ -56,13 +56,19 @@ absolute or leaves the repo. In a repo under analysis such a link is treated
 as hostile: it would pull whatever it points at, a key file or `/etc`, into
 the evidence.
 
+Shared ids: when `<run_dir>/ids.json` exists, read it before writing any id and
+use the ids it lists for the components and services the topology names (rule:
+`categories.md`, "Ids"). Without it, build ids by the slug rule.
+
 ## Procedure
 
 1. Read the index from `<run_dir>/depscan.json`.
 
 2. Seed from the `topology` contract's `real_dependencies` and
    `external_third_parties`. These are coarse by design — refine them, do not
-   simply copy them.
+   simply copy them. But each topology-named service stays one entry under its
+   `ids.json` id: put finer detail inside that entry, and add a separate service
+   only for something the topology does not name.
 3. Read every file under the index's `files.compose`, `files.k8s`, and
    `files.iac` for service declarations: images, chart dependencies, managed-
    service resources.
@@ -76,10 +82,12 @@ the evidence.
    the like) inside `uv.lock`, `package-lock.json`, `go.sum`, or a similar
    lockfile is a build-time artifact source, not a service the running
    system depends on — it belongs to `package`, not here.
-5. For each service identified, set `id` to `service:<slug>` — a stable slug
-   built from the service's name and role (e.g. `service:postgres-primary`,
-   `service:stripe-api`) — and `name` to the service's plain name (e.g.
-   `postgres`, `stripe`). Set `evidence` to the `file:line` locations that
+5. For each service identified, set `id` to `service:<slug>`. A service the
+   topology names takes exactly its `ids.json` id (when the file exists) and you
+   never shorten or rename it. One the topology does not name is slugged from the
+   service's name by the rule in `categories.md` (e.g. `service:stripe-api`), with
+   a suffix only when the repository distinguishes two instances. Set `name` to
+   the service's plain name (e.g. `postgres`, `stripe`). Set `evidence` to the `file:line` locations that
    show this service exists: the compose/k8s/iac declaration line, the
    url/host-port literal's line, or the client-construction line — the
    schema requires `id`, `name`, and `evidence`, and none of them is implied
@@ -115,6 +123,11 @@ the evidence.
 10. Link `related_ids` to the `network:` entry for the host and port this
     service is reached on. Both categories record it; `categories.md` has
     the rule, and its "Ids" section says how to build each id.
+    Also set `details.used_by`: for each first-party component (a
+    `component:` id from the topology contract) whose code or deployment
+    manifests use this service, one `{"component_id", "evidence"}` entry with
+    at least one `file:line` of the use. Omit the field when no component can
+    be tied to the service; never guess one.
 11. If the index's `coverage.skipped` is non-empty, record one assumption per
     skipped language naming it and what went unscanned.
 12. Set `lifecycle` to `run` on every dependency — these are needed while the service runs.

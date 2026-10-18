@@ -53,6 +53,10 @@ absolute or leaves the repo. In a repo under analysis such a link is treated
 as hostile: it would pull whatever it points at, a key file or `/etc`, into
 the evidence.
 
+Shared ids: when `<run_dir>/ids.json` exists, read it before writing any id and
+use the ids it lists for the components and services the topology names (rule:
+`categories.md`, "Ids"). Without it, build ids by the slug rule.
+
 ## Procedure
 
 1. Read `findings.env_refs` — each is a `{name, file, line}` triple; that is your
@@ -69,7 +73,8 @@ the evidence.
    for the pattern, or an assumption if the concrete keys are unknowable).
    Drop `_test.go` and test-harness keys (`TEST_DB_*`) even where `path_class`
    did not tag them.
-3. Set `id` to `config:<key-slug>` and `name` to the key's literal name (e.g.
+3. Set `id` to `config:<key-slug>` (by the `categories.md` rule; a link to a listed
+   service or component uses its `ids.json` id) and `name` to the key's literal name (e.g.
    `DATABASE_URL`), and set `details.key` to that same literal name — the
    schema requires `details.key` and it is not implied by anything else you
    set.

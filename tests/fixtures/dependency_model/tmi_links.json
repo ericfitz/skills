@@ -1,0 +1,486 @@
+{
+ "nodes": [
+  {
+   "id": "config:oauth-providers-<id>-<field>",
+   "name": "OAUTH_PROVIDERS_<ID>_<FIELD>",
+   "category": "config"
+  },
+  {
+   "id": "config:saml-providers-<id>-<field>",
+   "name": "SAML_PROVIDERS_<ID>_<FIELD>",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-alerting-webhook-url",
+   "name": "TMI_ALERTING_WEBHOOK_URL",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-drive-browser-oauth-client-id",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_DRIVE_BROWSER_OAUTH_CLIENT_ID",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-drive-credentials-file",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_DRIVE_CREDENTIALS_FILE",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-drive-enabled",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_DRIVE_ENABLED",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-drive-picker-app-id",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_DRIVE_PICKER_APP_ID",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-drive-picker-developer-key",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_DRIVE_PICKER_DEVELOPER_KEY",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-drive-service-account-email",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-workspace-enabled",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_WORKSPACE_ENABLED",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-workspace-picker-app-id",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_WORKSPACE_PICKER_APP_ID",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-google-workspace-picker-developer-key",
+   "name": "TMI_CONTENT_SOURCE_GOOGLE_WORKSPACE_PICKER_DEVELOPER_KEY",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-microsoft-application-object-id",
+   "name": "TMI_CONTENT_SOURCE_MICROSOFT_APPLICATION_OBJECT_ID",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-microsoft-client-id",
+   "name": "TMI_CONTENT_SOURCE_MICROSOFT_CLIENT_ID",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-microsoft-enabled",
+   "name": "TMI_CONTENT_SOURCE_MICROSOFT_ENABLED",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-microsoft-picker-origin",
+   "name": "TMI_CONTENT_SOURCE_MICROSOFT_PICKER_ORIGIN",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-content-source-microsoft-tenant-id",
+   "name": "TMI_CONTENT_SOURCE_MICROSOFT_TENANT_ID",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-extraction-async-enabled",
+   "name": "TMI_EXTRACTION_ASYNC_ENABLED",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-job-ack-wait",
+   "name": "TMI_JOB_ACK_WAIT",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-nats-creds",
+   "name": "TMI_NATS_CREDS",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-nats-tls-ca-file",
+   "name": "TMI_NATS_TLS_CA_FILE",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-nats-tls-cert-file",
+   "name": "TMI_NATS_TLS_CERT_FILE",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-nats-tls-key-file",
+   "name": "TMI_NATS_TLS_KEY_FILE",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-nats-tls-server-name",
+   "name": "TMI_NATS_TLS_SERVER_NAME",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-nats-url",
+   "name": "TMI_NATS_URL",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-oauth-callback-url",
+   "name": "TMI_OAUTH_CALLBACK_URL",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-redis-host",
+   "name": "TMI_REDIS_HOST",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-redis-port",
+   "name": "TMI_REDIS_PORT",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-saml-enabled",
+   "name": "TMI_SAML_ENABLED",
+   "category": "config"
+  },
+  {
+   "id": "config:tmi-worker-heartbeat-subject",
+   "name": "TMI_WORKER_HEARTBEAT_SUBJECT",
+   "category": "config"
+  },
+  {
+   "id": "network:api.github.com-443",
+   "name": "api.github.com:443",
+   "category": "network"
+  },
+  {
+   "id": "network:graph.microsoft.com-443",
+   "name": "graph.microsoft.com:443",
+   "category": "network"
+  },
+  {
+   "id": "network:login.microsoftonline.com-443",
+   "name": "login.microsoftonline.com:443",
+   "category": "network"
+  },
+  {
+   "id": "network:nats-service-host-4222",
+   "name": "$(NATS_SERVICE_HOST):4222",
+   "category": "network"
+  },
+  {
+   "id": "network:nats.tmi-platform.svc-4222",
+   "name": "nats.tmi-platform.svc:4222",
+   "category": "network"
+  },
+  {
+   "id": "network:nats.tmi-platform.svc-8222",
+   "name": "nats.tmi-platform.svc:8222",
+   "category": "network"
+  },
+  {
+   "id": "network:oauth2.googleapis.com-443",
+   "name": "oauth2.googleapis.com:443",
+   "category": "network"
+  },
+  {
+   "id": "network:openidconnect.googleapis.com-443",
+   "name": "openidconnect.googleapis.com:443",
+   "category": "network"
+  },
+  {
+   "id": "network:www.googleapis.com-443",
+   "name": "www.googleapis.com:443",
+   "category": "network"
+  },
+  {
+   "id": "security:oauth-providers-client-secret",
+   "name": "OAUTH_PROVIDERS_<ID>_CLIENT_SECRET",
+   "category": "security"
+  },
+  {
+   "id": "security:tmi-embedding-api-key",
+   "name": "TMI_EMBEDDING_API_KEY",
+   "category": "security"
+  },
+  {
+   "id": "security:tmi-timmy-llm-api-key",
+   "name": "TMI_TIMMY_LLM_API_KEY",
+   "category": "security"
+  },
+  {
+   "id": "security:tmi-timmy-text-embedding-api-key",
+   "name": "TMI_TIMMY_TEXT_EMBEDDING_API_KEY",
+   "category": "security"
+  },
+  {
+   "id": "service:microsoft-graph",
+   "name": "Microsoft Graph",
+   "category": "service"
+  },
+  {
+   "id": "service:nats",
+   "name": "nats",
+   "category": "service"
+  },
+  {
+   "id": "service:oauth-oidc-providers",
+   "name": "OAuth 2.0 / OIDC identity providers",
+   "category": "service"
+  },
+  {
+   "id": "service:oracle-adb",
+   "name": "oracle-adb",
+   "category": "service"
+  },
+  {
+   "id": "service:saml-idps",
+   "name": "SAML identity providers",
+   "category": "service"
+  }
+ ],
+ "links": [
+  {
+   "from": "config:oauth-providers-<id>-<field>",
+   "to": "service:oauth-2.0---oidc-identity-providers-(env-discovered;-google,-github,-microsoft-etc.)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:saml-providers-<id>-<field>",
+   "to": "service:saml-identity-providers",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-alerting-webhook-url",
+   "to": "service:arbitrary-http(s)-urls-and-webhook-receivers",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-drive-browser-oauth-client-id",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-drive-credentials-file",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-drive-enabled",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-drive-picker-app-id",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-drive-picker-developer-key",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-drive-service-account-email",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-workspace-enabled",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-workspace-picker-app-id",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-google-workspace-picker-developer-key",
+   "to": "service:google-drive---google-workspace-apis",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-microsoft-application-object-id",
+   "to": "service:microsoft-graph-(onedrive-sharepoint)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-microsoft-client-id",
+   "to": "service:microsoft-graph-(onedrive-sharepoint)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-microsoft-enabled",
+   "to": "service:microsoft-graph-(onedrive-sharepoint)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-microsoft-picker-origin",
+   "to": "service:microsoft-graph-(onedrive-sharepoint)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-content-source-microsoft-tenant-id",
+   "to": "service:microsoft-graph-(onedrive-sharepoint)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-extraction-async-enabled",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-job-ack-wait",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-nats-creds",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-nats-tls-ca-file",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-nats-tls-cert-file",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-nats-tls-key-file",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-nats-tls-server-name",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-nats-url",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-oauth-callback-url",
+   "to": "network:localhost-8080",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-redis-host",
+   "to": "network:localhost-6379",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-redis-port",
+   "to": "network:localhost-6379",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-saml-enabled",
+   "to": "service:saml-identity-providers",
+   "kind": "relates_to"
+  },
+  {
+   "from": "config:tmi-worker-heartbeat-subject",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:api.github.com-443",
+   "to": "service:oauth-2.0---oidc-identity-providers-(env-discovered;-google,-github,-microsoft-etc.)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:graph.microsoft.com-443",
+   "to": "service:microsoft-graph-(onedrive-sharepoint)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:login.microsoftonline.com-443",
+   "to": "service:oauth-2.0---oidc-identity-providers-(env-discovered;-google,-github,-microsoft-etc.)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:nats-service-host-4222",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:nats.tmi-platform.svc-4222",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:nats.tmi-platform.svc-8222",
+   "to": "service:nats-(jetstream)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:oauth2.googleapis.com-443",
+   "to": "service:oauth-2.0---oidc-identity-providers-(env-discovered;-google,-github,-microsoft-etc.)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:openidconnect.googleapis.com-443",
+   "to": "service:oauth-2.0---oidc-identity-providers-(env-discovered;-google,-github,-microsoft-etc.)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "network:www.googleapis.com-443",
+   "to": "service:oauth-2.0---oidc-identity-providers-(env-discovered;-google,-github,-microsoft-etc.)",
+   "kind": "relates_to"
+  },
+  {
+   "from": "security:oauth-providers-client-secret",
+   "to": "service:github-oauth",
+   "kind": "relates_to"
+  },
+  {
+   "from": "security:oauth-providers-client-secret",
+   "to": "service:google-oauth",
+   "kind": "relates_to"
+  },
+  {
+   "from": "security:oauth-providers-client-secret",
+   "to": "service:microsoft-oauth",
+   "kind": "relates_to"
+  },
+  {
+   "from": "security:tmi-embedding-api-key",
+   "to": "service:openai",
+   "kind": "relates_to"
+  },
+  {
+   "from": "security:tmi-timmy-llm-api-key",
+   "to": "service:openai",
+   "kind": "relates_to"
+  },
+  {
+   "from": "security:tmi-timmy-text-embedding-api-key",
+   "to": "service:openai",
+   "kind": "relates_to"
+  },
+  {
+   "from": "service:oauth-oidc-providers",
+   "to": "network:accounts.google.com-443",
+   "kind": "relates_to"
+  },
+  {
+   "from": "service:oracle-adb",
+   "to": "config:tmi-oracle-wallet-zip",
+   "kind": "relates_to"
+  },
+  {
+   "from": "service:oracle-adb",
+   "to": "config:tns-admin",
+   "kind": "relates_to"
+  }
+ ]
+}

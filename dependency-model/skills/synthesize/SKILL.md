@@ -29,6 +29,10 @@ run `depscan.py` once first (it prints the run dir; the scan gives
 `scan_root`), then invoke `profile:topology` (which invokes `profile:stack`)
 on `scan_root` — with `--ref` that is the snapshot, not the live tree — and
 save their contracts to `<run_dir>/stack.json` and `<run_dir>/topology.json`,
+then write the shared id list the six skills read:
+
+    uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/idmap.py <run_dir>/topology.json --write
+
 then invoke the six discovery skills **by name** — `/dependency-model:service`,
 `/dependency-model:package`, `/dependency-model:config`,
 `/dependency-model:security`, `/dependency-model:platform`,
@@ -77,6 +81,9 @@ each skill by name and take its envelope.
      component's `component:<slug>` id the same way.
    - Otherwise leave it and record an assumption naming both ids and why
      no node matched. Never invent a node to satisfy a link.
+   An entry with kind `used_by` is fixed by rewriting
+   `details.used_by[].component_id` in the saved service envelope, under the
+   same rules as the other rewrites.
    Re-run depgraph.py over the rewritten envelopes and take its output. An
    `unresolved` list that is still non-empty is fine once every remaining
    entry has its assumption; `unresolved` itself is not carried into the
@@ -122,12 +129,12 @@ each skill by name and take its envelope.
 4. Take the script's `health[]` as the base. **Never change or drop** a
    condition's `kind`, `subject_id`, `expectation`, or `evidence`, and never
    drop a condition or entry. You may only:
-   - Fill `required_for[]` (the script leaves it empty) with the ids of
-     components or functions that static evidence connects to the condition
-     — a `component:<slug>` id from `components[]`, an entry point, a
-     consuming file. Leave it empty
-     when nothing static connects it. It records which callers need the
-     condition met, never how important any of them are.
+   - Extend `required_for[]`. The script fills it from the service
+     skill's `used_by` (the component-to-service `depends_on` edges); add ids
+     of components or functions that static evidence also connects to the
+     condition — a `component:<slug>` id from `components[]`, an entry point,
+     a consuming file — and never remove one. It records which callers need
+     the condition met, never how important any of them are.
    - Add a `presence` condition for a dynamically loaded package — a
      reflectively resolved JDBC driver, an `importlib` plugin, a `dlopen`ed
      `.so` — citing the `file:line` of its loading site, **only when one

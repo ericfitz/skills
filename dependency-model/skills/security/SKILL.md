@@ -53,6 +53,10 @@ absolute or leaves the repo. In a repo under analysis such a link is treated
 as hostile: it would pull whatever it points at, a key file or `/etc`, into
 the evidence.
 
+Shared ids: when `<run_dir>/ids.json` exists, read it before writing any id and
+use the ids it lists for the components and services the topology names (rule:
+`categories.md`, "Ids"). Without it, build ids by the slug rule.
+
 ## Procedure
 
 1. Read `findings.secret_refs` (Kubernetes `secretKeyRef`: `env`, `secret`, `key`,

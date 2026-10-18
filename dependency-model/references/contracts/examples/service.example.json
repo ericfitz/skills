@@ -25,7 +25,8 @@
             "protocol": "postgres",
             "client_library": "github.com/jackc/pgx/v5",
             "managed_by": "compose",
-            "config_keys": ["DATABASE_URL"]
+            "config_keys": ["DATABASE_URL"],
+            "used_by": [{ "component_id": "component:api", "evidence": ["cmd/api/main.go:30"] }]
           }
         }
       ],

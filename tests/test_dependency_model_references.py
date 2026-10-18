@@ -83,5 +83,14 @@ class TestDefinitions(unittest.TestCase):
         self.assertIn("not yet technically defined", text)
 
 
+class TestCategoriesIdsRule(unittest.TestCase):
+    def test_categories_ids_rule(self):
+        text = (REFERENCES / "categories.md").read_text(encoding="utf-8")
+        self.assertIn("ids.json", text)
+        self.assertIn("parenthesized group", text)
+        flat = " ".join(text.split())
+        self.assertIn("never shortens", flat)
+
+
 if __name__ == "__main__":
     unittest.main()

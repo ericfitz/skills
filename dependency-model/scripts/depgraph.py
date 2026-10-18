@@ -24,14 +24,17 @@ Exit codes:
        invalid JSON), the envelopes came from different targets or refs, or a
        dependency entry is missing a required field (id, name, or lifecycle)
        or is otherwise malformed (e.g. a bare string instead of an object,
-       or a category value that isn't a dict)
+       or a category value that isn't a dict), or a topology component id
+       cannot be built (the topology is not an object, a component lacks a
+       string `name`, a name slugs to empty, or two names collide)
 """
 
 import argparse
 import json
 import sys
 
-from depgraphlib.graph import InvalidDependencyError, link_graph, slug
+from depgraphlib.graph import InvalidDependencyError, dedupe_components, link_graph
+from depgraphlib.ids import assign_ids
 from depgraphlib.merge import MixedProvenanceError, merge_envelopes
 from depgraphlib.mermaid import to_mermaid
 
@@ -61,9 +64,16 @@ def main(argv=None):
     topology = loaded.pop() if args.topology else {}
 
     try:
-        components = [{"id": f"component:{slug(c['name'])}", "name": c["name"],
+        topo_components = dedupe_components(topology.get("components"))
+        ids = assign_ids([c["name"] for c in topo_components], "component")
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        json.dump({"error": f"component ids: {exc}"}, sys.stderr)
+        sys.stderr.write("\n")
+        return 2
+    try:
+        components = [{"id": ids[c["name"]], "name": c["name"],
                        "role": c.get("role"), "evidence": list(c.get("evidence") or [])}
-                      for c in topology.get("components") or []]
+                      for c in topo_components]
         merged = merge_envelopes(loaded)
         graph, unresolved = link_graph(merged, components)
     except MixedProvenanceError as exc:

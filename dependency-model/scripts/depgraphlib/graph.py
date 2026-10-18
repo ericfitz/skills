@@ -10,6 +10,10 @@ exhaustive enumeration of every simple cycle in the graph — see
 `_find_cycles` for why.
 """
 
+import contextlib
+
+from depgraphlib.ids import assign_ids, slug
+
 
 class InvalidDependencyError(ValueError):
     """A dependency entry in the merged inventory is missing a field
@@ -25,18 +29,25 @@ def _require(d, field, category):
             f"field {field!r}: {d!r}") from exc
 
 
-def slug(name):
-    """The id slug rule from references/categories.md (Ids): lowercase; `_`,
-    spaces and `/` become `-`; `.` stays."""
-    return name.lower().replace("_", "-").replace(" ", "-").replace("/", "-")
+def dedupe_components(components):
+    """The topology's components with repeated names collapsed to the first,
+    so the graph and ids.json agree on one node per name."""
+    seen, unique = set(), []
+    for c in components or []:
+        if c["name"] not in seen:
+            seen.add(c["name"])
+            unique.append(c)
+    return unique
 
 
 def component_nodes(components):
     """Graph nodes for the topology contract's first-party components. They
     are not dependencies, so they never enter the inventory; category
     `component`, lifecycle `run` (the component is the running thing)."""
-    return [{"id": f"component:{slug(c['name'])}", "name": c["name"],
-             "category": "component", "lifecycle": "run"} for c in components or []]
+    components = dedupe_components(components)
+    ids = assign_ids([c["name"] for c in components], "component")
+    return [{"id": ids[c["name"]], "name": c["name"],
+             "category": "component", "lifecycle": "run"} for c in components]
 
 
 def _build_nodes(merged, components=None):
@@ -57,30 +68,56 @@ def canonical_id(id_):
     return id_.lower().replace("_", "-")
 
 
-def _resolver(known_ids):
-    """Map a written target id to a node id: exact match first, then a
-    canonical match when exactly one node has that canonical form, then
-    `service:<x>` to `component:<x>`: the system's own listener is not a
-    service (categories.md, worked adjudications), so a skill that wrote
-    `service:tmiserver` meant the first-party component."""
-    by_canonical = {}
-    for i in known_ids:
-        by_canonical.setdefault(canonical_id(i), []).append(i)
+def _category_and_rest(id_):
+    category, _, rest = id_.partition(":")
+    return category, rest
 
-    def resolve(target, _retry=True):
+
+def _resolver(nodes):
+    """Map a written target id to a node id. In order: exact match; canonical
+    match; `service:<x>` to `component:<x>` (the system's own listener is not
+    a service: categories.md, worked adjudications); the re-slugged id part
+    against every node's re-slugged id part; the re-slugged id part against
+    every node's slugged name. The first step that finds any candidate
+    decides: exactly one resolves, several leave the link unresolved. The
+    re-slug and name steps look only at nodes in the target's category. A
+    target whose id part cannot be slugged is left unresolved."""
+    known_ids = {n["id"] for n in nodes}
+    by_canonical = {}
+    by_reslug = {}
+    by_name = {}
+    for n in nodes:
+        by_canonical.setdefault(canonical_id(n["id"]), []).append(n["id"])
+        category, rest = _category_and_rest(n["id"])
+        for index, text in ((by_reslug, rest), (by_name, n["name"])):
+            with contextlib.suppress(ValueError):
+                index.setdefault((category, slug(text)), []).append(n["id"])
+
+    def resolve(target):
         if target in known_ids:
             return target
-        matches = by_canonical.get(canonical_id(target), [])
-        if len(matches) == 1:
-            return matches[0]
-        if _retry and target.startswith("service:"):
-            return resolve("component:" + target[len("service:"):], _retry=False)
+        steps = [by_canonical.get(canonical_id(target), [])]
+        if target.startswith("service:"):
+            component = "component:" + target[len("service:"):]
+            steps.append([component] if component in known_ids
+                         else by_canonical.get(canonical_id(component), []))
+        category, rest = _category_and_rest(target)
+        try:
+            key = (category, slug(rest))
+        except ValueError:
+            key = None
+        if key is not None:
+            steps += [by_reslug.get(key, []), by_name.get(key, [])]
+        for candidates in steps:
+            if candidates:
+                return candidates[0] if len(set(candidates)) == 1 else None
         return None
     return resolve
 
 
-def _build_edges(merged, known_ids):
-    resolve = _resolver(known_ids)
+def _build_edges(merged, nodes):
+    resolve = _resolver(nodes)
+    component_ids = {n["id"] for n in nodes if n["category"] == "component"}
     edges, unresolved = set(), set()
     for category, block in merged.get("categories", {}).items():
         for d in block.get("dependencies") or []:
@@ -94,6 +131,18 @@ def _build_edges(merged, known_ids):
                     unresolved.add((source, target, kind))
                 else:
                     edges.add((source, node, kind, lifecycle))
+            if category != "service":
+                continue
+            for use in d.get("details", {}).get("used_by") or []:
+                if not isinstance(use, dict):
+                    raise InvalidDependencyError(
+                        f"used_by entry of {source!r} is not an object: {use!r}")
+                target = _require(use, "component_id", category)
+                node = resolve(target)
+                if node in component_ids:
+                    edges.add((node, source, "depends_on", "run"))
+                else:
+                    unresolved.add((source, target, "used_by"))
     return ([{"from": f, "to": t, "kind": k, "lifecycle": lc}
              for f, t, k, lc in sorted(edges, key=lambda e: (e[0], e[1], e[2]))],
             [{"from": f, "to": t, "kind": k} for f, t, k in sorted(unresolved)])
@@ -176,10 +225,9 @@ def link_graph(merged, components=None):
     node; it is not part of the contract, and synthesize reconciles it.
     """
     nodes = _build_nodes(merged, components)
-    known_ids = {n["id"] for n in nodes}
-    edges, unresolved = _build_edges(merged, known_ids)
+    edges, unresolved = _build_edges(merged, nodes)
     adjacency = _depends_on_adjacency(edges)
-    cycles = _find_cycles(known_ids, adjacency)
+    cycles = _find_cycles({n["id"] for n in nodes}, adjacency)
     return {"nodes": nodes, "edges": edges, "cycles": cycles}, unresolved
 
 

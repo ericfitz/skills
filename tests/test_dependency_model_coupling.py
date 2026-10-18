@@ -292,5 +292,55 @@ class TestRegistration(unittest.TestCase):
                 self.assertIn(f"**{skill}**", text)
 
 
+class TestSharedIdList(unittest.TestCase):
+    def test_every_discovery_skill_points_at_ids_json(self):
+        for category in CATEGORIES:
+            with self.subTest(skill=category):
+                self.assertIn("ids.json", body(skill_path(category)))
+
+    def test_service_skill_never_shortens_listed_ids(self):
+        text = collapse_ws(body(skill_path("service")))
+        self.assertIn("never shorten", text)
+        self.assertNotIn("a stable slug built from the service's name and role", text)
+
+    def test_service_keeps_topology_named_services_whole(self):
+        text = collapse_ws(body(skill_path("service")))
+        self.assertIn("each topology-named service stays one entry", text)
+        self.assertIn("only for something the topology does not name", text)
+
+    def test_synthesize_runs_idmap(self):
+        text = body(skill_path("synthesize"))
+        self.assertIn("idmap.py", text)
+        self.assertIn("--write", text[text.index("idmap.py"):])
+
+    def test_running_discovery_order(self):
+        text = (PLUGIN / "references" / "running-discovery.md").read_text(encoding="utf-8")
+        text = text[text.index("## The sequence"):]
+        scan = text.index("depscan.py")
+        topology = text.index("profile:topology", scan)
+        idmap = text.index("idmap.py", topology)
+        self.assertLess(scan, topology)
+        self.assertLess(topology, idmap)
+
+    def test_report_documents_out(self):
+        text = collapse_ws(body(skill_path("report")))
+        self.assertIn("--out", text)
+        self.assertIn("does not end in `.md`", text)
+        self.assertIn("parent directory does not exist", text)
+
+    def test_report_frontmatter_and_catalog_mention_out(self):
+        head = body(skill_path("report")).split("---")[1]
+        self.assertIn("--out", head)
+        arch = (REPO / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+        row = next(ln for ln in arch.splitlines() if ln.startswith("| `report` | Renders"))
+        self.assertIn("--out", row)
+
+    def test_architecture_states_who_fills_required_for(self):
+        arch = collapse_ws((REPO / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8"))
+        self.assertNotIn("refining only `required_for`", arch)
+        self.assertIn("used_by", arch)
+        self.assertIn("ids.json", arch)
+
+
 if __name__ == "__main__":
     unittest.main()

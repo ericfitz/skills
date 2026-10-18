@@ -83,18 +83,26 @@ Every id is `<category>:<slug>`. The discovery skills run in parallel, and each
 writes `related_ids` pointing at entries another skill is creating at the
 same moment, so the slug has to be derivable from the evidence alone:
 
-- **Slug form.** Lowercase; `_`, spaces and `/` become `-`; `.` stays
-  (`network:metadata-169.254.169.254`).
+- **Slug form.** Lowercase; remove every balanced parenthesized group
+  (parentheses included); replace each run of characters other than `a-z`,
+  `0-9` and `.` with one `-`; trim leading and trailing `-`. `nats (JetStream)`
+  is `nats`; `OAuth 2.0 / OIDC identity providers (env-discovered; Google, GitHub,
+  Microsoft etc.)` is `oauth-2.0-oidc-identity-providers`; `migrate / dbtool /
+  genconfig` is `migrate-dbtool-genconfig`; `TMI_NATS_URL` is `tmi-nats-url`;
+  `metadata 169.254.169.254` is `metadata-169.254.169.254`. A name that is
+  wholly a parenthesized group keeps its text (`(JetStream)` is `jetstream`):
+  any name that slugs to empty falls back to the rule without group removal,
+  and if that is still empty it is an error; an unbalanced `(` or `)` is punctuation.
 - **`service:`** the name the service already has, in this order: its
   `name` in the topology contract's `real_dependencies[]` or
   `external_third_parties[]`, then its compose or Kubernetes service name,
   then the product name (`service:postgres`, `service:nats`). Add a suffix
   only when the repository itself distinguishes two instances.
 - **`network:`** `<host>-<port>` of the declared endpoint, host slugged:
-  `network:postgres-5432`, `network:api-openai-com-443`.
+  `network:postgres-5432`.
 - **`config:`** the key name slugged: `TMI_NATS_URL` is `config:tmi-nats-url`.
 - **`component:`** the system's own first-party components, slugged from
-  `components[].name` in the topology contract: `component:tmiserver`,
+  `components[].name` in the topology contract: `component:tmi-server`,
   `component:tooling-clis`. Not a category and never an inventory entry —
   `synthesize` adds these nodes from the topology — but the id to write in
   `related_ids` when an entry belongs to one of the system's own parts (an
@@ -104,9 +112,28 @@ same moment, so the slug has to be derivable from the evidence alone:
 - **`security:`, `platform:`, `package:`** as the owning skill defines them;
   links into these categories are rare.
 
+**Shared id list.** When a topology contract exists, `idmap.py` writes
+`<run_dir>/ids.json` from it: the id of every component and every service the
+topology names, plus a `skipped` list of topology services left out because
+they are a component's own listener. Read it before writing any id.
+
+- The service skill emits each topology-named service under exactly its
+  `ids.json` id and never shortens or renames it. It may emit services the
+  topology does not name, slugged by the rule above.
+- Every skill writes a link to a topology-named service or component using its
+  `ids.json` id, never a re-slug of a different spelling of the name.
+- A service that is plainly part of a listed one (Google OAuth inside the OIDC
+  providers entry) links to the listed id rather than inventing a finer one.
+- Without a topology contract there is no `ids.json`; the slug rule applies
+  alone.
+
 Write the id this rule produces even when the target entry is not yet
-visible to you. `depgraph.py` matches ids ignoring case and treating `_` and
-`-` as equal, and lists every link that still matches no node under
+visible to you. `depgraph.py` resolves a written id in this order: exact match;
+canonical match (case-insensitive, `_` and `-` equal); `service:<x>` to
+`component:<x>`; the re-slugged id part against nodes in the same category;
+the re-slugged id part against those nodes' slugged names. The first step
+that finds any candidate decides, and several candidates mean the link is
+unresolved. It lists every link that still matches no node under
 `unresolved`; `synthesize` reconciles those. A link is never silently lost.
 
 ## Never a duplicate

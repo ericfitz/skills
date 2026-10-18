@@ -163,7 +163,7 @@ human confirmation gate, and emits the `scenario` contract. Its durable side eff
 a fenced JSON block at the end. That file is the handoff to `openapi:arazzo`, which is
 why the arazzo skill can skip discovery entirely.
 
-`profile:stack` and `profile:topology` take a path only; under `synthesize --ref` they are handed the scan's `scan_root` snapshot and their contracts are saved to `<run_dir>/stack.json` and `<run_dir>/topology.json` (standalone, they stay in the reply, never in the target repo).
+`profile:stack` and `profile:topology` take a path only; under `synthesize --ref` they are handed the scan's `scan_root` snapshot and their contracts are saved to `<run_dir>/stack.json` and `<run_dir>/topology.json` (invoked directly, outside the dependency-model sequence, they stay in the reply, never in the target repo). `idmap.py` then reads `topology.json` and writes `<run_dir>/ids.json`, the one list of component and service ids the six discovery skills use, so a link in one skill resolves to an entry in another; without a topology contract there is no `ids.json` and the skills slug by the rule in `categories.md`.
 
 `profile:topology` is the seed for all six `dependency-model` discovery skills — the same
 refinement-tier relationship `stack` has to `topology`, and the same one-way direction
@@ -213,14 +213,14 @@ it needs handed to it, blank when it needs nothing from another skill.
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
-| `package` | The libraries the system ships with, with declared/locked/installed resolution and the dependency edges between them | `discovery` contract, `package` category | `topology`; `syft` |
-| `service` | Out-of-project services — databases, caches, queues, object stores, search, APIs — with how each is brought up and how it is declared to fail | `discovery` contract, `service` category | `topology`, `depscan.py` index |
-| `config` | The configuration the system must be supplied with, with what reads each key and what it declares as required or defaulted | `discovery` contract, `config` category | `topology`, `depscan.py` index |
-| `security` | The credential and permission surface — what each secret is named and where it is read, never its value | `discovery` contract, `security` category | `topology`, `depscan.py` index |
-| `platform` | Declared OS and cloud resources — CPU, memory, disk, GPU, architecture, runtime versions, managed services | `discovery` contract, `platform` category | `topology`, `depscan.py` index |
-| `network` | The names, hosts, and ports that must resolve and connect, inbound and outbound | `discovery` contract, `network` category | `topology`, `depscan.py` index |
-| `synthesize` | Merges the six discovery contracts into one inventory and graph, adds the system's own components as nodes, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts, `topology` (components), `depgraph.py`, `health.py` |
-| `report` | Renders the `synthesis` contract into a human-readable document — inventory by category, health definitions, dependency graph, cycles, and assumptions | `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run) | `synthesis` contract |
+| `package` | The libraries the system ships with, with declared/locked/installed resolution and the dependency edges between them | `discovery` contract, `package` category | `topology`, `ids.json`; `syft` |
+| `service` | Out-of-project services — databases, caches, queues, object stores, search, APIs — with how each is brought up and how it is declared to fail | `discovery` contract, `service` category | `topology`, `ids.json`, `depscan.py` index |
+| `config` | The configuration the system must be supplied with, with what reads each key and what it declares as required or defaulted | `discovery` contract, `config` category | `topology`, `ids.json`, `depscan.py` index |
+| `security` | The credential and permission surface — what each secret is named and where it is read, never its value | `discovery` contract, `security` category | `topology`, `ids.json`, `depscan.py` index |
+| `platform` | Declared OS and cloud resources — CPU, memory, disk, GPU, architecture, runtime versions, managed services | `discovery` contract, `platform` category | `topology`, `ids.json`, `depscan.py` index |
+| `network` | The names, hosts, and ports that must resolve and connect, inbound and outbound | `discovery` contract, `network` category | `topology`, `ids.json`, `depscan.py` index |
+| `synthesize` | Merges the six discovery contracts into one inventory and graph, adds the system's own components as nodes, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts, `topology` (components), `idmap.py`, `depgraph.py`, `health.py` |
+| `report` | Renders the `synthesis` contract into a human-readable document — inventory by category, health definitions, dependency graph, cycles, and assumptions | `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`) | `synthesis` contract |
 
 All six discovery skills emit the same `discovery` envelope with exactly one key
 under `categories` populated, so merging them is a key union rather than a
@@ -231,10 +231,11 @@ contract, so the system's own parts are health anchors without ever being
 inventory entries —
 reconciles any `related_ids` that `depgraph.py` reports as `unresolved`, and
 derives the health view with `health.py` — a deterministic pass over the
-merged graph and its resilience facts — refining only `required_for` and
-the gaps the envelopes cannot record, emitting the `synthesis` contract. `report` renders that contract into
+merged graph and its resilience facts — in which the script fills `required_for`
+from each service's `details.used_by` and `synthesize` may only add ids, while it
+also records the gaps the envelopes cannot — emitting the `synthesis` contract. `report` renders that contract into
 `docs/dependencies.md`, adding no facts of its own; a `--ref` run writes it to
-the scan's run dir instead, so the checked-out tree is never touched.
+the scan's run dir instead, so the checked-out tree is never touched, and `--out <file.md>` names the file explicitly.
 
 ### dev
 
