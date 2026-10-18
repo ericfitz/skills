@@ -273,6 +273,36 @@ class TestInvalidDependency(unittest.TestCase):
         self.assertIn("error", json.loads(err))
 
 
+TMI_RESOLVED = [
+    ("config:oauth-providers-<id>-<field>", "service:oauth-oidc-providers"),
+    ("config:saml-providers-<id>-<field>", "service:saml-idps"),
+    ("config:tmi-content-source-microsoft-application-object-id", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-client-id", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-enabled", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-picker-origin", "service:microsoft-graph"),
+    ("config:tmi-content-source-microsoft-tenant-id", "service:microsoft-graph"),
+    ("config:tmi-extraction-async-enabled", "service:nats"),
+    ("config:tmi-job-ack-wait", "service:nats"),
+    ("config:tmi-nats-creds", "service:nats"),
+    ("config:tmi-nats-tls-ca-file", "service:nats"),
+    ("config:tmi-nats-tls-cert-file", "service:nats"),
+    ("config:tmi-nats-tls-key-file", "service:nats"),
+    ("config:tmi-nats-tls-server-name", "service:nats"),
+    ("config:tmi-nats-url", "service:nats"),
+    ("config:tmi-saml-enabled", "service:saml-idps"),
+    ("config:tmi-worker-heartbeat-subject", "service:nats"),
+    ("network:api.github.com-443", "service:oauth-oidc-providers"),
+    ("network:graph.microsoft.com-443", "service:microsoft-graph"),
+    ("network:login.microsoftonline.com-443", "service:oauth-oidc-providers"),
+    ("network:nats-service-host-4222", "service:nats"),
+    ("network:nats.tmi-platform.svc-4222", "service:nats"),
+    ("network:nats.tmi-platform.svc-8222", "service:nats"),
+    ("network:oauth2.googleapis.com-443", "service:oauth-oidc-providers"),
+    ("network:openidconnect.googleapis.com-443", "service:oauth-oidc-providers"),
+    ("network:www.googleapis.com-443", "service:oauth-oidc-providers"),
+]
+
+
 TMI_STILL_UNRESOLVED = [
     "config:tmi-oracle-wallet-zip",
     "config:tns-admin",
@@ -330,7 +360,31 @@ class TestFallbackMatching(unittest.TestCase):
         _, unresolved = link_graph(merged(
             service=[dep("service:a", "Google Drive"), dep("service:b", "google-drive")],
             config=[dep("config:c", "C", related=["service:google-drive"])]))
-        self.assertEqual(len(unresolved), 1)
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:google-drive",
+                                       "kind": "relates_to"}])
+
+    def test_ambiguous_reslug_does_not_fall_through_to_name(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:nats", "other"), dep("service:nats-(tls)", "other2"),
+                     dep("service:x", "nats")],
+            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]))
+        self.assertEqual([u["to"] for u in unresolved], ["service:nats-(jetstream)"])
+
+    def test_ambiguous_canonical_does_not_fall_through_to_reslug(self):
+        _, unresolved = link_graph(merged(
+            service=[dep("service:Nats_X", "a"), dep("service:nats-x", "b"),
+                     dep("service:nats-x-(tls)", "c")],
+            config=[dep("config:c", "C", related=["service:NATS-X"])]))
+        self.assertEqual([u["to"] for u in unresolved], ["service:NATS-X"])
+
+    def test_component_retry_does_not_fuzzy_match_components(self):
+        g, unresolved = link_graph(merged(
+            service=[dep("service:nats", "nats")],
+            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]),
+            [{"name": "nats"}])
+        self.assertEqual(unresolved, [])
+        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]],
+                         [("config:c", "service:nats")])
 
     def test_fallbacks_never_cross_categories(self):
         _, unresolved = link_graph(merged(
@@ -344,7 +398,8 @@ class TestFallbackMatching(unittest.TestCase):
         _, unresolved = link_graph(merged(
             service=[dep("service:nats", "nats")],
             config=[dep("config:c", "C", related=["service:()"])]))
-        self.assertEqual(len(unresolved), 1)
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:()",
+                                       "kind": "relates_to"}])
 
     def test_tmi_regression(self):
         fixture = json.loads((Path(__file__).parent / "fixtures" / "dependency_model"
@@ -364,8 +419,10 @@ class TestFallbackMatching(unittest.TestCase):
                 dep(node["id"], node["name"], related=related, depends=depends or None))
         components = [{"name": n["name"]} for n in fixture["nodes"]
                       if n["category"] == "component"]
-        _, unresolved = link_graph(merged(**cats), components)
-        self.assertEqual(len(fixture["links"]) - len(unresolved), 26)
+        graph, unresolved = link_graph(merged(**cats), components)
+        resolved = sorted((e["from"], e["to"]) for e in graph["edges"])
+        self.assertEqual(len(resolved), 26)
+        self.assertEqual(resolved, TMI_RESOLVED)
         self.assertEqual(sorted(u["to"] for u in unresolved), TMI_STILL_UNRESOLVED)
 
 

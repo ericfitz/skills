@@ -67,7 +67,8 @@ def _resolver(nodes):
     match; `service:<x>` to `component:<x>` (the system's own listener is not
     a service: categories.md, worked adjudications); the re-slugged id part
     against every node's re-slugged id part; the re-slugged id part against
-    every node's slugged name. Each step needs exactly one candidate, and the
+    every node's slugged name. The first step that finds any candidate
+    decides: exactly one resolves, several leave the link unresolved. The
     re-slug and name steps look only at nodes in the target's category. A
     target whose id part cannot be slugged is left unresolved."""
     known_ids = {n["id"] for n in nodes}
@@ -81,25 +82,25 @@ def _resolver(nodes):
             with contextlib.suppress(ValueError):
                 index.setdefault((category, slug(text)), []).append(n["id"])
 
-    def unique(candidates):
-        return candidates[0] if candidates and len(set(candidates)) == 1 else None
-
-    def resolve(target, _retry=True):
+    def resolve(target):
         if target in known_ids:
             return target
-        matches = by_canonical.get(canonical_id(target), [])
-        if len(matches) == 1:
-            return matches[0]
-        if _retry and target.startswith("service:"):
-            found = resolve("component:" + target[len("service:"):], _retry=False)
-            if found:
-                return found
+        steps = [by_canonical.get(canonical_id(target), [])]
+        if target.startswith("service:"):
+            component = "component:" + target[len("service:"):]
+            steps.append([component] if component in known_ids
+                         else by_canonical.get(canonical_id(component), []))
         category, rest = _category_and_rest(target)
         try:
             key = (category, slug(rest))
         except ValueError:
-            return None
-        return unique(by_reslug.get(key, [])) or unique(by_name.get(key, []))
+            key = None
+        if key is not None:
+            steps += [by_reslug.get(key, []), by_name.get(key, [])]
+        for candidates in steps:
+            if candidates:
+                return candidates[0] if len(set(candidates)) == 1 else None
+        return None
     return resolve
 
 

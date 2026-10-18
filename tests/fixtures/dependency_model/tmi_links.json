@@ -1,46 +1,6 @@
 {
  "nodes": [
   {
-   "id": "component:migrate-dbtool-genconfig-worker-probe-dedup-group-members",
-   "name": "migrate / dbtool / genconfig / worker-probe / dedup-group-members",
-   "category": "component"
-  },
-  {
-   "id": "component:tmi-chunk-embed",
-   "name": "tmi-chunk-embed",
-   "category": "component"
-  },
-  {
-   "id": "component:tmi-component-controller",
-   "name": "tmi-component-controller",
-   "category": "component"
-  },
-  {
-   "id": "component:tmi-extractor",
-   "name": "tmi-extractor",
-   "category": "component"
-  },
-  {
-   "id": "component:tmi-rotator",
-   "name": "tmi-rotator",
-   "category": "component"
-  },
-  {
-   "id": "component:tmi-server",
-   "name": "tmi-server",
-   "category": "component"
-  },
-  {
-   "id": "component:tmi-server-oracle",
-   "name": "tmi-server-oracle",
-   "category": "component"
-  },
-  {
-   "id": "component:wstest",
-   "name": "wstest",
-   "category": "component"
-  },
-  {
    "id": "config:oauth-providers-<id>-<field>",
    "name": "OAUTH_PROVIDERS_<ID>_<FIELD>",
    "category": "config"
@@ -191,63 +151,13 @@
    "category": "config"
   },
   {
-   "id": "network:*.atlassian.net-443",
-   "name": "*.atlassian.net:443",
-   "category": "network"
-  },
-  {
-   "id": "network:0.0.0.0-0-443",
-   "name": "egress 0.0.0.0/0:443",
-   "category": "network"
-  },
-  {
-   "id": "network:0.0.0.0-0-80",
-   "name": "egress 0.0.0.0/0:80",
-   "category": "network"
-  },
-  {
-   "id": "network:34.232.165.1",
-   "name": "NAT egress EIP 34.232.165.1",
-   "category": "network"
-  },
-  {
-   "id": "network:api.atlassian.com-443",
-   "name": "api.atlassian.com:443",
-   "category": "network"
-  },
-  {
    "id": "network:api.github.com-443",
    "name": "api.github.com:443",
    "category": "network"
   },
   {
-   "id": "network:api.openai.com-443",
-   "name": "api.openai.com:443",
-   "category": "network"
-  },
-  {
-   "id": "network:api.tmi.dev-443",
-   "name": "api.tmi.dev:443",
-   "category": "network"
-  },
-  {
-   "id": "network:api.tmi.dev-80",
-   "name": "api.tmi.dev:80",
-   "category": "network"
-  },
-  {
-   "id": "network:eks-nodes-8080",
-   "name": "ALB -> EKS nodes :8080",
-   "category": "network"
-  },
-  {
    "id": "network:graph.microsoft.com-443",
    "name": "graph.microsoft.com:443",
-   "category": "network"
-  },
-  {
-   "id": "network:kubernetes.default.svc-443",
-   "name": "kubernetes.default.svc:443",
    "category": "network"
   },
   {
@@ -281,56 +191,6 @@
    "category": "network"
   },
   {
-   "id": "network:oracle-tns-alias",
-   "name": "tns_alias",
-   "category": "network"
-  },
-  {
-   "id": "network:postgres-5432",
-   "name": "postgres:5432",
-   "category": "network"
-  },
-  {
-   "id": "network:rds-5432",
-   "name": "${var.db_host}:5432",
-   "category": "network"
-  },
-  {
-   "id": "network:redis-6379",
-   "name": "redis:6379",
-   "category": "network"
-  },
-  {
-   "id": "network:route53-acm-validation",
-   "name": "Route 53 ACM validation records",
-   "category": "network"
-  },
-  {
-   "id": "network:route53-server-cname",
-   "name": "Route 53 CNAME var.server_domain",
-   "category": "network"
-  },
-  {
-   "id": "network:route53-ux-cname",
-   "name": "Route 53 CNAME var.ux_domain",
-   "category": "network"
-  },
-  {
-   "id": "network:s3-vpc-endpoint",
-   "name": "S3 gateway VPC endpoint",
-   "category": "network"
-  },
-  {
-   "id": "network:tmi-server-8080",
-   "name": "tmi-server:8080",
-   "category": "network"
-  },
-  {
-   "id": "network:var.vpc-cidr-53",
-   "name": "egress var.vpc_cidr:53",
-   "category": "network"
-  },
-  {
    "id": "network:www.googleapis.com-443",
    "name": "www.googleapis.com:443",
    "category": "network"
@@ -356,36 +216,6 @@
    "category": "security"
   },
   {
-   "id": "service:anthropic-api",
-   "name": "Anthropic API",
-   "category": "service"
-  },
-  {
-   "id": "service:atlassian-confluence",
-   "name": "Atlassian Confluence",
-   "category": "service"
-  },
-  {
-   "id": "service:aws-secrets-manager",
-   "name": "AWS Secrets Manager",
-   "category": "service"
-  },
-  {
-   "id": "service:google-drive-api",
-   "name": "Google Drive / Workspace APIs",
-   "category": "service"
-  },
-  {
-   "id": "service:http-content-sources",
-   "name": "arbitrary HTTP(S) content URLs",
-   "category": "service"
-  },
-  {
-   "id": "service:kubernetes-api",
-   "name": "kubernetes API server",
-   "category": "service"
-  },
-  {
    "id": "service:microsoft-graph",
    "name": "Microsoft Graph",
    "category": "service"
@@ -401,43 +231,13 @@
    "category": "service"
   },
   {
-   "id": "service:openai-api",
-   "name": "OpenAI API",
-   "category": "service"
-  },
-  {
    "id": "service:oracle-adb",
    "name": "oracle-adb",
    "category": "service"
   },
   {
-   "id": "service:otlp-collector",
-   "name": "OpenTelemetry OTLP collector",
-   "category": "service"
-  },
-  {
-   "id": "service:postgres",
-   "name": "postgres",
-   "category": "service"
-  },
-  {
-   "id": "service:redis",
-   "name": "redis",
-   "category": "service"
-  },
-  {
-   "id": "service:rerank-api",
-   "name": "rerank API",
-   "category": "service"
-  },
-  {
    "id": "service:saml-idps",
    "name": "SAML identity providers",
-   "category": "service"
-  },
-  {
-   "id": "service:webhook-receivers",
-   "name": "webhook receivers",
    "category": "service"
   }
  ],
