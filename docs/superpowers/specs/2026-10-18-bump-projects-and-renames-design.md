@@ -58,7 +58,8 @@ below was made by Claude under that instruction, not by the user; each is easy t
    the project's `pyproject.toml` names pytest (a dependency, extra, group or a
    `[tool.pytest...]` table) and ruff when it names ruff (likewise, or `[tool.ruff]`).
    A step not declared is `"skipped"` with `<step>_output` saying none is declared.
-   `"skipped"` never triggers bisect.
+   `"skipped"` never triggers bisect. This applies to uv projects only: pip mode has no
+   `pyproject.toml` to read declarations from and still runs both steps.
 7. **Renamed Go modules are found in `outdated`, not in `apply`.** For every outdated
    record, one batched `go list -m -e -json=Path,Version,GoMod,Error <mod>@<latest> ...` call
    returns each target's cached `GoMod` path (`-e` keeps one bad spec from aborting the
