@@ -41,12 +41,16 @@ def _fail(message):
 
 
 def _names(topology, key):
-    entries = topology.get(key) or []
+    entries = topology.get(key)
+    if entries is None:
+        return []
     if not isinstance(entries, list):
         raise ValueError(f"{key} must be a list, got {type(entries).__name__}")
     names = []
     for i, entry in enumerate(entries):
-        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+        if not isinstance(entry, dict):
+            raise ValueError(f"{key}[{i}] is not an object")
+        if not isinstance(entry.get("name"), str):
             raise ValueError(f"{key}[{i}] has no string `name`")
         names.append(entry["name"])
     return names

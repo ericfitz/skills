@@ -61,13 +61,14 @@ class IdmapCliTest(unittest.TestCase):
         ])
 
     def test_service_matching_a_component_is_skipped(self):
-        result, _ = run_doc(topo(components=["tmi-server"], real=["tmi-server", "redis"]))
+        result, _ = run_doc(topo(components=["tmi-server", "api"], real=["tmi-server", "redis"],
+                                 ext=["api"]))
         self.assertEqual(result.returncode, 0, result.stderr)
         doc = json.loads(result.stdout)
         self.assertEqual([s["name"] for s in doc["services"]], ["redis"])
-        self.assertEqual(len(doc["skipped"]), 1)
-        self.assertEqual(doc["skipped"][0]["name"], "tmi-server")
-        self.assertIn("component:tmi-server", doc["skipped"][0]["reason"])
+        self.assertEqual([k["name"] for k in doc["skipped"]], ["api", "tmi-server"])
+        self.assertIn("component:api", doc["skipped"][0]["reason"])
+        self.assertIn("component:tmi-server", doc["skipped"][1]["reason"])
 
     def test_collision_fallback(self):
         result, _ = run_doc(topo(real=["db (a)", "db (b)"]))
@@ -99,9 +100,24 @@ class IdmapCliTest(unittest.TestCase):
                 self.assertIn("error", json.loads(result.stderr))
 
     def test_list_that_is_not_a_list_exits_2(self):
-        result, _ = run_doc({"components": {"name": "x"}})
+        for key in ("components", "real_dependencies", "external_third_parties"):
+            for value in ({"name": "x"}, 0, False, "", "redis"):
+                with self.subTest(key=key, value=value):
+                    result, _ = run_doc({key: value})
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn(key, json.loads(result.stderr)["error"])
+
+    def test_null_lists_are_empty(self):
+        result, _ = run_doc({"components": None, "real_dependencies": None,
+                             "external_third_parties": None})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout),
+                         {"components": [], "services": [], "skipped": []})
+
+    def test_non_object_entry_says_so(self):
+        result, _ = run_doc({"external_third_parties": ["redis"]})
         self.assertEqual(result.returncode, 2)
-        self.assertIn("error", json.loads(result.stderr))
+        self.assertIn("is not an object", result.stderr)
 
     def test_invalid_json_exits_2(self):
         result, files = run_doc("{not json", "--write")
