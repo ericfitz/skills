@@ -152,7 +152,7 @@ bump.py issueTracker <TRACKER> issues # -> Context(issues=[...])
 
 If `HOST`/`TRACKER` is `none`, these return empty shapes — no error, nothing to skip.
 
-**Merge advisories:** the full advisory set = (union of every ecosystem's `audit`) ∪ (`codeHost alerts`). De-dupe by package name where sensible. Keep the issues/PRs context for the plan and to flag complications in Phase 5.
+**Merge advisories:** the full advisory set = (union of every ecosystem's `audit`) ∪ (`codeHost alerts`). Pass them all to `categorize` unmerged: it merges advisories per package itself (highest fixed version, first known current version, every id) and keeps an advisory from a nested project's manifest separate from the root one. Keep the issues/PRs context for the plan and to flag complications in Phase 5.
 
 ### Phase 5: Categorize and Display
 
@@ -180,10 +180,11 @@ echo '{
 `bump.py categorize` reads the payload JSON from stdin (optional `--root DIR`, default `.`), merges disk exclusions/holds, and prints a `Categories` value with four buckets: `securityFixes`, `safe`, `needsPlan`, `skipped` (each an UpdateRecord with an added `reason`, and `advisory` when one applies). See `reference/contracts.md`.
 
 **Categorization rules.** The rules below marked *(CLI)* are mechanically enforced by `bump.py categorize` from bump level, exclude globs, holds, replace targets, and pins. Rules marked *(judgment)* are not implemented by the categorizer — they are applied by you, the skill, when reading gathered issues/Dependabot context/changelogs, and should route a package into Needs Plan manually even though the CLI would otherwise call it safe:
-- **Security Fix** (auto-apply) *(CLI)*: patch/minor bump that resolves an advisory, not excluded/held/pinned. Major security fixes go to Needs Plan.
+- **Security Fix** (auto-apply) *(CLI)*: patch/minor bump that resolves an advisory, not excluded/held/pinned. Major security fixes go to Needs Plan. An advisory on a package with no update record (a transitive dependency) becomes a `kind: "transitive"` record from the advisory's current and fixed versions and is bucketed by the same rules.
+- **Advisories the CLI cannot act on** *(CLI)*: no fixed version, no known current version (Dependabot does not report one; `bump` is `"unknown"`), or a manifest in a subdirectory (a separate project this run does not cover, named in the reason) all go to Needs Plan. No advisory is dropped.
 - **Safe Update** (auto-apply) *(CLI)*: patch or minor bump, not excluded/held/pinned, not a major, not a replace target.
 - **Needs Plan** (never auto-apply): major bumps, excluded/held/pinned packages, and major security fixes are routed here by the CLI *(CLI)*; additionally, treat a package as Needs Plan yourself *(judgment)* when GitHub issues or Dependabot context indicate complications the categorizer can't see.
-- **Skipped** *(CLI)*: replace-directive targets and up-to-date packages.
+- **Skipped** *(CLI)*: replace-directive targets, up-to-date packages, and advisories whose current version is already at or past the fix.
 
 **Display** the four categories per ecosystem using the original table formats:
 
@@ -220,7 +221,7 @@ Skipped: 2 replace directives
 
 Repeat per ecosystem (Node's format additionally distinguishes override updates and security fixes — keep those sub-tables when the data has them). If no exclusions were found from any source, note `No exclusion rules found.`
 
-**Note on transitive/override updates:** Override and transitive version pins are surfaced in the display and Phase 10 manual plan; they are not auto-applied by the `apply` phase in this version.
+**Note on transitive/override updates:** a transitive security fix in Security Fixes is applied like any other spec (`name==X.Y.Z`, `name@X.Y.Z`, `module@vX.Y.Z`); each adapter's `apply` moves a transitive package through the lockfile. Node override entries and other version pins are surfaced in the display and Phase 10 manual plan; they are not auto-applied.
 
 ### Phase 6: Changelog Research (Needs-Plan majors)
 
@@ -335,15 +336,18 @@ Skip Steps 5–6, proceed to Phase 10. In Phase 11, because the PR is still open
 
 **Step 5 — Ready → merge automatically (squash), no confirmation:**
 ```bash
-bump.py codeHost <HOST> merge-pr <number>   # -> {"ok": bool, "output": str}; squash-merges and deletes the remote branch
+bump.py codeHost <HOST> merge-pr <number>   # -> {"ok": bool, "output": str}; gh pr merge --squash --delete-branch
 ```
-If `ok` is false, report the error, leave the PR open and the branch in place, and stop (do not delete the branch). On success: `Merged PR #<number> (squash) and deleted remote branch.`
+If `ok` is false, report the error, leave the PR open and the branch in place, and stop (do not delete the branch). On success: `Merged PR #<number> (squash) and deleted remote branch.` Run from the repo, `gh pr merge --delete-branch` usually also checks out `$BASE_BRANCH`, pulls, and deletes the local bump branch, so Step 6 must tolerate that work being done already.
 
 **Step 6 — Local cleanup:**
 ```bash
-git checkout "$BASE_BRANCH" && git pull && git branch -D "$BUMP_BRANCH"
+git checkout "$BASE_BRANCH" && git pull
+if git rev-parse --verify --quiet "refs/heads/$BUMP_BRANCH" >/dev/null; then
+  git branch -D "$BUMP_BRANCH"
+fi
 ```
-`git pull` fast-forwards `$BASE_BRANCH` to include the squash-merged commit; `-D` is required because the squash leaves the branch's individual commits unreachable. Record that the PR was merged for Phase 11.
+`git pull` fast-forwards `$BASE_BRANCH` to include the squash-merged commit (a no-op when `merge-pr` already pulled). The local branch is deleted only if `merge-pr` left it; `-D` is required because the squash leaves the branch's individual commits unreachable. Record that the PR was merged for Phase 11.
 
 ### Phase 10: Plan for Remaining Updates
 
@@ -436,7 +440,7 @@ The `Pull Request:` line reflects the actual outcome:
 
 ## Implementation Notes
 
-1. **Transitive dependencies**: `outdated` lists direct dependencies; transitive vulnerabilities surface through `audit`/`alerts`. For Node, transitive versions can be pinned via overrides.
+1. **Transitive dependencies**: `outdated` lists direct dependencies; transitive vulnerabilities surface through `audit`/`alerts`, and `categorize` turns each into a `transitive` record (see Phase 5). The Python/uv audit exports every extra and dependency group, so a package reached only through an optional extra is audited too. For Node, transitive versions can also be pinned via overrides.
 2. **Lockfiles**: `go.sum`, `pnpm-lock.yaml`, `package-lock.json`, `uv.lock` change as a result of `apply` (see `filesModified`) and must be committed.
 3. **Go replace directives**: always skipped — pass replace-target module paths as `replaceTargets` so the categorizer routes them to Skipped. Never auto-modify them.
 4. **Go workspaces**: when `detect` reports `workspace: true` (`go.work`), the Go adapter's `outdated`/`audit`/`apply` operate across the workspace.

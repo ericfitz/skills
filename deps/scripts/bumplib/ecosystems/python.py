@@ -94,13 +94,19 @@ def _audit_uv(root: Path) -> list:
     """
     with tempfile.TemporaryDirectory() as tmp:
         pylock = Path(tmp) / "pylock.toml"
+        # Every extra and group: a package reached only through an optional extra is
+        # still pinned in uv.lock and still ships to whoever installs that extra.
         exported = _run(["uv", "export", "--frozen", "--project", str(root),
+                         "--all-extras", "--all-groups",
                          "--format", "pylock.toml", "-o", str(pylock)])
         if exported.returncode != 0:
             return []       # no lockfile, or stale under --frozen: report nothing found
         out = _run(["uv", "tool", "run", "pip-audit", "--locked", str(pylock.parent),
                     "--format", "json", "--progress-spinner", "off"])
-        return _parse_audit_lenient(out.stdout)
+        advs = _parse_audit_lenient(out.stdout)
+        for a in advs:
+            a.location = "uv.lock"
+        return advs
 
 
 def _parse_audit_lenient(text: str) -> list:

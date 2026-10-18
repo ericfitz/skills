@@ -1,6 +1,7 @@
 """Agnostic categorizer: semver comparison + glob exclusion, no provider knowledge."""
 import re
 from dataclasses import asdict
+from pathlib import PurePosixPath
 
 from . import contracts as c
 
@@ -68,14 +69,75 @@ def _item(rec, reason, advisory=None):
     return d
 
 
+_SEVERITY_RANK = {"LOW": 1, "MODERATE": 2, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+
+
+def _nested(location: str) -> bool:
+    """A manifest in a subdirectory belongs to a separate project, which the ecosystem
+    adapters (rooted at the project directory) neither list nor apply to."""
+    return PurePosixPath(location or ".").parent != PurePosixPath(".")
+
+
+def _merge(advs) -> c.Advisory:
+    """One advisory per package: the highest fixed version, the first known current
+    version, the highest severity, and every id in first-seen order."""
+    ids = []
+    for a in advs:
+        ids += [i for i in a.ids if i and i not in ids]
+    fixes = [a.fixed for a in advs if a.fixed]
+    return c.Advisory(
+        package=advs[0].package,
+        ecosystem=next((a.ecosystem for a in advs if a.ecosystem), ""),
+        severity=max((a.severity for a in advs), key=lambda s: _SEVERITY_RANK.get(s.upper(), 0)),
+        current=next((a.current for a in advs if a.current), ""),
+        fixed=max(fixes, key=parse_semver) if fixes else "",
+        ids=ids,
+        summary=next((a.summary for a in advs if a.summary), ""),
+        source=", ".join(dict.fromkeys(a.source for a in advs if a.source)),
+        location=next((a.location for a in advs if a.location), ""))
+
+
+def _place_advisory(out, adv, nested, exclude, holds):
+    """Bucket an advisory no update record matched. It becomes a `transitive` record
+    (current from the advisory, latest = its fix) so that it is applied or planned
+    like any other update instead of disappearing."""
+    known = bool(adv.current and adv.fixed)
+    bump = classify_bump(adv.current, adv.fixed) if known else (
+        c.BUMP_NONE if adv.current else c.BUMP_UNKNOWN)
+    rec = c.UpdateRecord(name=adv.package, current=adv.current, latest=adv.fixed,
+                         wanted=adv.fixed, bump=bump, kind="transitive",
+                         location=adv.location, ecosystem=adv.ecosystem)
+    if nested:
+        out.needsPlan.append(_item(rec, f"advisory in {adv.location}, a separate project "
+                                        "this run does not cover", adv))
+    elif not adv.fixed:
+        out.needsPlan.append(_item(rec, "security advisory with no fixed version", adv))
+    elif not adv.current:
+        out.needsPlan.append(_item(rec, f"current version unknown; fixed in {adv.fixed}", adv))
+    elif bump == c.BUMP_NONE:
+        out.skipped.append(_item(rec, f"advisory already fixed ({adv.current} >= {adv.fixed})", adv))
+    elif excl := _excluded(rec, exclude, holds):
+        out.needsPlan.append(_item(rec, excl, adv))
+    elif bump == c.BUMP_MAJOR:
+        out.needsPlan.append(_item(rec, f"Major security fix ({adv.current} -> {adv.fixed})", adv))
+    else:
+        sev = adv.ids[0] if adv.ids else adv.severity
+        out.securityFixes.append(_item(rec, f"transitive security fix ({sev})", adv))
+
+
 def categorize(updates, advisories, exclude, holds, replace_targets) -> c.Categories:
-    adv_index = {a.package: a for a in advisories}
+    groups = {}
+    for a in advisories:
+        groups.setdefault((a.package, a.location if _nested(a.location) else ""), []).append(a)
+    merged = {key: _merge(advs) for key, advs in groups.items()}
+    adv_index = {pkg: a for (pkg, nested), a in merged.items() if not nested}
     out = c.Categories()
     for rec in updates:
-        if rec.name in replace_targets or rec.bump == c.BUMP_NONE:
-            out.skipped.append(_item(rec, "replace directive" if rec.name in replace_targets else "up to date"))
-            continue
         adv = adv_index.get(rec.name)
+        if rec.name in replace_targets or rec.bump == c.BUMP_NONE:
+            out.skipped.append(_item(rec, "replace directive" if rec.name in replace_targets else "up to date",
+                                     adv))
+            continue
         excl = _excluded(rec, exclude, holds)
         if rec.bump == c.BUMP_MAJOR:
             reason = "Major security fix" if adv else f"Major ({rec.current} -> {rec.latest})"
@@ -87,4 +149,8 @@ def categorize(updates, advisories, exclude, holds, replace_targets) -> c.Catego
             out.securityFixes.append(_item(rec, f"security fix ({sev})", adv))
         else:
             out.safe.append(_item(rec, f"{rec.bump} update"))
+    recorded = {rec.name for rec in updates}
+    for (pkg, nested), adv in sorted(merged.items()):
+        if nested or pkg not in recorded:
+            _place_advisory(out, adv, bool(nested), exclude, holds)
     return out

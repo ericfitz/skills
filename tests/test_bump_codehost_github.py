@@ -24,6 +24,26 @@ class TestGitHubCodeHost(unittest.TestCase):
         self.assertEqual(nltk.fixed, "")
         self.assertEqual(nltk.severity, "HIGH")
 
+    def test_parse_alerts_normalizes_ecosystem_to_the_contract_names(self):
+        advs = {a.package: a for a in gh.parse_alerts((FIX / "dependabot_alerts.json").read_text())}
+        self.assertEqual(advs["qs"].ecosystem, "node")
+        self.assertEqual(advs["nltk"].ecosystem, "python")
+        self.assertEqual(advs["pypdf"].ecosystem, "python")
+
+    def test_parse_alerts_passes_an_unmapped_ecosystem_through_lowercased(self):
+        advs = {a.package: a for a in gh.parse_alerts((FIX / "dependabot_alerts.json").read_text())}
+        self.assertEqual(advs["rack"].ecosystem, "rubygems")
+
+    def test_parse_alerts_carries_ghsa_and_cve_ids(self):
+        advs = {a.package: a for a in gh.parse_alerts((FIX / "dependabot_alerts.json").read_text())}
+        self.assertEqual(advs["pypdf"].ids, ["GHSA-v247-6f48-mgcj", "CVE-2026-102999"])
+        self.assertEqual(advs["qs"].ids, [])
+
+    def test_parse_alerts_records_the_manifest_as_location(self):
+        advs = {a.package: a for a in gh.parse_alerts((FIX / "dependabot_alerts.json").read_text())}
+        self.assertEqual(advs["pypdf"].location, "writing/skills/boring/uv.lock")
+        self.assertEqual(advs["qs"].location, "")
+
     def test_parse_prs(self):
         ctx = gh.parse_prs((FIX / "dep_prs.json").read_text())
         self.assertEqual(ctx.pullRequests[0]["id"], "#42")

@@ -5,4 +5,17 @@
   { "state": "open",
     "security_advisory": { "summary": "nltk path traversal", "severity": "high" },
     "security_vulnerability": { "first_patched_version": null },
-    "dependency": { "package": { "ecosystem": "pip", "name": "nltk" } } } ]
+    "dependency": { "package": { "ecosystem": "pip", "name": "nltk" } } },
+  { "state": "open",
+    "security_advisory": { "summary": "pypdf long runtimes", "severity": "high",
+                           "ghsa_id": "GHSA-v247-6f48-mgcj", "cve_id": "CVE-2026-102999",
+                           "identifiers": [ { "type": "GHSA", "value": "GHSA-v247-6f48-mgcj" },
+                                            { "type": "CVE", "value": "CVE-2026-102999" } ] },
+    "security_vulnerability": { "first_patched_version": { "identifier": "6.19.0" },
+                                "vulnerable_version_range": "< 6.19.0" },
+    "dependency": { "package": { "ecosystem": "pip", "name": "pypdf" },
+                    "manifest_path": "writing/skills/boring/uv.lock" } },
+  { "state": "open",
+    "security_advisory": { "summary": "gem thing", "severity": "low" },
+    "security_vulnerability": { "first_patched_version": { "identifier": "1.2.3" } },
+    "dependency": { "package": { "ecosystem": "RubyGems", "name": "rack" } } } ]

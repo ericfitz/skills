@@ -323,6 +323,21 @@ class TestAuditAgainstLockfile(unittest.TestCase):
         self.assertEqual(exp[exp.index("--format") + 1], "pylock.toml")
         self.assertEqual(exp[exp.index("--project") + 1], str(self.root))
 
+    def test_export_includes_every_extra_and_group(self):
+        """A package reached only through an optional extra (nltk via `boring`) is
+        still in uv.lock and still ships to whoever installs the extra; the default
+        export leaves it out, so its advisories were never seen."""
+        py.handle("audit", [])
+        exp = self._export_call()
+        self.assertIn("--all-extras", exp)
+        self.assertIn("--all-groups", exp)
+
+    def test_lockfile_advisories_are_located_at_uv_lock(self):
+        self.responses["pip-audit"] = (1, (FIX / "pip_audit.json").read_text())
+        advs = py.handle("audit", [])
+        self.assertTrue(advs)
+        self.assertEqual({a.location for a in advs}, {"uv.lock"})
+
     def test_audits_the_exported_file_not_the_environment(self):
         py.handle("audit", [])
         exp, aud = self._export_call(), self._audit_call()

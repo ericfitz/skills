@@ -127,5 +127,108 @@ class TestCategorize(unittest.TestCase):
         self.assertIn("Major security", out.needsPlan[0]["reason"])
 
 
+
+def adv(package, current="", fixed="", ids=(), location="", ecosystem="python", severity="HIGH"):
+    return c.Advisory(package=package, ecosystem=ecosystem, severity=severity, current=current,
+                      fixed=fixed, ids=list(ids), location=location)
+
+
+class TestAdvisoryWithoutUpdateRecord(unittest.TestCase):
+    """An advisory on a package that is not directly outdated -- every transitive
+    one -- used to vanish because categorize only looked advisories up from an
+    update record. Each now lands in exactly one bucket."""
+
+    def test_patch_fix_becomes_a_transitive_security_fix(self):
+        out = cat.categorize([], [adv("urllib3", "2.7.0", "2.7.1", ids=["GHSA-1"])], [], {}, set())
+        [item] = out.securityFixes
+        self.assertEqual((item["name"], item["current"], item["latest"], item["bump"], item["kind"]),
+                         ("urllib3", "2.7.0", "2.7.1", "patch", "transitive"))
+        self.assertEqual(item["ecosystem"], "python")
+        self.assertIn("GHSA-1", item["reason"])
+        self.assertEqual(item["advisory"]["package"], "urllib3")
+
+    def test_several_advisories_merge_to_the_highest_fix(self):
+        out = cat.categorize([], [adv("nltk", "3.10.0", "3.10.1", ids=["A"]),
+                                  adv("nltk", "", "3.10.3", ids=["B"], location="uv.lock"),
+                                  adv("nltk", "3.10.0", "3.10.2", ids=["A", "C"])],
+                             [], {}, set())
+        [item] = out.securityFixes
+        self.assertEqual((item["current"], item["latest"], item["bump"]), ("3.10.0", "3.10.3", "patch"))
+        self.assertEqual(item["advisory"]["ids"], ["A", "B", "C"])
+        self.assertEqual(out.needsPlan, [])
+
+    def test_highest_severity_wins_the_merge(self):
+        out = cat.categorize([], [adv("a", "1.0.0", "1.0.1", severity="LOW"),
+                                  adv("a", "1.0.0", "1.0.1", severity="CRITICAL"),
+                                  adv("a", "1.0.0", "1.0.1", severity="")], [], {}, set())
+        self.assertEqual(out.securityFixes[0]["advisory"]["severity"], "CRITICAL")
+
+    def test_major_fix_needs_a_plan(self):
+        out = cat.categorize([], [adv("pkg", "1.4.0", "2.0.0")], [], {}, set())
+        [item] = out.needsPlan
+        self.assertIn("Major security fix", item["reason"])
+        self.assertEqual(item["kind"], "transitive")
+
+    def test_excluded_transitive_needs_a_plan(self):
+        out = cat.categorize([], [adv("pkg", "1.4.0", "1.4.1")], ["pkg"], {}, set())
+        self.assertEqual(out.needsPlan[0]["reason"], "Excluded (pkg)")
+        self.assertEqual(out.securityFixes, [])
+
+    def test_held_transitive_needs_a_plan(self):
+        out = cat.categorize([], [adv("pkg", "1.4.0", "1.4.1")], [], {"pkg": "why"}, set())
+        self.assertEqual(out.needsPlan[0]["reason"], "Hold: why")
+
+    def test_unknown_current_version_needs_a_plan(self):
+        """Dependabot does not report the installed version, so the bump cannot
+        be classified; it is surfaced, not guessed."""
+        out = cat.categorize([], [adv("qs", "", "6.14.2", ecosystem="node")], [], {}, set())
+        [item] = out.needsPlan
+        self.assertEqual((item["bump"], item["latest"]), ("unknown", "6.14.2"))
+        self.assertIn("current version unknown", item["reason"])
+
+    def test_no_fixed_version_needs_a_plan(self):
+        out = cat.categorize([], [adv("nltk", "3.10.3", "")], [], {}, set())
+        [item] = out.needsPlan
+        self.assertIn("no fixed version", item["reason"])
+
+    def test_already_at_the_fix_is_skipped(self):
+        out = cat.categorize([], [adv("a", "2.0.0", "1.9.0")], [], {}, set())
+        self.assertEqual(out.skipped[0]["reason"], "advisory already fixed (2.0.0 >= 1.9.0)")
+
+    def test_nested_project_advisory_needs_a_plan_naming_the_location(self):
+        out = cat.categorize([], [adv("pypdf", "", "6.19.0", location="writing/skills/boring/uv.lock")],
+                             [], {}, set())
+        [item] = out.needsPlan
+        self.assertEqual(item["location"], "writing/skills/boring/uv.lock")
+        self.assertIn("writing/skills/boring/uv.lock", item["reason"])
+
+    def test_nested_and_root_advisories_on_one_package_stay_separate(self):
+        out = cat.categorize([], [adv("nltk", "3.10.0", "3.10.3", location="uv.lock"),
+                                  adv("nltk", "", "3.10.3", location="writing/skills/boring/uv.lock")],
+                             [], {}, set())
+        self.assertEqual([i["location"] for i in out.securityFixes], ["uv.lock"])
+        self.assertEqual([i["location"] for i in out.needsPlan], ["writing/skills/boring/uv.lock"])
+
+    def test_nested_advisory_does_not_mark_a_root_update_as_a_security_fix(self):
+        out = cat.categorize([rec("pypdf", "6.20.0", "6.21.0")],
+                             [adv("pypdf", "", "6.19.0", location="sub/uv.lock")], [], {}, set())
+        self.assertEqual([i["name"] for i in out.safe], ["pypdf"])
+        self.assertEqual([i["location"] for i in out.needsPlan], ["sub/uv.lock"])
+
+    def test_advisory_matching_an_update_record_is_not_duplicated(self):
+        out = cat.categorize([rec("qs", "6.14.1", "6.14.2")],
+                             [adv("qs", "6.14.1", "6.14.2", ecosystem="node")], [], {}, set())
+        self.assertEqual(len(out.securityFixes), 1)
+        self.assertEqual(out.needsPlan, [])
+        self.assertEqual(out.securityFixes[0]["kind"], "direct")
+
+    def test_output_order_is_deterministic(self):
+        advs = [adv("b", "1.0.0", "1.0.1"), adv("a", "1.0.0", "1.0.1")]
+        first = cat.categorize([], advs, [], {}, set())
+        second = cat.categorize([], list(reversed(advs)), [], {}, set())
+        self.assertEqual([i["name"] for i in first.securityFixes], ["a", "b"])
+        self.assertEqual(first, second)
+
+
 if __name__ == "__main__":
     unittest.main()

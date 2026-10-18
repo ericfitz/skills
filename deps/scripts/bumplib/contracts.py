@@ -10,6 +10,8 @@ BUMP_MAJOR = "major"
 BUMP_MINOR = "minor"
 BUMP_PATCH = "patch"
 BUMP_NONE = "none"
+# A synthesized record whose current version is not known (e.g. a Dependabot alert).
+BUMP_UNKNOWN = "unknown"
 
 
 @dataclass
@@ -36,6 +38,7 @@ class Advisory:
     ids: list = field(default_factory=list)
     summary: str = ""
     source: str = ""
+    location: str = ""
 
 
 @dataclass

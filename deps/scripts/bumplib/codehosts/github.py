@@ -5,6 +5,17 @@ import subprocess
 
 from .. import contracts as c
 
+# GitHub's package ecosystem names -> the contract's ecosystem names.
+_ECOSYSTEMS = {"pip": "python", "npm": "node", "go": "go"}
+
+
+def _alert_ids(advisory: dict) -> list:
+    """GHSA id first, then CVE ids, from the advisory's identifiers list."""
+    ids = advisory.get("identifiers") or []
+    ordered = [i.get("value", "") for i in ids if i.get("type") == "GHSA"]
+    ordered += [i.get("value", "") for i in ids if i.get("type") != "GHSA"]
+    return [i for i in dict.fromkeys(ordered) if i]
+
 
 def parse_alerts(json_text: str) -> list:
     """Parse Dependabot alerts from GitHub API response.
@@ -25,9 +36,12 @@ def parse_alerts(json_text: str) -> list:
         # first_patched_version can be JSON null (no fix released yet); `or {}`
         # guards against None.get(...) when the key is present but null.
         fixed = (a.get("security_vulnerability", {}).get("first_patched_version") or {}).get("identifier", "")
-        advs.append(c.Advisory(package=dep.get("name", ""), ecosystem=dep.get("ecosystem", ""),
+        eco = (dep.get("ecosystem") or "").lower()
+        # current stays "": an alert names the vulnerable range, not the installed version.
+        advs.append(c.Advisory(package=dep.get("name", ""), ecosystem=_ECOSYSTEMS.get(eco, eco),
                                severity=sa.get("severity", "").upper(), current="", fixed=fixed,
-                               ids=[], summary=sa.get("summary", ""), source="dependabot"))
+                               ids=_alert_ids(sa), summary=sa.get("summary", ""), source="dependabot",
+                               location=a.get("dependency", {}).get("manifest_path") or ""))
     return advs
 
 
