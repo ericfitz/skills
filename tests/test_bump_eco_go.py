@@ -21,8 +21,10 @@ class TestGoOutdated(unittest.TestCase):
         self.assertNotIn("golang.org/x/sys", names)
 
     def test_replace_and_pinned(self):
-        gomod = ("module x\nrequire (\n\tgithub.com/foo/bar v1.2.3 // pinned: compat\n)\n"
-                 "replace github.com/foo/bar => ./local\n")
+        gomod = (
+            "module x\nrequire (\n\tgithub.com/foo/bar v1.2.3 // pinned: compat\n)\n"
+            "replace github.com/foo/bar => ./local\n"
+        )
         self.assertIn("github.com/foo/bar", go.replace_targets(gomod))
         self.assertIn("github.com/foo/bar", go.pinned_names(gomod))
 
@@ -51,26 +53,15 @@ class TestGoOutdated(unittest.TestCase):
         self.assertNotIn("require", names)
 
     def test_pinned_names_block_form_require(self):
-        gomod = (
-            "module x\n"
-            "require (\n"
-            "\tgithub.com/foo/bar v1.2.3 // pinned: compat\n"
-            "\tgithub.com/other/pkg v2.0.0\n"
-            ")\n"
-        )
+        gomod = "module x\nrequire (\n\tgithub.com/foo/bar v1.2.3 // pinned: compat\n\tgithub.com/other/pkg v2.0.0\n)\n"
         names = go.pinned_names(gomod)
         self.assertIn("github.com/foo/bar", names)
         self.assertNotIn("github.com/other/pkg", names)
         self.assertNotIn("require", names)
 
-
     def test_required_filters_graph_only_modules_and_labels_kind(self):
         gomod = (
-            "module x\n"
-            "require github.com/gin-gonic/gin v1.10.0\n"
-            "require (\n"
-            "\tgolang.org/x/sys v0.21.0 // indirect\n"
-            ")\n"
+            "module x\nrequire github.com/gin-gonic/gin v1.10.0\nrequire (\n\tgolang.org/x/sys v0.21.0 // indirect\n)\n"
         )
         required = go.required_modules(gomod)
         self.assertEqual({"github.com/gin-gonic/gin": "direct", "golang.org/x/sys": "indirect"}, required)
@@ -120,8 +111,9 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.fail_on = None
         self.enterContext(mock.patch("bumplib.ecosystems.go.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.go._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.go.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.go.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)

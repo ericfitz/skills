@@ -3,6 +3,7 @@
 These functions spawn no subprocesses; they only merge already-gathered data
 (config exclusions/holds from disk + inputs passed in) and run the categorizer.
 """
+
 from pathlib import Path
 
 from . import categorize, config

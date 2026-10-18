@@ -1,4 +1,5 @@
 """Agnostic categorizer: semver comparison + glob exclusion, no provider knowledge."""
+
 import re
 from dataclasses import asdict
 from pathlib import PurePosixPath
@@ -94,7 +95,8 @@ def _merge(advs) -> c.Advisory:
         ids=ids,
         summary=next((a.summary for a in advs if a.summary), ""),
         source=", ".join(dict.fromkeys(a.source for a in advs if a.source)),
-        location=next((a.location for a in advs if a.location), ""))
+        location=next((a.location for a in advs if a.location), ""),
+    )
 
 
 def _place_advisory(out, adv, nested, exclude, holds):
@@ -102,14 +104,19 @@ def _place_advisory(out, adv, nested, exclude, holds):
     (current from the advisory, latest = its fix) so that it is applied or planned
     like any other update instead of disappearing."""
     known = bool(adv.current and adv.fixed)
-    bump = classify_bump(adv.current, adv.fixed) if known else (
-        c.BUMP_NONE if adv.current else c.BUMP_UNKNOWN)
-    rec = c.UpdateRecord(name=adv.package, current=adv.current, latest=adv.fixed,
-                         wanted=adv.fixed, bump=bump, kind="transitive",
-                         location=adv.location, ecosystem=adv.ecosystem)
+    bump = classify_bump(adv.current, adv.fixed) if known else (c.BUMP_NONE if adv.current else c.BUMP_UNKNOWN)
+    rec = c.UpdateRecord(
+        name=adv.package,
+        current=adv.current,
+        latest=adv.fixed,
+        wanted=adv.fixed,
+        bump=bump,
+        kind="transitive",
+        location=adv.location,
+        ecosystem=adv.ecosystem,
+    )
     if nested:
-        out.needsPlan.append(_item(rec, f"advisory in {adv.location}, a separate project "
-                                        "this run does not cover", adv))
+        out.needsPlan.append(_item(rec, f"advisory in {adv.location}, a separate project this run does not cover", adv))
     elif not adv.fixed:
         out.needsPlan.append(_item(rec, "security advisory with no fixed version", adv))
     elif not adv.current:
@@ -135,8 +142,7 @@ def categorize(updates, advisories, exclude, holds, replace_targets) -> c.Catego
     for rec in updates:
         adv = adv_index.get(rec.name)
         if rec.name in replace_targets or rec.bump == c.BUMP_NONE:
-            out.skipped.append(_item(rec, "replace directive" if rec.name in replace_targets else "up to date",
-                                     adv))
+            out.skipped.append(_item(rec, "replace directive" if rec.name in replace_targets else "up to date", adv))
             continue
         excl = _excluded(rec, exclude, holds)
         if rec.bump == c.BUMP_MAJOR:

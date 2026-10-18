@@ -33,8 +33,10 @@ class TestPython(unittest.TestCase):
     def test_audit_missing_binary_uv(self):
         """Regression test: audit verb should return [] when uv binary is missing (uv manager)."""
         # Mock detect to return uv manager
-        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None), \
-                mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
+        with (
+            mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None),
+            mock.patch("bumplib.ecosystems.python.detect") as mock_detect,
+        ):
             mock_detect.return_value = {"packageManager": "uv"}
             result = py.handle("audit", [])
             self.assertEqual(result, [])
@@ -42,8 +44,10 @@ class TestPython(unittest.TestCase):
     def test_audit_missing_binary_pip(self):
         """Regression test: audit verb should return [] when pip-audit binary is missing (pip manager)."""
         # Mock detect to return pip manager
-        with mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None), \
-                mock.patch("bumplib.ecosystems.python.detect") as mock_detect:
+        with (
+            mock.patch("bumplib.ecosystems.python.shutil.which", return_value=None),
+            mock.patch("bumplib.ecosystems.python.detect") as mock_detect,
+        ):
             mock_detect.return_value = {"packageManager": "pip"}
             result = py.handle("audit", [])
             self.assertEqual(result, [])
@@ -66,8 +70,9 @@ class TestProjectEnvironmentTargeting(unittest.TestCase):
         self.calls = []
         self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "uv", "present": True})
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
@@ -114,8 +119,10 @@ class TestProjectEnvironmentTargeting(unittest.TestCase):
             captured["env"] = env
             return mock.Mock(returncode=0, stdout="", stderr="")
 
-        with mock.patch("bumplib.ecosystems.python._run", side_effect=record), \
-                mock.patch.dict(os.environ, {"VIRTUAL_ENV": "/ephemeral"}):
+        with (
+            mock.patch("bumplib.ecosystems.python._run", side_effect=record),
+            mock.patch.dict(os.environ, {"VIRTUAL_ENV": "/ephemeral"}),
+        ):
             py.handle("outdated", [])
         self.assertFalse(any(c[:2] == ["uv", "sync"] for c in self.calls))
         self.assertNotIn("--python", self.calls[0])
@@ -159,8 +166,7 @@ class TestProjectEnvironmentTargeting(unittest.TestCase):
 
     def test_pip_manager_path_unchanged(self):
         """Only the uv path was environment-ambiguous; plain pip must not gain flags."""
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
             py.handle("outdated", [])
         self.assertEqual(self.calls[0], ["pip", "list", "--outdated", "--format", "json"])
 
@@ -180,8 +186,9 @@ class TestOutdatedReconcilesVenvWithLock(unittest.TestCase):
         self.calls = []
         self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "uv", "present": True})
+        )
         self.sync_rc = 0
 
     def _path(self, p):
@@ -229,8 +236,7 @@ class TestOutdatedReconcilesVenvWithLock(unittest.TestCase):
         self.assertIn("uv sync", err.getvalue())
 
     def test_pip_manager_never_syncs(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
             py.handle("outdated", [])
         self.assertEqual(self.calls, [["pip", "list", "--outdated", "--format", "json"]])
 
@@ -245,31 +251,36 @@ class TestApplyReportsOnlyRealChanges(unittest.TestCase):
         self._tmp = TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        self.enterContext(mock.patch("bumplib.ecosystems.python.Path",
-                                     side_effect=lambda p: self.root if str(p) == "." else Path(p)))
-        self.enterContext(mock.patch("bumplib.ecosystems.python._run",
-                                     return_value=mock.Mock(returncode=0, stdout="", stderr="")))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.Path", side_effect=lambda p: self.root if str(p) == "." else Path(p))
+        )
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python._run", return_value=mock.Mock(returncode=0, stdout="", stderr=""))
+        )
 
     def test_uv_noop_apply_reports_nothing_applied(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "uv", "present": True}), \
-                mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]):
+        with (
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "uv", "present": True}),
+            mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]),
+        ):
             result = py.handle("apply", ["charset-normalizer==3.5.1"])
         self.assertEqual(result, {"applied": [], "filesModified": []})
 
     def test_uv_apply_with_lock_change_reports_specs(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "uv", "present": True}), \
-                mock.patch("bumplib.ecosystems.python.changed_files", return_value=["uv.lock"]):
+        with (
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "uv", "present": True}),
+            mock.patch("bumplib.ecosystems.python.changed_files", return_value=["uv.lock"]),
+        ):
             result = py.handle("apply", ["requests==2.32.4"])
         self.assertEqual(result, {"applied": ["requests==2.32.4"], "filesModified": ["uv.lock"]})
 
     def test_pip_apply_unchanged(self):
         """pip install never edits requirements.txt, so an empty filesModified carries
         no signal there; keep echoing the specs."""
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}), \
-                mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]):
+        with (
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}),
+            mock.patch("bumplib.ecosystems.python.changed_files", return_value=[]),
+        ):
             result = py.handle("apply", ["requests==2.32.4"])
         self.assertEqual(result["applied"], ["requests==2.32.4"])
 
@@ -294,8 +305,9 @@ class TestAuditAgainstLockfile(unittest.TestCase):
         self.responses = {}
         self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.python.shutil.which", return_value="/bin/uv"))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "uv", "present": True})
+        )
         self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
 
     def _path(self, p):
@@ -319,7 +331,7 @@ class TestAuditAgainstLockfile(unittest.TestCase):
         py.handle("audit", [])
         exp = self._export_call()
         self.assertEqual(exp[:2], ["uv", "export"])
-        self.assertIn("--frozen", exp)                       # never re-resolve to audit
+        self.assertIn("--frozen", exp)  # never re-resolve to audit
         self.assertEqual(exp[exp.index("--format") + 1], "pylock.toml")
         self.assertEqual(exp[exp.index("--project") + 1], str(self.root))
 
@@ -374,8 +386,7 @@ class TestAuditAgainstLockfile(unittest.TestCase):
         self.assertEqual(py.handle("audit", []), [])
 
     def test_pip_manager_path_unchanged(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
             py.handle("audit", [])
         self.assertEqual(self.calls, [["pip-audit", "--format", "json"]])
 
@@ -389,13 +400,15 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
         self.calls = []
-        self.fail_on = None          # substring of argv marking the command that fails
+        self.fail_on = None  # substring of argv marking the command that fails
         self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "uv", "present": True})
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
@@ -413,7 +426,7 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.assertEqual(res["applied"], [])
         self.assertEqual(res["filesModified"], [])
         self.assertIn("unsatisfiable", res["error"])
-        self.assertFalse(any("sync" in c for c in self.calls))   # stops at first failure
+        self.assertFalse(any("sync" in c for c in self.calls))  # stops at first failure
 
     def test_uv_sync_failure_surfaces_error(self):
         self.fail_on = "sync"
@@ -428,8 +441,7 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.assertNotIn("error", res)
 
     def test_pip_install_failure_surfaces_error(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
             self.fail_on = "install"
             res = py.handle("apply", ["tqdm==4.70.0"])
         self.assertEqual(res["applied"], [])

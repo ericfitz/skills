@@ -46,10 +46,16 @@ class TestCategorizePayload(unittest.TestCase):
     def test_security_advisory_bucketed(self):
         payload = {
             "updates": [_rec("qs", "6.14.1", "6.14.2", "patch")],
-            "advisories": [{
-                "package": "qs", "ecosystem": "node", "severity": "HIGH",
-                "current": "6.14.1", "fixed": "6.14.2", "ids": ["CVE-1"],
-            }],
+            "advisories": [
+                {
+                    "package": "qs",
+                    "ecosystem": "node",
+                    "severity": "HIGH",
+                    "current": "6.14.1",
+                    "fixed": "6.14.2",
+                    "ids": ["CVE-1"],
+                }
+            ],
         }
         with tempfile.TemporaryDirectory() as td:
             out = orchestrate.categorize_payload(payload, root=td)
@@ -77,13 +83,15 @@ class TestCategorizePayload(unittest.TestCase):
 
     def test_disk_config_exclusions_merge(self):
         import json
+
         with tempfile.TemporaryDirectory() as td:
-            (Path(td) / ".bump-config.json").write_text(json.dumps({
-                "exclude": ["lodash"], "hold": {"react": "pinned to 17"}}))
-            payload = {"updates": [
-                _rec("lodash", "4.17.20", "4.17.21", "patch"),
-                _rec("react", "17.0.2", "17.0.3", "patch")],
-                "advisories": []}
+            (Path(td) / ".bump-config.json").write_text(
+                json.dumps({"exclude": ["lodash"], "hold": {"react": "pinned to 17"}})
+            )
+            payload = {
+                "updates": [_rec("lodash", "4.17.20", "4.17.21", "patch"), _rec("react", "17.0.2", "17.0.3", "patch")],
+                "advisories": [],
+            }
             out = orchestrate.categorize_payload(payload, root=td)
             names = {i["name"]: i["reason"] for i in out.needsPlan}
             self.assertIn("lodash", names)
@@ -95,6 +103,7 @@ class TestCategorizePayload(unittest.TestCase):
         import io
         import json
         from unittest import mock
+
         bump_cli = importlib.import_module("bump")
         payload = io.StringIO(json.dumps({"updates": [], "advisories": []}))
         buf = io.StringIO()

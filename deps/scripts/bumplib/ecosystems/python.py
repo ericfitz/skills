@@ -1,4 +1,5 @@
 """Python ecosystem adapter (uv / pip)."""
+
 import json
 import os
 import shutil
@@ -33,9 +34,18 @@ def parse_outdated(json_text: str) -> list:
         name = info["name"]
         cur = info.get("version", "")
         lat = info.get("latest_version", "")
-        recs.append(c.UpdateRecord(name=name, current=cur, latest=lat, wanted=lat,
-                                   bump=classify_bump(cur, lat), kind="direct",
-                                   location="pyproject.toml", ecosystem="python"))
+        recs.append(
+            c.UpdateRecord(
+                name=name,
+                current=cur,
+                latest=lat,
+                wanted=lat,
+                bump=classify_bump(cur, lat),
+                kind="direct",
+                location="pyproject.toml",
+                ecosystem="python",
+            )
+        )
     return recs
 
 
@@ -46,10 +56,18 @@ def parse_audit(json_text: str) -> list:
     for dep in data.get("dependencies", []):
         for v in dep.get("vulns", []):
             fixes = v.get("fix_versions", [])
-            advs.append(c.Advisory(package=dep.get("name", ""), ecosystem="python",
-                                   severity="", current=dep.get("version", ""),
-                                   fixed=fixes[0] if fixes else "", ids=[v.get("id", "")],
-                                   summary=v.get("description", ""), source="pip-audit"))
+            advs.append(
+                c.Advisory(
+                    package=dep.get("name", ""),
+                    ecosystem="python",
+                    severity="",
+                    current=dep.get("version", ""),
+                    fixed=fixes[0] if fixes else "",
+                    ids=[v.get("id", "")],
+                    summary=v.get("description", ""),
+                    source="pip-audit",
+                )
+            )
     return advs
 
 
@@ -96,13 +114,37 @@ def _audit_uv(root: Path) -> list:
         pylock = Path(tmp) / "pylock.toml"
         # Every extra and group: a package reached only through an optional extra is
         # still pinned in uv.lock and still ships to whoever installs that extra.
-        exported = _run(["uv", "export", "--frozen", "--project", str(root),
-                         "--all-extras", "--all-groups",
-                         "--format", "pylock.toml", "-o", str(pylock)])
+        exported = _run(
+            [
+                "uv",
+                "export",
+                "--frozen",
+                "--project",
+                str(root),
+                "--all-extras",
+                "--all-groups",
+                "--format",
+                "pylock.toml",
+                "-o",
+                str(pylock),
+            ]
+        )
         if exported.returncode != 0:
-            return []       # no lockfile, or stale under --frozen: report nothing found
-        out = _run(["uv", "tool", "run", "pip-audit", "--locked", str(pylock.parent),
-                    "--format", "json", "--progress-spinner", "off"])
+            return []  # no lockfile, or stale under --frozen: report nothing found
+        out = _run(
+            [
+                "uv",
+                "tool",
+                "run",
+                "pip-audit",
+                "--locked",
+                str(pylock.parent),
+                "--format",
+                "json",
+                "--progress-spinner",
+                "off",
+            ]
+        )
         advs = _parse_audit_lenient(out.stdout)
         for a in advs:
             a.location = "uv.lock"
@@ -148,8 +190,11 @@ def handle(verb, argv):
             # env to answer. `--frozen` keeps a read verb from rewriting the lockfile;
             # the sync is a no-op when already in sync (#37).
             if (root / "uv.lock").exists() and _run(["uv", "sync", "--frozen"]).returncode != 0:
-                print("warning: `uv sync --frozen` failed; outdated results reflect the "
-                      "existing environment, which may not match uv.lock", file=sys.stderr)
+                print(
+                    "warning: `uv sync --frozen` failed; outdated results reflect the "
+                    "existing environment, which may not match uv.lock",
+                    file=sys.stderr,
+                )
             venv = _project_python(root)
             cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
             env = None
@@ -159,8 +204,10 @@ def handle(verb, argv):
                 # Without an explicit interpreter uv answers for VIRTUAL_ENV, which under
                 # `uv run bump.py` is the empty PEP 723 ephemeral env -- strip it so
                 # discovery can never resolve there, and say so.
-                print("warning: no project environment found; outdated results may be "
-                      "incomplete (run `uv sync`)", file=sys.stderr)
+                print(
+                    "warning: no project environment found; outdated results may be incomplete (run `uv sync`)",
+                    file=sys.stderr,
+                )
                 env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
             out = _run(cmd, env=env)
         else:
@@ -177,7 +224,7 @@ def handle(verb, argv):
     if verb == "apply":
         if mgr == "uv":
             flags = []
-            for a in argv:              # a e.g. "requests==2.31.0"
+            for a in argv:  # a e.g. "requests==2.31.0"
                 flags += ["--upgrade-package", a.split("==")[0]]
             steps = [["uv", "lock", *flags], ["uv", "sync"]]
             candidates = ["pyproject.toml", "uv.lock"]
@@ -187,8 +234,11 @@ def handle(verb, argv):
         for cmd in steps:
             r = _run(cmd)
             if r.returncode != 0:
-                return {"applied": [], "filesModified": [],
-                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+                return {
+                    "applied": [],
+                    "filesModified": [],
+                    "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:],
+                }
         modified = changed_files(candidates, cwd=root)
         # For uv the lockfile is the evidence: `uv lock --upgrade-package X` is a no-op
         # when uv.lock already holds the target, and echoing the spec back as applied
@@ -198,10 +248,12 @@ def handle(verb, argv):
         return {"applied": applied, "filesModified": modified}
     if verb == "validate":
         results = {}
-        cmds = (("test", "uv run pytest" if mgr == "uv" else "pytest"),
-                ("lint", "uv run ruff check ." if mgr == "uv" else "ruff check ."))
+        cmds = (
+            ("test", "uv run pytest" if mgr == "uv" else "pytest"),
+            ("lint", "uv run ruff check ." if mgr == "uv" else "ruff check ."),
+        )
         for step, cmd in cmds:
-            r = _run_shell(cmd)          # trusted default/config strings
+            r = _run_shell(cmd)  # trusted default/config strings
             results[step] = "pass" if r.returncode == 0 else "fail"
             results[step + "_output"] = (r.stdout + r.stderr)[-4000:]
         return results

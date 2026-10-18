@@ -1,4 +1,5 @@
 """Go ecosystem adapter."""
+
 import json
 import re
 import shutil
@@ -24,10 +25,18 @@ def parse_outdated(text: str, required: dict | None = None) -> list:
         name, cur, lat = m.group(1), m.group(2), m.group(3)
         if required is not None and name not in required:
             continue
-        recs.append(c.UpdateRecord(name=name, current=cur, latest=lat, wanted=lat,
-                                   bump=classify_bump(cur, lat),
-                                   kind=required[name] if required else "direct",
-                                   location="go.mod", ecosystem="go"))
+        recs.append(
+            c.UpdateRecord(
+                name=name,
+                current=cur,
+                latest=lat,
+                wanted=lat,
+                bump=classify_bump(cur, lat),
+                kind=required[name] if required else "direct",
+                location="go.mod",
+                ecosystem="go",
+            )
+        )
     return recs
 
 
@@ -85,7 +94,7 @@ def replace_targets(gomod_text: str) -> set:
                 out.add(s.split("=>")[0].strip().split()[0])
             continue
         if s.startswith("replace ") and "=>" in s:
-            out.add(s[len("replace "):].split("=>")[0].strip().split()[0])
+            out.add(s[len("replace ") :].split("=>")[0].strip().split()[0])
     return out
 
 
@@ -124,9 +133,18 @@ def parse_vuln(json_text: str) -> list:
             affected = osv.get("affected") or [{}]
             pkg = affected[0].get("package", {}).get("name", "") if affected else ""
             severity = osv.get("database_specific", {}).get("severity", "")
-            advs.append(c.Advisory(package=pkg, ecosystem="go", severity=severity,
-                                   current="", fixed="", ids=[osv["id"]],
-                                   summary=osv.get("summary", ""), source="govulncheck"))
+            advs.append(
+                c.Advisory(
+                    package=pkg,
+                    ecosystem="go",
+                    severity=severity,
+                    current="",
+                    fixed="",
+                    ids=[osv["id"]],
+                    summary=osv.get("summary", ""),
+                    source="govulncheck",
+                )
+            )
     return advs
 
 
@@ -146,8 +164,7 @@ def handle(verb, argv):
     root = Path(".")
     if verb == "detect":
         present = (root / "go.mod").exists()
-        return {"present": present, "ecosystem": "go", "packageManager": "",
-                "workspace": (root / "go.work").exists()}
+        return {"present": present, "ecosystem": "go", "packageManager": "", "workspace": (root / "go.work").exists()}
     if verb == "cache-clear":
         return {"warnings": []}  # go refreshes via `go list`; no aggressive clean
     if verb == "outdated":
@@ -162,20 +179,23 @@ def handle(verb, argv):
         out = _run(["govulncheck", "-json", "./..."])
         return parse_vuln(out.stdout)
     if verb == "apply":
-        steps = [["go", "get", spec] for spec in argv]   # spec e.g. "github.com/foo/bar@v1.2.3"
+        steps = [["go", "get", spec] for spec in argv]  # spec e.g. "github.com/foo/bar@v1.2.3"
         steps.append(["go", "mod", "tidy"])
         if (root / "go.work").exists():
             steps.append(["go", "work", "sync"])
         for cmd in steps:
             r = _run(cmd)
             if r.returncode != 0:
-                return {"applied": [], "filesModified": [],
-                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+                return {
+                    "applied": [],
+                    "filesModified": [],
+                    "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:],
+                }
         return {"applied": argv, "filesModified": changed_files(["go.mod", "go.sum"], cwd=root)}
     if verb == "validate":
         results = {}
         for step, cmd in (("build", "go build ./..."), ("test", "go test ./..."), ("lint", "go vet ./...")):
-            r = _run_shell(cmd)         # trusted config/default strings
+            r = _run_shell(cmd)  # trusted config/default strings
             results[step] = "pass" if r.returncode == 0 else "fail"
             results[step + "_output"] = (r.stdout + r.stderr)[-4000:]
         return results
