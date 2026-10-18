@@ -114,8 +114,10 @@ use the ids it lists for the components and services the topology names (rule:
   from, not a network path the running system reaches. See step 1.
 - When a URL embeds what is plainly a credential in its path (a webhook
   token, a signed URL segment), record the URL with that segment replaced by
-  `***`, and hand the fact that a credential is embedded in this URL to the
-  `security` category.
+  `***`, and record in this category's `assumptions[]` that a credential is
+  embedded in the URL, naming the entry id and never the value. The `security`
+  category cannot be told directly: skills share no channel, and `report` reads
+  each category's `assumptions[]`.
 - `null` in `resilience` means no declaration was found — never that the
   behaviour is confirmed absent.
 - `lifecycle` has two values and never a third. It records which environment

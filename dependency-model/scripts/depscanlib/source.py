@@ -35,6 +35,20 @@ SKIP_REASON = "source-literal scanning covers go, js, python, and ts only"
 # it so one match can't blow up the findings payload.
 RAW_MAX_LEN = 200
 
+# `raw` is cut before anything that is not the call: the first `;` (a following
+# statement on the same line) and the language's line-comment marker. Both can
+# carry a same-line secret that the end-of-line patterns would otherwise sweep
+# into the scan index.
+COMMENT_MARKERS = {"go": "//", "python": "#", "js": "//", "ts": "//"}
+
+
+def _trim_raw(text, language):
+    """Return the call text cut at `;` and the comment marker, then capped."""
+    for marker in (";", COMMENT_MARKERS.get(language)):
+        if marker:
+            text = text.split(marker, 1)[0]
+    return text.strip()[:RAW_MAX_LEN]
+
 _IDENT = r"[A-Za-z_][A-Za-z0-9_]*"
 
 
@@ -130,7 +144,7 @@ def _scan_file(root, path, language, env_out, resilience_out):
                                 "mechanism": f"go-struct-tag:{match.group(1)}"})
         for pattern, kind in RESILIENCE_PATTERNS.get(language, []):
             for match in pattern.finditer(line):
-                raw = match.group(0).strip()[:RAW_MAX_LEN]
+                raw = _trim_raw(match.group(0), language)
                 resilience_out.append({"kind": kind, "raw": raw,
                                        "file": path, "line": number,
                                        "language": language})

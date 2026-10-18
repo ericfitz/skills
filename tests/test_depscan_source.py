@@ -134,10 +134,40 @@ class TestResilienceCalls(unittest.TestCase):
     def test_raw_is_capped_at_200_characters(self):
         """A minified bundle line can run tens of KB; raw must not carry
         that into the findings payload."""
-        huge_line = 'const CircuitBreaker=require("opossum");' + ("x" * 40000)
+        huge_line = 'const CircuitBreaker=require("opossum")' + ("x" * 40000)
         findings, _ = scan({"vendor.min.js": huge_line + "\n"})
         record = findings["resilience_calls"][0]
         self.assertEqual(len(record["raw"]), 200)
+
+    def test_raw_is_cut_before_a_following_statement_on_the_same_line(self):
+        findings, _ = scan({"a.js":
+            'const retry = require("p-retry"); const pw = "hunter2-secret";\n'})
+        raw = findings["resilience_calls"][0]["raw"]
+        self.assertNotIn("hunter2", raw)
+        self.assertNotIn(";", raw)
+        self.assertIn("p-retry", raw)
+
+    def test_raw_is_cut_before_a_python_trailing_comment(self):
+        findings, _ = scan({"a.py": '@retry(stop=3)  # token=abc123secret\n'})
+        raw = findings["resilience_calls"][0]["raw"]
+        self.assertNotIn("abc123", raw)
+        self.assertEqual(raw, "@retry(stop=3)")
+
+    def test_raw_is_cut_before_a_go_line_comment(self):
+        findings, _ = scan({"a.go":
+            'import "github.com/sony/gobreaker" // key=sk-live-123\n'})
+        raw = findings["resilience_calls"][0]["raw"]
+        self.assertNotIn("sk-live", raw)
+        self.assertNotIn("//", raw)
+        self.assertIn("gobreaker", raw)
+
+    def test_raw_is_cut_before_a_js_line_comment(self):
+        findings, _ = scan({"a.js": 'const b = require("opossum") // pw=zzz\n'})
+        self.assertNotIn("zzz", findings["resilience_calls"][0]["raw"])
+
+    def test_timeout_raw_is_cut_before_a_trailing_comment(self):
+        findings, _ = scan({"a.py": 'requests.get(u, timeout=5 # secret\n'})
+        self.assertNotIn("secret", findings["resilience_calls"][0]["raw"])
 
     def test_timeout_kwarg_not_confused_with_equality_check(self):
         findings, _ = scan({"app.py": 'if timeout == 30:\n    pass\n'})

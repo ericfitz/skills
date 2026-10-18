@@ -147,8 +147,10 @@ use the ids it lists for the components and services the topology names (rule:
   `related_ids`.
 - When a URL embeds what is plainly a credential in its path (a webhook
   token, a signed URL segment), record the URL with that segment replaced by
-  `***`, and hand the fact that a credential is embedded in this URL to the
-  `security` category.
+  `***`, and record in this category's `assumptions[]` that a credential is
+  embedded in the URL, naming the entry id and never the value. The `security`
+  category cannot be told directly: skills share no channel, and `report` reads
+  each category's `assumptions[]`.
 - No criticality, no blast radius, no monitoring-gap judgment, no test
   strategy. This layer reports facts.
 - Never invoke `profile`'s scripts by path; invoke `profile:topology` by name.

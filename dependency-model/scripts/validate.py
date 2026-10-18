@@ -15,44 +15,52 @@ from pathlib import Path
 
 CONTRACTS = Path(__file__).resolve().parents[1] / "references" / "contracts"
 
-def resolve_refs(schema, base_dir, _seen=None):
+def resolve_refs(schema, base_dir, _seen=None, _root=None):
     """Return schema with local-file $ref pointers replaced by their targets.
 
-    Only same-directory-relative file refs are supported ("core.schema.json").
-    Remote refs and JSON-pointer fragments raise ValueError rather than being
-    silently ignored: a $ref the validator skips is a schema that passes
-    everything, which is worse than no schema at all.
+    Only relative file refs that stay inside the top-level base_dir are
+    supported ("core.schema.json"). Remote refs, JSON-pointer fragments (a `#`
+    anywhere in the ref), non-string refs, and refs whose target resolves
+    outside the top-level base_dir (an absolute path, or `..` escaping it)
+    raise ValueError rather than being silently ignored: a $ref the validator
+    skips is a schema that passes everything, which is worse than no schema
+    at all. Circular refs are detected on the resolved target path.
 
     Keys sitting alongside a $ref are merged over the resolved target:
     `properties` merge key-by-key, `required` unions with the target's order
     first, everything else overrides.
     """
+    root = Path(base_dir).resolve() if _root is None else _root
     if isinstance(schema, list):
-        return [resolve_refs(item, base_dir, _seen) for item in schema]
+        return [resolve_refs(item, base_dir, _seen, root) for item in schema]
     if not isinstance(schema, dict):
         return schema
     if "$ref" not in schema:
-        return {key: resolve_refs(value, base_dir, _seen)
+        return {key: resolve_refs(value, base_dir, _seen, root)
                 for key, value in schema.items()}
 
     ref = schema["$ref"]
-    if "://" in ref or ref.startswith("#"):
+    if not isinstance(ref, str):
+        raise ValueError(f"unsupported $ref {ref!r}: a $ref must be a string")
+    if "://" in ref or "#" in ref:
         raise ValueError(
             f"unsupported $ref {ref!r}: only local file refs are supported")
+    target_path = (Path(base_dir) / ref).resolve()
+    if not target_path.is_relative_to(root):
+        raise ValueError(f"$ref {ref!r} resolves outside {str(root)!r}")
     seen = set(_seen or ())
-    if ref in seen:
+    if target_path in seen:
         raise ValueError(f"circular $ref: {ref!r}")
 
-    target_path = Path(base_dir) / ref
     target = json.loads(target_path.read_text(encoding="utf-8"))
-    merged = resolve_refs(target, target_path.parent, seen | {ref})
+    merged = resolve_refs(target, target_path.parent, seen | {target_path}, root)
     if not isinstance(merged, dict):
         raise ValueError(f"$ref target is not an object: {ref!r}")
 
     for key, value in schema.items():
         if key == "$ref":
             continue
-        value = resolve_refs(value, base_dir, _seen)
+        value = resolve_refs(value, base_dir, _seen, root)
         current = merged.get(key)
         if key == "properties" and isinstance(current, dict) and isinstance(value, dict):
             merged[key] = {**current, **value}
