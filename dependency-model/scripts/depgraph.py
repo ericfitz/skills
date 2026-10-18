@@ -24,7 +24,9 @@ Exit codes:
        invalid JSON), the envelopes came from different targets or refs, or a
        dependency entry is missing a required field (id, name, or lifecycle)
        or is otherwise malformed (e.g. a bare string instead of an object,
-       or a category value that isn't a dict)
+       or a category value that isn't a dict), or a topology component id
+       cannot be built (the topology is not an object, a component lacks a
+       string `name`, a name slugs to empty, or two names collide)
 """
 
 import argparse
@@ -61,10 +63,10 @@ def main(argv=None):
             return 2
     topology = loaded.pop() if args.topology else {}
 
-    topo_components = topology.get("components") or []
     try:
+        topo_components = topology.get("components") or []
         ids = assign_ids([c["name"] for c in topo_components], "component")
-    except (ValueError, TypeError, KeyError) as exc:
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
         json.dump({"error": f"component ids: {exc}"}, sys.stderr)
         sys.stderr.write("\n")
         return 2

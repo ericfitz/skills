@@ -50,6 +50,10 @@ class AssignIdsTest(unittest.TestCase):
         self.assertIn("'a b'", str(cm.exception))
         self.assertIn("'a-b'", str(cm.exception))
 
+    def test_non_string_name_raises_type_error(self):
+        with self.assertRaises(TypeError):
+            assign_ids([None], "component")
+
     def test_duplicate_names_are_one_entry(self):
         self.assertEqual(assign_ids(["nats", "nats"], "service"), {"nats": "service:nats"})
 

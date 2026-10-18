@@ -90,8 +90,9 @@ same moment, so the slug has to be derivable from the evidence alone:
   Microsoft etc.)` is `oauth-2.0-oidc-identity-providers`; `migrate / dbtool /
   genconfig` is `migrate-dbtool-genconfig`; `TMI_NATS_URL` is `tmi-nats-url`;
   `metadata 169.254.169.254` is `metadata-169.254.169.254`. A name that is
-  wholly a parenthesized group keeps its text (`(JetStream)` is `jetstream`);
-  an unbalanced `(` or `)` is punctuation.
+  wholly a parenthesized group keeps its text (`(JetStream)` is `jetstream`):
+  any name that slugs to empty falls back to the rule without group removal,
+  and if that is still empty it is an error; an unbalanced `(` or `)` is punctuation.
 - **`service:`** the name the service already has, in this order: its
   `name` in the topology contract's `real_dependencies[]` or
   `external_third_parties[]`, then its compose or Kubernetes service name,

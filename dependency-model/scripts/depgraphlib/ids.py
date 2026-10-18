@@ -38,6 +38,9 @@ def assign_ids(names, prefix):
     """Map each distinct name to `<prefix>:<slug>`. Names whose slugs collide
     fall back to `slug_keep_groups`; a collision that remains raises
     IdCollisionError naming both names."""
+    for n in names:
+        if not isinstance(n, str):
+            raise TypeError(f"name must be a string, got {n!r}")
     distinct = list(dict.fromkeys(names))
     slugs = {n: slug(n) for n in distinct}
     counts = {}
@@ -47,8 +50,6 @@ def assign_ids(names, prefix):
            for n in distinct}
     owner = {}
     for n in distinct:
-        if not ids[n]:
-            raise ValueError(f"cannot derive an id slug from {n!r}")
         if ids[n] in owner:
             raise IdCollisionError(
                 f"names {owner[ids[n]]!r} and {n!r} both produce id "
