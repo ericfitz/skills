@@ -25,7 +25,7 @@ Represents a dependency update opportunity.
 | `current` | string | yes | Currently installed/locked version |
 | `latest` | string | yes | Latest available version |
 | `wanted` | string | yes | Desired version to upgrade to (often same as `latest`) |
-| `bump` | string | yes | Semver bump class: "major", "minor", "patch", or "none" (from `classify_bump`) |
+| `bump` | string | yes | Semver bump class: "major", "minor", "patch", or "none" (from `classify_bump`); "unknown" on a record `categorize` synthesized from an advisory with no known current version |
 | `kind` | string | yes | Dependency kind: "direct", "transitive", or other ecosystem-specific value |
 | `location` | string | yes | File where the dependency is declared (e.g., "pyproject.toml", "go.mod", "package.json") |
 | `pinned` | boolean | no | (default: false) Whether the package is pinned and cannot be upgraded |
@@ -68,6 +68,7 @@ Represents a security vulnerability found by audit tools.
 | `ids` | list | no | (default: []) List of CVE/advisory IDs (e.g., ["CVE-2024-1234", "GHSA-xxxx-yyyy-zzzz"]) |
 | `summary` | string | no | (default: "") Human-readable description of the vulnerability |
 | `source` | string | no | (default: "") Source of the advisory (e.g., "pip-audit", "govulncheck", "dependabot", "audit") |
+| `location` | string | no | (default: "") Manifest or lockfile the advisory was found in, relative to the repo root (Python/uv audit: `uv.lock`; Dependabot: the alert's `manifest_path`). A path in a subdirectory marks a separate project the run does not cover |
 
 **Example Advisory (JSON):**
 ```json
@@ -193,7 +194,7 @@ Adapters: `github`, or `none` (special case).
 | Verb | Return Shape | Notes |
 |------|--------------|-------|
 | `detect` | dict | `{"present": bool}` — detects if the repository is hosted on this code host (e.g., GitHub via `git remote get-url origin`). For `none`: `{"present": false}` |
-| `alerts` | list | `[Advisory, ...]` — list of security alerts from the code host (e.g., Dependabot alerts); empty if code host not detected or no alerts. Returns `[]` if tool (gh) not installed |
+| `alerts` | list | `[Advisory, ...]` — list of security alerts from the code host (e.g., Dependabot alerts); empty if code host not detected or no alerts. Returns `[]` if tool (gh) not installed. Dependabot's ecosystem names map to the contract's (`pip`→`python`, `npm`→`node`, `go`→`go`; others lowercased); `ids` holds the GHSA id then CVE ids; `current` is always `""` because an alert names the vulnerable range, not the installed version |
 | `prs` | Context | `Context(pullRequests=[...])` — dependency-related PRs; empty list if no PRs or tool not installed |
 | `default-branch` | dict | `{"ok": true, "branch": str, "source": str}` resolved from `origin/HEAD`, else `gh repo view`; `{"ok": false, "output": str}` naming each attempt if unresolvable (never defaults to `main`). argv: `[]` |
 | `open-pr` | dict | `{"ok": bool, "output": str}` — creates a new PR; `ok` is true if successful. argv: `[branch, base, title, body]`; `base` is the resolved default branch and is required |
