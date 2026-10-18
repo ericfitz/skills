@@ -30,14 +30,32 @@ def _require(d, field, category):
 
 
 def dedupe_components(components):
-    """The topology's components with repeated names collapsed to the first,
-    so the graph and ids.json agree on one node per name."""
-    seen, unique = set(), []
+    """The topology's components with repeated names collapsed into the first,
+    so the graph and ids.json agree on one node per name. A later duplicate's
+    evidence is appended and its role fills a null one; a second, different
+    role is reported by role_conflicts rather than kept. Input is not mutated."""
+    unique = {}
     for c in components or []:
-        if c["name"] not in seen:
-            seen.add(c["name"])
-            unique.append(c)
-    return unique
+        first = unique.get(c["name"])
+        if first is None:
+            unique[c["name"]] = {**c, "evidence": list(c.get("evidence") or [])}
+            continue
+        if first.get("role") is None and c.get("role") is not None:
+            first["role"] = c["role"]
+        first["evidence"] += [e for e in c.get("evidence") or [] if e not in first["evidence"]]
+    return list(unique.values())
+
+
+def role_conflicts(components):
+    """{name: [role, ...]} for each component name given more than one
+    distinct non-null role, in first-seen order. dedupe_components keeps the
+    first, so the caller reports the rest instead of dropping them silently."""
+    roles = {}
+    for c in components or []:
+        role = c.get("role")
+        if role is not None and role not in roles.setdefault(c["name"], []):
+            roles[c["name"]].append(role)
+    return {name: rs for name, rs in roles.items() if len(rs) > 1}
 
 
 def component_nodes(components):

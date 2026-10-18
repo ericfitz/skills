@@ -29,18 +29,18 @@ Exit codes:
        string `name`, a name slugs to empty, or two names collide)
 """
 
-import argparse
 import json
 import sys
 
-from depgraphlib.graph import InvalidDependencyError, dedupe_components, link_graph
+from depgraphlib.graph import InvalidDependencyError, dedupe_components, link_graph, role_conflicts
 from depgraphlib.ids import assign_ids
 from depgraphlib.merge import MixedProvenanceError, merge_envelopes
 from depgraphlib.mermaid import to_mermaid
+from jsonargs import JsonErrorParser
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
+    parser = JsonErrorParser(
         prog="depgraph.py",
         description="Merge dependency-model discovery envelopes into a graph document.")
     parser.add_argument("envelopes", nargs="+", metavar="ENVELOPE.json",
@@ -65,6 +65,7 @@ def main(argv=None):
 
     try:
         topo_components = dedupe_components(topology.get("components"))
+        conflicts = role_conflicts(topology.get("components"))
         ids = assign_ids([c["name"] for c in topo_components], "component")
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
         json.dump({"error": f"component ids: {exc}"}, sys.stderr)
@@ -90,6 +91,9 @@ def main(argv=None):
         json.dump({"error": f"invalid dependency: {exc}"}, sys.stderr)
         sys.stderr.write("\n")
         return 2
+    for name, roles in sorted(conflicts.items()):
+        sys.stderr.write(f"depgraph.py: component {name!r} is listed with roles "
+                         f"{', '.join(map(repr, roles))}; kept {roles[0]!r}\n")
     if unresolved:
         sys.stderr.write(f"depgraph.py: {len(unresolved)} link(s) match no node; "
                          "see `unresolved` in the output\n")

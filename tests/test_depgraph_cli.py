@@ -82,6 +82,17 @@ class UsedByErrorsTest(unittest.TestCase):
         self.assertEqual(len([n for n in doc["graph"]["nodes"]
                               if n["category"] == "component"]), 1)
 
+    def test_duplicate_components_merge_and_a_role_conflict_is_reported(self):
+        code, out, err = run({"components": [
+            {"name": "api", "role": "http", "evidence": ["cmd/api/main.go:1"]},
+            {"name": "api", "role": "grpc", "evidence": ["deploy/api.yaml:3"]}]})
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["components"],
+                         [{"id": "component:api", "name": "api", "role": "http",
+                           "evidence": ["cmd/api/main.go:1", "deploy/api.yaml:3"]}])
+        self.assertIn("'api'", err)
+        self.assertIn("'grpc'", err)
+
 
 if __name__ == "__main__":
     unittest.main()

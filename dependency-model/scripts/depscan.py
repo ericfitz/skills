@@ -21,17 +21,17 @@ Exit codes:
     2  PATH is not a usable directory, or REF is not a commit in it
 """
 
-import argparse
 import json
 import sys
 from pathlib import Path
 
 from depscanlib.report import build_scan
 from depscanlib.run import RefError, prepare
+from jsonargs import JsonErrorParser
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
+    parser = JsonErrorParser(
         prog="depscan.py",
         description="Emit a deterministic JSON dependency-evidence index.")
     parser.add_argument("path", nargs="?", default=".",

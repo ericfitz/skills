@@ -21,13 +21,14 @@ Exit codes:
     2  repo path or syft JSON unusable
 """
 
-import argparse
 import json
 import re
 import sys
 import tomllib
 from collections import deque
 from pathlib import Path
+
+from jsonargs import JsonErrorParser
 
 BUILD, RUN = "build", "run"
 
@@ -213,7 +214,7 @@ def propagate(roots, artifacts, relationships):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
+    parser = JsonErrorParser(
         prog="pkglifecycle.py",
         description="Derive build-vs-run lifecycle for syft-catalogued packages.")
     parser.add_argument("path", help="repo root")

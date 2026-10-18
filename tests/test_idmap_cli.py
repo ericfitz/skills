@@ -1,5 +1,7 @@
 # tests/test_idmap_cli.py
 import json
+import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -11,9 +13,10 @@ SCRIPT = REPO / "dependency-model" / "scripts" / "idmap.py"
 TMI = REPO / "tests" / "fixtures" / "dependency_model" / "topology_tmi.json"
 
 
-def run(path, *flags):
+def run(path, *flags, umask=None):
+    preexec = None if umask is None else (lambda: os.umask(umask))
     return subprocess.run([sys.executable, str(SCRIPT), str(path), *flags],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, preexec_fn=preexec)
 
 
 def run_doc(doc, *flags):
@@ -141,6 +144,17 @@ class IdmapCliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout),
                          {"components": [], "services": [], "skipped": []})
+
+    def test_written_mode_follows_umask(self):
+        """ids.json gets the mode any new file would: 0666 less the umask."""
+        for umask, mode in ((0o022, 0o644), (0o077, 0o600), (0o002, 0o664)):
+            with self.subTest(umask=oct(umask)), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "topology.json"
+                path.write_text(json.dumps(topo(components=["api"])))
+                result = run(path, "--write", umask=umask)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                written = Path(tmp) / "ids.json"
+                self.assertEqual(stat.S_IMODE(written.stat().st_mode), mode)
 
     def test_write_is_deterministic(self):
         with tempfile.TemporaryDirectory() as tmp:

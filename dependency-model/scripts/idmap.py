@@ -23,13 +23,13 @@ Exit codes:
        names collide even after the fallback
 """
 
-import argparse
 import json
 import os
 import sys
 import tempfile
 
 from depgraphlib.ids import assign_ids
+from jsonargs import JsonErrorParser
 
 SERVICE_SOURCES = ("real_dependencies", "external_third_parties")
 
@@ -89,7 +89,11 @@ def write_atomic(path, text):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
-        os.chmod(tmp, 0o644)
+        # mkstemp creates 0600; give ids.json the mode open() would (0666
+        # less the umask). Reading the umask means setting it, so restore it.
+        umask = os.umask(0)
+        os.umask(umask)
+        os.chmod(tmp, 0o666 & ~umask)
         os.replace(tmp, path)
     except BaseException:
         if os.path.exists(tmp):
@@ -98,7 +102,7 @@ def write_atomic(path, text):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
+    parser = JsonErrorParser(
         prog="idmap.py",
         description="Write the shared component/service id list for a topology contract.")
     parser.add_argument("topology", metavar="TOPOLOGY.json",

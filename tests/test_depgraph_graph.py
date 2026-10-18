@@ -7,7 +7,14 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
 
-from depgraphlib.graph import build_graph, component_nodes, link_graph, slug
+from depgraphlib.graph import (
+    build_graph,
+    component_nodes,
+    dedupe_components,
+    link_graph,
+    role_conflicts,
+    slug,
+)
 
 
 def dep(id_, name, lifecycle="run", related=None, depends=None):
@@ -94,6 +101,29 @@ class TestUsedBy(unittest.TestCase):
     def test_duplicate_component_names_give_one_node(self):
         nodes = component_nodes([{"name": "api"}, {"name": "api"}])
         self.assertEqual([n["id"] for n in nodes], ["component:api"])
+
+    def test_duplicate_components_keep_every_evidence_entry(self):
+        out = dedupe_components([{"name": "api", "role": "http", "evidence": ["a:1"]},
+                                 {"name": "api", "role": None, "evidence": ["b:2", "a:1"]}])
+        self.assertEqual(out, [{"name": "api", "role": "http", "evidence": ["a:1", "b:2"]}])
+
+    def test_a_null_role_takes_the_later_duplicates_role(self):
+        out = dedupe_components([{"name": "api", "role": None, "evidence": []},
+                                 {"name": "api", "role": "http", "evidence": []}])
+        self.assertEqual(out[0]["role"], "http")
+
+    def test_dedupe_does_not_mutate_its_input(self):
+        first = {"name": "api", "role": None, "evidence": ["a:1"]}
+        dedupe_components([first, {"name": "api", "role": "http", "evidence": ["b:2"]}])
+        self.assertEqual(first, {"name": "api", "role": None, "evidence": ["a:1"]})
+
+    def test_role_conflicts_name_each_distinct_role(self):
+        self.assertEqual(role_conflicts([{"name": "api", "role": "http"},
+                                         {"name": "api", "role": None},
+                                         {"name": "api", "role": "grpc"},
+                                         {"name": "api", "role": "http"},
+                                         {"name": "worker", "role": "jobs"}]),
+                         {"api": ["http", "grpc"]})
 
 
 class TestEdges(unittest.TestCase):
@@ -432,11 +462,15 @@ class TestFallbackMatching(unittest.TestCase):
             config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]))
         self.assertEqual([u["to"] for u in unresolved], ["service:nats-(jetstream)"])
 
-    def test_ambiguous_canonical_does_not_fall_through_to_reslug(self):
-        _, unresolved = link_graph(merged(
-            service=[dep("service:Nats_X", "a"), dep("service:nats-x", "b"),
-                     dep("service:nats-x-(tls)", "c")],
-            config=[dep("config:c", "C", related=["service:NATS-X"])]))
+    def test_ambiguous_canonical_does_not_fall_through_to_a_unique_component(self):
+        """Canonical collisions are also re-slug and name collisions, so only
+        the service-to-component step can be unique after an ambiguous
+        canonical one; the first step with candidates must still decide."""
+        g, unresolved = link_graph(merged(
+            service=[dep("service:Nats_X", "a"), dep("service:nats-x", "b")],
+            config=[dep("config:c", "C", related=["service:NATS-X"])]),
+            [{"name": "nats-x"}])
+        self.assertEqual(g["edges"], [])
         self.assertEqual([u["to"] for u in unresolved], ["service:NATS-X"])
 
     def test_component_retry_does_not_fuzzy_match_components(self):
@@ -481,7 +515,10 @@ class TestFallbackMatching(unittest.TestCase):
                 dep(node["id"], node["name"], related=related, depends=depends or None))
         components = [{"name": n["name"]} for n in fixture["nodes"]
                       if n["category"] == "component"]
+        self.assertEqual(len(components), 8)
         graph, unresolved = link_graph(merged(**cats), components)
+        self.assertEqual(sorted(n["id"] for n in graph["nodes"] if n["category"] == "component"),
+                         sorted(n["id"] for n in fixture["nodes"] if n["category"] == "component"))
         resolved = sorted((e["from"], e["to"]) for e in graph["edges"])
         self.assertEqual(len(resolved), 26)
         self.assertEqual(resolved, TMI_RESOLVED)
