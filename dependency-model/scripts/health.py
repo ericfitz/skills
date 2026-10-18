@@ -19,15 +19,15 @@ Exit codes:
        (missing `inventory` or `graph`, or a malformed entry)
 """
 
-import argparse
 import json
 import sys
 
 from depgraphlib.health import derive_health
+from jsonargs import JsonErrorParser
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
+    parser = JsonErrorParser(
         prog="health.py",
         description="Derive health[] from depgraph.py output.")
     parser.add_argument("document", metavar="DEPGRAPH_OUT.json",

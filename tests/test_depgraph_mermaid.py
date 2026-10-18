@@ -105,6 +105,18 @@ class TestCollapsedView(unittest.TestCase):
         self.assertEqual(out["view"], "full")
         self.assertEqual(out["collapsed"], {})
 
+    def test_full_view_draws_one_arrow_per_from_to_kind(self):
+        """Edges that differ only in lifecycle are one arrow, as in the
+        collapsed view; a different kind is a different arrow."""
+        g = graph(["a", "b"], edges=[
+            edge("package:a", "package:b"),
+            {**edge("package:a", "package:b"), "lifecycle": "run"},
+            edge("package:a", "package:b", kind="relates_to")])
+        out = to_mermaid(g)
+        self.assertEqual(out["view"], "full")
+        self.assertEqual(out["mermaid"].count("n0 --> n1"), 1)
+        self.assertEqual(out["mermaid"].count("n0 -.-> n1"), 1)
+
     def test_collapsed_keeps_components_and_services(self):
         g = big_graph(61)
         g["edges"] = [edge("package:p0", "service:pg"), edge("package:p1", "service:pg"),
@@ -114,9 +126,11 @@ class TestCollapsedView(unittest.TestCase):
         self.assertFalse(out["degraded"])
         self.assertEqual(out["collapsed"], {"package": 61})
         self.assertEqual(out["node_count"], 64)
-        self.assertIn("64", out["reason"])
-        self.assertIn("60", out["reason"])
+        self.assertEqual(out["reason"], "64 nodes exceeds the 60-node Mermaid cap; showing "
+                                        "a collapsed view of 4 nodes with the other "
+                                        "categories rolled up")
         text = out["mermaid"]
+        self.assertEqual(len([ln for ln in text.splitlines() if "[" in ln]), 4)
         self.assertEqual(text.count('["package (61)"]'), 1)
         self.assertIn('[["api"]]', text)
         self.assertIn('["pg"]', text)
@@ -149,7 +163,9 @@ class TestCollapsedView(unittest.TestCase):
         self.assertIsNone(out["view"])
         self.assertEqual(out["collapsed"], {})
         self.assertEqual(out["node_count"], 4)
-        self.assertIn("3", out["reason"])
+        self.assertEqual(out["reason"], "4 nodes exceeds the 3-node Mermaid cap, and the "
+                                        "collapsed view still has 4 nodes; a rendered graph "
+                                        "this size is unreadable")
 
 
 if __name__ == "__main__":

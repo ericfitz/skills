@@ -57,7 +57,10 @@ each skill by name and take its envelope.
    "mermaid": {...}, "unresolved": [...]}`: the
    merged inventory (key union across categories), the topology's
    `components[]` with a `component:<slug>` id added (first-party, so they
-   are graph nodes and health anchors but never inventory entries), the
+   are graph nodes and health anchors but never inventory entries; a name
+   the topology lists twice is one entry carrying both evidence lists, and
+   when the two roles differ depgraph.py keeps the first and names the
+   others on stderr, which goes in `assumptions[]`), the
    typed-edge graph with `depends_on` and `relates_to` edges and any cycles
    found, and a Mermaid
    rendering. If it exits 2 because the envelopes disagree on `target` or

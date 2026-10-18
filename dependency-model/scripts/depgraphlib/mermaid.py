@@ -7,6 +7,9 @@ valid Mermaid identifiers, but they render correctly as labels.
 First-party components (category `component`) use the [[subroutine]] shape
 so the system's own parts stand out from what they depend on.
 
+Both views draw one arrow per (from, to, kind): edges that differ only in
+lifecycle are the same arrow on a diagram.
+
 Escaping is verified against mmdc: a raw double quote inside a quoted label
 breaks parsing, and #quot; is the escape that works. #, <, > and ; are fine.
 """

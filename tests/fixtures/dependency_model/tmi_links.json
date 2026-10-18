@@ -239,6 +239,46 @@
    "id": "service:saml-idps",
    "name": "SAML identity providers",
    "category": "service"
+  },
+  {
+   "id": "component:migrate-dbtool-genconfig-worker-probe-dedup-group-members",
+   "name": "migrate / dbtool / genconfig / worker-probe / dedup-group-members",
+   "category": "component"
+  },
+  {
+   "id": "component:tmi-chunk-embed",
+   "name": "tmi-chunk-embed",
+   "category": "component"
+  },
+  {
+   "id": "component:tmi-component-controller",
+   "name": "tmi-component-controller",
+   "category": "component"
+  },
+  {
+   "id": "component:tmi-extractor",
+   "name": "tmi-extractor",
+   "category": "component"
+  },
+  {
+   "id": "component:tmi-rotator",
+   "name": "tmi-rotator",
+   "category": "component"
+  },
+  {
+   "id": "component:tmi-server",
+   "name": "tmi-server",
+   "category": "component"
+  },
+  {
+   "id": "component:tmi-server-oracle",
+   "name": "tmi-server-oracle",
+   "category": "component"
+  },
+  {
+   "id": "component:wstest",
+   "name": "wstest",
+   "category": "component"
   }
  ],
  "links": [

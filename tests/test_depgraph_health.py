@@ -191,6 +191,7 @@ class TestRequiredFor(unittest.TestCase):
         r = derive_health(document(
             dep("service:pg", used_by=used("component:api")), components=("api",)))
         entry = next(h for h in r["health"] if h["service_id"] == "component:api")
+        self.assertTrue(entry["conditions"])
         for c in entry["conditions"]:
             self.assertEqual(c["required_for"], ["component:api"])
 
@@ -199,10 +200,10 @@ class TestRequiredFor(unittest.TestCase):
             dep("service:pg", used_by=used("component:api")),
             dep("service:cache", used_by=used("component:api")),
             components=("api", "worker")))
-        for h in r["health"]:
-            if h["service_id"] == "component:api":
-                for c in h["conditions"]:
-                    self.assertEqual(c["required_for"], ["component:api"])
+        entry = next(h for h in r["health"] if h["service_id"] == "component:api")
+        self.assertTrue(entry["conditions"])
+        for c in entry["conditions"]:
+            self.assertEqual(c["required_for"], ["component:api"])
 
     def test_component_gets_upstream_health_on_used_service(self):
         r = derive_health(document(
@@ -212,9 +213,10 @@ class TestRequiredFor(unittest.TestCase):
 
     def test_no_used_by_leaves_required_for_empty(self):
         r = derive_health(document(dep("service:pg"), components=("api",)))
-        for entry in r["health"]:
-            for c in entry["conditions"]:
-                self.assertEqual(c["required_for"], [])
+        conds = [c for entry in r["health"] for c in entry["conditions"]]
+        self.assertTrue(conds)
+        for c in conds:
+            self.assertEqual(c["required_for"], [])
 
 
 class TestCli(unittest.TestCase):
