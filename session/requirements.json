@@ -41,6 +41,12 @@
         "macos": "brew install gh",
         "docs": "https://cli.github.com"
       }
+    },
+    {
+      "name": "agentbus",
+      "required": false,
+      "why": "handoff runs `agentbus park` at session end so only direct messages wake the finished session; without it the step is skipped",
+      "probe": ["agentbus", "version"]
     }
   ],
   "auth": [
