@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Use when asked to /handoff, "update the handoff", "write the handoff", "checkpoint", at a checkpoint (task finished, decision made, PR merged), or when the user says they are stopping, going to sleep, or ending the session. Rewrites HANDOFF.md with current state only, routes long-lived knowledge out, and reports everything not yet landed. It never commits, pushes or deploys.
+description: Use when asked to /handoff, "update the handoff", "write the handoff", or "checkpoint", when the session ends (including an autonomous run finishing its work), when context is about to pass 40%, or when the user says they are stopping, going to sleep, or ending the session. Not after each task, decision or merge. Rewrites HANDOFF.md with current state only, routes long-lived knowledge out, and reports everything not yet landed. It never commits, pushes or deploys.
 ---
 
 # /handoff
@@ -25,6 +25,12 @@ the file you found. If neither exists, create it at the main checkout root, so w
 sessions share one handoff. Say which path you wrote.
 
 ## Steps
+
+0. **Skip if unchanged:** if this session already ran `/handoff` and since then has made no
+   commits, file changes, task updates or decisions, and learned no facts, say
+   "HANDOFF.md unchanged", run step 6 (park), and stop. A session woken after its
+   end-of-session handoff (for example by an agentbus message it only read) does not rewrite
+   the file.
 
 1. **Collect:** run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh` from inside the repo. Read the
    current HANDOFF.md (location above), if any. Review this session for: what was done, what is
@@ -54,7 +60,7 @@ sessions share one handoff. Say which path you wrote.
    - Tracked files (CLAUDE.md, ADRs) are edited but **not committed**.
    - Agentbus memories (when a server is available) are created with `send` to the project's
      memory channel; do not ask before creating them.
-   Nothing is moved silently: every move appears in the "routed" table in step 6.
+   Nothing is moved silently: every move appears in the "routed" table in step 7.
 
 4. **Rewrite HANDOFF.md** from this template. Aim for 40 lines or fewer; going over means
    something should be routed out in step 3.
@@ -82,7 +88,13 @@ sessions share one handoff. Say which path you wrote.
    (use the directory where the file lives, not the cwd, which may be a worktree), append
    `HANDOFF.md` to that directory's `.gitignore` and say so. Do not commit the `.gitignore` change.
 
-6. **End with a report** of what was routed and what is not landed, without asking any questions:
+6. **Park (session end only):** when this handoff ends the session and an agentbus MCP server
+   is available, run `agentbus park` as the last agentbus action, after every send and memory
+   write. While parked, only direct messages wake the session; the user's next prompt or any
+   agentbus call other than `receive` unparks it. Exit 2 (no live session) is not an error.
+   Skip this step for a mid-session handoff.
+
+7. **End with a report** of what was routed and what is not landed, without asking any questions:
    - **Routed:** a table (item, destination, file path or memory id) of every move made in
      step 3, so the user can revert any of them. Omit it if nothing was routed.
    - **Not landed:** everything uncommitted, unpushed, unmerged or undeployed, each with the
@@ -92,10 +104,10 @@ sessions share one handoff. Say which path you wrote.
 ## Rules
 
 - `/handoff` never commits, pushes or deploys. It only writes HANDOFF.md, makes routing
-  edits, and reports.
+  edits, parks the agentbus session at session end, and reports.
 - `/handoff` never prompts the user. If an item's destination is unclear, pick the closest row
   of the routing table and say so in the report.
 - History is dropped by design. The record of finished work is git log, merged PRs and closed
   issues.
-- At a mid-session checkpoint (task, decision, merge), run the same steps; the routing list is
-  usually empty and the file gets shorter.
+- Mid-session, run only when asked or when context is about to pass 40%, with the same steps.
+  Per-task progress lives in git, PRs and agentbus task lists, not in repeated handoffs.
