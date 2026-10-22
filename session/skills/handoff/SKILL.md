@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Use when asked to /handoff, "update the handoff", "write the handoff", "checkpoint", at a checkpoint (task finished, decision made, PR merged), or when the user says they are stopping, going to sleep, or ending the session. Rewrites HANDOFF.md with current state only, routes long-lived knowledge out, and reports everything not yet landed. It never commits, pushes or deploys.
+description: Use when asked to /handoff, "update the handoff", "write the handoff", or "checkpoint", when the session ends (including an autonomous run finishing its work), when context is about to pass 40%, or when the user says they are stopping, going to sleep, or ending the session. Not after each task, decision or merge. Rewrites HANDOFF.md with current state only, routes long-lived knowledge out, and reports everything not yet landed. It never commits, pushes or deploys.
 ---
 
 # /handoff
@@ -25,6 +25,11 @@ the file you found. If neither exists, create it at the main checkout root, so w
 sessions share one handoff. Say which path you wrote.
 
 ## Steps
+
+0. **Skip if unchanged:** if this session already ran `/handoff` and since then has made no
+   commits, file changes, task updates or decisions, and learned no facts, say
+   "HANDOFF.md unchanged" and stop. A session woken after its end-of-session handoff (for
+   example by an agentbus message it only read) does not rewrite the file.
 
 1. **Collect:** run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh` from inside the repo. Read the
    current HANDOFF.md (location above), if any. Review this session for: what was done, what is
@@ -97,5 +102,5 @@ sessions share one handoff. Say which path you wrote.
   of the routing table and say so in the report.
 - History is dropped by design. The record of finished work is git log, merged PRs and closed
   issues.
-- At a mid-session checkpoint (task, decision, merge), run the same steps; the routing list is
-  usually empty and the file gets shorter.
+- Mid-session, run only when asked or when context is about to pass 40%, with the same steps.
+  Per-task progress lives in git, PRs and agentbus task lists, not in repeated handoffs.
