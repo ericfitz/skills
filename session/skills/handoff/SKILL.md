@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Use when asked to /handoff, "update the handoff", "write the handoff", or "checkpoint", when the session ends (including an autonomous run finishing its work), when context is about to pass 40%, or when the user says they are stopping, going to sleep, or ending the session. Not after each task, decision or merge. Rewrites HANDOFF.md with current state only, routes long-lived knowledge out, and reports everything not yet landed. It never commits, pushes or deploys.
+description: Use when asked to /handoff, "update the handoff", "write the handoff", or "checkpoint", when the session ends, or when the user says they are stopping, going to sleep, or ending the session. Not after each task, decision or merge. Rewrites HANDOFF.md with current state only, routes long-lived knowledge out, and reports everything not yet landed. It never commits, pushes or deploys.
 ---
 
 # /handoff
@@ -109,5 +109,5 @@ sessions share one handoff. Say which path you wrote.
   of the routing table and say so in the report.
 - History is dropped by design. The record of finished work is git log, merged PRs and closed
   issues.
-- Mid-session, run only when asked or when context is about to pass 40%, with the same steps.
+- Mid-session, run only when asked, with the same steps.
   Per-task progress lives in git, PRs and agentbus task lists, not in repeated handoffs.
