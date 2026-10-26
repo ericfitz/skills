@@ -108,15 +108,19 @@ rules are committed.
 
 ### profile — project discovery
 
-- **stack** — Identify what a codebase is built with: languages, runtimes, package managers, build commands, and monorepo layout.
 - **docs** — Read the documentary record (PRDs, requirements, specs, ADRs, wiki pages) and extract requirements, user-workflow evidence, domain vocabulary, and invariants.
-- **topology** — Determine how the system deploys and what it depends on: components, real dependencies, third-party services, configuration, startup order, and standup difficulty.
 - **journeys** — Identify the key workflows users actually perform, mined from documentation, routes, CLI commands, and UI entry points, ranked by business criticality with dependency edges.
+- **report** — Turn saved profile contracts and optional explicit JSON, text or Markdown support into one offline HTML report with expandable evidence, tables and diagrams. Honors an explicit output path and requests browser opening unless `--no-open` is supplied.
+- **stack** — Identify what a codebase is built with: languages, runtimes, package managers, build commands, and monorepo layout.
+- **topology** — Determine how the system deploys and what it depends on: components, real dependencies, third-party services, configuration, startup order, and standup difficulty.
 
 Read-only inference backed by `scripts/profile_inventory.py`, a deterministic
-repo census. Each skill emits a versioned JSON contract under
+repo census. Discovery skills emit versioned JSON contracts under
 `references/contracts/`; those contracts are the supported interface for other
-plugins.
+plugins. `report` consumes saved contracts without running discovery. Its default
+destination is `<artifact_dir>/profile-report.html`; `--out ~/Downloads/name.html`
+uses that exact location. Destination failures stop generation; browser-opening
+failures are reported separately after the report is saved.
 
 ### itest — integration test design
 

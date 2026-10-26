@@ -38,6 +38,7 @@ flowchart LR
     p_docs["docs"]
     p_topo["topology"]
     p_journeys["journeys"]
+    p_report["report — saved artifacts only"]
   end
 
   subgraph itest["itest — integration test design"]
@@ -86,6 +87,10 @@ flowchart LR
   p_stack -- "stack" --> p_topo
   p_stack -- "stack" --> p_journeys
   p_docs  -- "docs" --> p_journeys
+  p_stack -- "saved stack.json" --> p_report
+  p_docs -- "saved docs.json" --> p_report
+  p_topo -- "saved topology.json" --> p_report
+  p_journeys -- "saved journeys.json" --> p_report
 
   p_stack -- "stack" --> i_conv
   p_stack -- "stack" --> i_crit
@@ -149,6 +154,12 @@ and produces none; it is a preflight, not a stage.
 
 ### Reading the core chain
 
+`profile:report` consumes the four saved profile contracts and optional explicitly
+supplied JSON, text or Markdown support. It writes a portable offline HTML report
+with in-page artifact provenance and evidence, without invoking discovery or
+reading referenced source paths. It honors the requested output destination and
+reports browser-opening failures separately from successful generation.
+
 `profile:stack` is the gate. Its contract carries the repo inventory produced by
 `profile_inventory.py`, so no downstream skill re-runs the census. `profile:docs` is the
 second gate: `journeys` and the `itest` discovery skills read the documentary record
@@ -182,6 +193,7 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `docs` | What the project's own record says it must do — requirements, journey evidence, glossary, invariants | `docs` contract | `stack` |
 | `topology` | How the system deploys — components, real dependencies, third parties, config mechanism, startup order, standup difficulty | `topology` contract | `stack` |
 | `journeys` | The workflows users actually perform, ranked, with dependency edges — **candidates for a human to confirm** | `journeys` contract | `stack`, `docs` |
+| `report` | A human summary with expandable evidence, tables and offline diagrams | One self-contained HTML file | Saved `stack`, `docs`, `journeys`, `topology`; optional explicit support files |
 
 ### itest
 
