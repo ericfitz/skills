@@ -50,7 +50,7 @@ declare -a PLUGINS=(
   "deps:development:bump"
   "logseq:productivity:capture,query,lint,organize,from-obsidian"
   "cats:testing:analyze,fp,init,report,run"
-  "profile:development:docs,journeys,stack,topology"
+  "profile:development:docs,journeys,report,stack,topology"
   "itest:development:conventions,critique,design,state"
   "openapi:development:arazzo,init"
   "env:development:check"
