@@ -88,11 +88,13 @@ sessions share one handoff. Say which path you wrote.
    (use the directory where the file lives, not the cwd, which may be a worktree), append
    `HANDOFF.md` to that directory's `.gitignore` and say so. Do not commit the `.gitignore` change.
 
-6. **Park (session end only):** when this handoff ends the session and an agentbus MCP server
-   is available, run `agentbus park` as the last agentbus action, after every send and memory
-   write. While parked, only direct messages wake the session; the user's next prompt or any
-   agentbus call other than `receive` unparks it. Exit 2 (no live session) is not an error.
-   Skip this step for a mid-session handoff.
+6. **Park (session end only):** when this handoff ends the session, park each installed bus:
+   run `agentbus park` if `command -v agentbus` succeeds, and `agentbus2 park` if
+   `command -v agentbus2` succeeds; run both when both are installed and skip whichever is
+   absent. Each park is the last action on its own bus, after every send and memory write to
+   that bus. While parked, only direct messages wake the session; the user's next prompt or any
+   call to that bus other than `receive` unparks it. Exit 2 (no live session) from either is not
+   an error. Skip this step for a mid-session handoff.
 
 7. **End with a report** of what was routed and what is not landed, without asking any questions:
    - **Routed:** a table (item, destination, file path or memory id) of every move made in
@@ -104,7 +106,7 @@ sessions share one handoff. Say which path you wrote.
 ## Rules
 
 - `/handoff` never commits, pushes or deploys. It only writes HANDOFF.md, makes routing
-  edits, parks the agentbus session at session end, and reports.
+  edits, parks the agentbus and agentbus2 sessions at session end, and reports.
 - `/handoff` never prompts the user. If an item's destination is unclear, pick the closest row
   of the routing table and say so in the report.
 - History is dropped by design. The record of finished work is git log, merged PRs and closed

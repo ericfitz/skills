@@ -47,6 +47,12 @@
       "required": false,
       "why": "handoff runs `agentbus park` at session end so only direct messages wake the finished session; without it the step is skipped",
       "probe": ["agentbus", "version"]
+    },
+    {
+      "name": "agentbus2",
+      "required": false,
+      "why": "handoff runs `agentbus2 park` at session end so only direct messages wake the finished session; without it the step is skipped",
+      "probe": ["agentbus2", "version"]
     }
   ],
   "auth": [
