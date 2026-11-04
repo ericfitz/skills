@@ -96,6 +96,15 @@ class TestSessionSkills(unittest.TestCase):
         self.assertTrue(backlog.is_file(), f"{backlog} missing: go invokes github:backlog")
         self.assertRegex(backlog.read_text(encoding="utf-8"), r"(?m)^name: backlog$")
 
+    def test_handoff_sets_idle_before_park(self):
+        handoff = (PLUGIN / "skills" / "handoff" / "SKILL.md").read_text(encoding="utf-8")
+        step = re.search(r"(?ms)^6\. \*\*Park.*?(?=^7\. )", handoff)
+        self.assertIsNotNone(step, "handoff step 6 (Park) missing")
+        text = step.group(0)
+        self.assertIn("`set_status`", text)
+        self.assertIn("tag `idle`", text)
+        self.assertLess(text.index("`set_status`"), text.index("Each park is the last action"))
+
     def test_scripts_resolved_via_plugin_root(self):
         for skill in ("go", "handoff"):
             with self.subTest(skill=skill):
