@@ -56,7 +56,7 @@ class TestSessionScripts(unittest.TestCase):
 
     def test_hint_names_plugin_qualified_skill(self):
         text = (PLUGIN / "scripts" / "handoff-hint.sh").read_text(encoding="utf-8")
-        self.assertIn("/session:continue", text)
+        self.assertIn("/session:go", text)
         self.assertNotIn("/usr/bin/python3", text)
 
     def test_repo_state_uses_path_python(self):
@@ -80,24 +80,24 @@ class TestSessionHooks(unittest.TestCase):
 class TestSessionSkills(unittest.TestCase):
     def test_waiting_heading_in_sync(self):
         handoff = (PLUGIN / "skills" / "handoff" / "SKILL.md").read_text(encoding="utf-8")
-        cont = (PLUGIN / "skills" / "continue" / "SKILL.md").read_text(encoding="utf-8")
+        cont = (PLUGIN / "skills" / "go" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("WAITING ON USER:", handoff)
         self.assertIn("Waiting on the user", cont)
         self.assertIn("WAITING ON USER:", cont)
         self.assertIn("WAITING ON ERIC:", cont)  # legacy heading still accepted
         self.assertNotIn("WAITING ON ERIC:", handoff)
 
-    def test_continue_hands_off_to_backlog(self):
-        cont = (PLUGIN / "skills" / "continue" / "SKILL.md").read_text(encoding="utf-8")
+    def test_go_hands_off_to_backlog(self):
+        cont = (PLUGIN / "skills" / "go" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("github:backlog", cont)
         self.assertIn("No queued work", cont)
         self.assertIn("unavailable: github plugin not installed", cont)
         backlog = REPO / "github" / "skills" / "backlog" / "SKILL.md"
-        self.assertTrue(backlog.is_file(), f"{backlog} missing: continue invokes github:backlog")
+        self.assertTrue(backlog.is_file(), f"{backlog} missing: go invokes github:backlog")
         self.assertRegex(backlog.read_text(encoding="utf-8"), r"(?m)^name: backlog$")
 
     def test_scripts_resolved_via_plugin_root(self):
-        for skill in ("continue", "handoff"):
+        for skill in ("go", "handoff"):
             with self.subTest(skill=skill):
                 text = (PLUGIN / "skills" / skill / "SKILL.md").read_text(encoding="utf-8")
                 self.assertIn("${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh", text)

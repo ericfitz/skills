@@ -1,9 +1,9 @@
 #!/bin/bash
 # SessionStart hook: when the repo at the session's cwd has a HANDOFF.md, tell Claude to
-# run /session:continue. Prints only for source startup|resume (the hooks.json matcher also
+# run /session:go. Prints only for source startup|resume (the hooks.json matcher also
 # filters, but the hook does not rely on it). Always exits 0. Run with --self-test to check.
 
-HINT="HANDOFF.md exists in this repo. Before other work, invoke the /session:continue skill (the repo may have changed since the handoff was written), unless the user's first message gives a different instruction."
+HINT="HANDOFF.md exists in this repo. Before other work, invoke the /session:go skill (the repo may have changed since the handoff was written), unless the user's first message gives a different instruction."
 
 # field <json> <key>: print the string value of a top-level key, or nothing
 field() {

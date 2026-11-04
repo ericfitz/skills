@@ -5,7 +5,7 @@ description: Use when asked to /handoff, "update the handoff", "write the handof
 
 # /handoff
 
-End (or checkpoint) the session so the next one can start with `/session:continue`. HANDOFF.md
+End (or checkpoint) the session so the next one can start with `/session:go`. HANDOFF.md
 holds only current state: it is replaced, never appended. Long-lived knowledge moves to
 where it belongs. Nothing that hasn't landed goes unreported.
 
