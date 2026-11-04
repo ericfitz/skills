@@ -1,6 +1,6 @@
 #!/bin/bash
 # repo-state.sh: collect facts about the git repo containing the current directory.
-# Never changes anything. Used by the /session:continue and /session:handoff skills.
+# Never changes anything. Used by the /session:go and /session:handoff skills.
 # Part of the session plugin.
 #
 # Exit 0 whenever a report was produced; exit 2 when not inside a git repo.

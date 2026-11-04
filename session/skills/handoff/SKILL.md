@@ -5,7 +5,7 @@ description: Use when asked to /handoff, "update the handoff", "write the handof
 
 # /handoff
 
-End (or checkpoint) the session so the next one can start with `/session:continue`. HANDOFF.md
+End (or checkpoint) the session so the next one can start with `/session:go`. HANDOFF.md
 holds only current state: it is replaced, never appended. Long-lived knowledge moves to
 where it belongs. Nothing that hasn't landed goes unreported.
 
@@ -91,8 +91,10 @@ sessions share one handoff. Say which path you wrote.
 6. **Park (session end only):** when this handoff ends the session, park each installed bus:
    run `agentbus park` if `command -v agentbus` succeeds, and `agentbus2 park` if
    `command -v agentbus2` succeeds; run both when both are installed and skip whichever is
-   absent. Each park is the last action on its own bus, after every send and memory write to
-   that bus. While parked, only direct messages wake the session; the user's next prompt or any
+   absent. Before each park, when that bus's MCP server is available, call its `set_status`
+   with tag `idle` and a one-line text such as "handoff written", so discover and the TUI
+   stop showing the session's last working status. Each park is the last action on its own
+   bus, after every send, memory write and `set_status` on that bus. While parked, only direct messages wake the session; the user's next prompt or any
    call to that bus other than `receive` unparks it. Exit 2 (no live session) from either is not
    an error. Skip this step for a mid-session handoff.
 
@@ -106,7 +108,8 @@ sessions share one handoff. Say which path you wrote.
 ## Rules
 
 - `/handoff` never commits, pushes or deploys. It only writes HANDOFF.md, makes routing
-  edits, parks the agentbus and agentbus2 sessions at session end, and reports.
+  edits, sets the agentbus and agentbus2 statuses to idle and parks both sessions at session
+  end, and reports.
 - `/handoff` never prompts the user. If an item's destination is unclear, pick the closest row
   of the routing table and say so in the report.
 - History is dropped by design. The record of finished work is git log, merged PRs and closed

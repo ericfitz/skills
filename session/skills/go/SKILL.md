@@ -1,9 +1,9 @@
 ---
-name: continue
-description: Use at the start of a session when HANDOFF.md exists, when asked to /continue, or on phrasing like "resume from handoff", "pick up where we left off", "where were we", or "what's next in this repo". Reads HANDOFF.md, checks it against the real repo state, reports drift, and proposes the next action, or runs github:backlog when nothing is queued. It never starts work. Not for a plain "continue" or "keep going" mid-task.
+name: go
+description: Use at the start of a session when HANDOFF.md exists, when asked to /go (formerly /continue), or on phrasing like "resume from handoff", "pick up where we left off", "where were we", or "what's next in this repo". Reads HANDOFF.md, checks it against the real repo state, reports drift, and proposes the next action, or runs github:backlog when nothing is queued. It never starts work. Not for a plain "continue" or "keep going" mid-task.
 ---
 
-# /continue
+# /go
 
 Start the session from the current state, not from memory. HANDOFF.md says what the last
 session believed; `repo-state.sh` says what is true now. The job is to report both, flag every
@@ -84,7 +84,7 @@ root, and use that absolute path.
 
 ## Rules
 
-- Read-only: `/continue` never edits files, commits, pushes, deploys or sends agentbus
+- Read-only: `/go` never edits files, commits, pushes, deploys or sends agentbus
   messages other than the protocol's registration. The step 6 handoff to `github:backlog`
   only reads issues; any work begins only after the user confirms an issue there.
 - Facts beat HANDOFF.md. When they disagree, the fact goes in State and the disagreement goes

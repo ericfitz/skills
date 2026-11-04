@@ -5,7 +5,7 @@
     {
       "name": "git",
       "required": true,
-      "why": "repo-state.sh (used by continue and handoff) and the SessionStart hint read branch, upstream, worktree and dirty-file facts from git",
+      "why": "repo-state.sh (used by go and handoff) and the SessionStart hint read branch, upstream, worktree and dirty-file facts from git",
       "probe": ["git", "--version"],
       "install": {
         "macos": "brew install git",
@@ -35,7 +35,7 @@
     {
       "name": "gh",
       "required": false,
-      "why": "repo-state.sh reports open PRs and main CI status for continue and handoff; without gh it reports GITHUB: unavailable",
+      "why": "repo-state.sh reports open PRs and main CI status for go and handoff; without gh it reports GITHUB: unavailable",
       "probe": ["gh", "--version"],
       "install": {
         "macos": "brew install gh",
@@ -59,7 +59,7 @@
     {
       "name": "GitHub (gh)",
       "probe": ["gh", "auth", "status"],
-      "why": "repo-state.sh needs an authenticated gh to list open PRs and CI runs; without it continue and handoff mark those facts unverified",
+      "why": "repo-state.sh needs an authenticated gh to list open PRs and CI runs; without it go and handoff mark those facts unverified",
       "remedy": "gh auth login"
     }
   ]
