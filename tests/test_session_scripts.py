@@ -98,12 +98,16 @@ class TestSessionSkills(unittest.TestCase):
 
     def test_handoff_sets_idle_before_park(self):
         handoff = (PLUGIN / "skills" / "handoff" / "SKILL.md").read_text(encoding="utf-8")
-        step = re.search(r"(?ms)^6\. \*\*Park.*?(?=^7\. )", handoff)
-        self.assertIsNotNone(step, "handoff step 6 (Park) missing")
+        step = re.search(r"(?ms)^6\. \*\*Go quiet.*?(?=^7\. )", handoff)
+        self.assertIsNotNone(step, "handoff step 6 (Go quiet) missing")
         text = step.group(0)
-        self.assertIn("`set_status`", text)
-        self.assertIn("tag `idle`", text)
-        self.assertLess(text.index("`set_status`"), text.index("Each park is the last action"))
+        self.assertIn("status to idle", text)
+        self.assertIn("lowest-attention mode", text)
+        self.assertIn("Do this last", text)
+        self.assertLess(text.index("status to idle"), text.index("lowest-attention mode"))
+        # Services are named as examples only; the skill must not hardcode their CLI commands.
+        self.assertNotRegex(handoff, r"`(agentbus2?|agentmesh) park`")
+        self.assertNotIn("agentbus2", handoff)
 
     def test_scripts_resolved_via_plugin_root(self):
         for skill in ("go", "handoff"):
