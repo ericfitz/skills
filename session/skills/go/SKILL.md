@@ -52,10 +52,10 @@ root, and use that absolute path.
    configured`, `GITHUB: unavailable` and `MAIN CI: unavailable` are not drift: they make the
    corresponding facts unverified, which goes on the State line. Drift is reported, not fixed.
 
-4. **Check agentbus** for pending messages, only when an agentbus MCP server is available:
-   follow the using-agentbus skill (register, then `receive`; do not start a background
-   `wait`) and note any message that changes the next step. Without an agentbus server, skip
-   this step.
+4. **Check for messages** on each an inter-agent communication mechanism (such as agentbus or agentmesh) this session is connected to: follow that mechanism's
+   usage skill (using-agentbus or using-agentmesh) to register and read pending messages,
+   without starting a background wait, and note any message that changes the next step.
+   Without such a mechanism, skip this step.
 
 5. **Print a summary of 10 lines or fewer** with exactly these headings:
    - **State:** branch, HEAD, upstream, dirty/clean, open PRs, main CI: <status>, deployed versions; plus "unverified: PRs/CI/deployed" for whichever of those the labels above mark unavailable.
@@ -84,8 +84,8 @@ root, and use that absolute path.
 
 ## Rules
 
-- Read-only: `/go` never edits files, commits, pushes, deploys or sends agentbus
-  messages other than the protocol's registration. The step 6 handoff to `github:backlog`
+- Read-only: `/go` never edits files, commits, pushes, deploys or sends inter-agent
+  messages other than the mechanism's registration. The step 6 handoff to `github:backlog`
   only reads issues; any work begins only after the user confirms an issue there.
 - Facts beat HANDOFF.md. When they disagree, the fact goes in State and the disagreement goes
   in Drift.

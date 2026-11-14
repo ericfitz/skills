@@ -28,17 +28,13 @@ sessions share one handoff. Say which path you wrote.
 
 0. **Skip if unchanged:** if this session already ran `/handoff` and since then has made no
    commits, file changes, task updates or decisions, and learned no facts, say
-   "HANDOFF.md unchanged", run step 6 (park), and stop. A session woken after its
-   end-of-session handoff (for example by an agentbus message it only read) does not rewrite
+   "HANDOFF.md unchanged", run step 6 (go quiet), and stop. A session woken after its
+   end-of-session handoff (for example by an inter-agent message it only read) does not rewrite
    the file.
 
 1. **Collect:** run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/repo-state.sh` from inside the repo. Read the
    current HANDOFF.md (location above), if any. Review this session for: what was done, what is
-   in flight, what is blocked, decisions the user made, and facts learned. Labels you will see:
-   BRANCH, HEAD, UPSTREAM, DIRTY, WORKTREES, UNMERGED BRANCHES, OPEN PRS (mine), MAIN CI,
-   `DEPLOYED ...`/`IMAGE ...` lines, and `STATE-CHECKS:`. The `DEPLOYED`/`IMAGE` lines come from
-   `.local/state-checks.sh`, an optional, machine-local, untracked script in the repo root; when
-   it is missing the output says `STATE-CHECKS: not configured`. If you see
+   in flight, what is blocked, decisions the user made, and facts learned. If you see
    `GITHUB: unavailable`, `MAIN CI: unavailable`, `STATE-CHECKS: FAILED|TIMEOUT|not configured`,
    or `UPSTREAM: none`, treat the dependent facts (merged, deployed, pushed) as unverified: do
    not drop work on their strength, and mark DEPLOYED values `carried over, unverified`.
@@ -52,14 +48,13 @@ sessions share one handoff. Say which path you wrote.
      | Kind | Destination |
      |---|---|
      | applies to every session in this repo | project CLAUDE.md |
-     | situational fact, tool quirk, benign noise | agentbus `memory/<project>` when an agentbus MCP server is available; otherwise the project CLAUDE.md (the closest row), and the report says so |
+     | situational fact, tool quirk, benign noise | the project's memory store in an inter-agent communication mechanism (such as agentbus or agentmesh), when one is connected; otherwise the project CLAUDE.md (the closest row), and the report says so |
      | human decision | ADR in `docs/adr/`, plus a one-line "see ADR-NNNN" in the project CLAUDE.md if it keeps coming up |
 
-3. **Route, without asking.** Make every move on the routing list; do not stop for approval.
-   The moves are easy to undo:
+3. **Route.** Make every move on the routing list. The moves are easy to undo:
    - Tracked files (CLAUDE.md, ADRs) are edited but **not committed**.
-   - Agentbus memories (when a server is available) are created with `send` to the project's
-     memory channel; do not ask before creating them.
+   - Memories go to the mechanism's project memory store, following that mechanism's usage
+     skill (using-agentbus or using-agentmesh).
    Nothing is moved silently: every move appears in the "routed" table in step 7.
 
 4. **Rewrite HANDOFF.md** from this template. Aim for 40 lines or fewer; going over means
@@ -88,31 +83,31 @@ sessions share one handoff. Say which path you wrote.
    (use the directory where the file lives, not the cwd, which may be a worktree), append
    `HANDOFF.md` to that directory's `.gitignore` and say so. Do not commit the `.gitignore` change.
 
-6. **Park (session end only):** when this handoff ends the session, park each installed bus:
-   run `agentbus park` if `command -v agentbus` succeeds, and `agentbus2 park` if
-   `command -v agentbus2` succeeds; run both when both are installed and skip whichever is
-   absent. Before each park, when that bus's MCP server is available, call its `set_status`
-   with tag `idle` and a one-line text such as "handoff written", so discover and the TUI
-   stop showing the session's last working status. Each park is the last action on its own
-   bus, after every send, memory write and `set_status` on that bus. While parked, only direct messages wake the session; the user's next prompt or any
-   call to that bus other than `receive` unparks it. Exit 2 (no live session) from either is not
-   an error. Skip this step for a mid-session handoff.
+6. **Go quiet (session end only):** for each inter-agent communication mechanism this
+   session is connected to (such as agentbus or agentmesh), set your status to idle with a short note
+   such as "handoff written", so other agents stop seeing your last working status. Then
+   switch to that mechanism's lowest-attention mode, in which only messages addressed directly
+   to you wake the session (both call this parking), following that mechanism's usage
+   skill (using-agentbus or using-agentmesh). Do this last on each mechanism, after every message, memory write and status
+   update there. A mechanism reporting that this session has nothing to park is not an error.
+   Skip this step for a mid-session handoff.
 
-7. **End with a report** of what was routed and what is not landed, without asking any questions:
+7. **End with a report** of what was routed and what is not landed:
    - **Routed:** a table (item, destination, file path or memory id) of every move made in
      step 3, so the user can revert any of them. Omit it if nothing was routed.
    - **Not landed:** everything uncommitted, unpushed, unmerged or undeployed, each with the
      command that would land it (absolute paths), for example
-     `cd /path/to/repo && git push origin feat/x`, `gh pr merge 123 --squash`.
+     `git -C /path/to/repo push origin feat/x`, `gh pr merge 123 --squash`.
 
 ## Rules
 
 - `/handoff` never commits, pushes or deploys. It only writes HANDOFF.md, makes routing
-  edits, sets the agentbus and agentbus2 statuses to idle and parks both sessions at session
-  end, and reports.
-- `/handoff` never prompts the user. If an item's destination is unclear, pick the closest row
-  of the routing table and say so in the report.
+  edits, goes quiet on each connected inter-agent communication mechanism at session end (step 6), and
+  reports.
+- `/handoff` never prompts the user or stops for approval, including for routing moves and
+  memory writes. If an item's destination is unclear, pick the closest row of the routing
+  table and say so in the report.
 - History is dropped by design. The record of finished work is git log, merged PRs and closed
   issues.
 - Mid-session, run only when asked, with the same steps.
-  Per-task progress lives in git, PRs and agentbus task lists, not in repeated handoffs.
+  Per-task progress lives in git, PRs and inter-agent task lists, not in repeated handoffs.
