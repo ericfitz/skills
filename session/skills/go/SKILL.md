@@ -1,6 +1,6 @@
 ---
 name: go
-description: Use at the start of a session when HANDOFF.md exists, when asked to /go (formerly /continue), or on phrasing like "resume from handoff", "pick up where we left off", "where were we", or "what's next in this repo". Reads HANDOFF.md, checks it against the real repo state, reports drift, and proposes the next action, or runs github:backlog when nothing is queued. It never starts work. Not for a plain "continue" or "keep going" mid-task.
+description: Use at the start of a session when HANDOFF.md exists, when asked to /go (formerly /continue), or on phrasing like "resume from handoff", "pick up where we left off", "where were we", or "what's next in this repo". Reads HANDOFF.md, checks it against the real repo state, reports drift, and proposes the next action, or runs github:backlog when nothing is queued or every NEXT item is already done. After the user's first reply it names the session. It never starts work. Not for a plain "continue" or "keep going" mid-task.
 ---
 
 # /go
@@ -52,23 +52,30 @@ root, and use that absolute path.
    configured`, `GITHUB: unavailable` and `MAIN CI: unavailable` are not drift: they make the
    corresponding facts unverified, which goes on the State line. Drift is reported, not fixed.
 
+   Also classify each HANDOFF.md NEXT item as **done** or **open**. An item is done when the
+   facts already collected confirm it, or when a read-only query quoted in the item confirms it.
+   Run only these queries: `gh ... list|view|status`; `gh api` as a GET (no `-X`/`--method`
+   other than GET, and no `-f`, `-F`, `--field` or `--input`); `git log|show|status`. Every
+   other item is open, including "pick from the backlog" items. A done item is not drift.
+
 4. **Check for messages** on each an inter-agent communication mechanism (such as agentbus or agentmesh) this session is connected to: follow that mechanism's
    usage skill (using-agentbus or using-agentmesh) to register and read pending messages,
    without starting a background wait, and note any message that changes the next step.
    Without such a mechanism, skip this step.
 
 5. **Print a summary of 10 lines or fewer** with exactly these headings:
-   - **State:** branch, HEAD, upstream, dirty/clean, open PRs, main CI: <status>, deployed versions; plus "unverified: PRs/CI/deployed" for whichever of those the labels above mark unavailable.
+   - **State:** branch, HEAD, upstream, dirty/clean, open PRs, main CI: <status>, deployed versions; plus "unverified: PRs/CI/deployed" for whichever of those the labels above mark unavailable; plus `NEXT done: <item numbers>` when step 3 found any done items.
    - **Drift:** the mismatches from step 3, or "none".
    - **Waiting on the user:** each item with the exact command to run (absolute paths) or the
      exact `Approve: <action and target>` line to send. Read the handoff's `WAITING ON USER:`
      section; also accept the legacy heading `WAITING ON ERIC:` in existing handoff files.
-   - **Proposed next action:** one item, taken from HANDOFF.md NEXT unless drift changes it.
+   - **Proposed next action:** one item, the first open NEXT item unless drift changes it.
      When step 6 applies, it is "run `/github:backlog`".
 
 6. **No queued work: run the backlog.** No queued work means all of these hold:
    - HANDOFF.md IN FLIGHT is empty or "none" (or HANDOFF.md is missing in both places);
-   - HANDOFF.md NEXT is empty, "none", or only says to pick an item from the backlog or issue list;
+   - HANDOFF.md NEXT has no open items after step 3 (it is empty, "none", only says to pick an
+     item from the backlog or issue list, or every item is done);
    - the Drift line is "none". Drift means unrecorded work exists, so propose handling it instead.
    WAITING ON USER items do not block this step; they stay on their summary line.
    When all hold and the `github:backlog` skill is in the available-skills list, print the
@@ -80,12 +87,25 @@ root, and use that absolute path.
 
 7. **Stop and wait for the user. Do not start work.** If the user's first message already gave
    a different instruction, follow it instead of the proposal. After step 6 the stop is
-   `github:backlog`'s own confirmation question.
+   `github:backlog`'s own confirmation question. The reply then triggers step 8.
+
+8. **Name the session.** On the user's first reply that chooses work (or a first message that
+   already gave an instruction), before starting the work, run one Bash command:
+   ```bash
+   d="${XDG_STATE_HOME:-$HOME/.local/state}/session-plugin/titles"; mkdir -p "$d" && printf '%s\n' '<title>' > "$d/$CLAUDE_CODE_SESSION_ID"
+   ```
+   - The file is `${XDG_STATE_HOME:-$HOME/.local/state}/session-plugin/titles/<CLAUDE_CODE_SESSION_ID>`; the hook reads and deletes it.
+   - The title is 50 characters or fewer and names the work, e.g. `#42 backlog pagination fix`.
+   - Skip this step when `CLAUDE_CODE_SESSION_ID` is unset, e.g. on Codex.
+   - If the reply chooses nothing, skip it and keep waiting.
+   - The UserPromptSubmit hook applies the title on the following prompt and never replaces a
+     title the user set.
 
 ## Rules
 
 - Read-only: `/go` never edits files, commits, pushes, deploys or sends inter-agent
-  messages other than the mechanism's registration. The step 6 handoff to `github:backlog`
+  messages other than the mechanism's registration, except the step 8 title file, which lives
+  outside the repo. The step 6 handoff to `github:backlog`
   only reads issues; any work begins only after the user confirms an issue there.
 - Facts beat HANDOFF.md. When they disagree, the fact goes in State and the disagreement goes
   in Drift.

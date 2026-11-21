@@ -171,9 +171,9 @@ by key union; `synthesize` and `report` consume that merged output. Requires
 ### session — session continuity
 
 - **handoff** — End or checkpoint a session: rewrite a machine-local, untracked `HANDOFF.md` holding only current state, route long-lived knowledge to CLAUDE.md, ADRs or the memory of an inter-agent communication mechanism (such as agentbus or agentmesh), and report everything not yet landed. Never commits, pushes, or deploys.
-- **go** — Resume from `HANDOFF.md`: compare it with live repo facts (branch, dirty files, worktrees, open PRs, main CI, optional `.local/state-checks.sh` deployed versions), report drift, propose the next action, and stop without starting work. When the handoff queues no work and there is no drift, it hands off to `github:backlog` to recommend the next issue.
+- **go** — Resume from `HANDOFF.md`: compare it with live repo facts (branch, dirty files, worktrees, open PRs, main CI, optional `.local/state-checks.sh` deployed versions), report drift, propose the next action, and stop without starting work. When the handoff queues no work and there is no drift, it hands off to `github:backlog` to recommend the next issue; the same happens when every NEXT item is already confirmed done. After the user's first reply it names the session via a UserPromptSubmit hook.
 
-A SessionStart hook prints a one-line reminder to run `go` when the repo has a `HANDOFF.md`. Requires `git` and `perl`; `gh`, an inter-agent communication mechanism (such as agentbus or agentmesh) and the `github` plugin are optional.
+Two hooks: SessionStart prints a one-line reminder to run `go` when the repo has a `HANDOFF.md`; UserPromptSubmit applies the title `go` chose. Requires `git` and `perl`; `gh`, an inter-agent communication mechanism (such as agentbus or agentmesh) and the `github` plugin are optional.
 
 ---
 

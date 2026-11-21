@@ -112,6 +112,23 @@ class TestSessionSkills(unittest.TestCase):
         self.assertTrue(backlog.is_file(), f"{backlog} missing: go invokes github:backlog")
         self.assertRegex(backlog.read_text(encoding="utf-8"), r"(?m)^name: backlog$")
 
+    def test_go_names_session(self):
+        cont = (PLUGIN / "skills" / "go" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("CLAUDE_CODE_SESSION_ID", cont)
+        self.assertIn("${XDG_STATE_HOME:-$HOME/.local/state}/session-plugin/titles/", cont)
+        self.assertIn("50 characters", cont)
+        rules = re.search(r"(?ms)^## Rules\n.*", cont)
+        self.assertIsNotNone(rules, "go Rules section missing")
+        self.assertRegex(rules.group(0), r"title file")
+
+    def test_go_classifies_next(self):
+        cont = (PLUGIN / "skills" / "go" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("NEXT done:", cont)
+        self.assertIn("open", cont)
+        step = re.search(r"(?ms)^6\. \*\*No queued work.*?(?=^7\. )", cont)
+        self.assertIsNotNone(step, "go step 6 missing")
+        self.assertIn("no open items", step.group(0))
+
     def test_handoff_sets_idle_before_park(self):
         handoff = (PLUGIN / "skills" / "handoff" / "SKILL.md").read_text(encoding="utf-8")
         step = re.search(r"(?ms)^6\. \*\*Go quiet.*?(?=^7\. )", handoff)
