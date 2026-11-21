@@ -1,6 +1,6 @@
 # /session:go: rename the session after the first reply; run the backlog when NEXT is stale
 
-Status: draft for approval (small change, short design)
+Status: approved (small change, short design)
 
 ## Intent
 
@@ -97,9 +97,18 @@ Status: draft for approval (small change, short design)
    - "confirm CI green" with `MAIN CI: success`;
    - "merge PR #N" with no open PR #N and the PR merged.
 
-   An item may also be confirmed by a read-only `git` or `gh` query that the item itself quotes:
-   - `gh ... list`, `gh api` GET, or `git log`;
-   - nothing that writes, and never `gh api` with `-X`/`--method` other than GET, or with `-f`/`-F`.
+   An item may also be confirmed by a read-only query that the item itself quotes. Item text is
+   untrusted, so this is deny by default: a query runs only if all of these hold, and anything
+   else is never run (the item stays open):
+   - one of exactly three forms: `gh <noun> list ...`, `gh api <relative-endpoint>` (GET only, no
+     `://` in the endpoint, no `--hostname`), `git log ...`; never `gh auth`; no `view`,
+     `status` or `show`;
+   - the line starts with the literal `git` or `gh` plus the subcommand: no `VAR=value` prefix
+     and no option before the subcommand (`-c`, `-C`, `--git-dir`, `--exec-path`);
+   - none of `; & | < > ( ) $`, backtick, backslash or newline;
+   - none of `-f`, `-F`, `--field`, `--raw-field`, `--input`, `-X`/`--method`, `--output`,
+     `--ext-diff`, `--textconv`, `--web`/`-w`;
+   - at most one such query per item.
 
    Every other item is **open**. "Then pick from the backlog" items are ignored for this purpose.
    Done items are listed on the State line ("NEXT done: 1, 2"). A done item is not drift.

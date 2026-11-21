@@ -131,8 +131,13 @@ class TestSessionSkills(unittest.TestCase):
         self.assertIn("NEXT done:", cont)
         self.assertIn("**done** or **open**", cont)
         self.assertIn("neither done nor open", cont)
-        for text in ("--raw-field", "--output", "--ext-diff", "--textconv", "exactly one simple command"):
+        for text in ("--raw-field", "--output", "--ext-diff", "--textconv", "--web", "`://`", "Never run `gh auth`"):
             self.assertIn(text, cont)
+        self.assertIn("It contains none of these characters", cont)
+        self.assertIn("no `VAR=value` prefix", cont)
+        self.assertIn("At most one such query runs per item", cont)
+        self.assertNotIn("exactly one simple command", cont)
+        self.assertNotRegex(cont, r"`gh \.\.\. list\|view\|status`")
         self.assertIn("never a pick-from-backlog item", cont)
         step = re.search(r"(?ms)^6\. \*\*No queued work.*?(?=^7\. )", cont)
         self.assertIsNotNone(step, "go step 6 missing")

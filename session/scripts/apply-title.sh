@@ -7,6 +7,12 @@
 # apply <json>: print the hook output JSON when a title applies
 apply() {
   local state=${XDG_STATE_HOME:-$HOME/.local/state}/session-plugin
+  # Nothing pending: skip starting python3 (builtins only, so it works without any tools)
+  local -a pending
+  shopt -s nullglob dotglob
+  pending=("$state"/titles/*)
+  shopt -u nullglob dotglob
+  ((${#pending[@]} > 0)) || return 0
   printf '%s' "$1" | python3 -c '
 import json, os, re, sys, time, unicodedata
 
@@ -45,7 +51,7 @@ try:
         os.remove(path)
     except OSError:
         pass
-    bad = ("Cc", "Zl", "Zp")
+    bad = ("Cc", "Cf", "Zl", "Zp")
     title = "".join(c for c in line if unicodedata.category(c) not in bad).strip()[:80]
     if title:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "sessionTitle": title}}))
@@ -59,6 +65,7 @@ selftest() {
   tmp=$(mktemp -d) || exit 1
   export XDG_STATE_HOME=$tmp
   state=$tmp/session-plugin/titles
+  trap 'rm -rf "$tmp"' EXIT
   mkdir -p "$state"
 
   # run <json>: set out and rc from the hook
@@ -138,7 +145,19 @@ os.utime(sys.argv[1] + "/recent-one", (now - 86400,) * 2)' "$state"
   run '{"session_id":"abc-123"}'
   [[ $rc == 0 && $(title_of "$out") == ab ]] || fail "(m) U+2028 rc=$rc out=$out"
 
-  rm -rf "$tmp"
+  printf 'a\xe2\x80\x8bb\xe2\x80\xaec\n' >"$state/abc-123"
+  run '{"session_id":"abc-123"}'
+  [[ $rc == 0 && $(title_of "$out") == abc ]] || fail "(n) Cf chars rc=$rc out=$out"
+
+  printf 'pending\n' >"$state/abc-123"
+  run '[]'
+  [[ $rc == 0 && -z $out ]] || fail "(o) json array rc=$rc out=$out"
+  run '{"session_id":123}'
+  [[ $rc == 0 && -z $out ]] || fail "(p) integer session_id rc=$rc out=$out"
+  mkdir "$state/dir-id"
+  run '{"session_id":"dir-id"}'
+  [[ $rc == 0 && -z $out ]] || fail "(q) directory at title path rc=$rc out=$out"
+
   ((fails == 0)) && echo ok
   exit $fails
 }
