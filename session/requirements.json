@@ -25,7 +25,7 @@
     {
       "name": "python3",
       "required": false,
-      "why": "repo-state.sh and the SessionStart hint parse JSON with python3; without it open-PR and CI details are omitted and the hint stays silent and the title hook stays silent",
+      "why": "repo-state.sh and the SessionStart hint parse JSON with python3; without it open-PR and CI details are omitted, and the SessionStart hint and the title hook stay silent",
       "probe": ["python3", "--version"],
       "install": {
         "macos": "brew install python",

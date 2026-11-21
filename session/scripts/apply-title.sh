@@ -8,7 +8,7 @@
 apply() {
   local state=${XDG_STATE_HOME:-$HOME/.local/state}/session-plugin
   printf '%s' "$1" | python3 -c '
-import json, os, re, sys, time
+import json, os, re, sys, time, unicodedata
 
 try:
     data = json.load(sys.stdin)
@@ -37,13 +37,16 @@ try:
         except OSError:
             pass
         sys.exit(0)
+    if not os.path.isfile(path):
+        sys.exit(0)
     with open(path, encoding="utf-8", errors="replace") as f:
-        line = f.readline()
+        line = f.readline(1024)
     try:
         os.remove(path)
     except OSError:
         pass
-    title = "".join(c for c in line if ord(c) >= 32 and ord(c) != 127).strip()[:80]
+    bad = ("Cc", "Zl", "Zp")
+    title = "".join(c for c in line if unicodedata.category(c) not in bad).strip()[:80]
     if title:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "sessionTitle": title}}))
 except BaseException:
@@ -123,6 +126,17 @@ os.utime(sys.argv[1] + "/recent-one", (now - 86400,) * 2)' "$state"
 
   out=$(printf '{"session_id":"abc-123"}' | XDG_STATE_HOME=/nonexistent/x bash "$self"); rc=$?
   [[ $rc == 0 && -z $out ]] || fail "(k) missing state dir rc=$rc out=$out"
+
+  printf 'pending\n' >"$state/abc-123"
+  mkdir "$tmp/bin"
+  ln -s "$(command -v bash)" "$tmp/bin/bash"
+  ln -s "$(command -v cat)" "$tmp/bin/cat"
+  out=$(printf '{"session_id":"abc-123"}' | PATH=$tmp/bin "$tmp/bin/bash" "$self"); rc=$?
+  [[ $rc == 0 && -z $out ]] || fail "(l) no python3 rc=$rc out=$out"
+
+  printf 'a\xe2\x80\xa8b\n' >"$state/abc-123"
+  run '{"session_id":"abc-123"}'
+  [[ $rc == 0 && $(title_of "$out") == ab ]] || fail "(m) U+2028 rc=$rc out=$out"
 
   rm -rf "$tmp"
   ((fails == 0)) && echo ok
