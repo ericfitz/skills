@@ -120,11 +120,20 @@ class TestSessionSkills(unittest.TestCase):
         rules = re.search(r"(?ms)^## Rules\n.*", cont)
         self.assertIsNotNone(rules, "go Rules section missing")
         self.assertRegex(rules.group(0), r"title file")
+        self.assertRegex(rules.group(0), r"The one write exception is the step 8\s+title file")
+        self.assertIn("must not contain `'`", cont)
+        step7 = re.search(r"(?ms)^7\. \*\*Stop.*?(?=^8\. )", cont)
+        self.assertIsNotNone(step7, "go step 7 missing")
+        self.assertIn("step 8", step7.group(0))
 
     def test_go_classifies_next(self):
         cont = (PLUGIN / "skills" / "go" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("NEXT done:", cont)
-        self.assertIn("open", cont)
+        self.assertIn("**done** or **open**", cont)
+        self.assertIn("neither done nor open", cont)
+        for text in ("--raw-field", "--output", "--ext-diff", "--textconv", "exactly one simple command"):
+            self.assertIn(text, cont)
+        self.assertIn("never a pick-from-backlog item", cont)
         step = re.search(r"(?ms)^6\. \*\*No queued work.*?(?=^7\. )", cont)
         self.assertIsNotNone(step, "go step 6 missing")
         self.assertIn("no open items", step.group(0))
