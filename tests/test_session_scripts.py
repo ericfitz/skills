@@ -13,7 +13,11 @@ sys.dont_write_bytecode = True
 
 REPO = Path(__file__).resolve().parents[1]
 PLUGIN = REPO / "session"
-SCRIPTS = [PLUGIN / "scripts" / "repo-state.sh", PLUGIN / "scripts" / "handoff-hint.sh"]
+SCRIPTS = [
+    PLUGIN / "scripts" / "repo-state.sh",
+    PLUGIN / "scripts" / "handoff-hint.sh",
+    PLUGIN / "scripts" / "apply-title.sh",
+]
 PRIVATE = re.compile(r"efitz|eric|tmi|/Users|_lib|\.claude/skills", re.IGNORECASE)
 
 
@@ -67,14 +71,26 @@ class TestSessionScripts(unittest.TestCase):
 class TestSessionHooks(unittest.TestCase):
     def test_hooks_json_points_at_existing_script(self):
         data = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))
-        entries = data["hooks"]["SessionStart"]
-        self.assertEqual(len(entries), 1)
-        self.assertEqual(entries[0]["matcher"], "startup|resume")
-        commands = [h["command"] for h in entries[0]["hooks"]]
-        self.assertEqual(len(commands), 1)
-        match = re.search(r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+?)\"?$", commands[0])
-        self.assertIsNotNone(match, f"no ${{CLAUDE_PLUGIN_ROOT}} script in {commands[0]!r}")
-        self.assertTrue((PLUGIN / match.group(1)).is_file(), f"hook script {match.group(1)} missing")
+        expected = {
+            "SessionStart": ("startup|resume", "scripts/handoff-hint.sh"),
+            "UserPromptSubmit": (None, "scripts/apply-title.sh"),
+        }
+        for event, (matcher, script) in expected.items():
+            entries = data["hooks"][event]
+            self.assertEqual(len(entries), 1, event)
+            if matcher is None:
+                self.assertIn(entries[0].get("matcher", ""), ("", None), event)
+            else:
+                self.assertEqual(entries[0]["matcher"], matcher, event)
+            hooks = entries[0]["hooks"]
+            self.assertEqual(len(hooks), 1, event)
+            command = hooks[0]["command"]
+            match = re.search(r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+?)\"?$", command)
+            self.assertIsNotNone(match, f"no ${{CLAUDE_PLUGIN_ROOT}} script in {command!r}")
+            self.assertEqual(match.group(1), script, event)
+            self.assertTrue((PLUGIN / match.group(1)).is_file(), f"hook script {match.group(1)} missing")
+            if event == "UserPromptSubmit":
+                self.assertLessEqual(hooks[0]["timeout"], 10)
 
 
 class TestSessionSkills(unittest.TestCase):
