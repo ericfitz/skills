@@ -1,6 +1,6 @@
 # Marketplace architecture
 
-How the `efitz-skills` plugins compose. The [README](../README.md) says what each
+How the `estack` plugins compose. The [README](../README.md) says what each
 skill does; this document says what each skill *hands to* another, and in what form.
 
 Read this before adding a plugin that builds on an existing one, and update it as

@@ -9,7 +9,7 @@ Analyze the differences between the master i18n file and target-language files, 
 
 This skill bundles its own analyzer (`scripts/check-i18n.py`) so it is tool-agnostic — it does not rely on `pnpm`, `npm`, or any other project-specific wrapper.
 
-When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/efitz-skills/loc/<version>/`. The analyzer lives at the plugin root's `scripts/` directory, so the analyzer is at `${CLAUDE_PLUGIN_ROOT}/scripts/check-i18n.py` (plugin-root `scripts/`, NOT a `skills/<skill>/scripts/` subpath). If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md, walk up to the plugin root, and use the absolute path to `scripts/check-i18n.py`. Do **NOT** fall back to the legacy `$SKILL_DIR` form.
+When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/estack/loc/<version>/`. The analyzer lives at the plugin root's `scripts/` directory, so the analyzer is at `${CLAUDE_PLUGIN_ROOT}/scripts/check-i18n.py` (plugin-root `scripts/`, NOT a `skills/<skill>/scripts/` subpath). If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md, walk up to the plugin root, and use the absolute path to `scripts/check-i18n.py`. Do **NOT** fall back to the legacy `$SKILL_DIR` form.
 
 ## Bundled tool
 

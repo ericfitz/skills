@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal agent-skills marketplace (`efitz-skills`). Sixteen plugins,
+efitz's personal agent-skills marketplace (`estack`). Sixteen plugins,
 each bundling one or more skills, installable into **Claude Code** or
 **OpenAI Codex CLI** — the repo carries native manifests for both harnesses.
 Invoke a skill as `/<plugin>:<skill>`.
@@ -19,10 +19,10 @@ Or manually, in either CLI:
 
 ```sh
 claude plugin marketplace add ericfitz/skills
-claude plugin install <plugin>@efitz-skills
+claude plugin install <plugin>@estack
 
 codex plugin marketplace add ericfitz/skills
-codex plugin install <plugin>@efitz-skills
+codex plugin install <plugin>@estack
 ```
 
 The Claude Code manifests (`.claude-plugin/`) are the source of truth; the

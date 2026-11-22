@@ -22,7 +22,7 @@ Check your available skills for `profile:stack`, `profile:docs`, `profile:topolo
 and `profile:journeys`. If any is missing, stop and tell the user:
 
 > This skill needs the `profile` plugin, which is not installed. Install it from the
-> `efitz-skills` marketplace and run `/itest:design` again.
+> `estack` marketplace and run `/itest:design` again.
 
 Do not attempt to reach `profile`'s files by path, and do not proceed with partial
 discovery. Failing here costs nothing; failing three subagents deep wastes the run.

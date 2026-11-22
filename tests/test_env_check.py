@@ -117,7 +117,7 @@ class TestDiscoveryFlatLayout(unittest.TestCase):
 class TestDiscoveryCacheLayout(unittest.TestCase):
     def test_cache_layout_picks_highest_version_and_names_it(self):
         with tempfile.TemporaryDirectory() as d:
-            mkt = Path(d) / "cache" / "efitz-skills"
+            mkt = Path(d) / "cache" / "estack"
             self_path = _write_requirements(
                 mkt / "env" / "1.0.0" / "requirements.json",
                 {"requirements_version": "1.0.0", "plugin": "env"})
@@ -135,7 +135,7 @@ class TestDiscoveryCacheLayout(unittest.TestCase):
 
     def test_cache_layout_equal_length_version_ordering(self):
         with tempfile.TemporaryDirectory() as d:
-            mkt = Path(d) / "cache" / "efitz-skills"
+            mkt = Path(d) / "cache" / "estack"
             _write_requirements(
                 mkt / "env" / "1.0.0" / "requirements.json",
                 {"requirements_version": "1.0.0", "plugin": "env"})
@@ -153,7 +153,7 @@ class TestDiscoveryCacheLayout(unittest.TestCase):
 
     def test_cache_layout_degraded_reports_self_only_when_no_siblings(self):
         with tempfile.TemporaryDirectory() as d:
-            mkt = Path(d) / "cache" / "efitz-skills"
+            mkt = Path(d) / "cache" / "estack"
             self_path = _write_requirements(
                 mkt / "env" / "1.0.0" / "requirements.json",
                 {"requirements_version": "1.0.0", "plugin": "env"})
@@ -202,7 +202,7 @@ class TestBrokenDeclarations(unittest.TestCase):
         # must not traceback build_report -- it must be named as broken, and
         # a valid sibling elsewhere must still be evaluated normally.
         with tempfile.TemporaryDirectory() as d:
-            mkt = Path(d) / "cache" / "efitz-skills"
+            mkt = Path(d) / "cache" / "estack"
             _write_requirements(
                 mkt / "env" / "1.0.0" / "requirements.json",
                 {"requirements_version": "1.0.0", "plugin": "env"})

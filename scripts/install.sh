@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-step installer for the efitz-skills marketplace, for Claude Code and/or
+# One-step installer for the estack marketplace, for Claude Code and/or
 # Codex CLI. Idempotent: adds the marketplace only if missing, installs only
 # the plugins not already installed.
 #
@@ -22,7 +22,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-MARKETPLACE_NAME="efitz-skills"
+MARKETPLACE_NAME="estack"
 MARKETPLACE_SOURCE="ericfitz/skills"
 
 usage() {
@@ -161,7 +161,7 @@ hooks_path = Path(sys.argv[1])
 backup_path = hooks_path.parent / (hooks_path.name + ".bak")
 
 command = (
-    "bash -c 'p=$(ls -d \"$HOME\"/.codex/plugins/cache/efitz-skills/github/*/scripts/refresh_gh_projects.py "
+    "bash -c 'p=$(ls -d \"$HOME\"/.codex/plugins/cache/estack/github/*/scripts/refresh_gh_projects.py "
     "2>/dev/null | sort -V | tail -1); [ -n \"$p\" ] && exec python3 \"$p\"; exit 0'"
 )
 

@@ -16,7 +16,7 @@ mode that confirms before changing anything.
 This skill bundles `env_check.py` inside its plugin at `scripts/env_check.py`.
 When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's
 install root — typically
-`~/.claude/plugins/cache/efitz-skills/env/<version>/`. If Claude Code does
+`~/.claude/plugins/cache/estack/env/<version>/`. If Claude Code does
 not pre-substitute the variable when you read this file, resolve it
 yourself: locate the directory containing this SKILL.md, walk up to the
 plugin root, and use that absolute path.

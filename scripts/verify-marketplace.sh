@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Structural sanity check for the efitz-skills marketplace.
+# Structural sanity check for the estack marketplace.
 # No /plugin commands; just verifies files and content patterns.
 # Exits non-zero on first failure with a clear message.
 
@@ -185,12 +185,12 @@ scan_legacy '~/\.claude/agents'        '~/.claude/agents/'
 hdr "No stale old-plugin example paths"
 
 OLD_NAMES='analyze-localization-files|validate-localization-coverage|detect-non-localizable|translate-to-language|update-json-localization-file|localization-backfill|plugin-vetter|race-condition-audit|backlog-next|file-github-bug|verify-migrate-doc|visual-regression-triage'
-stale=$(grep -rnE "efitz-skills/($OLD_NAMES)/" --include='SKILL.md' . 2>/dev/null || true)
+stale=$(grep -rnE "estack/($OLD_NAMES)/" --include='SKILL.md' . 2>/dev/null || true)
 if [ -n "$stale" ]; then
-  bad "Stale efitz-skills/<old-plugin>/ example paths in SKILL.md:"
+  bad "Stale estack/<old-plugin>/ example paths in SKILL.md:"
   echo "$stale" | while IFS= read -r line; do printf '         %s\n' "$line"; done
 else
-  ok "No stale efitz-skills/<old-plugin>/ example paths"
+  ok "No stale estack/<old-plugin>/ example paths"
 fi
 
 # ---------- Repo cleanup ----------

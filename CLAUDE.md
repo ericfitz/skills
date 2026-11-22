@@ -1,4 +1,4 @@
-# CLAUDE.md — efitz-skills marketplace
+# CLAUDE.md — estack marketplace
 
 A dual-harness agent-skills marketplace. Each top-level directory is a plugin bundling one or more skills, installable into Claude Code or OpenAI Codex CLI. Skills are invoked as `/<plugin>:<skill>`.
 

@@ -11,7 +11,7 @@ Pick the next GitHub issue to work on by analyzing open issues, prioritizing the
 
 ## Bundled Script Location
 
-This skill bundles `gh-issues.py` inside its plugin at `scripts/gh-issues.py`. When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/efitz-skills/github/<version>/`. If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md, walk up to the plugin root, and use that absolute path. Do **NOT** fall back to `~/.claude/scripts/gh-issues.py` — that path is from the legacy command and may not exist after cutover.
+This skill bundles `gh-issues.py` inside its plugin at `scripts/gh-issues.py`. When you see `${CLAUDE_PLUGIN_ROOT}` below, it refers to this plugin's install root — typically `~/.claude/plugins/cache/estack/github/<version>/`. If Claude Code does not pre-substitute the variable when you read this file, resolve it yourself: locate the directory containing this SKILL.md, walk up to the plugin root, and use that absolute path. Do **NOT** fall back to `~/.claude/scripts/gh-issues.py` — that path is from the legacy command and may not exist after cutover.
 
 ## Process
 
