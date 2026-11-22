@@ -23,7 +23,7 @@ Sequence: `${CLAUDE_PLUGIN_ROOT}/references/running-discovery.md`
     /discover:package [path] [--ref <branch>]
 
 Standalone invocation: if you were not handed a `discover:topology` contract,
-invoke `discover:topology` first and use its output as `seeded_by`. Never invoke
+invoke `discover:topology` first and use its output as `seeded_by`. Never run
 the inventory script by path.
 
 `syft` is required. If it is not on PATH, emit the envelope with

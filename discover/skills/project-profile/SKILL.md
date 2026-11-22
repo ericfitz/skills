@@ -22,8 +22,9 @@ their contracts, and render one offline HTML report.
 3. Invoke `discover:journeys` with `[path]` and the stack and docs contracts.
    Save its reply as `journeys.json` in the artifact directory. In the final
    message, say that the journeys are unconfirmed candidates.
-4. Invoke `discover:topology` with `[path]`, giving it the artifact directory
-   as its run dir; it saves `topology.json` there.
+4. Invoke `discover:topology` with `[path]` and the stack contract from step 1,
+   so it does not run stack again and overwrite `stack.json`. Give it the
+   artifact directory as its run dir; it saves `topology.json` there.
 5. Invoke `discover:project-report` with `<artifact_dir> [--out <file.html>]
    [--title <text>] [--no-open]`. Report both the artifact directory and the
    report path.

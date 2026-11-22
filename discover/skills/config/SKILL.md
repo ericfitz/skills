@@ -23,7 +23,7 @@ Sequence: `${CLAUDE_PLUGIN_ROOT}/references/running-discovery.md`
     /discover:config [path] [--ref <branch>]
 
 Standalone invocation: if you were not handed a `discover:topology` contract,
-invoke `discover:topology` first and use its output as `seeded_by`. Never invoke
+invoke `discover:topology` first and use its output as `seeded_by`. Never run
 the inventory script by path.
 
 If you were not handed a run dir by another of the six discovery skills, run
