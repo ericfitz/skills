@@ -139,7 +139,10 @@ sys.exit(0 if '$name@$MARKETPLACE_NAME' in ids else 1)
 # the highest installed issues plugin version's refresh_gh_projects.py at
 # run time, so plugin upgrades never leave the hook stale. Merges (never
 # clobbers) an existing hooks.json; idempotent (skips, untouched, if an
-# entry already references refresh_gh_projects.py). A backup is written to
+# entry already runs the current command or names a refresh_gh_projects.py
+# path that exists). An entry whose path matches no file -- for example one
+# left from before a plugin rename -- is repointed to the current command and
+# the change is printed. A backup is written to
 # hooks.json.bak only at the moment the file is actually about to be
 # modified, and an existing .bak is never overwritten, so it always holds
 # the file's original pre-installer content. Malformed JSON, or JSON that
@@ -152,7 +155,10 @@ install_codex_session_hook() {
   mkdir -p "$codex_dir"
 
   if ! python3 - "$hooks_file" <<'PYEOF'
+import glob
 import json
+import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -195,25 +201,67 @@ session_start = hooks.setdefault("SessionStart", [])
 if not isinstance(session_start, list):
     refuse('"hooks.SessionStart" is not an array')
 
-for matcher_entry in session_start:
-    if not isinstance(matcher_entry, dict):
-        continue
-    for h in matcher_entry.get("hooks", []) or []:
-        if isinstance(h, dict) and "refresh_gh_projects.py" in h.get("command", ""):
-            print(f"{hooks_path}: a SessionStart entry already references refresh_gh_projects.py; leaving as-is")
-            sys.exit(0)
+def script_path_exists(cmd: str):
+    """True/False for whether the refresh_gh_projects.py path (a glob) in cmd matches a file; None if cmd names no such path (a bare name with no directory counts as none)."""
+    unquoted = re.sub(r"[\\'\"]", "", cmd)
+    match = re.search(r"\S*/refresh_gh_projects\.py", unquoted)
+    if not match:
+        return None
+    pattern = match.group(0).replace("${HOME}", "$HOME").replace("$HOME", str(Path.home()))
+    pattern = os.path.expanduser(pattern)
+    return bool(glob.glob(pattern))
 
-session_start.append({
-    "matcher": "startup",
-    "hooks": [
-        {
-            "type": "command",
-            "command": command,
-            "shell": "bash",
-            "async": True,
-        }
-    ],
-})
+
+existing = [
+    h
+    for matcher_entry in session_start
+    if isinstance(matcher_entry, dict)
+    for h in (matcher_entry.get("hooks", []) or [])
+    if isinstance(h, dict) and isinstance(h.get("command"), str) and "refresh_gh_projects.py" in h["command"]
+]
+
+if existing:
+    repointed = False
+    has_current = any(h["command"] == command for h in existing)
+    for h in existing:
+        if h["command"] == command:
+            print(f"{hooks_path}: a SessionStart entry already runs the current refresh_gh_projects.py command; leaving as-is")
+            continue
+        found = script_path_exists(h["command"])
+        if found is None:
+            print(
+                f"warning: {hooks_path}: could not find a refresh_gh_projects.py path in {h['command']!r}; leaving as-is",
+                file=sys.stderr,
+            )
+        elif found:
+            print(f"{hooks_path}: a SessionStart entry references an existing refresh_gh_projects.py; leaving as-is")
+        elif has_current:
+            print(
+                f"warning: {hooks_path}: an entry names a refresh_gh_projects.py path that does not exist, "
+                f"but another entry already runs the current command; remove the stale one by hand: {h['command']!r}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"{hooks_path}: repointing a SessionStart entry whose refresh_gh_projects.py path does not exist")
+            print(f"  old: {h['command']}")
+            print(f"  new: {command}")
+            h["command"] = command
+            repointed = True
+            has_current = True
+    if not repointed:
+        sys.exit(0)
+else:
+    session_start.append({
+        "matcher": "startup",
+        "hooks": [
+            {
+                "type": "command",
+                "command": command,
+                "shell": "bash",
+                "async": True,
+            }
+        ],
+    })
 
 if hooks_path.exists():
     if backup_path.exists():
@@ -223,7 +271,7 @@ if hooks_path.exists():
         print(f"backed up {hooks_path} to {backup_path}")
 
 hooks_path.write_text(json.dumps(data, indent=2) + "\n")
-print(f"merged SessionStart refresh_gh_projects.py hook into {hooks_path}")
+print(f"wrote SessionStart refresh_gh_projects.py hook to {hooks_path}")
 PYEOF
   then
     echo "FAILED: could not merge SessionStart hook into $hooks_file (see message above)" >&2
