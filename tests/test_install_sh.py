@@ -174,7 +174,21 @@ class TestCodexSessionHookMerge(unittest.TestCase):
         before = self.hooks.read_bytes()
         result = self.run_installer()
         self.assertEqual(self.hooks.read_bytes(), before)
-        self.assertIn("leaving as-is", result.stdout + result.stderr)
+        self.assertIn("could not find a refresh_gh_projects.py path it can check", result.stderr)
+
+    def test_paths_that_cannot_be_judged_are_left_alone_with_a_warning(self):
+        for command in (
+            'python3 "$CODEX_HOME/plugins/x/scripts/refresh_gh_projects.py"',
+            'python3 "/Users/Jane Doe/bin/refresh_gh_projects.py"',
+            "python3 scripts/refresh_gh_projects.py",
+        ):
+            with self.subTest(command=command):
+                self.hooks.write_text(json.dumps(hooks_doc(command)))
+                before = self.hooks.read_bytes()
+                result = self.run_installer()
+                self.assertEqual(self.hooks.read_bytes(), before)
+                self.assertIn("could not find a refresh_gh_projects.py path it can check", result.stderr)
+                self.assertFalse(self.backup.exists())
 
     def test_stale_entry_beside_the_current_one_is_reported_not_duplicated(self):
         current = self.current_command()

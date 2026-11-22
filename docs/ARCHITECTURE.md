@@ -191,7 +191,7 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `synthesize` | Merges the six discovery contracts into one inventory and graph, adds the system's own components as nodes, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts, `topology` (components), `idmap.py`, `depgraph.py`, `health.py` |
 | `dependency-report` | Renders the `synthesis` contract into a human-readable document — inventory by category, health definitions, dependency graph, cycles, and assumptions | `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`) | `synthesis` contract |
 | `project-profile` | Shortcut: one offline HTML profile of a project, chaining `stack`, `docs`, `journeys`, `topology`, then `project-report` (user-invoked only) | The four saved project contracts in a temp artifact directory, plus the HTML report | — (runs the skills it chains) |
-| `dependency-model` | Shortcut: the whole dependency model in one command, chaining `synthesize` then `dependency-report` (user-invoked only) | `synthesis` contract, `docs/dependencies.md` | — (runs the skills it chains) |
+| `dependency-model` | Shortcut: the whole dependency model in one command, chaining `synthesize` then `dependency-report` (user-invoked only) | `synthesis` contract and the `dependency-report` document (`docs/dependencies.md` unless `--ref` or `--out`) | — (runs the skills it chains) |
 
 All six discovery skills emit the same `discovery` envelope with exactly one key
 under `categories` populated, so merging them is a key union rather than a
@@ -223,7 +223,7 @@ the scan's run dir instead, so the checked-out tree is never touched, and `--out
 |---|---|---|---|
 | `init` | The project's OpenAPI and Arazzo spec locations, discovered and verified | `.local/openapi/config.yaml` | `.local/cats/config.yaml` as a spec hint, when present |
 | `arazzo` | Confirmed journeys expressed as an Arazzo 1.0 workflow spec bound to real operations | `arazzo.yaml` | `docs/journeys.md`, `.local/openapi/config.yaml` |
-| `api-workflows` | Shortcut: an Arazzo spec in one command, running `init` when no OpenAPI spec is recorded, then `arazzo` (user-invoked only) | `.local/openapi/config.yaml` when created, `arazzo.yaml` | `docs/journeys.md` |
+| `api-workflows` | Shortcut: an Arazzo spec in one command, running `init` when no OpenAPI spec is recorded, then `arazzo` (user-invoked only) | `.local/openapi/config.yaml` when created, `arazzo.yaml` | `docs/journeys.md`, or the journeys doc path given |
 
 ### test-api-fuzzing
 

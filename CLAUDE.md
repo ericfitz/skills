@@ -32,7 +32,7 @@ Several files are derived from the plugin/skill tree; editing the tree without t
 6. `docs/ARCHITECTURE.md` — a node in the dependency graph and a row in the skill catalog, if the plugin produces or consumes anything another plugin reads
 7. `<plugin>/requirements.json` — every CLI tool, config file, and auth session the plugin needs, each marked required or optional (`/environment:check` discovers these by glob; no change to the `environment` plugin is needed)
 
-**Adding, removing, or renaming a skill, or changing its `disable-model-invocation`:** items 3, 4, and 5 (item 4 writes or removes the skill's generated `agents/openai.yaml`), plus the skill's `SKILL.md` frontmatter `name` must equal its directory name and the directory must live under `<plugin>/skills/`.
+**Adding, removing, or renaming a skill:** items 3, 4, and 5, plus the skill's `SKILL.md` frontmatter `name` must equal its directory name and the directory must live under `<plugin>/skills/`. Changing a skill's `disable-model-invocation` needs only item 4, which writes or removes its generated `agents/openai.yaml`.
 
 **Changing what one plugin hands another** (a contract schema, a well-known artifact path, a `.local/` config file): update `docs/ARCHITECTURE.md`. If the Mermaid dependency graph changes, re-render it rather than eyeballing it:
 

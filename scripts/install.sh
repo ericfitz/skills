@@ -202,13 +202,16 @@ if not isinstance(session_start, list):
     refuse('"hooks.SessionStart" is not an array')
 
 def script_path_exists(cmd: str):
-    """True/False for whether the refresh_gh_projects.py path (a glob) in cmd matches a file; None if cmd names no such path (a bare name with no directory counts as none)."""
+    """True/False for whether the refresh_gh_projects.py path (a glob) in cmd matches a file; None if it cannot be judged (no such path, a bare name, a relative path, or another variable)."""
     unquoted = re.sub(r"[\\'\"]", "", cmd)
     match = re.search(r"\S*/refresh_gh_projects\.py", unquoted)
     if not match:
         return None
     pattern = match.group(0).replace("${HOME}", "$HOME").replace("$HOME", str(Path.home()))
     pattern = os.path.expanduser(pattern)
+    # Another variable, or a path cut short by a space, cannot be judged: say so, never repoint it.
+    if "$" in pattern or not os.path.isabs(pattern):
+        return None
     return bool(glob.glob(pattern))
 
 
@@ -230,7 +233,7 @@ if existing:
         found = script_path_exists(h["command"])
         if found is None:
             print(
-                f"warning: {hooks_path}: could not find a refresh_gh_projects.py path in {h['command']!r}; leaving as-is",
+                f"warning: {hooks_path}: could not find a refresh_gh_projects.py path it can check in {h['command']!r}; leaving as-is",
                 file=sys.stderr,
             )
         elif found:
