@@ -6,10 +6,6 @@ __pycache__/
 .envrc
 .ruff_cache/
 
-# Built skill output — produced by copying the skill src into a
-# distributable tree. Regenerated; not tracked.
-writing/skills/boring/dist/
-
 # IDE local state
 .vscode/
 

@@ -10,23 +10,6 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
-[project.optional-dependencies]
-# Heavy NLP stack used only by writing/skills/boring. Not needed to run the
-# test suite; install with `uv sync --extra boring` when working on that tree.
-boring = [
-    "spacy>=3.8.16",
-    "proselint>=0.14",
-    "textstat>=0.7",
-    "pypdf>=6.20.0",
-    "python-docx>=1.1",
-    # The en_core_web_sm model is not on PyPI. Pinning it here keeps the
-    # model and spaCy in lockstep, which is the drift SKILL.md warns about.
-    "en-core-web-sm",
-]
-
-[tool.uv.sources]
-en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
-
 [dependency-groups]
 dev = [
     "pytest>=8.0",
@@ -68,7 +51,6 @@ known-first-party = ["inventorylib", "depscanlib", "depgraphlib", "jsonargs"]
 extra-paths = [
     "cats/scripts",
     "deps/scripts",
-    "logseq/scripts",
     "dev/scripts",
     "dependency-model/scripts",
     "tests",
@@ -84,12 +66,6 @@ include = ["tests/**"]
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 
-[tool.ty.src]
-# writing/skills/boring depends on the optional `boring` extra (spaCy et al),
-# which a default `uv sync` does not install, so its imports are unresolvable
-# in the default environment. Check it with: uv run --extra boring ty check
-exclude = ["writing/skills/boring"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Makes the per-tool libs importable without the sys.path.insert() preamble
@@ -98,7 +74,6 @@ testpaths = ["tests"]
 pythonpath = [
     "cats/scripts",
     "deps/scripts",
-    "logseq/scripts",
     "dev/scripts",
     "tests",
 ]

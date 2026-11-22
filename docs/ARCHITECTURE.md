@@ -264,13 +264,9 @@ These have no cross-plugin edges. Internal orchestration is noted where it exist
 | Plugin | Skills | Notes |
 |---|---|---|
 | `loc` | `analyze`, `coverage`, `detect-nonloc`, `translate-to`, `update-json`, `validate-translation`, `backfill` | `backfill` orchestrates the other six; `analyze` and `coverage` share the bundled `check-i18n.py` |
-| `logseq` | `capture`, `query`, `lint`, `organize`, `from-obsidian` | All mechanics go through one bundled CLI |
 | `github` | `backlog`, `create-issue` | Both read `.local/repos.json`; `create-issue` also reads `.local/gh-projects.json` |
-| `security` | `vet-plugin`, `race-cond` | — |
 | `deps` | `bump` | Thin orchestrator over the `bumplib` CLI |
-| `wiki` | `verify-doc` | Reads `.local/repos.json` |
 | `ui` | `vrt` | Reads `.local/repos.json` when present, else falls back to `gh` defaults |
-| `writing` | `boring` | Bundles a deterministic analyzer |
 | `env` | `check` | Reads every plugin's `requirements.json` |
 | `session` | `go`, `handoff` | Share the bundled `repo-state.sh`; `handoff` writes a machine-local `HANDOFF.md` that `go` reads; a SessionStart hook prompts `go`; `go` invokes `github:backlog` (optional) when the handoff queues no work |
 

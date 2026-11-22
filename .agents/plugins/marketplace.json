@@ -10,14 +10,6 @@
       }
     },
     {
-      "name": "security",
-      "category": "security",
-      "source": {
-        "source": "local",
-        "path": "./security"
-      }
-    },
-    {
       "name": "github",
       "category": "development",
       "source": {
@@ -34,14 +26,6 @@
       }
     },
     {
-      "name": "wiki",
-      "category": "documentation",
-      "source": {
-        "source": "local",
-        "path": "./wiki"
-      }
-    },
-    {
       "name": "dev",
       "category": "development",
       "source": {
@@ -50,27 +34,11 @@
       }
     },
     {
-      "name": "writing",
-      "category": "writing",
-      "source": {
-        "source": "local",
-        "path": "./writing"
-      }
-    },
-    {
       "name": "deps",
       "category": "development",
       "source": {
         "source": "local",
         "path": "./deps"
-      }
-    },
-    {
-      "name": "logseq",
-      "category": "productivity",
-      "source": {
-        "source": "local",
-        "path": "./logseq"
       }
     },
     {

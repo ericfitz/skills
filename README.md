@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal agent-skills marketplace (`estack`). Sixteen plugins,
+efitz's personal agent-skills marketplace (`estack`). Twelve plugins,
 each bundling one or more skills, installable into **Claude Code** or
 **OpenAI Codex CLI** — the repo carries native manifests for both harnesses.
 Invoke a skill as `/<plugin>:<skill>`.
@@ -53,11 +53,6 @@ recommended entry point for common goals.
 - **validate-translation** — Verify a translated string or i18n file update: placeholder preservation, length, encoding, and common translation errors.
 - **backfill** — Translate every missing or untranslated key across all locale files using the master locale as the source. Tool-agnostic; reads the project's i18n configuration.
 
-### security
-
-- **vet-plugin** — Security-first vetting of plugins/skills before installing from any marketplace, GitHub, or other source. Checks for red flags, permission scope, and suspicious patterns.
-- **race-cond** — Systematic identification of race conditions, concurrency bugs, and thread-safety issues. Supports TypeScript, JavaScript, Python, Go, Rust, C++, Java, and Kotlin.
-
 ### github
 
 - **backlog** — Pick the next GitHub issue to work on: fetches open issues, applies exclusion rules, prioritizes by status/security/dependencies, and recommends one.
@@ -67,10 +62,6 @@ recommended entry point for common goals.
 
 - **vrt** — Triage Playwright visual-regression (screenshot) failures: presents baseline, actual, and diff images framed against the current task context to decide bug vs. expected change.
 
-### wiki
-
-- **verify-doc** — Verify a documentation file's accuracy against source code and external references, then migrate it into a project wiki. Reads target repo and wiki path from `.local/repos.json`.
-
 ### dev — sem-powered developer toolkit
 
 - **sem-annotate** — Generate and refresh durable `SEM@<sha>` intent markers on code entities using the sem CLI. Modes: full-scope, `--update <files>`, `--rebuild`.
@@ -79,21 +70,9 @@ recommended entry point for common goals.
 
 All three support Go, TypeScript/JavaScript, and Python.
 
-### writing
-
-- **boring** — Evaluate technical business writing for "boringness" across 20 sub-dimensions on four axes (Direction, Density, Texture, Surprise). Combines a deterministic mechanical analyzer (15 sub-dimensions, runs as a Python script) with five LLM-judged sub-dimensions.
-
 ### deps
 
 - **bump** — Update dependencies safely across Go, Python, and Node ecosystems. Auto-detects ecosystems, applies safe patch/minor updates with build+test+lint validation, bisects failures to isolate bad packages, and surfaces a prioritized plan for majors and held packages.
-
-### logseq
-
-- **capture** — Capture a note, TODO, or meeting summary into the local Logseq graph — today's journal by default, or a named page.
-- **query** — Answer questions from the graph: search pages and journals, follow backlinks, surface TODOs and tagged content. Read-only.
-- **lint** — Find consistency problems — broken links, case-conflicting link spellings, orphan pages, near-duplicate page names, unparseable pages — and apply chosen fixes.
-- **organize** — Merge/dedupe and restructure pages: combine duplicate topic pages (rewriting inbound links), split overgrown pages, promote journal content into topic pages.
-- **from-obsidian** — Convert and import notes from a local Obsidian vault — a single note, a folder, or the whole vault. Repeatable; unchanged already-imported notes are skipped.
 
 ### cats — CATS API fuzzing
 
