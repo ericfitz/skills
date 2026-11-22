@@ -49,3 +49,4 @@ npx -y -p @mermaid-js/mermaid-cli mmdc -i <extracted.mmd> -o /tmp/out.svg
 ## Learned Preferences
 
 - Plugin and contract versions move only when the user explicitly declares a feature done and productionized; never bump on a schema or interface change, and ask before bumping any version.
+- Never open pull requests on this repo: work on a branch, merge it into `main` locally (fast-forward or merge), run the exit criteria, and push `main`.
