@@ -47,8 +47,7 @@ class TestCodexParity(unittest.TestCase):
                 if "${" in target:
                     continue  # env-var paths are covered by test_plugin_root_references_resolve
                 with self.subTest(skill=str(skill.relative_to(REPO)), link=target):
-                    self.assertTrue((skill.parent / target).exists(),
-                                    f"dangling relative link: {target}")
+                    self.assertTrue((skill.parent / target).exists(), f"dangling relative link: {target}")
 
     def test_dispatching_skills_declare_no_subagent_fallback(self):
         for skill in skill_files():
@@ -56,8 +55,7 @@ class TestCodexParity(unittest.TestCase):
             if not SUBAGENT_REF.search(text):
                 continue
             with self.subTest(skill=str(skill.relative_to(REPO))):
-                self.assertIn(FALLBACK_MARKER, text,
-                              "skill dispatches subagents but has no fallback note")
+                self.assertIn(FALLBACK_MARKER, text, "skill dispatches subagents but has no fallback note")
 ```
 
 - [ ] **Step 2: Run to verify both fail as expected**

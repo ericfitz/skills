@@ -119,8 +119,10 @@ git commit -m "fix(sem-annotate): classify handles uncommitted/blank anchor (#11
 class TestInvalidRevError(unittest.TestCase):
     def _patch(self, stderr):
         import subprocess as sp
+
         def fake_run(cmd, cwd=None, capture_output=True, text=True, check=True):
             raise sp.CalledProcessError(1, cmd, stderr=stderr)
+
         self._orig = sa.subprocess.run
         sa.subprocess.run = fake_run
 
@@ -214,21 +216,23 @@ class TestEntityLogicSha(unittest.TestCase):
         sa.sem_log_entity = self._orig_log
 
     def test_picks_newest_logic_ignoring_later_cosmetic(self):
-        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": [
-            {"change_type": "added", "commit": {"sha": "aaa111"}},
-            {"change_type": "modified (logic)", "commit": {"sha": "bbb222"}},
-            {"change_type": "modified (cosmetic)", "commit": {"sha": "ccc333"}},
-        ]}
+        sa.sem_log_entity = lambda n, f, cwd=None: {
+            "changes": [
+                {"change_type": "added", "commit": {"sha": "aaa111"}},
+                {"change_type": "modified (logic)", "commit": {"sha": "bbb222"}},
+                {"change_type": "modified (cosmetic)", "commit": {"sha": "ccc333"}},
+            ]
+        }
         self.assertEqual(sa.entity_logic_sha("E", "f.py"), "bbb222")
 
     def test_added_only(self):
-        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": [
-            {"change_type": "added", "commit": {"sha": "aaa111"}}]}
+        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": [{"change_type": "added", "commit": {"sha": "aaa111"}}]}
         self.assertEqual(sa.entity_logic_sha("E", "f.py"), "aaa111")
 
     def test_fallback_when_only_cosmetic(self):
-        sa.sem_log_entity = lambda n, f, cwd=None: {"changes": [
-            {"change_type": "modified (cosmetic)", "commit": {"sha": "ccc333"}}]}
+        sa.sem_log_entity = lambda n, f, cwd=None: {
+            "changes": [{"change_type": "modified (cosmetic)", "commit": {"sha": "ccc333"}}]
+        }
         self.assertEqual(sa.entity_logic_sha("E", "f.py", fallback_sha="zzz999"), "zzz999")
 
     def test_fallback_when_empty(self):
@@ -239,6 +243,7 @@ class TestEntityLogicSha(unittest.TestCase):
     def test_sem_log_entity_returns_empty_on_semerror(self):
         def boom(args, cwd=None):
             raise sa.SemError("nope")
+
         orig = sa.run_sem
         sa.run_sem = boom
         try:
@@ -294,8 +299,7 @@ def entity_logic_sha(name, file, cwd=None, fallback_sha=""):
 def head_sha(cwd=None):
     """git rev-parse HEAD, or '' if unavailable."""
     try:
-        r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=cwd,
-                           capture_output=True, text=True, check=True)
+        r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True, check=True)
         return r.stdout.strip()
     except Exception:
         return ""
@@ -331,8 +335,10 @@ In `tests/test_sem_annotate.py`:
 
 (a) In `TestScan.test_scan_flags_missing_and_stale_only`, the existing tail asserts `work[0]["blame_sha"]`. Change that assertion to `anchor_sha`, and monkeypatch `entity_logic_sha` so scan does not call real `sem log`. Add to that test's setup of mocks:
 ```python
-        sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": \
-            {"Fresh": "aaaaaaa000111222333", "Missing": "bbbbbbb000111222333"}.get(name, "")
+sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": {
+    "Fresh": "aaaaaaa000111222333",
+    "Missing": "bbbbbbb000111222333",
+}.get(name, "")
 ```
 and change the final assertion:
 ```python
@@ -351,20 +357,21 @@ Also restore `sa.entity_logic_sha` in that class's `tearDown` (capture the origi
 class TestScanInvalidSha(unittest.TestCase):
     def setUp(self):
         self.files = {"src/a.ts": "// SEM@deadbee: old\nfunction A() {}\n"}
-        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
-                      sa.entity_logic_sha, sa.logic_changed_entities)
+        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame, sa.entity_logic_sha, sa.logic_changed_entities)
         sa._read_text = lambda p: self.files[p]
         sa.sem_entities = lambda paths, cwd=None: [
-            {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 2, "end_line": 2}]
+            {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 2, "end_line": 2}
+        ]
         sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "ffff999"}]
         sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "ffff999"
+
         def boom(base, f, cwd=None):
             raise sa.InvalidRevError("revspec not found")
+
         sa.logic_changed_entities = boom
 
     def tearDown(self):
-        (sa._read_text, sa.sem_entities, sa.sem_blame,
-         sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
+        (sa._read_text, sa.sem_entities, sa.sem_blame, sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
 
     def test_bad_hash_reported_not_crashed(self):
         work = sa.scan(["src/a.ts"])
@@ -376,25 +383,27 @@ class TestScanInvalidSha(unittest.TestCase):
 
 class TestScanFreshAfterWrite(unittest.TestCase):
     """#13 regression: marker anchored to the entity's last logic change is fresh."""
+
     def setUp(self):
         # decl-line blame is commit A, but body last changed in commit B; marker carries B.
         self.files = {"src/g.ts": "// SEM@bbbbbbb: guard\nclass G {}\n"}
-        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
-                      sa.entity_logic_sha, sa.logic_changed_entities)
+        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame, sa.entity_logic_sha, sa.logic_changed_entities)
         sa._read_text = lambda p: self.files[p]
         sa.sem_entities = lambda paths, cwd=None: [
-            {"name": "G", "type": "class", "file": "src/g.ts", "start_line": 2, "end_line": 2}]
+            {"name": "G", "type": "class", "file": "src/g.ts", "start_line": 2, "end_line": 2}
+        ]
         sa.sem_blame = lambda f, cwd=None: [{"name": "G", "commit": "aaaaaaa_declline"}]
         sa.entity_logic_sha = lambda name, f, cwd=None, fallback_sha="": "bbbbbbb000111"  # commit B
+
         # Must NOT be consulted: anchor already prefix-matches the marker, so classify
         # returns fresh without a logic diff. Make it explode to prove that.
         def must_not_call(base, f, cwd=None):
             raise AssertionError("logic_changed_entities should not be called when anchor matches marker")
+
         sa.logic_changed_entities = must_not_call
 
     def tearDown(self):
-        (sa._read_text, sa.sem_entities, sa.sem_blame,
-         sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
+        (sa._read_text, sa.sem_entities, sa.sem_blame, sa.entity_logic_sha, sa.logic_changed_entities) = self._orig
 
     def test_marker_matching_anchor_is_fresh(self):
         # anchor 'bbbbbbb000111' startswith marker 'bbbbbbb' -> fresh, logic check skipped
@@ -413,45 +422,52 @@ Expected: FAIL (scan still uses `blame_sha`/old logic; no `invalid-sha`).
 Replace the `work = []` ... `return work` block of `scan` with:
 
 ```python
-    work = []
-    for f, ents in by_file.items():
-        read_path = f if cwd is None else os.path.join(cwd, f)
-        text = _read_text(read_path)
-        lines = text.splitlines()
-        blame_by_name = {b["name"]: (b.get("commit") or "")
-                         for b in sem_blame(f, cwd=cwd)}
-        for e in ents:
-            marker = find_marker_above(lines, e["start_line"])
-            existing_sha = marker["sha"] if marker else None
-            anchor_sha = entity_logic_sha(
-                e["name"], f, cwd=cwd,
-                fallback_sha=blame_by_name.get(e["name"], "")) or ""
-            existing_desc = marker["desc"] if marker else None
-            if rebuild:
-                status = "missing"
-            else:
-                logic = False
-                if existing_sha and not _is_uncommitted(anchor_sha) \
-                        and not anchor_sha.startswith(existing_sha):
-                    try:
-                        logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
-                    except InvalidRevError:
-                        work.append({
-                            "file": f, "name": e["name"],
-                            "start_line": e["start_line"], "end_line": e["end_line"],
-                            "status": "invalid-sha", "anchor_sha": anchor_sha,
-                            "existing_desc": existing_desc, "bad_sha": existing_sha,
-                        })
-                        continue
-                status = classify(existing_sha, anchor_sha, logic)
-            if status in ("missing", "stale"):
-                work.append({
-                    "file": f, "name": e["name"],
-                    "start_line": e["start_line"], "end_line": e["end_line"],
-                    "status": status, "anchor_sha": anchor_sha,
+work = []
+for f, ents in by_file.items():
+    read_path = f if cwd is None else os.path.join(cwd, f)
+    text = _read_text(read_path)
+    lines = text.splitlines()
+    blame_by_name = {b["name"]: (b.get("commit") or "") for b in sem_blame(f, cwd=cwd)}
+    for e in ents:
+        marker = find_marker_above(lines, e["start_line"])
+        existing_sha = marker["sha"] if marker else None
+        anchor_sha = entity_logic_sha(e["name"], f, cwd=cwd, fallback_sha=blame_by_name.get(e["name"], "")) or ""
+        existing_desc = marker["desc"] if marker else None
+        if rebuild:
+            status = "missing"
+        else:
+            logic = False
+            if existing_sha and not _is_uncommitted(anchor_sha) and not anchor_sha.startswith(existing_sha):
+                try:
+                    logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
+                except InvalidRevError:
+                    work.append(
+                        {
+                            "file": f,
+                            "name": e["name"],
+                            "start_line": e["start_line"],
+                            "end_line": e["end_line"],
+                            "status": "invalid-sha",
+                            "anchor_sha": anchor_sha,
+                            "existing_desc": existing_desc,
+                            "bad_sha": existing_sha,
+                        }
+                    )
+                    continue
+            status = classify(existing_sha, anchor_sha, logic)
+        if status in ("missing", "stale"):
+            work.append(
+                {
+                    "file": f,
+                    "name": e["name"],
+                    "start_line": e["start_line"],
+                    "end_line": e["end_line"],
+                    "status": status,
+                    "anchor_sha": anchor_sha,
                     "existing_desc": existing_desc,
-                })
-    return work
+                }
+            )
+return work
 ```
 
 - [ ] **Step 4: Run new tests + full suite**
@@ -513,9 +529,12 @@ class TestWrite(unittest.TestCase):
             with open(p, "w") as f:
                 f.write("package p\nfunc A() {}\n")
             res = sa.write(
-                [{"file": p, "name": "A", "start_line": 2, "desc": "x"},
-                 {"file": p, "name": "Ghost", "start_line": 99, "desc": "y"}],
-                [{"file": p, "name": "A", "start_line": 2, "anchor_sha": "aaa1111"}])
+                [
+                    {"file": p, "name": "A", "start_line": 2, "desc": "x"},
+                    {"file": p, "name": "Ghost", "start_line": 99, "desc": "y"},
+                ],
+                [{"file": p, "name": "A", "start_line": 2, "anchor_sha": "aaa1111"}],
+            )
             self.assertEqual(res["skipped"], 1)
             self.assertEqual(res["markers"], 1)
 
@@ -527,8 +546,10 @@ class TestWrite(unittest.TestCase):
                 p = os.path.join(d, "x.go")
                 with open(p, "w") as f:
                     f.write("package p\nfunc A() {}\n")
-                sa.write([{"file": p, "name": "A", "start_line": 2, "desc": "x"}],
-                         [{"file": p, "name": "A", "start_line": 2, "anchor_sha": ""}])
+                sa.write(
+                    [{"file": p, "name": "A", "start_line": 2, "desc": "x"}],
+                    [{"file": p, "name": "A", "start_line": 2, "anchor_sha": ""}],
+                )
                 self.assertEqual(open(p).read().splitlines()[1], "// SEM@headfff: x")
         finally:
             sa.head_sha = orig
@@ -575,8 +596,7 @@ def write(descriptions, worklist, cwd=None):
     The sha is taken from the worklist (NEVER the LLM); a blank anchor falls back to
     the current HEAD sha. Returns {"files_written","markers","skipped"}.
     """
-    anchors = {(w["file"], w["name"], w["start_line"]): (w.get("anchor_sha") or "")
-               for w in worklist}
+    anchors = {(w["file"], w["name"], w["start_line"]): (w.get("anchor_sha") or "") for w in worklist}
     by_file = {}
     skipped = 0
     for d in descriptions:
@@ -585,8 +605,7 @@ def write(descriptions, worklist, cwd=None):
             skipped += 1
             continue
         sha = anchors[key] or head_sha(cwd)
-        by_file.setdefault(d["file"], []).append(
-            {"start_line": d["start_line"], "sha": sha, "desc": d["desc"]})
+        by_file.setdefault(d["file"], []).append({"start_line": d["start_line"], "sha": sha, "desc": d["desc"]})
     written = 0
     markers = 0
     for f, ups in by_file.items():

@@ -80,18 +80,21 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'sem_annotate'`.
 ```python
 # dev/scripts/sem_annotate.py
 """sem-annotate: generate and refresh SEM@<sha> intent markers on code entities."""
+
 import re
 import os
 
 COMMENT_BY_EXT = {
-    ".go": "//", ".ts": "//", ".tsx": "//", ".js": "//", ".jsx": "//",
+    ".go": "//",
+    ".ts": "//",
+    ".tsx": "//",
+    ".js": "//",
+    ".jsx": "//",
     ".py": "#",
 }
 
 # Matches a SEM marker line: indent, comment prefix, short/full hex sha, description.
-SEM_MARKER_RE = re.compile(
-    r"^(?P<indent>\s*)(?P<prefix>//|#)\s*SEM@(?P<sha>[0-9a-fA-F]{4,40}):\s?(?P<desc>.*)$"
-)
+SEM_MARKER_RE = re.compile(r"^(?P<indent>\s*)(?P<prefix>//|#)\s*SEM@(?P<sha>[0-9a-fA-F]{4,40}):\s?(?P<desc>.*)$")
 
 
 def comment_prefix(path):
@@ -129,12 +132,12 @@ git commit -m "feat(sem-annotate): script scaffold + comment-prefix resolver"
 ```python
 class TestParseMarkers(unittest.TestCase):
     SRC = (
-        "package auth\n"                                  # 0
-        "\n"                                              # 1
+        "package auth\n"  # 0
+        "\n"  # 1
         "// SEM@b14a829: validate an oauth token (pure)\n"  # 2
-        "func Validate() {}\n"                            # 3
-        "    # SEM@deadbee: parse a config file\n"        # 4 (indented, hash)
-        "x = 1\n"                                         # 5
+        "func Validate() {}\n"  # 3
+        "    # SEM@deadbee: parse a config file\n"  # 4 (indented, hash)
+        "x = 1\n"  # 5
     )
 
     def test_parse_returns_indexed_markers(self):
@@ -146,13 +149,13 @@ class TestParseMarkers(unittest.TestCase):
 
     def test_find_marker_above_entity(self):
         lines = self.SRC.splitlines()
-        m = sa.find_marker_above(lines, 4)   # entity 'func Validate' is on 1-based line 4
+        m = sa.find_marker_above(lines, 4)  # entity 'func Validate' is on 1-based line 4
         self.assertIsNotNone(m)
         self.assertEqual(m["sha"], "b14a829")
 
     def test_find_marker_above_none_when_absent(self):
         lines = self.SRC.splitlines()
-        self.assertIsNone(sa.find_marker_above(lines, 6))  # line above 'x = 1' is a marker? no — it's line 5 'x = 1'? 
+        self.assertIsNone(sa.find_marker_above(lines, 6))  # line above 'x = 1' is a marker? no — it's line 5 'x = 1'?
 ```
 
 Note: in `test_find_marker_above_none_when_absent`, entity 1-based line 6 is `x = 1`; the line above (1-based 5) is the indented `# SEM@deadbee` marker, so adjust the assertion below.
@@ -266,7 +269,7 @@ def apply_marker(lines, start_line, prefix, sha, desc):
     Indentation is copied from the entity definition line. Returns a NEW list.
     """
     lines = list(lines)
-    idx = start_line - 1                       # entity line, 0-based
+    idx = start_line - 1  # entity line, 0-based
     entity_line = lines[idx] if 0 <= idx < len(lines) else ""
     indent = entity_line[: len(entity_line) - len(entity_line.lstrip())]
     marker = build_marker(prefix, indent, sha, desc)
@@ -370,6 +373,7 @@ git commit -m "feat(sem-annotate): classify entities missing/stale/fresh w/ shor
 ```python
 import types
 
+
 class TestScan(unittest.TestCase):
     def setUp(self):
         self.files = {}  # path -> source text
@@ -387,9 +391,9 @@ class TestScan(unittest.TestCase):
         path = "auth/x.go"
         self.files[path] = (
             "package auth\n"
-            "// SEM@aaaaaaa: validate a token\n"   # fresh: sha matches blame below
+            "// SEM@aaaaaaa: validate a token\n"  # fresh: sha matches blame below
             "func Fresh() {}\n"
-            "func Missing() {}\n"                   # no marker -> missing
+            "func Missing() {}\n"  # no marker -> missing
         )
         entities = [
             {"name": "Fresh", "type": "function", "start_line": 3, "end_line": 3},
@@ -489,12 +493,17 @@ def scan(paths, cwd=None, rebuild=False):
                     logic = e["name"] in logic_changed_entities(existing_sha, f, cwd=cwd)
                 status = classify(existing_sha, blame_sha, logic)
             if status in ("missing", "stale"):
-                work.append({
-                    "file": f, "name": e["name"],
-                    "start_line": e["start_line"], "end_line": e["end_line"],
-                    "status": status, "blame_sha": blame_sha,
-                    "existing_desc": marker["desc"] if marker else None,
-                })
+                work.append(
+                    {
+                        "file": f,
+                        "name": e["name"],
+                        "start_line": e["start_line"],
+                        "end_line": e["end_line"],
+                        "status": status,
+                        "blame_sha": blame_sha,
+                        "existing_desc": marker["desc"] if marker else None,
+                    }
+                )
     return work
 ```
 
@@ -543,16 +552,19 @@ git commit -m "feat(sem-annotate): sem CLI wrappers + scan() worklist builder"
 ```python
 import io, json, tempfile, os
 
+
 class TestWrite(unittest.TestCase):
     def test_write_applies_bottom_up(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "x.go")
             with open(p, "w") as f:
                 f.write("package p\nfunc A() {}\nfunc B() {}\n")
-            n = sa.write([
-                {"file": p, "start_line": 2, "sha": "aaa1111", "desc": "build A"},
-                {"file": p, "start_line": 3, "sha": "bbb2222", "desc": "build B"},
-            ])
+            n = sa.write(
+                [
+                    {"file": p, "start_line": 2, "sha": "aaa1111", "desc": "build A"},
+                    {"file": p, "start_line": 3, "sha": "bbb2222", "desc": "build B"},
+                ]
+            )
             self.assertEqual(n, 1)  # one file written
             out = open(p).read().splitlines()
             self.assertEqual(out[1], "// SEM@aaa1111: build A")
@@ -609,8 +621,7 @@ def write(updates, cwd=None):
 
 def parse_args(argv):
     p = argparse.ArgumentParser(prog="sem_annotate")
-    p.add_argument("--update", nargs="+", metavar="FILE",
-                   help="scan only these files (entity-granular update)")
+    p.add_argument("--update", nargs="+", metavar="FILE", help="scan only these files (entity-granular update)")
     sub = p.add_subparsers(dest="cmd")
     s = sub.add_parser("scan")
     s.add_argument("paths", nargs="*", default=["."])

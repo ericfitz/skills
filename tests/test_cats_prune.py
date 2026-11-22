@@ -131,8 +131,7 @@ class TestPruneRunDbs(unittest.TestCase):
                 raise OSError("simulated unlink failure")
             return real_unlink(self, missing_ok=missing_ok)
 
-        with mock.patch.object(Path, "unlink", flaky_unlink), \
-                self.assertLogs(run.__name__, level="WARNING") as ctx:
+        with mock.patch.object(Path, "unlink", flaky_unlink), self.assertLogs(run.__name__, level="WARNING") as ctx:
             deleted = run.prune_run_dbs(self.root, keep=1)
 
         self.assertNotIn(flaky_name, {p.name for p in deleted})

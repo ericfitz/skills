@@ -184,25 +184,21 @@ class TestPropagate(unittest.TestCase):
     ]
 
     def test_transitive_of_a_build_root_is_build(self):
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, self.RELS)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, self.RELS)
         self.assertEqual(out["a2"], "build")
 
     def test_transitive_of_a_run_root_is_run(self):
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, self.RELS)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, self.RELS)
         self.assertEqual(out["a4"], "run")
 
     def test_run_wins_when_reachable_from_both(self):
         """A package pulled in by both a dev tool and the app ships."""
         rels = self.RELS + [{"parent": "a2", "child": "a3", "type": "dependency-of"}]
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, rels)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, rels)
         self.assertEqual(out["a2"], "run")
 
     def test_roots_keep_their_own_classification(self):
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, self.RELS)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, self.RELS)
         self.assertEqual(out["a1"], "build")
         self.assertEqual(out["a3"], "run")
 
@@ -219,8 +215,10 @@ class TestPropagate(unittest.TestCase):
         self.assertEqual(out["a2"], "run")
 
     def test_a_cycle_terminates(self):
-        rels = [{"parent": "a1", "child": "a2", "type": "dependency-of"},
-                {"parent": "a2", "child": "a1", "type": "dependency-of"}]
+        rels = [
+            {"parent": "a1", "child": "a2", "type": "dependency-of"},
+            {"parent": "a2", "child": "a1", "type": "dependency-of"},
+        ]
         out = pkglifecycle.propagate({"pytest": "build"}, self.ARTIFACTS, rels)
         self.assertEqual(out["a1"], "build")
 
@@ -230,11 +228,15 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"pyproject.toml": PYPROJECT})
             syft = Path(tmp) / "syft.json"
-            syft.write_text(json.dumps({
-                "artifacts": [{"id": "a1", "name": "pytest"},
-                              {"id": "a3", "name": "pyyaml"}],
-                "artifactRelationships": [],
-            }), encoding="utf-8")
+            syft.write_text(
+                json.dumps(
+                    {
+                        "artifacts": [{"id": "a1", "name": "pytest"}, {"id": "a3", "name": "pyyaml"}],
+                        "artifactRelationships": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
             rc = pkglifecycle.main([str(root), "--syft-json", str(syft)])
             self.assertEqual(rc, 0)
 
@@ -329,9 +331,9 @@ def _package_json(path, out):
         return
     if not isinstance(data, dict):
         return
-    for dep in (data.get("dependencies") or {}):
+    for dep in data.get("dependencies") or {}:
         out[_name(dep)] = RUN
-    for dep in (data.get("devDependencies") or {}):
+    for dep in data.get("devDependencies") or {}:
         out.setdefault(_name(dep), BUILD)
 
 
@@ -339,14 +341,13 @@ def _cargo(path, out):
     data = _load_toml(path)
     if not data:
         return
-    for dep in (data.get("dependencies") or {}):
+    for dep in data.get("dependencies") or {}:
         out[_name(dep)] = RUN
-    for dep in (data.get("dev-dependencies") or {}):
+    for dep in data.get("dev-dependencies") or {}:
         out.setdefault(_name(dep), BUILD)
 
 
-_GO_REQUIRE = re.compile(r"^\s*(?:require\s+)?([a-z0-9][\w.\-/]*\.[\w.\-/]+)\s+v\S+",
-                         re.IGNORECASE)
+_GO_REQUIRE = re.compile(r"^\s*(?:require\s+)?([a-z0-9][\w.\-/]*\.[\w.\-/]+)\s+v\S+", re.IGNORECASE)
 
 
 def _go_mod(path, out):
@@ -371,12 +372,25 @@ MANIFESTS = {
 # Ecosystems we can detect but not classify. Their presence becomes an
 # assumption rather than a silent gap.
 UNPARSEABLE = {
-    "Gemfile": "ruby", "composer.json": "php", "pom.xml": "java",
-    "build.gradle": "java", "build.gradle.kts": "java",
+    "Gemfile": "ruby",
+    "composer.json": "php",
+    "pom.xml": "java",
+    "build.gradle": "java",
+    "build.gradle.kts": "java",
 }
 
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "vendor", "dist",
-             "build", "target", "site-packages", "__pycache__"}
+SKIP_DIRS = {
+    ".git",
+    "node_modules",
+    ".venv",
+    "venv",
+    "vendor",
+    "dist",
+    "build",
+    "target",
+    "site-packages",
+    "__pycache__",
+}
 
 
 def _walk(root):
@@ -434,8 +448,8 @@ def propagate(roots, artifacts, relationships):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="pkglifecycle.py",
-        description="Derive build-vs-run lifecycle for syft-catalogued packages.")
+        prog="pkglifecycle.py", description="Derive build-vs-run lifecycle for syft-catalogued packages."
+    )
     parser.add_argument("path", help="repo root")
     parser.add_argument("--syft-json", required=True, help="syft-json output file")
     parser.add_argument("--indent", type=int, default=2)
@@ -453,13 +467,11 @@ def main(argv=None):
         sys.stderr.write("\n")
         return 2
 
-    lifecycle = propagate(classify_roots(root),
-                          syft.get("artifacts") or [],
-                          syft.get("artifactRelationships") or [])
+    lifecycle = propagate(classify_roots(root), syft.get("artifacts") or [], syft.get("artifactRelationships") or [])
     indent = args.indent if args.indent > 0 else None
-    print(json.dumps({"lifecycle": lifecycle,
-                      "unresolved": unresolved_ecosystems(root)},
-                     indent=indent, sort_keys=True))
+    print(
+        json.dumps({"lifecycle": lifecycle, "unresolved": unresolved_ecosystems(root)}, indent=indent, sort_keys=True)
+    )
     return 0
 
 
@@ -536,11 +548,9 @@ class TestLifecycle(unittest.TestCase):
 
     def test_package_example_is_build_and_service_example_is_run(self):
         pkg = load(EXAMPLES / "package.example.json")
-        self.assertEqual(
-            pkg["categories"]["package"]["dependencies"][0]["lifecycle"], "build")
+        self.assertEqual(pkg["categories"]["package"]["dependencies"][0]["lifecycle"], "build")
         svc = load(EXAMPLES / "service.example.json")
-        self.assertEqual(
-            svc["categories"]["service"]["dependencies"][0]["lifecycle"], "run")
+        self.assertEqual(svc["categories"]["service"]["dependencies"][0]["lifecycle"], "run")
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -754,34 +764,28 @@ class TestSynthesisContract(unittest.TestCase):
 
     def test_requires_the_four_parts(self):
         schema = load(CONTRACTS / "synthesis.schema.json")
-        for field in ("contract_version", "target", "inventory", "graph", "health",
-                      "assumptions"):
+        for field in ("contract_version", "target", "inventory", "graph", "health", "assumptions"):
             self.assertIn(field, schema["required"])
 
     def test_edge_kinds_are_exactly_two(self):
         schema = load(CONTRACTS / "synthesis.schema.json")
         edge = schema["properties"]["graph"]["properties"]["edges"]["items"]
-        self.assertEqual(edge["properties"]["kind"]["enum"],
-                         ["depends_on", "relates_to"])
+        self.assertEqual(edge["properties"]["kind"]["enum"], ["depends_on", "relates_to"])
 
     def test_condition_kinds_are_the_three_documented(self):
         schema = load(CONTRACTS / "synthesis.schema.json")
-        cond = (schema["properties"]["health"]["items"]
-                ["properties"]["conditions"]["items"])
-        self.assertEqual(cond["properties"]["kind"]["enum"],
-                         ["presence", "bound", "upstream_health"])
+        cond = schema["properties"]["health"]["items"]["properties"]["conditions"]["items"]
+        self.assertEqual(cond["properties"]["kind"]["enum"], ["presence", "bound", "upstream_health"])
 
     def test_expectation_accepts_null(self):
         """null means no declaration was found -- never 'no bound needed'."""
         schema = load(CONTRACTS / "synthesis.schema.json")
-        cond = (schema["properties"]["health"]["items"]
-                ["properties"]["conditions"]["items"])
+        cond = schema["properties"]["health"]["items"]["properties"]["conditions"]["items"]
         self.assertIn("null", cond["properties"]["expectation"]["type"])
 
     def test_example_carries_a_null_expectation_and_a_declared_one(self):
         instance = load(EXAMPLES / "synthesis.example.json")
-        expectations = [c["expectation"]
-                        for h in instance["health"] for c in h["conditions"]]
+        expectations = [c["expectation"] for h in instance["health"] for c in h["conditions"]]
         self.assertIn(None, expectations)
         self.assertTrue(any(e is not None for e in expectations))
 
@@ -855,9 +859,11 @@ from depgraphlib.merge import merge_envelopes
 
 
 def env(category, deps, status="discovered"):
-    return {"contract_version": "1.0.0", "target": "/r",
-            "categories": {category: {"status": status, "dependencies": deps,
-                                      "assumptions": []}}}
+    return {
+        "contract_version": "1.0.0",
+        "target": "/r",
+        "categories": {category: {"status": status, "dependencies": deps, "assumptions": []}},
+    }
 
 
 class TestMergeEnvelopes(unittest.TestCase):
@@ -896,8 +902,10 @@ class TestMergeEnvelopes(unittest.TestCase):
     def test_output_is_deterministic(self):
         envs = [env("network", []), env("service", [])]
         import json
-        self.assertEqual(json.dumps(merge_envelopes(envs), sort_keys=True),
-                         json.dumps(merge_envelopes(envs), sort_keys=True))
+
+        self.assertEqual(
+            json.dumps(merge_envelopes(envs), sort_keys=True), json.dumps(merge_envelopes(envs), sort_keys=True)
+        )
 
 
 if __name__ == "__main__":
@@ -942,8 +950,8 @@ def merge_envelopes(envelopes):
     for envelope in envelopes:
         for name, block in (envelope.get("categories") or {}).items():
             target = categories.setdefault(
-                name, {"status": block.get("status", "discovered"),
-                       "dependencies": [], "assumptions": []})
+                name, {"status": block.get("status", "discovered"), "dependencies": [], "assumptions": []}
+            )
             if block.get("status") == "failed":
                 target["status"] = "failed"
             seen = {d["id"] for d in target["dependencies"] if "id" in d}
@@ -1004,23 +1012,22 @@ from depgraphlib.graph import build_graph
 
 
 def dep(id_, name, lifecycle="run", related=None, depends=None):
-    d = {"id": id_, "name": name, "lifecycle": lifecycle,
-         "evidence": [], "related_ids": related or [], "details": {}}
+    d = {"id": id_, "name": name, "lifecycle": lifecycle, "evidence": [], "related_ids": related or [], "details": {}}
     if depends is not None:
         d["details"]["depends_on"] = depends
     return d
 
 
 def merged(**cats):
-    return {"categories": {k: {"status": "discovered", "dependencies": v,
-                               "assumptions": []} for k, v in cats.items()}}
+    return {"categories": {k: {"status": "discovered", "dependencies": v, "assumptions": []} for k, v in cats.items()}}
 
 
 class TestNodes(unittest.TestCase):
     def test_one_node_per_dependency_carrying_category_and_lifecycle(self):
         g = build_graph(merged(service=[dep("service:pg", "postgres")]))
-        self.assertEqual(g["nodes"], [{"id": "service:pg", "name": "postgres",
-                                       "category": "service", "lifecycle": "run"}])
+        self.assertEqual(
+            g["nodes"], [{"id": "service:pg", "name": "postgres", "category": "service", "lifecycle": "run"}]
+        )
 
     def test_nodes_are_sorted_by_id(self):
         g = build_graph(merged(service=[dep("service:b", "b"), dep("service:a", "a")]))
@@ -1029,27 +1036,36 @@ class TestNodes(unittest.TestCase):
 
 class TestEdges(unittest.TestCase):
     def test_depends_on_edges_come_from_package_details(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:b-2"]),
-            dep("package:b-2", "b", "build")]))
-        self.assertEqual(g["edges"], [{"from": "package:a-1", "to": "package:b-2",
-                                       "kind": "depends_on", "lifecycle": "build"}])
+        g = build_graph(
+            merged(
+                package=[dep("package:a-1", "a", "build", depends=["package:b-2"]), dep("package:b-2", "b", "build")]
+            )
+        )
+        self.assertEqual(
+            g["edges"], [{"from": "package:a-1", "to": "package:b-2", "kind": "depends_on", "lifecycle": "build"}]
+        )
 
     def test_relates_to_edges_come_from_related_ids(self):
-        g = build_graph(merged(
-            service=[dep("service:pg", "postgres", related=["network:pg-5432"])],
-            network=[dep("network:pg-5432", "postgres:5432")]))
-        self.assertEqual(g["edges"], [{"from": "service:pg", "to": "network:pg-5432",
-                                       "kind": "relates_to", "lifecycle": "run"}])
+        g = build_graph(
+            merged(
+                service=[dep("service:pg", "postgres", related=["network:pg-5432"])],
+                network=[dep("network:pg-5432", "postgres:5432")],
+            )
+        )
+        self.assertEqual(
+            g["edges"], [{"from": "service:pg", "to": "network:pg-5432", "kind": "relates_to", "lifecycle": "run"}]
+        )
 
     def test_the_two_edge_kinds_are_not_conflated(self):
         """A consumer asking what must be reachable at runtime filters to run
         edges; one asking what we build against filters to build."""
-        g = build_graph(merged(
-            package=[dep("package:a-1", "a", "build", depends=["package:b-2"]),
-                     dep("package:b-2", "b", "build")],
-            service=[dep("service:pg", "pg", related=["network:x"])],
-            network=[dep("network:x", "x")]))
+        g = build_graph(
+            merged(
+                package=[dep("package:a-1", "a", "build", depends=["package:b-2"]), dep("package:b-2", "b", "build")],
+                service=[dep("service:pg", "pg", related=["network:x"])],
+                network=[dep("network:x", "x")],
+            )
+        )
         kinds = {e["kind"] for e in g["edges"]}
         self.assertEqual(kinds, {"depends_on", "relates_to"})
 
@@ -1058,34 +1074,44 @@ class TestEdges(unittest.TestCase):
         self.assertEqual(g["edges"], [])
 
     def test_edges_are_sorted_and_deduplicated(self):
-        g = build_graph(merged(service=[
-            dep("service:a", "a", related=["service:b", "service:b"]),
-            dep("service:b", "b")]))
+        g = build_graph(
+            merged(service=[dep("service:a", "a", related=["service:b", "service:b"]), dep("service:b", "b")])
+        )
         self.assertEqual(len(g["edges"]), 1)
 
 
 class TestCycles(unittest.TestCase):
     def test_a_two_node_cycle_is_reported(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:b-2"]),
-            dep("package:b-2", "b", "build", depends=["package:a-1"])]))
+        g = build_graph(
+            merged(
+                package=[
+                    dep("package:a-1", "a", "build", depends=["package:b-2"]),
+                    dep("package:b-2", "b", "build", depends=["package:a-1"]),
+                ]
+            )
+        )
         self.assertEqual(len(g["cycles"]), 1)
         self.assertEqual(sorted(g["cycles"][0]), ["package:a-1", "package:b-2"])
 
     def test_an_acyclic_graph_reports_none(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:b-2"]),
-            dep("package:b-2", "b", "build")]))
+        g = build_graph(
+            merged(
+                package=[dep("package:a-1", "a", "build", depends=["package:b-2"]), dep("package:b-2", "b", "build")]
+            )
+        )
         self.assertEqual(g["cycles"], [])
 
     def test_a_self_loop_is_a_cycle(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:a-1"])]))
+        g = build_graph(merged(package=[dep("package:a-1", "a", "build", depends=["package:a-1"])]))
         self.assertEqual(g["cycles"], [["package:a-1"]])
 
     def test_cycles_are_deterministic(self):
-        m = merged(package=[dep("package:a-1", "a", "build", depends=["package:b-2"]),
-                            dep("package:b-2", "b", "build", depends=["package:a-1"])])
+        m = merged(
+            package=[
+                dep("package:a-1", "a", "build", depends=["package:b-2"]),
+                dep("package:b-2", "b", "build", depends=["package:a-1"]),
+            ]
+        )
         self.assertEqual(build_graph(m)["cycles"], build_graph(m)["cycles"])
 
 
@@ -1146,9 +1172,11 @@ from depgraphlib.mermaid import to_mermaid
 
 
 def graph(names, edges=None):
-    return {"nodes": [{"id": f"package:{n}", "name": n, "category": "package",
-                       "lifecycle": "build"} for n in names],
-            "edges": edges or [], "cycles": []}
+    return {
+        "nodes": [{"id": f"package:{n}", "name": n, "category": "package", "lifecycle": "build"} for n in names],
+        "edges": edges or [],
+        "cycles": [],
+    }
 
 
 class TestMermaid(unittest.TestCase):
@@ -1178,14 +1206,16 @@ class TestMermaid(unittest.TestCase):
         self.assertIn('["has<tag>"]', out["mermaid"])
 
     def test_edges_are_emitted_between_the_opaque_ids(self):
-        g = graph(["a", "b"], edges=[{"from": "package:a", "to": "package:b",
-                                      "kind": "depends_on", "lifecycle": "build"}])
+        g = graph(
+            ["a", "b"], edges=[{"from": "package:a", "to": "package:b", "kind": "depends_on", "lifecycle": "build"}]
+        )
         out = to_mermaid(g)
         self.assertRegex(out["mermaid"], r"n\d+ --> n\d+")
 
     def test_an_edge_to_a_node_not_in_the_graph_is_skipped(self):
-        g = graph(["a"], edges=[{"from": "package:a", "to": "package:ghost",
-                                 "kind": "depends_on", "lifecycle": "build"}])
+        g = graph(
+            ["a"], edges=[{"from": "package:a", "to": "package:ghost", "kind": "depends_on", "lifecycle": "build"}]
+        )
         self.assertNotIn("-->", to_mermaid(g)["mermaid"])
 
     def test_output_is_deterministic(self):
@@ -1241,20 +1271,21 @@ def to_mermaid(graph, cap=CAP_DEFAULT):
     nodes = sorted(graph.get("nodes") or [], key=lambda n: n["id"])
     count = len(nodes)
     if count > cap:
-        return {"mermaid": None, "degraded": True, "node_count": count,
-                "reason": f"{count} nodes exceeds the {cap}-node Mermaid cap; "
-                          f"a rendered graph this size is unreadable"}
+        return {
+            "mermaid": None,
+            "degraded": True,
+            "node_count": count,
+            "reason": f"{count} nodes exceeds the {cap}-node Mermaid cap; a rendered graph this size is unreadable",
+        }
 
     index = {node["id"]: f"n{i}" for i, node in enumerate(nodes)}
     lines = ["flowchart LR"]
     lines += [f'  {index[n["id"]]}["{_label(n["name"])}"]' for n in nodes]
-    for edge in sorted(graph.get("edges") or [],
-                       key=lambda e: (e["from"], e["to"], e["kind"])):
+    for edge in sorted(graph.get("edges") or [], key=lambda e: (e["from"], e["to"], e["kind"])):
         if edge["from"] in index and edge["to"] in index:
             arrow = "-->" if edge["kind"] == "depends_on" else "-.->"
-            lines.append(f'  {index[edge["from"]]} {arrow} {index[edge["to"]]}')
-    return {"mermaid": "\n".join(lines) + "\n", "degraded": False,
-            "node_count": count, "reason": None}
+            lines.append(f"  {index[edge['from']]} {arrow} {index[edge['to']]}")
+    return {"mermaid": "\n".join(lines) + "\n", "degraded": False, "node_count": count, "reason": None}
 ```
 
 - [ ] **Step 4: Verify the emitted Mermaid actually renders**
@@ -1407,8 +1438,7 @@ class TestLifecycleInstructions(unittest.TestCase):
     def test_platform_states_the_split_by_details_kind(self):
         text = body(PLUGIN / "skills" / "platform" / "SKILL.md")
         self.assertIn("details.kind", text)
-        for kind in ("cpu", "memory", "disk", "gpu", "cloud-service",
-                     "arch", "os", "runtime-version"):
+        for kind in ("cpu", "memory", "disk", "gpu", "cloud-service", "arch", "os", "runtime-version"):
             with self.subTest(kind=kind):
                 self.assertIn(kind, text)
 

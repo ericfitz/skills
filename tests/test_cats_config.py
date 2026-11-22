@@ -156,8 +156,7 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(c.results_dir, c.repo_root / "test" / "results" / "cats")
 
     def test_health_url_defaults_to_server(self):
-        self.assertEqual(cfg.load_config(self._write(MINIMAL)).health_url,
-                         "http://localhost:8080")
+        self.assertEqual(cfg.load_config(self._write(MINIMAL)).health_url, "http://localhost:8080")
 
     def test_missing_required_key_names_the_key(self):
         body = MINIMAL.replace("server: http://localhost:8080\n", "")
@@ -177,21 +176,26 @@ class TestLoadConfig(unittest.TestCase):
         self.assertIn("nobody", str(ctx.exception))
 
     def test_skip_fuzzers_for_extension_entry_parsed(self):
-        body = MINIMAL + """
+        body = (
+            MINIMAL
+            + """
 cats:
   skip_fuzzers_for_extension:
     - {extension: x-public-endpoint, value: "true", fuzzers: [BypassAuthentication]}
 """
+        )
         c = cfg.load_config(self._write(body))
-        self.assertEqual(c.cats.skip_fuzzers_for_extension[0]["fuzzers"],
-                         ["BypassAuthentication"])
+        self.assertEqual(c.cats.skip_fuzzers_for_extension[0]["fuzzers"], ["BypassAuthentication"])
 
     def test_skip_fuzzers_for_extension_missing_fuzzers_rejected(self):
-        body = MINIMAL + """
+        body = (
+            MINIMAL
+            + """
 cats:
   skip_fuzzers_for_extension:
     - {extension: x-public-endpoint, value: "true"}
 """
+        )
         with self.assertRaises(cfg.ConfigError) as ctx:
             cfg.load_config(self._write(body))
         self.assertIn("skip_fuzzers_for_extension", str(ctx.exception))
@@ -239,9 +243,7 @@ cats:
         self.assertIn("http_methods", str(ctx.exception))
 
     def test_wrong_type_token_cmd_rejected(self):
-        body = MINIMAL.replace(
-            'admin: {token_cmd: "echo tok"}', "admin: {token_cmd: 5}"
-        )
+        body = MINIMAL.replace('admin: {token_cmd: "echo tok"}', "admin: {token_cmd: 5}")
         with self.assertRaises(cfg.ConfigError) as ctx:
             cfg.load_config(self._write(body))
         self.assertIn("token_cmd", str(ctx.exception))
@@ -275,9 +277,12 @@ cats:
 class TestInitTemplate(unittest.TestCase):
     def test_rendered_config_round_trips(self):
         text = cfg.render_init_config(
-            spec="api/openapi.json", server="http://localhost:3000",
-            health_url="http://localhost:3000/health", results_dir="test/results/cats",
-            rules="test/cats/false-positives.yaml")
+            spec="api/openapi.json",
+            server="http://localhost:3000",
+            health_url="http://localhost:3000/health",
+            results_dir="test/results/cats",
+            rules="test/cats/false-positives.yaml",
+        )
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".local" / "cats").mkdir(parents=True)
@@ -290,8 +295,8 @@ class TestInitTemplate(unittest.TestCase):
 
     def test_template_documents_keep_runs(self):
         text = cfg.render_init_config(
-            spec="s", server="http://h", health_url="http://h",
-            results_dir="r", rules="f.yaml")
+            spec="s", server="http://h", health_url="http://h", results_dir="r", rules="f.yaml"
+        )
         self.assertIn("keep_runs:", text)
 
     def test_template_documents_validity_gates(self):
@@ -299,20 +304,21 @@ class TestInitTemplate(unittest.TestCase):
         # that never learns `skip_paths` exists is the one that ships a campaign
         # which logs itself out (TMI #591).
         text = cfg.render_init_config(
-            spec="s", server="http://h", health_url="http://h",
-            results_dir="r", rules="f.yaml")
+            spec="s", server="http://h", health_url="http://h", results_dir="r", rules="f.yaml"
+        )
         for key in ("max_connection_error_pct:", "max_unauthenticated_pct:", "skip_paths:"):
             self.assertIn(key, text)
 
     def test_template_documents_hooks(self):
         text = cfg.render_init_config(
-            spec="s", server="http://h", health_url="http://h",
-            results_dir="r", rules="f.yaml")
+            spec="s", server="http://h", health_url="http://h", results_dir="r", rules="f.yaml"
+        )
         for key in ("seed:", "pre_run:", "post_run:", "token_cmd:"):
             self.assertIn(key, text)
 
     def test_starter_rules_are_stack_agnostic(self):
         from catslib import rules as R
+
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
             fh.write(cfg.INITIAL_RULES_YAML)
         loaded = R.load_rules(Path(fh.name))

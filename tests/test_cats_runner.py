@@ -32,12 +32,12 @@ class TestResolveToken(unittest.TestCase):
         # `printf ''` (single quotes) rather than `printf ""` — the latter breaks
         # the surrounding double-quoted YAML flow scalar (`{token_cmd: "printf """}`
         # is invalid YAML; PyYAML rejects it before resolve_token ever runs).
-        c = make_config(self, CONFIG.replace('printf secret-token', "printf ''"))
+        c = make_config(self, CONFIG.replace("printf secret-token", "printf ''"))
         with self.assertRaises(run.HookError):
             run.resolve_token(c.identities["admin"], c.repo_root, {})
 
     def test_failing_command_raises_with_command_in_message(self):
-        c = make_config(self, CONFIG.replace('printf secret-token', 'exit 3'))
+        c = make_config(self, CONFIG.replace("printf secret-token", "exit 3"))
         with self.assertRaises(run.HookError) as ctx:
             run.resolve_token(c.identities["admin"], c.repo_root, {})
         self.assertIn("exit 3", str(ctx.exception))
@@ -46,9 +46,7 @@ class TestResolveToken(unittest.TestCase):
         # stdout is the token channel; stderr is the diagnostic channel — a
         # failing token_cmd's stderr is safe to surface and makes the error
         # actionable instead of a bare exit code.
-        c = make_config(self, CONFIG.replace(
-            'printf secret-token', 'echo boom-diagnostic >&2; exit 3'
-        ))
+        c = make_config(self, CONFIG.replace("printf secret-token", "echo boom-diagnostic >&2; exit 3"))
         with self.assertRaises(run.HookError) as ctx:
             run.resolve_token(c.identities["admin"], c.repo_root, {})
         self.assertIn("boom-diagnostic", str(ctx.exception))
@@ -83,16 +81,14 @@ class TestHeadersFile(unittest.TestCase):
         # must still produce a file CATS (a YAML parser) can read correctly —
         # an f-string would have broken on input like this.
         with tempfile.TemporaryDirectory() as d:
-            value = '*starts-with-star and has: a colon-space'
+            value = "*starts-with-star and has: a colon-space"
             p = run.write_headers_file(Path(d), "Authorization", value)
             parsed = yaml.safe_load(p.read_text())
             self.assertEqual(parsed, {"all": {"Authorization": value}})
 
     def test_extra_headers_merge_into_the_same_all_block(self):
         with tempfile.TemporaryDirectory() as d:
-            p = run.write_headers_file(
-                Path(d), "Authorization", "Bearer tok", {"If-Match": "*", "X-Trace": "on"}
-            )
+            p = run.write_headers_file(Path(d), "Authorization", "Bearer tok", {"If-Match": "*", "X-Trace": "on"})
             self.assertEqual(
                 yaml.safe_load(p.read_text()),
                 {"all": {"Authorization": "Bearer tok", "If-Match": "*", "X-Trace": "on"}},
@@ -103,17 +99,12 @@ class TestHeadersFile(unittest.TestCase):
         # write order is the second line of defence, because the failure mode
         # is a silently unauthenticated campaign rather than an error.
         with tempfile.TemporaryDirectory() as d:
-            p = run.write_headers_file(
-                Path(d), "Authorization", "Bearer tok", {"Authorization": "Bearer WRONG"}
-            )
-            self.assertEqual(
-                yaml.safe_load(p.read_text())["all"]["Authorization"], "Bearer tok"
-            )
+            p = run.write_headers_file(Path(d), "Authorization", "Bearer tok", {"Authorization": "Bearer WRONG"})
+            self.assertEqual(yaml.safe_load(p.read_text())["all"]["Authorization"], "Bearer tok")
 
     def test_write_failure_removes_the_partial_file(self):
         with tempfile.TemporaryDirectory() as d:
-            with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")), \
-                    self.assertRaises(OSError):
+            with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")), self.assertRaises(OSError):
                 run.write_headers_file(Path(d), "Authorization", "Bearer tok")
             # mkstemp's file must not survive a chmod/write failure.
             self.assertEqual(list(Path(d).glob("cats-headers-*")), [])
@@ -123,9 +114,13 @@ class TestBuildArgv(unittest.TestCase):
     def _argv(self, **kw):
         c = make_config(self)
         return run.build_cats_argv(
-            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
-            path_filter=kw.get("path_filter"), rate=kw.get("rate"),
-            blackbox=kw.get("blackbox", False))
+            c,
+            headers_file=Path("/tmp/h.yml"),
+            report_dir=Path("/tmp/rep"),
+            path_filter=kw.get("path_filter"),
+            rate=kw.get("rate"),
+            blackbox=kw.get("blackbox", False),
+        )
 
     def test_core_flags_present(self):
         argv = self._argv()
@@ -167,13 +162,11 @@ class TestBuildArgv(unittest.TestCase):
         self.assertNotIn("--skipPaths", " ".join(self._argv()))
 
     def test_skip_paths_rendered_as_one_comma_list(self):
-        body = CONFIG.replace(
-            "  extra_args:", "  skip_paths: [/me/logout, /me/nuke]\n  extra_args:"
-        )
+        body = CONFIG.replace("  extra_args:", "  skip_paths: [/me/logout, /me/nuke]\n  extra_args:")
         c = make_config(self, body)
         argv = run.build_cats_argv(
-            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
-            path_filter=None, rate=None, blackbox=False)
+            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"), path_filter=None, rate=None, blackbox=False
+        )
         self.assertIn("--skipPaths=/me/logout,/me/nuke", argv)
 
     def test_explicit_path_filter_overrides_skip_paths(self):
@@ -182,8 +175,13 @@ class TestBuildArgv(unittest.TestCase):
         body = CONFIG.replace("  extra_args:", "  skip_paths: [/me/logout]\n  extra_args:")
         c = make_config(self, body)
         argv = run.build_cats_argv(
-            c, headers_file=Path("/tmp/h.yml"), report_dir=Path("/tmp/rep"),
-            path_filter="/me/logout", rate=None, blackbox=False)
+            c,
+            headers_file=Path("/tmp/h.yml"),
+            report_dir=Path("/tmp/rep"),
+            path_filter="/me/logout",
+            rate=None,
+            blackbox=False,
+        )
         self.assertIn("--paths=/me/logout", argv)
         self.assertNotIn("--skipPaths", " ".join(argv))
 
@@ -194,8 +192,14 @@ class TestValidityGates(unittest.TestCase):
 
     def _result(self, **kw):
         return run.RunResult(
-            run_id="R", db_path=Path("/tmp/x.db"), report_dir=Path("/tmp/r"),
-            cats_exit_code=0, parse_stats=None, classify_result=None, **kw)
+            run_id="R",
+            db_path=Path("/tmp/x.db"),
+            report_dir=Path("/tmp/r"),
+            cats_exit_code=0,
+            parse_stats=None,
+            classify_result=None,
+            **kw,
+        )
 
     def test_clean_run_has_no_reasons(self):
         r = self._result(connection_errors=6, unauthenticated=356, total_tests=10000)
@@ -231,9 +235,7 @@ class TestValidityGates(unittest.TestCase):
 
 class TestRunId(unittest.TestCase):
     def test_format(self):
-        self.assertEqual(
-            run.run_id_for(datetime(2026, 7, 26, 22, 2, 0, tzinfo=UTC)),
-            "20260726T220200Z")
+        self.assertEqual(run.run_id_for(datetime(2026, 7, 26, 22, 2, 0, tzinfo=UTC)), "20260726T220200Z")
 
 
 # --- preflight -----------------------------------------------------------
@@ -276,16 +278,10 @@ class _LiveServer:
         self.thread.join(timeout=5)
 
 
-def _with_fake_cats(
-    bindir: Path, extra_script: str = "", version_output: str = 'echo "CATS 11.0.0-fake"'
-) -> Path:
+def _with_fake_cats(bindir: Path, extra_script: str = "", version_output: str = 'echo "CATS 11.0.0-fake"') -> Path:
     """Create a fake `cats` executable on a directory, for PATH injection."""
     script = bindir / "cats"
-    script.write_text(
-        "#!/bin/sh\n"
-        f'if [ "$1" = "--version" ]; then {version_output}; exit 0; fi\n'
-        + extra_script
-    )
+    script.write_text(f'#!/bin/sh\nif [ "$1" = "--version" ]; then {version_output}; exit 0; fi\n' + extra_script)
     script.chmod(0o755)
     return script
 
@@ -360,8 +356,7 @@ class TestPreflight(unittest.TestCase):
 
     def test_missing_cats_binary_raises(self):
         c = self._config()
-        with mock.patch("shutil.which", return_value=None), \
-                self.assertRaises(run.PreflightError) as ctx:
+        with mock.patch("shutil.which", return_value=None), self.assertRaises(run.PreflightError) as ctx:
             run.preflight(c)
         self.assertIn("cats", str(ctx.exception).lower())
 
@@ -378,8 +373,10 @@ class TestPreflight(unittest.TestCase):
         self.server.stop()
         with tempfile.TemporaryDirectory() as bindir:
             _with_fake_cats(Path(bindir))
-            with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}), \
-                    self.assertRaises(run.PreflightError) as ctx:
+            with (
+                mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}),
+                self.assertRaises(run.PreflightError) as ctx,
+            ):
                 run.preflight(c)
         self.assertIn(c.health_url, str(ctx.exception))
 
@@ -393,8 +390,10 @@ class TestPreflight(unittest.TestCase):
         c = make_config(self, CONFIG.replace("http://localhost:8080", error_server.url))
         with tempfile.TemporaryDirectory() as bindir:
             _with_fake_cats(Path(bindir))
-            with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}), \
-                    self.assertRaises(run.PreflightError) as ctx:
+            with (
+                mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}),
+                self.assertRaises(run.PreflightError) as ctx,
+            ):
                 run.preflight(c)
         message = str(ctx.exception)
         self.assertIn("404", message)
@@ -442,9 +441,7 @@ class TestExecute(unittest.TestCase):
         self.server = _LiveServer()
         self.addCleanup(self.server.stop)
         self.bindir = tempfile.mkdtemp()
-        self._path_patch = mock.patch.dict(
-            os.environ, {"PATH": f"{self.bindir}:{os.environ['PATH']}"}
-        )
+        self._path_patch = mock.patch.dict(os.environ, {"PATH": f"{self.bindir}:{os.environ['PATH']}"})
         self._path_patch.start()
         self.addCleanup(self._path_patch.stop)
 
@@ -502,8 +499,7 @@ class TestExecute(unittest.TestCase):
     def test_finished_at_stays_null_when_classify_fails(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         c = self._config()
-        with mock.patch.object(run, "classify_db", side_effect=ClassifyError("boom")), \
-                self.assertRaises(ClassifyError):
+        with mock.patch.object(run, "classify_db", side_effect=ClassifyError("boom")), self.assertRaises(ClassifyError):
             run.execute(c)
 
         db_files = list(c.results_dir.glob("cats-results-*.db"))
@@ -523,18 +519,14 @@ class TestExecute(unittest.TestCase):
 
     def test_seed_hook_failure_aborts_before_any_db_is_written(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
-        c = self._config(CONFIG.replace(
-            "identities:", "hooks:\n  seed: \"exit 5\"\nidentities:"
-        ))
+        c = self._config(CONFIG.replace("identities:", 'hooks:\n  seed: "exit 5"\nidentities:'))
         with self.assertRaises(run.HookError):
             run.execute(c)
         self.assertEqual(list(c.results_dir.glob("cats-results-*.db")), [])
 
     def test_skip_seed_bypasses_failing_seed_hook(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
-        c = self._config(CONFIG.replace(
-            "identities:", "hooks:\n  seed: \"exit 5\"\nidentities:"
-        ))
+        c = self._config(CONFIG.replace("identities:", 'hooks:\n  seed: "exit 5"\nidentities:'))
         result = run.execute(c, skip_seed=True)
         self.assertEqual(result.cats_exit_code, 0)
 
@@ -549,9 +541,7 @@ class TestExecute(unittest.TestCase):
 
     def test_post_run_hook_failure_warns_but_does_not_raise(self):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
-        c = self._config(CONFIG.replace(
-            "identities:", "hooks:\n  post_run: \"exit 6\"\nidentities:"
-        ))
+        c = self._config(CONFIG.replace("identities:", 'hooks:\n  post_run: "exit 6"\nidentities:'))
         with self.assertLogs(run.__name__, level="WARNING") as ctx:
             result = run.execute(c)
         self.assertTrue(result.db_path.exists())
@@ -571,9 +561,7 @@ class TestExecute(unittest.TestCase):
         _with_fake_cats(Path(self.bindir), _FAKE_CATS_RUN)
         with tempfile.TemporaryDirectory() as d:
             env_dump = Path(d) / "post_run_env.txt"
-            c = self._config(CONFIG.replace(
-                "identities:", f'hooks:\n  post_run: "env > {env_dump}"\nidentities:'
-            ))
+            c = self._config(CONFIG.replace("identities:", f'hooks:\n  post_run: "env > {env_dump}"\nidentities:'))
             run.execute(c)
             self.assertTrue(env_dump.exists())
             self.assertNotIn("secret-token", env_dump.read_text())
@@ -667,10 +655,12 @@ class TestHookOrder(unittest.TestCase):
     def _order(self, body_extra, **kw):
         calls = []
         c = make_config(self, CONFIG.replace("identities:", body_extra + "identities:"))
-        with mock.patch.object(run, "run_hook", side_effect=lambda n, *a, **k: calls.append(n)), \
-                mock.patch.object(run, "preflight"), \
-                mock.patch.object(run, "resolve_token", return_value="tok"), \
-                mock.patch.object(run, "subprocess") as sp:
+        with (
+            mock.patch.object(run, "run_hook", side_effect=lambda n, *a, **k: calls.append(n)),
+            mock.patch.object(run, "preflight"),
+            mock.patch.object(run, "resolve_token", return_value="tok"),
+            mock.patch.object(run, "subprocess") as sp,
+        ):
             sp.run.return_value = mock.Mock(returncode=0)
             run.execute(c, skip_parse=True, **kw)
         return calls

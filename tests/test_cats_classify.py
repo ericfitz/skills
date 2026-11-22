@@ -23,8 +23,10 @@ class TestClassifyDb(unittest.TestCase):
         self.assertEqual(result.flagged, 0)
 
     def test_rule_matching_on_json_body_path(self):
-        rules = write_rules("version: 1\nrules:\n  - id: ADDON\n    why: w\n"
-                            "    when: {json_body.error_description: {contains: enum_values}}\n")
+        rules = write_rules(
+            "version: 1\nrules:\n  - id: ADDON\n    why: w\n"
+            "    when: {json_body.error_description: {contains: enum_values}}\n"
+        )
         db = build_db([cats_json()])
         self.assertEqual(C.classify_db(db, rules, allow_5xx=False).flagged, 1)
 
@@ -153,9 +155,7 @@ class TestClassifyDb(unittest.TestCase):
         conn = sqlite3.connect(db)
         row = conn.execute("SELECT is_false_positive, fp_rule FROM tests").fetchone()
         self.assertEqual(row, (1, "VALIDATION_400"))
-        self.assertEqual(
-            conn.execute("SELECT rule_id FROM fp_rules").fetchall(), [("VALIDATION_400",)]
-        )
+        self.assertEqual(conn.execute("SELECT rule_id FROM fp_rules").fetchall(), [("VALIDATION_400",)])
 
     def test_record_from_db_unknown_id_raises(self):
         db = build_db([cats_json()])
@@ -179,9 +179,7 @@ class TestRecordEquivalence(unittest.TestCase):
         db = build_db([data])
         conn = sqlite3.connect(db)
         conn.row_factory = sqlite3.Row
-        row_id = conn.execute(
-            "SELECT id FROM tests WHERE test_id = ?", (data["testId"],)
-        ).fetchone()[0]
+        row_id = conn.execute("SELECT id FROM tests WHERE test_id = ?", (data["testId"],)).fetchone()[0]
         record_db = C.record_from_db(conn, row_id)
         return record_json, record_db
 
@@ -290,9 +288,7 @@ class TestSchemaMigration(unittest.TestCase):
         db = build_db([cats_json()])
         _downgrade_run_meta_to_prefix_schema(db)
         conn = sqlite3.connect(db)
-        self.assertNotIn(
-            "classified_at", [row[1] for row in conn.execute("PRAGMA table_info(run_meta)")]
-        )
+        self.assertNotIn("classified_at", [row[1] for row in conn.execute("PRAGMA table_info(run_meta)")])
         conn.close()
 
         result = C.classify_db(db, write_rules(ONE_RULE), allow_5xx=False)

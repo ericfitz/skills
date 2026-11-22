@@ -99,9 +99,7 @@ class TestCandidateSearch(TempTree):
         self.assertEqual([p.name for p in found], ["openapi.yaml"])
 
     def test_finds_json_openapi3(self):
-        self.write("spec.json", json.dumps(
-            {"openapi": "3.0.3", "info": {"title": "t", "version": "1"},
-             "paths": {}}))
+        self.write("spec.json", json.dumps({"openapi": "3.0.3", "info": {"title": "t", "version": "1"}, "paths": {}}))
         found = find_specs.find_candidate_files(self.root, "openapi")
         self.assertEqual([p.name for p in found], ["spec.json"])
 
@@ -125,8 +123,7 @@ class TestCandidateSearch(TempTree):
         self.write("generated/openapi.yaml", MINIMAL_OPENAPI_YAML)
         self.write("openapi.yaml", MINIMAL_OPENAPI_YAML)
         found = find_specs.find_candidate_files(self.root, "openapi")
-        self.assertEqual([str(p.relative_to(self.root)) for p in found],
-                         ["openapi.yaml"])
+        self.assertEqual([str(p.relative_to(self.root)) for p in found], ["openapi.yaml"])
 
 
 class TestVerify(TempTree):
@@ -186,14 +183,14 @@ class TestDiscoverAndMain(TempTree):
         with patch.object(find_specs.shutil, "which", lambda name: None):
             result = find_specs.discover(self.root)
         paths = [e["path"] for e in result["openapi"]]
-        self.assertEqual(paths, ["openapi.yaml", str(Path("deep/nested/openapi.yaml")),
-                                 "openapi.json"])
+        self.assertEqual(paths, ["openapi.yaml", str(Path("deep/nested/openapi.yaml")), "openapi.json"])
 
     def test_empty_tree_exits_zero_with_empty_lists(self):
         proc = subprocess.run(
-            [sys.executable, str(REPO / "openapi" / "scripts" / "find_specs.py"),
-             str(self.root)],
-            capture_output=True, text=True)
+            [sys.executable, str(REPO / "openapi" / "scripts" / "find_specs.py"), str(self.root)],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         data = json.loads(proc.stdout)
         self.assertEqual(data, {"openapi": [], "arazzo": []})
@@ -231,14 +228,17 @@ from pathlib import Path
 import yaml
 
 GLOBS = ("*.yaml", "*.yml", "*.json")
-EXCLUDE_DIRS = {".git", "node_modules", "vendor", ".venv", "venv",
-                "dist", "build", "target"}
+EXCLUDE_DIRS = {".git", "node_modules", "vendor", ".venv", "venv", "dist", "build", "target"}
 
 # kind -> regexes a real spec's version line would match (line-anchored for
 # YAML, key-quoted for JSON). Content-level check happens in verify().
 MARKERS = {
-    "openapi": [r'^\s*openapi:\s*["\']?3', r'"openapi"\s*:\s*"3',
-                r'^\s*swagger:\s*["\']?2\.0', r'"swagger"\s*:\s*"2\.0"'],
+    "openapi": [
+        r'^\s*openapi:\s*["\']?3',
+        r'"openapi"\s*:\s*"3',
+        r'^\s*swagger:\s*["\']?2\.0',
+        r'"swagger"\s*:\s*"2\.0"',
+    ],
     "arazzo": [r'^\s*arazzo:\s*["\']?1', r'"arazzo"\s*:\s*"1'],
 }
 
@@ -293,8 +293,7 @@ def _structural(doc, kind):
         return "unknown", False, "document is not a mapping"
     if kind == "openapi":
         version = doc.get("openapi") or doc.get("swagger")
-        label = ("swagger" if "swagger" in doc and "openapi" not in doc
-                 else "openapi")
+        label = "swagger" if "swagger" in doc and "openapi" not in doc else "openapi"
         if not version:
             return "unknown", False, "no openapi/swagger version field"
         marker = f"{label}-{version}"
@@ -318,8 +317,7 @@ def _external_validator(path, kind):
     for name, kinds, build in VALIDATORS:
         if kind in kinds and shutil.which(name):
             try:
-                proc = subprocess.run(build(path), capture_output=True,
-                                      text=True, timeout=60)
+                proc = subprocess.run(build(path), capture_output=True, text=True, timeout=60)
             except (subprocess.TimeoutExpired, OSError) as exc:
                 return name, None, f"{name} failed to run: {exc}"
             detail = (proc.stdout + proc.stderr).strip().splitlines()
@@ -328,13 +326,16 @@ def _external_validator(path, kind):
 
 
 def verify(path, root, kind):
-    entry = {"path": str(Path(path).resolve().relative_to(Path(root).resolve())),
-             "marker": "unknown", "valid": False,
-             "validator": "structural", "detail": ""}
+    entry = {
+        "path": str(Path(path).resolve().relative_to(Path(root).resolve())),
+        "marker": "unknown",
+        "valid": False,
+        "validator": "structural",
+        "detail": "",
+    }
     try:
         text = Path(path).read_text(encoding="utf-8", errors="replace")
-        doc = (json.loads(text) if str(path).endswith(".json")
-               else yaml.safe_load(text))
+        doc = json.loads(text) if str(path).endswith(".json") else yaml.safe_load(text)
     except (ValueError, yaml.YAMLError) as exc:
         entry["detail"] = f"parse error: {exc}".splitlines()[0]
         return entry
@@ -343,8 +344,7 @@ def verify(path, root, kind):
     if ok:
         name, verdict, vdetail = _external_validator(path, kind)
         if verdict is not None:
-            entry.update(validator=name, valid=verdict,
-                         detail=vdetail or detail)
+            entry.update(validator=name, valid=verdict, detail=vdetail or detail)
     return entry
 
 
@@ -352,18 +352,15 @@ def discover(root):
     root = Path(root)
     result = {}
     for kind in ("openapi", "arazzo"):
-        entries = [verify(p, root, kind)
-                   for p in find_candidate_files(root, kind)]
-        entries.sort(key=lambda e: (not e["valid"],
-                                    len(Path(e["path"]).parts), e["path"]))
+        entries = [verify(p, root, kind) for p in find_candidate_files(root, kind)]
+        entries.sort(key=lambda e: (not e["valid"], len(Path(e["path"]).parts), e["path"]))
         result[kind] = entries
     return result
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("root", nargs="?", default=".",
-                        help="repository root to search (default: .)")
+    parser.add_argument("root", nargs="?", default=".", help="repository root to search (default: .)")
     args = parser.parse_args(argv)
     print(json.dumps(discover(Path(args.root)), indent=2))
     return 0
@@ -485,8 +482,7 @@ class TestArazzoSkill(unittest.TestCase):
     def test_arazzo_reads_the_journeys_doc_itest_emits(self):
         # Cross-plugin consistency: same well-known path itest:design writes.
         arazzo = ARAZZO.read_text(encoding="utf-8")
-        itest = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
-            encoding="utf-8")
+        itest = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("docs/journeys.md", arazzo)
         self.assertIn("docs/journeys.md", itest)
 
@@ -508,8 +504,8 @@ class TestArazzoSkill(unittest.TestCase):
 
     def test_arazzo_references_resolve_inside_the_plugin(self):
         import re
-        for ref in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)",
-                              ARAZZO.read_text(encoding="utf-8")):
+
+        for ref in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)", ARAZZO.read_text(encoding="utf-8")):
             self.assertNotIn("..", ref)
             self.assertTrue((REPO / "openapi" / ref.lstrip("/")).exists())
 ```

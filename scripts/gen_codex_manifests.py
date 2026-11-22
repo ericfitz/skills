@@ -79,8 +79,7 @@ def generate(repo: Path) -> dict[Path, str]:
             codex_entry["category"] = entry["category"]
         codex_entry["source"] = {"source": "local", "path": source}
         entries.append(codex_entry)
-    out[repo / ".agents" / "plugins" / "marketplace.json"] = _render(
-        {"name": marketplace["name"], "plugins": entries})
+    out[repo / ".agents" / "plugins" / "marketplace.json"] = _render({"name": marketplace["name"], "plugins": entries})
     return out
 
 
@@ -95,8 +94,11 @@ def main() -> int:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 2
     if args.check:
-        drift = [path for path, content in rendered.items()
-                 if not path.is_file() or path.read_text(encoding="utf-8") != content]
+        drift = [
+            path
+            for path, content in rendered.items()
+            if not path.is_file() or path.read_text(encoding="utf-8") != content
+        ]
         if drift:
             for path in sorted(drift):
                 print(f"DRIFT: {path.relative_to(args.repo)}", file=sys.stderr)

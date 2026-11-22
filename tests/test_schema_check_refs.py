@@ -39,11 +39,13 @@ class TestResolveRefs(unittest.TestCase):
     def test_sibling_properties_merge_and_keep_the_core(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
-            resolved = resolve_refs({
-                "$ref": "core.schema.json",
-                "properties": {"details": {"type": "object",
-                                           "required": ["kind"]}},
-            }, base)
+            resolved = resolve_refs(
+                {
+                    "$ref": "core.schema.json",
+                    "properties": {"details": {"type": "object", "required": ["kind"]}},
+                },
+                base,
+            )
             self.assertIn("id", resolved["properties"])
             self.assertIn("name", resolved["properties"])
             self.assertEqual(resolved["properties"]["details"]["required"], ["kind"])
@@ -51,29 +53,34 @@ class TestResolveRefs(unittest.TestCase):
     def test_sibling_required_unions_without_duplicates(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
-            resolved = resolve_refs({
-                "$ref": "core.schema.json",
-                "required": ["name", "details"],
-            }, base)
+            resolved = resolve_refs(
+                {
+                    "$ref": "core.schema.json",
+                    "required": ["name", "details"],
+                },
+                base,
+            )
             self.assertEqual(resolved["required"], ["id", "name", "details"])
 
     def test_resolves_refs_nested_under_items(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
-            resolved = resolve_refs(
-                {"type": "array", "items": {"$ref": "core.schema.json"}}, base)
-            self.assertEqual(resolved["items"]["properties"]["id"],
-                             {"type": "string"})
+            resolved = resolve_refs({"type": "array", "items": {"$ref": "core.schema.json"}}, base)
+            self.assertEqual(resolved["items"]["properties"]["id"], {"type": "string"})
 
     def test_resolves_a_ref_inside_a_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
-            base = write_schemas(tmp, {"outer.schema.json": {
-                "type": "object",
-                "properties": {"dep": {"$ref": "core.schema.json"}},
-            }})
+            base = write_schemas(
+                tmp,
+                {
+                    "outer.schema.json": {
+                        "type": "object",
+                        "properties": {"dep": {"$ref": "core.schema.json"}},
+                    }
+                },
+            )
             resolved = resolve_refs({"$ref": "outer.schema.json"}, base)
-            self.assertEqual(resolved["properties"]["dep"]["required"],
-                             ["id", "name"])
+            self.assertEqual(resolved["properties"]["dep"]["required"], ["id", "name"])
 
     def test_remote_ref_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -90,10 +97,8 @@ class TestResolveRefs(unittest.TestCase):
     def test_circular_ref_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            (base / "a.schema.json").write_text(
-                json.dumps({"$ref": "b.schema.json"}), encoding="utf-8")
-            (base / "b.schema.json").write_text(
-                json.dumps({"$ref": "a.schema.json"}), encoding="utf-8")
+            (base / "a.schema.json").write_text(json.dumps({"$ref": "b.schema.json"}), encoding="utf-8")
+            (base / "b.schema.json").write_text(json.dumps({"$ref": "a.schema.json"}), encoding="utf-8")
             with self.assertRaises(ValueError):
                 resolve_refs({"$ref": "a.schema.json"}, base)
 
@@ -103,18 +108,15 @@ class TestResolveRefs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             (base / "sub").mkdir()
-            (base / "shared.schema.json").write_text(
-                json.dumps({"$ref": "sub/shared.schema.json"}), encoding="utf-8")
-            (base / "sub" / "shared.schema.json").write_text(
-                json.dumps({"type": "string"}), encoding="utf-8")
+            (base / "shared.schema.json").write_text(json.dumps({"$ref": "sub/shared.schema.json"}), encoding="utf-8")
+            (base / "sub" / "shared.schema.json").write_text(json.dumps({"type": "string"}), encoding="utf-8")
             resolved = resolve_refs({"$ref": "shared.schema.json"}, base)
             self.assertEqual(resolved, {"type": "string"})
 
     def test_self_ref_is_still_circular(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            (base / "a.schema.json").write_text(
-                json.dumps({"$ref": "a.schema.json"}), encoding="utf-8")
+            (base / "a.schema.json").write_text(json.dumps({"$ref": "a.schema.json"}), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "circular"):
                 resolve_refs({"$ref": "a.schema.json"}, base)
 
@@ -132,8 +134,7 @@ class TestResolveRefs(unittest.TestCase):
                     resolve_refs({"$ref": bad}, base)
 
     def test_absolute_path_ref_is_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp, \
-                tempfile.TemporaryDirectory() as other:
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as other:
             base = write_schemas(tmp)
             outside = Path(other) / "x.schema.json"
             outside.write_text(json.dumps({"type": "string"}), encoding="utf-8")
@@ -153,7 +154,8 @@ class TestResolveRefs(unittest.TestCase):
             base = write_schemas(tmp)
             (base / "sub").mkdir()
             (base / "sub" / "inner.schema.json").write_text(
-                json.dumps({"$ref": "../core.schema.json"}), encoding="utf-8")
+                json.dumps({"$ref": "../core.schema.json"}), encoding="utf-8"
+            )
             resolved = resolve_refs({"$ref": "sub/inner.schema.json"}, base)
             self.assertEqual(resolved, CORE)
 
@@ -163,19 +165,22 @@ class TestResolveRefs(unittest.TestCase):
             (root / "contracts" / "sub").mkdir(parents=True)
             (root / "secret.json").write_text("{}", encoding="utf-8")
             (root / "contracts" / "sub" / "inner.schema.json").write_text(
-                json.dumps({"$ref": "../../secret.json"}), encoding="utf-8")
+                json.dumps({"$ref": "../../secret.json"}), encoding="utf-8"
+            )
             with self.assertRaisesRegex(ValueError, "outside"):
-                resolve_refs({"$ref": "sub/inner.schema.json"},
-                             root / "contracts")
+                resolve_refs({"$ref": "sub/inner.schema.json"}, root / "contracts")
 
     def test_other_sibling_keys_override_the_target_outright(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
-            resolved = resolve_refs({
-                "$ref": "core.schema.json",
-                "type": "array",
-                "description": "added",
-            }, base)
+            resolved = resolve_refs(
+                {
+                    "$ref": "core.schema.json",
+                    "type": "array",
+                    "description": "added",
+                },
+                base,
+            )
             self.assertEqual(resolved["type"], "array")
             self.assertEqual(resolved["description"], "added")
             self.assertEqual(resolved["required"], ["id", "name"])
@@ -186,8 +191,7 @@ class TestValidateWithBaseDir(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
             schema = {"type": "array", "items": {"$ref": "core.schema.json"}}
-            self.assertEqual(
-                validate([{"id": "a", "name": "b"}], schema, base_dir=base), [])
+            self.assertEqual(validate([{"id": "a", "name": "b"}], schema, base_dir=base), [])
 
     def test_base_dir_reports_violations_inside_the_referenced_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -198,8 +202,7 @@ class TestValidateWithBaseDir(unittest.TestCase):
             self.assertIn("name", errors[0])
 
     def test_without_base_dir_behaviour_is_unchanged(self):
-        schema = {"type": "object", "required": ["a"],
-                  "properties": {"a": {"type": "string"}}}
+        schema = {"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}}
         self.assertEqual(validate({"a": "x"}, schema), [])
         self.assertEqual(len(validate({}, schema)), 1)
 

@@ -32,19 +32,36 @@ def cats_json(**over: Any) -> dict[str, Any]:
     `cats_json(response={**cats_json()["response"], "responseCode": 500})`.
     """
     data: dict[str, Any] = {
-        "testId": "Test 1", "traceId": "t-1", "fuzzer": "HappyPath",
-        "path": "/things", "contractPath": "/things", "fullRequestPath": "/things",
-        "scenario": "happy", "expectedResult": "Should return 200",
-        "result": "error", "resultReason": "Unexpected Response Code: 400",
-        "resultDetails": "details", "server": "http://h",
-        "request": {"httpMethod": "POST", "url": "http://h/things",
-                     "timestamp": "2026-07-26T00:00:00Z", "payload": '{"a":1}',
-                     "headers": [{"key": "Accept", "value": "application/json"}]},
-        "response": {"httpMethod": "POST", "responseCode": 400, "responseTimeInMs": 12,
-                      "numberOfWordsInResponse": 3, "numberOfLinesInResponse": 1,
-                      "contentLengthInBytes": 42, "responseContentType": "application/json",
-                      "jsonBody": {"error": "bad", "error_description": "bad enum_values"},
-                      "headers": [{"key": "Content-Type", "value": "application/json"}]},
+        "testId": "Test 1",
+        "traceId": "t-1",
+        "fuzzer": "HappyPath",
+        "path": "/things",
+        "contractPath": "/things",
+        "fullRequestPath": "/things",
+        "scenario": "happy",
+        "expectedResult": "Should return 200",
+        "result": "error",
+        "resultReason": "Unexpected Response Code: 400",
+        "resultDetails": "details",
+        "server": "http://h",
+        "request": {
+            "httpMethod": "POST",
+            "url": "http://h/things",
+            "timestamp": "2026-07-26T00:00:00Z",
+            "payload": '{"a":1}',
+            "headers": [{"key": "Accept", "value": "application/json"}],
+        },
+        "response": {
+            "httpMethod": "POST",
+            "responseCode": 400,
+            "responseTimeInMs": 12,
+            "numberOfWordsInResponse": 3,
+            "numberOfLinesInResponse": 1,
+            "contentLengthInBytes": 42,
+            "responseContentType": "application/json",
+            "jsonBody": {"error": "bad", "error_description": "bad enum_values"},
+            "headers": [{"key": "Content-Type", "value": "application/json"}],
+        },
     }
     data.update(over)
     return data
@@ -125,7 +142,4 @@ def write_rules(text: str) -> list[R.Rule]:
     return R.load_rules(path)
 
 
-ONE_RULE = (
-    "version: 1\nrules:\n  - id: VALIDATION_400\n    why: correct rejection\n"
-    "    when: {response_code: 400}\n"
-)
+ONE_RULE = "version: 1\nrules:\n  - id: VALIDATION_400\n    why: correct rejection\n    when: {response_code: 400}\n"

@@ -151,33 +151,42 @@ from repobuilder import build_repo, git_init
 class TestWalkRepo(unittest.TestCase):
     def test_lists_files_relative_and_sorted(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {
-                "b.py": "x = 1\n",
-                "a.py": "y = 2\n",
-                "pkg/c.py": "z = 3\n",
-            })
+            root = build_repo(
+                tmp,
+                {
+                    "b.py": "x = 1\n",
+                    "a.py": "y = 2\n",
+                    "pkg/c.py": "z = 3\n",
+                },
+            )
             files, method = walk_repo(root)
             self.assertEqual(files, ["a.py", "b.py", "pkg/c.py"])
             self.assertEqual(method, "walk")
 
     def test_skips_noise_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {
-                "app.py": "x = 1\n",
-                "node_modules/left-pad/index.js": "//\n",
-                ".venv/lib/thing.py": "x = 1\n",
-                "dist/bundle.js": "//\n",
-            })
+            root = build_repo(
+                tmp,
+                {
+                    "app.py": "x = 1\n",
+                    "node_modules/left-pad/index.js": "//\n",
+                    ".venv/lib/thing.py": "x = 1\n",
+                    "dist/bundle.js": "//\n",
+                },
+            )
             files, _ = walk_repo(root)
             self.assertEqual(files, ["app.py"])
 
     def test_uses_git_listing_and_honors_gitignore(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {
-                ".gitignore": "secret.txt\n",
-                "app.py": "x = 1\n",
-                "secret.txt": "shh\n",
-            })
+            root = build_repo(
+                tmp,
+                {
+                    ".gitignore": "secret.txt\n",
+                    "app.py": "x = 1\n",
+                    "secret.txt": "shh\n",
+                },
+            )
             git_init(root)
             files, method = walk_repo(root)
             self.assertEqual(method, "git")
@@ -214,10 +223,27 @@ import subprocess
 from pathlib import Path
 
 SKIP_DIRS = {
-    ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "env",
-    "vendor", "dist", "build", "target", "out", "__pycache__",
-    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".next",
-    ".gradle", "site-packages", ".idea",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    ".venv",
+    "venv",
+    "env",
+    "vendor",
+    "dist",
+    "build",
+    "target",
+    "out",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".next",
+    ".gradle",
+    "site-packages",
+    ".idea",
 }
 
 
@@ -229,9 +255,11 @@ def _git_files(root):
     """Return git's view of the repo, or None if root is not a usable git repo."""
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--cached", "--others",
-             "--exclude-standard"],
-            capture_output=True, text=True, timeout=30, check=False,
+            ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -383,24 +411,82 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'inventorylib.language
 from pathlib import PurePosixPath
 
 EXT_LANGUAGE = {
-    ".py": "python", ".go": "go", ".rs": "rust", ".rb": "ruby",
-    ".ts": "typescript", ".tsx": "typescript",
-    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
-    ".java": "java", ".kt": "kotlin", ".kts": "kotlin",
-    ".cs": "csharp", ".php": "php", ".swift": "swift", ".scala": "scala",
-    ".ex": "elixir", ".exs": "elixir", ".erl": "erlang",
-    ".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".hpp": "cpp",
-    ".sh": "shell", ".bash": "shell", ".sql": "sql", ".lua": "lua",
-    ".dart": "dart", ".clj": "clojure", ".hs": "haskell",
+    ".py": "python",
+    ".go": "go",
+    ".rs": "rust",
+    ".rb": "ruby",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".mjs": "javascript",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    ".cs": "csharp",
+    ".php": "php",
+    ".swift": "swift",
+    ".scala": "scala",
+    ".ex": "elixir",
+    ".exs": "elixir",
+    ".erl": "erlang",
+    ".c": "c",
+    ".h": "c",
+    ".cpp": "cpp",
+    ".cc": "cpp",
+    ".hpp": "cpp",
+    ".sh": "shell",
+    ".bash": "shell",
+    ".sql": "sql",
+    ".lua": "lua",
+    ".dart": "dart",
+    ".clj": "clojure",
+    ".hs": "haskell",
 }
 
 IGNORABLE_EXTS = {
-    ".md", ".rst", ".txt", ".json", ".yml", ".yaml", ".toml", ".ini",
-    ".cfg", ".conf", ".lock", ".csv", ".tsv", ".xml", ".html", ".htm",
-    ".css", ".scss", ".less", ".svg", ".png", ".jpg", ".jpeg", ".gif",
-    ".ico", ".webp", ".pdf", ".woff", ".woff2", ".ttf", ".eot",
-    ".gitignore", ".gitattributes", ".editorconfig", ".env", ".example",
-    ".mod", ".sum", ".log", ".zip", ".gz", ".tar",
+    ".md",
+    ".rst",
+    ".txt",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".lock",
+    ".csv",
+    ".tsv",
+    ".xml",
+    ".html",
+    ".htm",
+    ".css",
+    ".scss",
+    ".less",
+    ".svg",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".webp",
+    ".pdf",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".gitignore",
+    ".gitattributes",
+    ".editorconfig",
+    ".env",
+    ".example",
+    ".mod",
+    ".sum",
+    ".log",
+    ".zip",
+    ".gz",
+    ".tar",
 }
 
 
@@ -474,9 +560,12 @@ from inventorylib.manifests import detect_manifests
 class TestDetectManifests(unittest.TestCase):
     def test_detects_go_module(self):
         found = detect_manifests(["go.mod", "main.go"])
-        self.assertEqual(found, [
-            {"path": "go.mod", "ecosystem": "go", "package_manager": "go"},
-        ])
+        self.assertEqual(
+            found,
+            [
+                {"path": "go.mod", "ecosystem": "go", "package_manager": "go"},
+            ],
+        )
 
     def test_lockfile_refines_package_manager(self):
         found = detect_manifests(["pyproject.toml", "uv.lock"])
@@ -495,11 +584,14 @@ class TestDetectManifests(unittest.TestCase):
         self.assertIsNone(found[0]["package_manager"])
 
     def test_monorepo_reports_each_manifest_sorted(self):
-        found = detect_manifests([
-            "web/package.json", "web/yarn.lock", "api/go.mod",
-        ])
-        self.assertEqual([entry["path"] for entry in found],
-                         ["api/go.mod", "web/package.json"])
+        found = detect_manifests(
+            [
+                "web/package.json",
+                "web/yarn.lock",
+                "api/go.mod",
+            ]
+        )
+        self.assertEqual([entry["path"] for entry in found], ["api/go.mod", "web/package.json"])
         self.assertEqual(found[1]["package_manager"], "yarn")
 
     def test_non_manifest_files_ignored(self):
@@ -600,11 +692,13 @@ def detect_manifests(paths):
             for lock_ecosystem, manager in locks_by_dir.get(parsed.parent.as_posix(), set())
             if lock_ecosystem == ecosystem
         )
-        found.append({
-            "path": path,
-            "ecosystem": ecosystem,
-            "package_manager": siblings[0] if siblings else default_manager,
-        })
+        found.append(
+            {
+                "path": path,
+                "ecosystem": ecosystem,
+                "package_manager": siblings[0] if siblings else default_manager,
+            }
+        )
     return found
 ```
 
@@ -692,16 +786,20 @@ class TestClassifyTestFiles(unittest.TestCase):
         self.assertIn("dir:integration", record["signals"])
 
     def test_pytest_marker_detected_from_content(self):
-        [record] = classify({
-            "tests/test_api.py": "import pytest\n\n@pytest.mark.integration\ndef test_x(): pass\n",
-        })
+        [record] = classify(
+            {
+                "tests/test_api.py": "import pytest\n\n@pytest.mark.integration\ndef test_x(): pass\n",
+            }
+        )
         self.assertEqual(record["kind"], "integration")
         self.assertIn("marker:pytest.mark.integration", record["signals"])
 
     def test_go_build_tag_detected(self):
-        [record] = classify({
-            "api/client_test.go": "//go:build integration\n\npackage api\n",
-        })
+        [record] = classify(
+            {
+                "api/client_test.go": "//go:build integration\n\npackage api\n",
+            }
+        )
         self.assertEqual(record["kind"], "integration")
         self.assertIn("buildtag:integration", record["signals"])
         self.assertEqual(record["language"], "go")
@@ -764,9 +862,21 @@ from pathlib import Path, PurePosixPath
 from inventorylib.languages import EXT_LANGUAGE
 
 TEST_DIR_NAMES = {
-    "test", "tests", "spec", "specs", "__tests__", "testing",
-    "e2e", "integration", "it", "itest", "functional", "acceptance",
-    "contract", "endtoend", "end_to_end",
+    "test",
+    "tests",
+    "spec",
+    "specs",
+    "__tests__",
+    "testing",
+    "e2e",
+    "integration",
+    "it",
+    "itest",
+    "functional",
+    "acceptance",
+    "contract",
+    "endtoend",
+    "end_to_end",
 }
 
 INTEGRATION_DIRS = {"integration", "it", "itest", "functional", "acceptance", "contract"}
@@ -774,14 +884,20 @@ E2E_DIRS = {"e2e", "endtoend", "end_to_end"}
 
 # (glob, language)
 NAME_PATTERNS = (
-    ("test_*.py", "python"), ("*_test.py", "python"),
+    ("test_*.py", "python"),
+    ("*_test.py", "python"),
     ("*_test.go", "go"),
-    ("*.test.ts", "typescript"), ("*.test.tsx", "typescript"),
-    ("*.spec.ts", "typescript"), ("*.spec.tsx", "typescript"),
-    ("*.test.js", "javascript"), ("*.spec.js", "javascript"),
-    ("*Test.java", "java"), ("*Tests.java", "java"),
+    ("*.test.ts", "typescript"),
+    ("*.test.tsx", "typescript"),
+    ("*.spec.ts", "typescript"),
+    ("*.spec.tsx", "typescript"),
+    ("*.test.js", "javascript"),
+    ("*.spec.js", "javascript"),
+    ("*Test.java", "java"),
+    ("*Tests.java", "java"),
     ("*Tests.cs", "csharp"),
-    ("*_spec.rb", "ruby"), ("*_test.rb", "ruby"),
+    ("*_spec.rb", "ruby"),
+    ("*_test.rb", "ruby"),
     ("*_test.rs", "rust"),
     ("*_test.exs", "elixir"),
 )
@@ -790,8 +906,7 @@ NAME_PATTERNS = (
 CONTENT_MARKERS = (
     ("marker:pytest.mark.integration", "integration", ("pytest.mark.integration",)),
     ("marker:pytest.mark.e2e", "e2e", ("pytest.mark.e2e",)),
-    ("buildtag:integration", "integration",
-     ("//go:build integration", "// +build integration")),
+    ("buildtag:integration", "integration", ("//go:build integration", "// +build integration")),
     ("buildtag:e2e", "e2e", ("//go:build e2e", "// +build e2e")),
     ("marker:testcontainers", "integration", ("testcontainers",)),
 )
@@ -813,9 +928,7 @@ def _is_source(path):
 def _name_signals(path):
     """Return (signals, language) for path, or ([], None) if it is not a test file."""
     parsed = PurePosixPath(path)
-    signals = [
-        "dir:%s" % part for part in parsed.parts[:-1] if part in TEST_DIR_NAMES
-    ]
+    signals = ["dir:%s" % part for part in parsed.parts[:-1] if part in TEST_DIR_NAMES]
     language = None
     for pattern, pattern_language in NAME_PATTERNS:
         if fnmatch.fnmatch(parsed.name, pattern):
@@ -832,10 +945,7 @@ def _content_signals(full_path, max_bytes):
         text = Path(full_path).read_text(encoding="utf-8", errors="replace")[:max_bytes]
     except OSError:
         return []
-    return [
-        name for name, _, needles in CONTENT_MARKERS
-        if any(needle in text for needle in needles)
-    ]
+    return [name for name, _, needles in CONTENT_MARKERS if any(needle in text for needle in needles)]
 
 
 def _resolve_kind(signals):
@@ -861,12 +971,14 @@ def classify_test_files(root, paths, max_bytes=4096):
         if not signals:
             continue
         signals = signals + _content_signals(root / path, max_bytes)
-        records.append({
-            "path": path,
-            "language": language,
-            "kind": _resolve_kind(signals),
-            "signals": sorted(set(signals)),
-        })
+        records.append(
+            {
+                "path": path,
+                "language": language,
+                "kind": _resolve_kind(signals),
+                "signals": sorted(set(signals)),
+            }
+        )
     return records
 
 
@@ -926,16 +1038,14 @@ def infra(files):
 class TestDetectInfra(unittest.TestCase):
     def test_github_workflows_are_ci(self):
         found = infra({".github/workflows/test.yml": "on: push\n"})
-        self.assertEqual(found["ci"], [{"path": ".github/workflows/test.yml",
-                                        "system": "github-actions"}])
+        self.assertEqual(found["ci"], [{"path": ".github/workflows/test.yml", "system": "github-actions"}])
 
     def test_gitlab_ci_detected(self):
         found = infra({".gitlab-ci.yml": "stages: [test]\n"})
         self.assertEqual(found["ci"][0]["system"], "gitlab-ci")
 
     def test_compose_and_dockerfile_detected(self):
-        found = infra({"Dockerfile": "FROM scratch\n",
-                       "docker-compose.yml": "services: {}\n"})
+        found = infra({"Dockerfile": "FROM scratch\n", "docker-compose.yml": "services: {}\n"})
         kinds = {entry["kind"] for entry in found["containers"]}
         self.assertEqual(kinds, {"dockerfile", "compose"})
 
@@ -964,24 +1074,20 @@ class TestDetectInfra(unittest.TestCase):
         self.assertEqual(paths, {"cmd/server/main.go", "manage.py"})
 
     def test_nested_index_is_a_barrel_not_an_entrypoint(self):
-        found = infra({"index.js": "run()\n",
-                       "src/components/Button/index.ts": "export * from './Button'\n"})
+        found = infra({"index.js": "run()\n", "src/components/Button/index.ts": "export * from './Button'\n"})
         paths = {entry["path"] for entry in found["entrypoints"]}
         self.assertEqual(paths, {"index.js"})
 
     def test_sam_template_detected_by_transform(self):
-        found = infra({"template.yaml":
-                       "Transform: AWS::Serverless-2016-10-31\nResources: {}\n"})
+        found = infra({"template.yaml": "Transform: AWS::Serverless-2016-10-31\nResources: {}\n"})
         self.assertEqual(found["iac"][0]["kind"], "sam")
 
     def test_plain_cloudformation_is_not_called_sam(self):
-        found = infra({"infra/template.yaml":
-                       "AWSTemplateFormatVersion: '2010-09-09'\nResources: {}\n"})
+        found = infra({"infra/template.yaml": "AWSTemplateFormatVersion: '2010-09-09'\nResources: {}\n"})
         self.assertEqual(found["iac"][0]["kind"], "cloudformation")
 
     def test_issue_form_template_is_not_iac(self):
-        found = infra({".github/ISSUE_TEMPLATE/template.yml":
-                       "name: Bug report\nbody: []\n"})
+        found = infra({".github/ISSUE_TEMPLATE/template.yml": "name: Bug report\nbody: []\n"})
         self.assertEqual(found["iac"], [])
 
     def test_documentation_is_not_this_modules_job(self):
@@ -1056,8 +1162,17 @@ TEST_CONFIG_FILES = {
 }
 
 ENTRYPOINT_NAMES = {
-    "main.py", "__main__.py", "manage.py", "app.py", "wsgi.py", "asgi.py",
-    "main.go", "main.rs", "Program.cs", "main.ts", "server.js",
+    "main.py",
+    "__main__.py",
+    "manage.py",
+    "app.py",
+    "wsgi.py",
+    "asgi.py",
+    "main.go",
+    "main.rs",
+    "Program.cs",
+    "main.ts",
+    "server.js",
 }
 
 # index.* is an entrypoint only at the repo root, where it is npm's default
@@ -1068,9 +1183,14 @@ ROOT_ONLY_ENTRYPOINTS = {"index.ts", "index.js"}
 
 # ordered: first substring found in the command wins
 TEST_COMMAND_FRAMEWORKS = (
-    ("vitest", "vitest"), ("jest", "jest"), ("playwright", "playwright"),
-    ("mocha", "mocha"), ("ava", "ava"), ("cypress", "cypress"),
-    ("pytest", "pytest"), ("go test", "go-test"),
+    ("vitest", "vitest"),
+    ("jest", "jest"),
+    ("playwright", "playwright"),
+    ("mocha", "mocha"),
+    ("ava", "ava"),
+    ("cypress", "cypress"),
+    ("pytest", "pytest"),
+    ("go test", "go-test"),
 )
 
 
@@ -1148,19 +1268,19 @@ def detect_infra(root, paths):
             iac.append({"path": path, "kind": IAC_EXTS[parsed.suffix]})
 
         if name in TEST_CONFIG_FILES:
-            test_config.append({
-                "path": path,
-                "framework": TEST_CONFIG_FILES[name],
-                "command": None,
-            })
+            test_config.append(
+                {
+                    "path": path,
+                    "framework": TEST_CONFIG_FILES[name],
+                    "command": None,
+                }
+            )
         elif name == "package.json":
             entry = _package_json_test_config(root, path)
             if entry:
                 test_config.append(entry)
 
-        if name in ENTRYPOINT_NAMES or (
-            name in ROOT_ONLY_ENTRYPOINTS and parsed.parent.as_posix() == "."
-        ):
+        if name in ENTRYPOINT_NAMES or (name in ROOT_ONLY_ENTRYPOINTS and parsed.parent.as_posix() == "."):
             entrypoints.append({"path": path, "language_hint": parsed.suffix})
 
     return {
@@ -1228,14 +1348,16 @@ def git_commit_all(base, message="init"):
     """Commit everything under base. Requires git_init to have run. Returns base."""
     base = Path(base)
     env = {
-        "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.com",
-        "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.com",
-        "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_AUTHOR_NAME": "test",
+        "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "test",
+        "GIT_COMMITTER_EMAIL": "test@example.com",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
         "PATH": os.environ.get("PATH", ""),
     }
     subprocess.run(["git", "-C", str(base), "add", "-A"], check=True, env=env)
-    subprocess.run(["git", "-C", str(base), "commit", "-q", "-m", message],
-                   check=True, env=env)
+    subprocess.run(["git", "-C", str(base), "commit", "-q", "-m", message], check=True, env=env)
     return base
 ```
 
@@ -1312,14 +1434,15 @@ class TestGuessDocType(unittest.TestCase):
 
 class TestDetectDocs(unittest.TestCase):
     def test_collects_named_docs_and_doc_directories(self):
-        found = census({
-            "README.md": "# x\n",
-            "docs/guide.md": "# y\n",
-            "specs/auth.md": "# z\n",
-            "src/app.py": "x = 1\n",
-        })
-        self.assertEqual([d["path"] for d in found["docs"]],
-                         ["README.md", "docs/guide.md", "specs/auth.md"])
+        found = census(
+            {
+                "README.md": "# x\n",
+                "docs/guide.md": "# y\n",
+                "specs/auth.md": "# z\n",
+                "src/app.py": "x = 1\n",
+            }
+        )
+        self.assertEqual([d["path"] for d in found["docs"]], ["README.md", "docs/guide.md", "specs/auth.md"])
 
     def test_markdown_beside_code_is_not_documentation(self):
         found = census({"src/notes.md": "# z\n"})
@@ -1355,11 +1478,11 @@ class TestDetectDocs(unittest.TestCase):
         self.assertEqual(stamps[1:], [None, None])
 
     def test_doc_sites_detected(self):
-        found = census({"mkdocs.yml": "site_name: x\n",
-                        "web/docusaurus.config.js": "module.exports = {}\n"})
+        found = census({"mkdocs.yml": "site_name: x\n", "web/docusaurus.config.js": "module.exports = {}\n"})
         self.assertEqual(
             [(s["path"], s["generator"]) for s in found["docs_sites"]],
-            [("mkdocs.yml", "mkdocs"), ("web/docusaurus.config.js", "docusaurus")])
+            [("mkdocs.yml", "mkdocs"), ("web/docusaurus.config.js", "docusaurus")],
+        )
 
     def test_sphinx_conf_counts_only_inside_a_doc_directory(self):
         found = census({"docs/conf.py": "project = 'x'\n", "src/conf.py": "X = 1\n"})
@@ -1402,21 +1525,47 @@ import subprocess
 from pathlib import Path, PurePosixPath
 
 DOC_TYPES = (
-    "prd", "requirements", "spec", "design", "architecture", "adr",
-    "runbook", "api_reference", "user_guide", "tutorial", "readme",
-    "changelog", "unknown",
+    "prd",
+    "requirements",
+    "spec",
+    "design",
+    "architecture",
+    "adr",
+    "runbook",
+    "api_reference",
+    "user_guide",
+    "tutorial",
+    "readme",
+    "changelog",
+    "unknown",
 )
 
 DOC_EXTS = {".md", ".rst", ".adoc", ".txt"}
 
 DOC_DIRS = {
-    "docs", "doc", "documentation", "adr", "adrs", "decisions",
-    "rfc", "rfcs", "spec", "specs", "design", "wiki", "notes",
+    "docs",
+    "doc",
+    "documentation",
+    "adr",
+    "adrs",
+    "decisions",
+    "rfc",
+    "rfcs",
+    "spec",
+    "specs",
+    "design",
+    "wiki",
+    "notes",
 }
 
 DOC_NAMES = {
-    "README.md", "README.rst", "README.txt",
-    "CONTRIBUTING.md", "ARCHITECTURE.md", "CHANGELOG.md", "CHANGELOG.rst",
+    "README.md",
+    "README.rst",
+    "README.txt",
+    "CONTRIBUTING.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
+    "CHANGELOG.rst",
 }
 
 STEM_TYPES = {
@@ -1510,7 +1659,10 @@ def _git_available(root):
     try:
         proc = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return False
@@ -1521,7 +1673,10 @@ def _git_last_modified(root, path):
     try:
         proc = subprocess.run(
             ["git", "-C", str(root), "log", "-1", "--format=%cI", "--", path],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -1568,12 +1723,14 @@ def detect_docs(root, paths, max_git_lookups=500):
             lookups += 1
         else:
             last_modified = None
-        docs.append({
-            "path": path,
-            "doc_type_guess": guess_doc_type(path),
-            "size": _size(root, path),
-            "last_modified": last_modified,
-        })
+        docs.append(
+            {
+                "path": path,
+                "doc_type_guess": guess_doc_type(path),
+                "size": _size(root, path),
+                "last_modified": last_modified,
+            }
+        )
     return {"docs": docs, "docs_sites": _doc_sites(paths)}
 ```
 
@@ -1646,43 +1803,50 @@ class TestCoverageConfidence(unittest.TestCase):
         self.assertEqual(coverage_confidence([], [{"path": "go.mod"}], [], 3), "low")
 
     def test_no_manifests_is_low(self):
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [], [], 3), "low")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [], [], 3), "low")
 
     def test_mostly_classified_is_high(self):
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], [], 100),
-            "high")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], [], 100), "high")
 
     def test_many_unclassified_is_partial(self):
         self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
-                                ["a.zig"] * 20, 100),
-            "partial")
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], ["a.zig"] * 20, 100), "partial"
+        )
 
     def test_share_of_exactly_five_percent_is_still_high(self):
         """The binding rule says at most 5%; the boundary belongs to high."""
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
-                                ["a.zig"] * 5, 100),
-            "high")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], ["a.zig"] * 5, 100), "high")
 
     def test_share_just_above_five_percent_is_partial(self):
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
-                                ["a.zig"] * 6, 100),
-            "partial")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], ["a.zig"] * 6, 100), "partial")
 
 
 class TestBuildInventory(unittest.TestCase):
     def test_has_all_required_keys(self):
         found = inventory(PY_REPO)
-        self.assertEqual(set(found), {
-            "root", "listing_method", "languages", "manifests", "test_files",
-            "test_dirs", "test_config", "ci", "containers", "iac",
-            "entrypoints", "docs", "docs_total", "docs_sites", "unclassified",
-            "unclassified_total", "coverage_confidence", "inventory_version",
-        })
+        self.assertEqual(
+            set(found),
+            {
+                "root",
+                "listing_method",
+                "languages",
+                "manifests",
+                "test_files",
+                "test_dirs",
+                "test_config",
+                "ci",
+                "containers",
+                "iac",
+                "entrypoints",
+                "docs",
+                "docs_total",
+                "docs_sites",
+                "unclassified",
+                "unclassified_total",
+                "coverage_confidence",
+                "inventory_version",
+            },
+        )
 
     def test_root_is_absolute_and_paths_are_relative(self):
         found = inventory(PY_REPO)
@@ -1714,15 +1878,16 @@ class TestBuildInventory(unittest.TestCase):
     def test_infra_classified_files_are_not_unclassified(self):
         """The inventory must not contradict itself: recognized IaC is not
         unknown, and confidence does not degrade for understood files."""
-        found = inventory({
-            "pyproject.toml": "[project]\nname = 'demo'\n",
-            "uv.lock": "version = 1\n",
-            "app.py": "x = 1\n",
-            "infra/main.tf": "resource {}\n",
-            "infra/vars.tfvars": "v = 1\n",
-        })
-        self.assertEqual([r["path"] for r in found["iac"]],
-                         ["infra/main.tf", "infra/vars.tfvars"])
+        found = inventory(
+            {
+                "pyproject.toml": "[project]\nname = 'demo'\n",
+                "uv.lock": "version = 1\n",
+                "app.py": "x = 1\n",
+                "infra/main.tf": "resource {}\n",
+                "infra/vars.tfvars": "v = 1\n",
+            }
+        )
+        self.assertEqual([r["path"] for r in found["iac"]], ["infra/main.tf", "infra/vars.tfvars"])
         self.assertEqual(found["unclassified"], [])
         self.assertEqual(found["coverage_confidence"], "high")
 
@@ -1738,8 +1903,7 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(found["coverage_confidence"], "partial")
 
     def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
-        found = inventory({"main.zig": "pub fn main() void {}\n",
-                           "build.zig": "pub fn build() void {}\n"})
+        found = inventory({"main.zig": "pub fn main() void {}\n", "build.zig": "pub fn build() void {}\n"})
         self.assertEqual(found["languages"], [])
         self.assertEqual(found["manifests"], [])
         self.assertEqual(found["coverage_confidence"], "low")
@@ -1809,8 +1973,7 @@ def build_inventory(root):
     # repo the census fully understood — a self-contradictory inventory.
     known = {
         record["path"]
-        for section in (infra["ci"], infra["containers"], infra["iac"],
-                        infra["test_config"], infra["entrypoints"])
+        for section in (infra["ci"], infra["containers"], infra["iac"], infra["test_config"], infra["entrypoints"])
         for record in section
     }
     unclassified = [p for p in unclassified if p not in known]
@@ -1833,8 +1996,7 @@ def build_inventory(root):
         "docs_sites": docs["docs_sites"],
         "unclassified": sorted(unclassified)[:UNCLASSIFIED_LIMIT],
         "unclassified_total": len(unclassified),
-        "coverage_confidence": coverage_confidence(
-            languages, manifests, unclassified, len(paths)),
+        "coverage_confidence": coverage_confidence(languages, manifests, unclassified, len(paths)),
     }
 ```
 
@@ -1912,8 +2074,7 @@ class TestCli(unittest.TestCase):
             _, first, _ = run([str(root)])
             _, second, _ = run([str(root)])
         self.assertEqual(first, second)
-        self.assertEqual(
-            first, json.dumps(json.loads(first), indent=2, sort_keys=True) + "\n")
+        self.assertEqual(first, json.dumps(json.loads(first), indent=2, sort_keys=True) + "\n")
 
     def test_indent_flag_changes_formatting(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1973,14 +2134,11 @@ from inventorylib.report import build_inventory
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="profile_inventory.py",
-        description="Emit a deterministic JSON inventory of a repository.")
-    parser.add_argument("path", nargs="?", default=".",
-                        help="repo root to inventory (default: current directory)")
-    parser.add_argument("--json", action="store_true",
-                        help="emit JSON (default; accepted for explicitness)")
-    parser.add_argument("--indent", type=int, default=2,
-                        help="JSON indent; 0 for compact output")
+        prog="profile_inventory.py", description="Emit a deterministic JSON inventory of a repository."
+    )
+    parser.add_argument("path", nargs="?", default=".", help="repo root to inventory (default: current directory)")
+    parser.add_argument("--json", action="store_true", help="emit JSON (default; accepted for explicitness)")
+    parser.add_argument("--indent", type=int, default=2, help="JSON indent; 0 for compact output")
     args = parser.parse_args(argv)
 
     root = Path(args.path)
@@ -2059,8 +2217,7 @@ CONTRACTS = REPO / "profile" / "references" / "contracts"
 
 class TestValidator(unittest.TestCase):
     def test_accepts_valid_object(self):
-        schema = {"type": "object", "required": ["a"],
-                  "properties": {"a": {"type": "string"}}}
+        schema = {"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}}
         self.assertEqual(validate({"a": "x"}, schema), [])
 
     def test_reports_missing_required_property(self):
@@ -2091,9 +2248,10 @@ class TestValidator(unittest.TestCase):
 class TestProfileContracts(unittest.TestCase):
     def test_every_schema_is_valid_json_and_has_required_metadata(self):
         schemas = sorted(CONTRACTS.glob("*.schema.json"))
-        self.assertEqual([p.name for p in schemas],
-                         ["docs.schema.json", "journeys.schema.json",
-                          "stack.schema.json", "topology.schema.json"])
+        self.assertEqual(
+            [p.name for p in schemas],
+            ["docs.schema.json", "journeys.schema.json", "stack.schema.json", "topology.schema.json"],
+        )
         for path in schemas:
             with self.subTest(schema=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))
@@ -2108,8 +2266,8 @@ class TestProfileContracts(unittest.TestCase):
             with self.subTest(contract=name):
                 self.assertTrue(example_path.exists(), "missing example for %s" % name)
                 errors = validate(
-                    json.loads(example_path.read_text(encoding="utf-8")),
-                    json.loads(path.read_text(encoding="utf-8")))
+                    json.loads(example_path.read_text(encoding="utf-8")), json.loads(path.read_text(encoding="utf-8"))
+                )
                 self.assertEqual(errors, [])
 
     def test_topology_contract_uses_no_testing_vocabulary(self):
@@ -2182,8 +2340,7 @@ def validate(instance, schema, path="$"):
     if expected:
         types = expected if isinstance(expected, list) else [expected]
         if not any(TYPE_CHECKS[t](instance) for t in types if t in TYPE_CHECKS):
-            return ["%s: expected type %s, got %s"
-                    % (path, "|".join(types), type(instance).__name__)]
+            return ["%s: expected type %s, got %s" % (path, "|".join(types), type(instance).__name__)]
 
     if "enum" in schema and instance not in schema["enum"]:
         errors.append("%s: %r not in enum %r" % (path, instance, schema["enum"]))
@@ -2194,13 +2351,11 @@ def validate(instance, schema, path="$"):
                 errors.append("%s: missing required property %r" % (path, name))
         for name, subschema in schema.get("properties", {}).items():
             if name in instance:
-                errors.extend(
-                    validate(instance[name], subschema, "%s.%s" % (path, name)))
+                errors.extend(validate(instance[name], subschema, "%s.%s" % (path, name)))
 
     if isinstance(instance, list) and "items" in schema:
         for index, item in enumerate(instance):
-            errors.extend(
-                validate(item, schema["items"], "%s[%d]" % (path, index)))
+            errors.extend(validate(item, schema["items"], "%s[%d]" % (path, index)))
 
     return errors
 ```
@@ -3255,8 +3410,7 @@ def skill_files():
 class TestPluginStructure(unittest.TestCase):
     def test_every_plugin_is_registered_in_the_marketplace(self):
         registered = {
-            entry["source"].lstrip("./")
-            for entry in json.loads(MARKETPLACE.read_text(encoding="utf-8"))["plugins"]
+            entry["source"].lstrip("./") for entry in json.loads(MARKETPLACE.read_text(encoding="utf-8"))["plugins"]
         }
         for plugin in plugin_dirs():
             with self.subTest(plugin=plugin.name):
@@ -3265,8 +3419,7 @@ class TestPluginStructure(unittest.TestCase):
     def test_every_plugin_manifest_has_name_and_description(self):
         for plugin in plugin_dirs():
             with self.subTest(plugin=plugin.name):
-                data = json.loads(
-                    (plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+                data = json.loads((plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
                 self.assertEqual(data["name"], plugin.name)
                 self.assertTrue(data["description"].strip())
 
@@ -3291,8 +3444,7 @@ class TestPluginStructure(unittest.TestCase):
             plugin = skill.parents[2]
             for ref in PLUGIN_ROOT_REF.findall(skill.read_text(encoding="utf-8")):
                 with self.subTest(skill=skill.parent.name, ref=ref):
-                    self.assertTrue((plugin / ref.lstrip("/")).exists(),
-                                    "%s references missing %s" % (skill, ref))
+                    self.assertTrue((plugin / ref.lstrip("/")).exists(), "%s references missing %s" % (skill, ref))
 
 
 if __name__ == "__main__":

@@ -58,8 +58,7 @@ class TestSchemaMeta(unittest.TestCase):
             p = os.path.join(d, ".local", "sem.db")
             conn = db.connect(p)
             self.assertTrue(os.path.exists(p))
-            tbls = {r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'")}
+            tbls = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             self.assertIn("meta", tbls)
             self.assertIn("entities", tbls)
             conn.close()
@@ -105,6 +104,7 @@ Records the 'highest commit covered' (HEAD sha + commit count) so freshness vs. 
 current HEAD is a one-line check. The DB is a regenerable mirror; in-source markers
 remain the source of truth.
 """
+
 import datetime
 import os
 import sqlite3
@@ -152,8 +152,7 @@ def connect(path):
 
 def set_meta(conn, key, value):
     conn.execute(
-        "INSERT INTO meta(key, value) VALUES(?, ?) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        "INSERT INTO meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
         (key, value),
     )
     conn.commit()
@@ -234,11 +233,12 @@ class TestIndexFiles(unittest.TestCase):
             "src/a.ts": "// SEM@aaaaaaa: build a thing\nfunction A() {}\n",
         }
         self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame)
-        sa._read_text = lambda p, *a, **k: self.files[p.replace(self.repo + "/", "")] \
-            if p.startswith(self.repo) else self.files[p]
+        sa._read_text = lambda p, *a, **k: (
+            self.files[p.replace(self.repo + "/", "")] if p.startswith(self.repo) else self.files[p]
+        )
         sa.sem_entities = lambda paths, cwd=None: [
-            {"name": "A", "type": "function", "file": "src/a.ts",
-             "start_line": 2, "end_line": 2}]
+            {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 2, "end_line": 2}
+        ]
         sa.sem_blame = lambda f, cwd=None: [{"name": "A", "commit": "aaaaaaa999"}]
 
     def tearDown(self):
@@ -253,17 +253,14 @@ class TestIndexFiles(unittest.TestCase):
             conn = db.connect(os.path.join(d, ".local", "sem.db"))
             n = db.index_files(conn, ["src/a.ts"], cwd=d)
             self.assertEqual(n, 1)
-            row = conn.execute(
-                "SELECT name, sha, desc, blame_sha FROM entities WHERE file='src/a.ts'"
-            ).fetchone()
+            row = conn.execute("SELECT name, sha, desc, blame_sha FROM entities WHERE file='src/a.ts'").fetchone()
             self.assertEqual(row[0], "A")
-            self.assertEqual(row[1], "aaaaaaa")          # marker sha
+            self.assertEqual(row[1], "aaaaaaa")  # marker sha
             self.assertEqual(row[2], "build a thing")
-            self.assertEqual(row[3], "aaaaaaa999")       # blame sha
+            self.assertEqual(row[3], "aaaaaaa999")  # blame sha
             # re-index is idempotent (delete-then-insert; still one row)
             db.index_files(conn, ["src/a.ts"], cwd=d)
-            cnt = conn.execute(
-                "SELECT COUNT(*) FROM entities WHERE file='src/a.ts'").fetchone()[0]
+            cnt = conn.execute("SELECT COUNT(*) FROM entities WHERE file='src/a.ts'").fetchone()[0]
             self.assertEqual(cnt, 1)
             conn.close()
 ```
@@ -283,6 +280,7 @@ CODE_EXTS = (".go", ".ts", ".tsx", ".js", ".jsx", ".py")
 
 def _entities_for(paths, cwd):
     import sem_annotate as sa
+
     out = []
     for e in sa.sem_entities(paths, cwd=cwd):
         if e.get("type") in sa.CODE_TYPES:
@@ -293,6 +291,7 @@ def _entities_for(paths, cwd):
 def index_files(conn, files, cwd=None):
     """Delete-then-insert rows for each file in `files`. Returns rows written."""
     import sem_annotate as sa
+
     written = 0
     now = _now()
     for f in files:
@@ -311,10 +310,16 @@ def index_files(conn, files, cwd=None):
                 "INSERT OR REPLACE INTO entities"
                 "(file, name, start_line, end_line, sha, desc, blame_sha, updated_at)"
                 " VALUES(?,?,?,?,?,?,?,?)",
-                (f, e["name"], e["start_line"], e.get("end_line"),
-                 marker["sha"] if marker else None,
-                 marker["desc"] if marker else None,
-                 blame.get(e["name"], {}).get("commit"), now),
+                (
+                    f,
+                    e["name"],
+                    e["start_line"],
+                    e.get("end_line"),
+                    marker["sha"] if marker else None,
+                    marker["desc"] if marker else None,
+                    blame.get(e["name"], {}).get("commit"),
+                    now,
+                ),
             )
             written += 1
     conn.commit()
@@ -325,6 +330,7 @@ def _scope_files(cwd, paths):
     """Resolve the file list to index from explicit paths or the scope file."""
     import sem_annotate as sa
     import sem_scope
+
     scope = None
     if paths:
         scan_paths = list(paths)
@@ -405,7 +411,9 @@ class TestAutoAndStatus(unittest.TestCase):
             conn.close()
             called = {"build": 0}
             orig = db.build
-            db.build = lambda cwd=None, paths=None: called.__setitem__("build", 1) or {"files": 0, "entities": 0, "mode": "full"}
+            db.build = lambda cwd=None, paths=None: (
+                called.__setitem__("build", 1) or {"files": 0, "entities": 0, "mode": "full"}
+            )
             try:
                 res = db.auto_update(cwd=d)
                 self.assertEqual(called["build"], 1)
@@ -463,9 +471,9 @@ def auto_update(cwd=None):
         res["mode"] = "full"
         return res
     import sem_scope
+
     scope = sem_scope.load_scope(cwd)
-    files = [f for f in changed_files(cwd, head)
-             if not (scope is not None and sem_scope.is_excluded(f, scope))]
+    files = [f for f in changed_files(cwd, head) if not (scope is not None and sem_scope.is_excluded(f, scope))]
     conn = connect(path)
     try:
         n = index_files(conn, files, cwd=cwd)
@@ -490,8 +498,13 @@ def status(cwd=None):
         verdict = "up-to-date"
     else:
         verdict = "stale"
-    return {"stored_sha": stored_sha, "stored_count": stored_count,
-            "current_sha": cur_sha, "current_count": cur_count, "verdict": verdict}
+    return {
+        "stored_sha": stored_sha,
+        "stored_count": stored_count,
+        "current_sha": cur_sha,
+        "current_count": cur_count,
+        "verdict": verdict,
+    }
 ```
 
 - [ ] **Step 4: Run tests**
@@ -526,10 +539,15 @@ Add to `tests/test_sem_annotate.py` (CLI-dispatch test; monkeypatch `sa`'s lazy 
 class TestDbSubcommand(unittest.TestCase):
     def test_db_status_dispatches(self):
         import sem_db
+
         orig = sem_db.status
-        sem_db.status = lambda cwd=None: {"verdict": "up-to-date", "stored_sha": "x",
-                                          "stored_count": "1", "current_sha": "x",
-                                          "current_count": "1"}
+        sem_db.status = lambda cwd=None: {
+            "verdict": "up-to-date",
+            "stored_sha": "x",
+            "stored_count": "1",
+            "current_sha": "x",
+            "current_count": "1",
+        }
         out = io.StringIO()
         _stdout = sys.stdout
         sys.stdout = out
@@ -543,9 +561,12 @@ class TestDbSubcommand(unittest.TestCase):
 
     def test_db_update_no_files_is_auto(self):
         import sem_db
+
         called = {"auto": 0}
         orig = sem_db.auto_update
-        sem_db.auto_update = lambda cwd=None: called.__setitem__("auto", 1) or {"mode": "auto", "files": 0, "entities": 0}
+        sem_db.auto_update = lambda cwd=None: (
+            called.__setitem__("auto", 1) or {"mode": "auto", "files": 0, "entities": 0}
+        )
         try:
             rc = sa.main(["db", "update", "-C", "/tmp"])
         finally:
@@ -573,19 +594,19 @@ In `dev/scripts/sem_annotate.py` `parse_args`, register the subparser:
 In `main`, add a branch (lazy import to avoid an import cycle at module load):
 
 ```python
-    if ns.cmd == "db":
-        import sem_db
-        action = ns.db_action
-        paths = ns.paths or None
-        if action == "build":
-            res = sem_db.build(cwd=ns.cwd, paths=paths)
-        elif action == "update":
-            res = sem_db.update(cwd=ns.cwd, files=paths) if paths \
-                else sem_db.auto_update(cwd=ns.cwd)
-        else:  # status
-            res = sem_db.status(cwd=ns.cwd)
-        print(json.dumps(res))
-        return 0
+if ns.cmd == "db":
+    import sem_db
+
+    action = ns.db_action
+    paths = ns.paths or None
+    if action == "build":
+        res = sem_db.build(cwd=ns.cwd, paths=paths)
+    elif action == "update":
+        res = sem_db.update(cwd=ns.cwd, files=paths) if paths else sem_db.auto_update(cwd=ns.cwd)
+    else:  # status
+        res = sem_db.status(cwd=ns.cwd)
+    print(json.dumps(res))
+    return 0
 ```
 
 Update the usage line at the bottom of `main` to mention `db`.

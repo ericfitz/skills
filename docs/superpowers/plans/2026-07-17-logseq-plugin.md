@@ -198,13 +198,16 @@ class TestResolve(unittest.TestCase):
             root = Path(td)
             g2 = make_graph(root, "work")
             cp = root / "config.json"
-            cp.write_text(json.dumps({
-                "graphs": {"main": {"path": str(root / "gone")},
-                           "work": {"path": str(g2)}},
-                "default_graph": "main",
-                "obsidian_vault": str(root),
-                "api": {"url": "http://127.0.0.1:12315"},
-            }))
+            cp.write_text(
+                json.dumps(
+                    {
+                        "graphs": {"main": {"path": str(root / "gone")}, "work": {"path": str(g2)}},
+                        "default_graph": "main",
+                        "obsidian_vault": str(root),
+                        "api": {"url": "http://127.0.0.1:12315"},
+                    }
+                )
+            )
             r = cfg.resolve(graph="work", config_path=cp, env={})
             self.assertEqual(r.path, g2)
             self.assertEqual(r.obsidian_vault, root)
@@ -259,8 +262,7 @@ class TestResolve(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             with self.assertRaises(cfg.ConfigError):
-                cfg.resolve(config_path=root / "absent.json",
-                            graphs_dir=root / "graphs", env={})
+                cfg.resolve(config_path=root / "absent.json", graphs_dir=root / "graphs", env={})
 
 
 class TestWriteConfig(unittest.TestCase):
@@ -268,9 +270,14 @@ class TestWriteConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             g = make_graph(root)
-            r = cfg.Resolved(name="notes", path=g, source="discovered",
-                             api_url=cfg.DEFAULT_API_URL, api_token=None,
-                             obsidian_vault=None)
+            r = cfg.Resolved(
+                name="notes",
+                path=g,
+                source="discovered",
+                api_url=cfg.DEFAULT_API_URL,
+                api_token=None,
+                obsidian_vault=None,
+            )
             cp = root / "cfg" / "config.json"
             cfg.write_config(r, config_path=cp)
             r2 = cfg.resolve(config_path=cp, env={})
@@ -292,6 +299,7 @@ Expected: FAIL — `ImportError: cannot import name 'config'` (module doesn't ex
 ```python
 # logseq/scripts/logseqlib/config.py
 """Graph resolution: config file first, Logseq's own recent-graphs list as fallback."""
+
 import json
 import os
 from dataclasses import dataclass
@@ -336,7 +344,7 @@ def discover_graphs(graphs_dir: Path) -> list[Path]:
     for f in sorted(graphs_dir.iterdir()):
         if not (f.name.startswith(TRANSIT_PREFIX) and f.suffix == ".transit"):
             continue
-        encoded = f.name[len(TRANSIT_PREFIX):-len(".transit")]
+        encoded = f.name[len(TRANSIT_PREFIX) : -len(".transit")]
         p = Path(encoded.replace("++", "/"))
         if is_graph_dir(p):
             found.append(p)
@@ -365,8 +373,9 @@ def _from_config(data: dict, graph: str | None, env: dict) -> Resolved | None:
     )
 
 
-def resolve(graph: str | None = None, config_path: Path = CONFIG_PATH,
-            graphs_dir: Path | None = None, env: dict | None = None) -> Resolved:
+def resolve(
+    graph: str | None = None, config_path: Path = CONFIG_PATH, graphs_dir: Path | None = None, env: dict | None = None
+) -> Resolved:
     env = os.environ if env is None else env
     graphs_dir = LOGSEQ_GRAPHS_DIR if graphs_dir is None else graphs_dir
 
@@ -396,8 +405,7 @@ def resolve(graph: str | None = None, config_path: Path = CONFIG_PATH,
     if len(candidates) > 1:
         raise AmbiguousGraphError(candidates)
     raise ConfigError(
-        f"no Logseq graph found: config {config_path} missing/stale and no "
-        f"graphs discovered under {graphs_dir}"
+        f"no Logseq graph found: config {config_path} missing/stale and no graphs discovered under {graphs_dir}"
     )
 
 
@@ -411,8 +419,7 @@ def write_config(resolved: Resolved, config_path: Path = CONFIG_PATH) -> None:
     graphs = data.setdefault("graphs", {})
     graphs[resolved.name] = {"path": str(resolved.path)}
     data.setdefault("default_graph", resolved.name)
-    data.setdefault("api", {"url": resolved.api_url,
-                            "token_env": DEFAULT_TOKEN_ENV})
+    data.setdefault("api", {"url": resolved.api_url, "token_env": DEFAULT_TOKEN_ENV})
     if resolved.obsidian_vault:
         data.setdefault("obsidian_vault", str(resolved.obsidian_vault))
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -478,14 +485,7 @@ NESTED_TABS = "- a\n\t- a1\n\t\t- a1x\n- b\n"
 
 NESTED_SPACES = "- a\n  - a1\n    - a1x\n- b\n"
 
-PROPS = (
-    "title:: My Page\n"
-    "tags:: project, active\n"
-    "\n"
-    "- first block\n"
-    "  id:: 6650some-uuid\n"
-    "- TODO call [[Alice]]\n"
-)
+PROPS = "title:: My Page\ntags:: project, active\n\n- first block\n  id:: 6650some-uuid\n- TODO call [[Alice]]\n"
 
 OPAQUE = (
     "- notes\n"
@@ -537,16 +537,14 @@ class TestStructure(unittest.TestCase):
 
     def test_page_properties(self):
         p = pg.parse(PROPS)
-        self.assertEqual(pg.page_properties(p),
-                         {"title": "My Page", "tags": "project, active"})
+        self.assertEqual(pg.page_properties(p), {"title": "My Page", "tags": "project, active"})
         first = p.blocks[0]
         self.assertEqual(pg.block_properties(first), {"id": "6650some-uuid"})
 
     def test_first_bullet_props_page(self):
         text = "- title:: Alt Style\n  alias:: other\n- body\n"
         p = pg.parse(text)
-        self.assertEqual(pg.page_properties(p),
-                         {"title": "Alt Style", "alias": "other"})
+        self.assertEqual(pg.page_properties(p), {"title": "Alt Style", "alias": "other"})
 
     def test_bad_indent_raises(self):
         with self.assertRaises(pg.PageParseError):
@@ -575,6 +573,7 @@ Unmodeled syntax (queries, embeds, logbook, code fences) rides along as raw
 continuation lines and is never rewritten. Pages we cannot parse raise
 PageParseError and must never be written back.
 """
+
 import re
 from dataclasses import dataclass, field
 
@@ -618,8 +617,7 @@ def _depth(indent: str, unit: str, lineno: int) -> int:
         return 0
     n, rem = divmod(len(indent), len(unit))
     if rem or indent != unit * n:
-        raise PageParseError(f"line {lineno}: indentation is not a whole "
-                             f"number of {unit!r} units")
+        raise PageParseError(f"line {lineno}: indentation is not a whole number of {unit!r} units")
     return n
 
 
@@ -633,15 +631,13 @@ def parse(text: str) -> Page:
         m = BULLET_RE.match(line)
         if not m:
             if stack:
-                stack[-1].lines.append(_strip_unit(line, page.indent_unit,
-                                                   len(stack) - 1))
+                stack[-1].lines.append(_strip_unit(line, page.indent_unit, len(stack) - 1))
             else:
                 page.pre_lines.append(line)
             continue
         depth = _depth(m.group("indent"), page.indent_unit, i)
         if depth > len(stack):
-            raise PageParseError(f"line {i}: bullet depth {depth} with no "
-                                 f"parent at depth {depth - 1}")
+            raise PageParseError(f"line {i}: bullet depth {depth} with no parent at depth {depth - 1}")
         del stack[depth:]
         block = Block(lines=[f"- {m.group('rest')}"])
         if depth == 0:
@@ -654,7 +650,7 @@ def parse(text: str) -> Page:
 
 def _strip_unit(line: str, unit: str, depth: int) -> str:
     prefix = unit * depth
-    return line[len(prefix):] if prefix and line.startswith(prefix) else line
+    return line[len(prefix) :] if prefix and line.startswith(prefix) else line
 
 
 def _write_block(out: list[str], block: Block, unit: str, depth: int) -> None:
@@ -776,10 +772,8 @@ class TestNaming(unittest.TestCase):
         self.assertEqual(pg.journal_filename("2026-07-17"), "2026_07_17.md")
 
     def test_page_filename_roundtrip(self):
-        self.assertEqual(pg.page_filename("project/roadmap"),
-                         "project%2Froadmap.md")
-        self.assertEqual(pg.filename_to_page_name("project%2Froadmap"),
-                         "project/roadmap")
+        self.assertEqual(pg.page_filename("project/roadmap"), "project%2Froadmap.md")
+        self.assertEqual(pg.filename_to_page_name("project%2Froadmap"), "project/roadmap")
         self.assertEqual(pg.page_filename("Plain Name"), "Plain Name.md")
 
 
@@ -841,8 +835,7 @@ def journal_filename(date_iso: str) -> str:
 
 
 def page_filename(name: str) -> str:
-    return quote(name, safe=" ") .replace("/", "%2F") + ".md" \
-        if "/" in name else name + ".md"
+    return quote(name, safe=" ").replace("/", "%2F") + ".md" if "/" in name else name + ".md"
 
 
 def filename_to_page_name(stem: str) -> str:
@@ -918,9 +911,9 @@ from logseqlib import api, config as cfg  # noqa: E402
 
 
 def resolved(graph: Path) -> cfg.Resolved:
-    return cfg.Resolved(name="t", path=graph, source="config",
-                        api_url="http://127.0.0.1:12315", api_token="tok",
-                        obsidian_vault=None)
+    return cfg.Resolved(
+        name="t", path=graph, source="config", api_url="http://127.0.0.1:12315", api_token="tok", obsidian_vault=None
+    )
 
 
 def make_graph(td: str) -> Path:
@@ -943,8 +936,7 @@ class TestApiPath(unittest.TestCase):
             with mock.patch.object(api, "_post", fake_post):
                 out = api.append_to_page(resolved(make_graph(td)), "Inbox", "hi")
         self.assertEqual(out["via"], "api")
-        self.assertIn(("logseq.Editor.appendBlockInPage", ["Inbox", "hi"]),
-                      calls)
+        self.assertIn(("logseq.Editor.appendBlockInPage", ["Inbox", "hi"]), calls)
 
     def test_append_to_journal_via_api_uses_query(self):
         def fake_post(url, token, method, args, timeout=3.0):
@@ -955,8 +947,7 @@ class TestApiPath(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             with mock.patch.object(api, "_post", fake_post):
-                out = api.append_to_journal(resolved(make_graph(td)), "note",
-                                            "2026-07-17")
+                out = api.append_to_journal(resolved(make_graph(td)), "note", "2026-07-17")
         self.assertEqual(out["via"], "api")
         self.assertEqual(out["target"], "jul 17th, 2026")
 
@@ -981,8 +972,7 @@ class TestFileFallback(unittest.TestCase):
             with mock.patch.object(api, "_post", self._down):
                 out = api.append_to_page(resolved(g), "Inbox", "new")
             self.assertEqual(out["via"], "files")
-            self.assertEqual((g / "pages" / "Inbox.md").read_text(),
-                             "- old\n- new\n")
+            self.assertEqual((g / "pages" / "Inbox.md").read_text(), "- old\n- new\n")
 
     def test_probe_false_when_down(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1016,6 +1006,7 @@ Expected: FAIL — `ImportError` (no `api` module).
 ```python
 # logseq/scripts/logseqlib/api.py
 """Hybrid write layer: Logseq local HTTP API when up, file edits otherwise."""
+
 import json
 import urllib.error
 import urllib.request
@@ -1033,8 +1024,7 @@ def _post(url, token, method, args, timeout=3.0):
     req = urllib.request.Request(
         f"{url.rstrip('/')}/api",
         data=json.dumps({"method": method, "args": args}).encode(),
-        headers={"Authorization": f"Bearer {token}",
-                 "Content-Type": "application/json"},
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -1045,8 +1035,7 @@ def _post(url, token, method, args, timeout=3.0):
 
 def probe(resolved) -> bool:
     try:
-        _post(resolved.api_url, resolved.api_token,
-              "logseq.App.getCurrentGraph", [])
+        _post(resolved.api_url, resolved.api_token, "logseq.App.getCurrentGraph", [])
         return True
     except ApiUnavailable:
         return False
@@ -1054,11 +1043,9 @@ def probe(resolved) -> bool:
 
 def journal_page_name(resolved, date_iso):
     day = date_iso.replace("-", "")
-    q = ("[:find (pull ?p [:block/name]) "
-         f":where [?p :block/journal-day {day}]]")
+    q = f"[:find (pull ?p [:block/name]) :where [?p :block/journal-day {day}]]"
     try:
-        rows = _post(resolved.api_url, resolved.api_token,
-                     "logseq.DB.datascriptQuery", [q])
+        rows = _post(resolved.api_url, resolved.api_token, "logseq.DB.datascriptQuery", [q])
     except ApiUnavailable:
         return None
     if rows and rows[0] and isinstance(rows[0][0], dict):
@@ -1070,8 +1057,7 @@ def append_to_journal(resolved, text, date_iso):
     name = journal_page_name(resolved, date_iso)
     if name:
         try:
-            _post(resolved.api_url, resolved.api_token,
-                  "logseq.Editor.appendBlockInPage", [name, text])
+            _post(resolved.api_url, resolved.api_token, "logseq.Editor.appendBlockInPage", [name, text])
             return {"via": "api", "target": name}
         except ApiUnavailable:
             pass
@@ -1082,8 +1068,7 @@ def append_to_journal(resolved, text, date_iso):
 
 def append_to_page(resolved, page_name, text):
     try:
-        _post(resolved.api_url, resolved.api_token,
-              "logseq.Editor.appendBlockInPage", [page_name, text])
+        _post(resolved.api_url, resolved.api_token, "logseq.Editor.appendBlockInPage", [page_name, text])
         return {"via": "api", "target": page_name}
     except ApiUnavailable:
         path = resolved.path / "pages" / pg.page_filename(page_name)
@@ -1158,8 +1143,7 @@ def build_graph(td: str) -> Path:
     (g / "pages").mkdir()
     (g / "journals").mkdir()
     (g / "logseq").mkdir()
-    (g / "pages" / "Alpha.md").write_text(
-        "type:: project\n\n- links to [[Beta]] and [[beta]]\n- see [[Gone]]\n")
+    (g / "pages" / "Alpha.md").write_text("type:: project\n\n- links to [[Beta]] and [[beta]]\n- see [[Gone]]\n")
     (g / "pages" / "Beta.md").write_text("- tagged #active\n- plain\n")
     (g / "pages" / "Betta.md").write_text("- near-dupe of Beta\n")
     (g / "pages" / "Loner.md").write_text("- nobody links here\n")
@@ -1243,6 +1227,7 @@ Expected: FAIL — `ImportError` (no `scan` module).
 ```python
 # logseq/scripts/logseqlib/scan.py
 """Read-only graph walker: link index + pure lint checks over it."""
+
 import difflib
 import re
 from dataclasses import dataclass, field
@@ -1273,9 +1258,9 @@ class Index:
 def _scan_file(path: Path, is_journal: bool) -> PageInfo:
     name = pg.filename_to_page_name(path.stem)
     text = path.read_text()
-    info = PageInfo(name=name, path=path, is_journal=is_journal,
-                    links=set(LINK_RE.findall(text)),
-                    tags=set(TAG_RE.findall(text)))
+    info = PageInfo(
+        name=name, path=path, is_journal=is_journal, links=set(LINK_RE.findall(text)), tags=set(TAG_RE.findall(text))
+    )
     try:
         parsed = pg.parse(text)
         info.properties = pg.page_properties(parsed)
@@ -1298,14 +1283,15 @@ def scan_graph(graph: Path) -> Index:
 
 def backlinks(index: Index, name: str) -> set:
     target = name.lower()
-    return {key for key, info in index.pages.items()
-            if target in {ln.lower() for ln in info.links}}
+    return {key for key, info in index.pages.items() if target in {ln.lower() for ln in info.links}}
 
 
 def lint_unparseable(index: Index):
-    return [{"type": "unparseable", "page": info.name,
-             "detail": info.parse_error}
-            for info in index.pages.values() if info.parse_error]
+    return [
+        {"type": "unparseable", "page": info.name, "detail": info.parse_error}
+        for info in index.pages.values()
+        if info.parse_error
+    ]
 
 
 def lint_broken_links(index: Index):
@@ -1313,8 +1299,7 @@ def lint_broken_links(index: Index):
     for info in index.pages.values():
         for link in sorted(info.links):
             if link.lower() not in index.pages:
-                out.append({"type": "broken-link", "page": info.name,
-                            "detail": f"[[{link}]] has no page file"})
+                out.append({"type": "broken-link", "page": info.name, "detail": f"[[{link}]] has no page file"})
     return out
 
 
@@ -1327,9 +1312,13 @@ def lint_case_conflicts(index: Index):
     for low, forms in sorted(spellings.items()):
         if len(forms) > 1:
             canonical = index.pages[low].name if low in index.pages else None
-            out.append({"type": "case-conflict",
-                        "page": canonical or sorted(forms)[0],
-                        "detail": "link spellings: " + ", ".join(sorted(forms))})
+            out.append(
+                {
+                    "type": "case-conflict",
+                    "page": canonical or sorted(forms)[0],
+                    "detail": "link spellings: " + ", ".join(sorted(forms)),
+                }
+            )
     return out
 
 
@@ -1338,31 +1327,39 @@ def lint_orphans(index: Index):
     for info in index.pages.values():
         linked |= {ln.lower() for ln in info.links}
         linked |= {t.lower() for t in info.tags}
-    return [{"type": "orphan", "page": info.name,
-             "detail": "no inbound links and no tags"}
-            for key, info in sorted(index.pages.items())
-            if not info.is_journal and key not in linked and not info.tags]
+    return [
+        {"type": "orphan", "page": info.name, "detail": "no inbound links and no tags"}
+        for key, info in sorted(index.pages.items())
+        if not info.is_journal and key not in linked and not info.tags
+    ]
 
 
 def lint_near_duplicates(index: Index):
     names = sorted(k for k, v in index.pages.items() if not v.is_journal)
     out = []
     for i, a in enumerate(names):
-        for b in names[i + 1:]:
+        for b in names[i + 1 :]:
             if a == b:
                 continue
             if difflib.SequenceMatcher(None, a, b).ratio() >= 0.85:
-                out.append({"type": "near-duplicate",
-                            "page": index.pages[a].name,
-                            "detail": f"{index.pages[a].name} ~ "
-                                      f"{index.pages[b].name}"})
+                out.append(
+                    {
+                        "type": "near-duplicate",
+                        "page": index.pages[a].name,
+                        "detail": f"{index.pages[a].name} ~ {index.pages[b].name}",
+                    }
+                )
     return out
 
 
 def lint_all(index: Index):
-    return (lint_unparseable(index) + lint_broken_links(index)
-            + lint_case_conflicts(index) + lint_orphans(index)
-            + lint_near_duplicates(index))
+    return (
+        lint_unparseable(index)
+        + lint_broken_links(index)
+        + lint_case_conflicts(index)
+        + lint_orphans(index)
+        + lint_near_duplicates(index)
+    )
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -1435,8 +1432,7 @@ class TestDryRunAndDiff(unittest.TestCase):
     def test_dry_run_touches_nothing(self):
         with tempfile.TemporaryDirectory() as td:
             g, f = graph_with_page(td)
-            out = ap.apply_changeset(
-                g, [ap.Change(f, "- new\n")], STAMP, dry_run=True)
+            out = ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP, dry_run=True)
             self.assertTrue(out["dry_run"])
             self.assertIn("-- old", out["diff"].replace("\n", " "))
             self.assertEqual(f.read_text(), "- old\n")
@@ -1445,8 +1441,7 @@ class TestDryRunAndDiff(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             g, f = graph_with_page(td)
             new = g / "pages" / "B.md"
-            d = ap.diff_changeset(g, [ap.Change(new, "- born\n"),
-                                      ap.Change(f, None)])
+            d = ap.diff_changeset(g, [ap.Change(new, "- born\n"), ap.Change(f, None)])
             self.assertIn("pages/B.md", d)
             self.assertIn("+- born", d)
             self.assertIn("-- old", d)  # deletion of the "- old" line
@@ -1457,8 +1452,7 @@ class TestApply(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             g, f = graph_with_page(td)
             other = g / "pages" / "B.md"
-            out = ap.apply_changeset(
-                g, [ap.Change(f, None), ap.Change(other, "- hi\n")], STAMP)
+            out = ap.apply_changeset(g, [ap.Change(f, None), ap.Change(other, "- hi\n")], STAMP)
             self.assertFalse(f.exists())
             self.assertEqual(other.read_text(), "- hi\n")
             bdir = g / "logseq" / ".backups" / STAMP
@@ -1477,21 +1471,18 @@ class TestApply(unittest.TestCase):
 
 class TestGitGuard(unittest.TestCase):
     def _git(self, g, *args):
-        subprocess.run(["git", "-C", str(g), *args], check=True,
-                       capture_output=True)
+        subprocess.run(["git", "-C", str(g), *args], check=True, capture_output=True)
 
     def test_dirty_tree_blocks_without_force(self):
         with tempfile.TemporaryDirectory() as td:
             g, f = graph_with_page(td)
             self._git(g, "init", "-q")
             self._git(g, "add", "-A")
-            self._git(g, "-c", "user.email=t@t", "-c", "user.name=t",
-                      "commit", "-qm", "init")
+            self._git(g, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init")
             f.write_text("- dirty\n")  # uncommitted change
             with self.assertRaises(ap.ApplyError):
                 ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP)
-            out = ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP,
-                                     force=True)
+            out = ap.apply_changeset(g, [ap.Change(f, "- new\n")], STAMP, force=True)
             self.assertEqual(f.read_text(), "- new\n")
             self.assertIn("pages/A.md", out["applied"])
 
@@ -1516,6 +1507,7 @@ Expected: FAIL — `ImportError` (no `apply` module).
 ```python
 # logseq/scripts/logseqlib/apply.py
 """Safe multi-file changeset application: diff, backup, git guard, atomic writes."""
+
 import difflib
 import os
 import shutil
@@ -1548,8 +1540,8 @@ def diff_changeset(graph: Path, changes: list) -> str:
         old = ch.path.read_text() if ch.path.is_file() else ""
         new = ch.new_content if ch.new_content is not None else ""
         diff = difflib.unified_diff(
-            old.splitlines(keepends=True), new.splitlines(keepends=True),
-            fromfile=f"a/{rel}", tofile=f"b/{rel}")
+            old.splitlines(keepends=True), new.splitlines(keepends=True), fromfile=f"a/{rel}", tofile=f"b/{rel}"
+        )
         chunks.append("".join(diff))
     return "\n".join(c for c in chunks if c)
 
@@ -1571,15 +1563,15 @@ def git_is_dirty(graph: Path):
     if not (graph / ".git").exists():
         return None
     try:
-        r = subprocess.run(["git", "-C", str(graph), "status", "--porcelain"],
-                           capture_output=True, text=True, check=True)
+        r = subprocess.run(
+            ["git", "-C", str(graph), "status", "--porcelain"], capture_output=True, text=True, check=True
+        )
     except (OSError, subprocess.CalledProcessError):
         return None
     return bool(r.stdout.strip())
 
 
-def apply_changeset(graph: Path, changes: list, now_stamp: str,
-                    dry_run: bool = False, force: bool = False) -> dict:
+def apply_changeset(graph: Path, changes: list, now_stamp: str, dry_run: bool = False, force: bool = False) -> dict:
     rels = [_relpath(graph, ch.path) for ch in changes]  # validates all paths
     diff = diff_changeset(graph, changes)
     if dry_run:
@@ -1596,8 +1588,7 @@ def apply_changeset(graph: Path, changes: list, now_stamp: str,
         tmp = ch.path.with_suffix(ch.path.suffix + ".tmp")
         tmp.write_text(ch.new_content)
         os.replace(tmp, ch.path)
-    return {"applied": rels, "backup": str(bdir) if bdir else None,
-            "diff": diff}
+    return {"applied": rels, "backup": str(bdir) if bdir else None, "diff": diff}
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -1650,8 +1641,7 @@ def build_graph(td: str) -> Path:
     (g / "journals").mkdir()
     (g / "logseq").mkdir()
     (g / "pages" / "Foo.md").write_text("- the foo page\n")
-    (g / "pages" / "Bar.md").write_text(
-        "- see [[foo]] and [[Foo]] but not [[foo-timer]]\n- tag #foo here\n")
+    (g / "pages" / "Bar.md").write_text("- see [[foo]] and [[Foo]] but not [[foo-timer]]\n- tag #foo here\n")
     (g / "pages" / "Baz.md").write_text("- links [[Bar]]\n")
     return g
 
@@ -1662,12 +1652,11 @@ class TestRenameRefs(unittest.TestCase):
             g = build_graph(td)
             index = scan.scan_graph(g)
             changes = refactor.rename_refs(index, "foo", "Food Court")
-            by_rel = {str(c.path.relative_to(g)): c.new_content
-                      for c in changes}
+            by_rel = {str(c.path.relative_to(g)): c.new_content for c in changes}
             self.assertEqual(
                 by_rel["pages/Bar.md"],
-                "- see [[Food Court]] and [[Food Court]] but not "
-                "[[foo-timer]]\n- tag #Food Court here\n")
+                "- see [[Food Court]] and [[Food Court]] but not [[foo-timer]]\n- tag #Food Court here\n",
+            )
             self.assertNotIn("pages/Baz.md", by_rel)  # untouched pages omitted
 
     def test_no_matches_no_changes(self):
@@ -1683,11 +1672,9 @@ class TestMergePages(unittest.TestCase):
             index = scan.scan_graph(g)
             merged = "- combined\n- from [[foo]]\n"
             changes = refactor.merge_pages(index, "Foo", "Bar", merged)
-            by_rel = {str(c.path.relative_to(g)): c.new_content
-                      for c in changes}
+            by_rel = {str(c.path.relative_to(g)): c.new_content for c in changes}
             self.assertIsNone(by_rel["pages/Foo.md"])  # delete
-            self.assertEqual(by_rel["pages/Bar.md"],
-                             "- combined\n- from [[Bar]]\n")
+            self.assertEqual(by_rel["pages/Bar.md"], "- combined\n- from [[Bar]]\n")
 
     def test_unknown_page_raises(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1710,6 +1697,7 @@ Expected: FAIL — `ImportError` (no `refactor` module).
 ```python
 # logseq/scripts/logseqlib/refactor.py
 """Changeset builders for reference renames and page merges."""
+
 import re
 
 from .apply import Change
@@ -1717,8 +1705,7 @@ from .apply import Change
 
 def _substitute(text: str, old: str, new: str) -> str:
     link = re.compile(r"\[\[" + re.escape(old) + r"\]\]", re.IGNORECASE)
-    tag = re.compile(r"(?<!\S)#" + re.escape(old) + r"(?![\w/-])",
-                     re.IGNORECASE)
+    tag = re.compile(r"(?<!\S)#" + re.escape(old) + r"(?![\w/-])", re.IGNORECASE)
     text = link.sub(f"[[{new}]]", text)
     return tag.sub(f"#{new}", text)
 
@@ -1804,10 +1791,8 @@ from logseqlib import convert as cv  # noqa: E402
 
 class TestFrontmatter(unittest.TestCase):
     def test_simple_and_inline_list(self):
-        r = cv.convert_note("---\ntitle: My Note\ntags: [a, b]\n---\nBody.\n",
-                            "My Note")
-        self.assertEqual(r.content,
-                         "title:: My Note\ntags:: a, b\n\n- Body.\n")
+        r = cv.convert_note("---\ntitle: My Note\ntags: [a, b]\n---\nBody.\n", "My Note")
+        self.assertEqual(r.content, "title:: My Note\ntags:: a, b\n\n- Body.\n")
         self.assertEqual(r.warnings, [])
 
     def test_nested_value_warns_and_drops(self):
@@ -1819,8 +1804,7 @@ class TestFrontmatter(unittest.TestCase):
 class TestBody(unittest.TestCase):
     def test_paragraphs_and_headings(self):
         r = cv.convert_note("# Head\n\nPara one\nstill one\n\nPara two\n", "t")
-        self.assertEqual(r.content,
-                         "- # Head\n- Para one\n  still one\n- Para two\n")
+        self.assertEqual(r.content, "- # Head\n- Para one\n  still one\n- Para two\n")
 
     def test_lists_keep_nesting(self):
         r = cv.convert_note("- a\n  - a1\n- b\n", "t")
@@ -1837,9 +1821,7 @@ class TestBody(unittest.TestCase):
 
     def test_callout_known_type(self):
         r = cv.convert_note("> [!note] Heads up\n> body line\n", "t")
-        self.assertEqual(r.content,
-                         "- #+BEGIN_NOTE\n  Heads up\n  body line\n"
-                         "  #+END_NOTE\n")
+        self.assertEqual(r.content, "- #+BEGIN_NOTE\n  Heads up\n  body line\n  #+END_NOTE\n")
 
     def test_callout_unknown_type_warns(self):
         r = cv.convert_note("> [!zany] eh\n", "t")
@@ -1887,12 +1869,12 @@ Expected: FAIL — `ImportError` (no `convert` module).
 ```python
 # logseq/scripts/logseqlib/convert.py
 """Obsidian markdown -> Logseq outline conversion (pure text, no I/O)."""
+
 import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
-ADMONITIONS = {"note": "NOTE", "warning": "WARNING", "tip": "TIP",
-               "important": "IMPORTANT", "caution": "CAUTION"}
+ADMONITIONS = {"note": "NOTE", "warning": "WARNING", "tip": "TIP", "important": "IMPORTANT", "caution": "CAUTION"}
 ASSET_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".webp"}
 
 EMBED_RE = re.compile(r"!\[\[([^\[\]]+)\]\]")
@@ -1913,8 +1895,7 @@ def _frontmatter(lines, warnings):
     if not lines or lines[0].strip() != "---":
         return [], lines
     try:
-        end = next(i for i in range(1, len(lines))
-                   if lines[i].strip() == "---")
+        end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
     except StopIteration:
         return [], lines
     props, i = [], 1
@@ -1932,8 +1913,7 @@ def _frontmatter(lines, warnings):
             j += 1
         if items and not val:
             val, i = ", ".join(items), j
-        elif not val or (j < end and lines[j].startswith((" ", "\t"))
-                         and lines[j].strip()):
+        elif not val or (j < end and lines[j].startswith((" ", "\t")) and lines[j].strip()):
             warnings.append(f"frontmatter key '{key}' skipped (nested value)")
             while j < end and lines[j].startswith((" ", "\t")):
                 j += 1
@@ -1944,7 +1924,7 @@ def _frontmatter(lines, warnings):
         if val.startswith("[") and val.endswith("]"):
             val = ", ".join(p.strip() for p in val[1:-1].split(","))
         props.append(f"{key}:: {val}")
-    return props, lines[end + 1:]
+    return props, lines[end + 1 :]
 
 
 def _inline(line, assets):
@@ -1995,8 +1975,7 @@ def convert_note(text: str, title: str) -> ConvertResult:
             m = CALLOUT_RE.match(quote[0])
             if m and m.group(1).lower() in ADMONITIONS:
                 kind = ADMONITIONS[m.group(1).lower()]
-                body = ([m.group(2)] if m.group(2) else []) + \
-                       [q[2:] for q in quote[1:]]
+                body = ([m.group(2)] if m.group(2) else []) + [q[2:] for q in quote[1:]]
                 out.append(f"- #+BEGIN_{kind}")
                 out.extend(f"  {_inline(b, assets)}" for b in body)
                 out.append(f"  #+END_{kind}")
@@ -2023,19 +2002,20 @@ def convert_note(text: str, title: str) -> ConvertResult:
             i += 1
             continue
         para = []
-        while (i < len(lines) and lines[i].strip()
-               and not lines[i].startswith(("```", "> "))
-               and not LIST_RE.match(lines[i])
-               and not (lines[i].startswith("#")
-                        and lines[i].lstrip("#").startswith(" "))):
+        while (
+            i < len(lines)
+            and lines[i].strip()
+            and not lines[i].startswith(("```", "> "))
+            and not LIST_RE.match(lines[i])
+            and not (lines[i].startswith("#") and lines[i].lstrip("#").startswith(" "))
+        ):
             para.append(_inline(lines[i], assets))
             i += 1
         out.append(f"- {para[0]}")
         out.extend(f"  {p}" for p in para[1:])
     head = "\n".join(props) + "\n\n" if props else ""
     body = "\n".join(out) + "\n" if out else ""
-    return ConvertResult(content=head + body, warnings=warnings,
-                         assets=assets)
+    return ConvertResult(content=head + body, warnings=warnings, assets=assets)
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -2115,8 +2095,7 @@ class TestPlanImport(unittest.TestCase):
             (graph / "pages" / "sub%2FDeep.md").write_text("- native\n")
             plans = {p.page_name: p for p in cv.plan_import(vault, graph)}
             self.assertEqual(plans["Simple"].status, "new")
-            self.assertIn(f"import-hash:: {src_hash}",
-                          plans["Simple"].content)
+            self.assertIn(f"import-hash:: {src_hash}", plans["Simple"].content)
             self.assertIn("imported-from:: Simple.md", plans["Simple"].content)
             self.assertEqual(plans["sub/Deep"].status, "collision")
             self.assertNotIn(".obsidian/junk", plans)
@@ -2149,13 +2128,11 @@ class TestAssets(unittest.TestCase):
             (vault / "sub" / "Gone.md").write_text("![[nope.png]]\n")
             plans = cv.plan_import(vault, graph, scope=vault / "sub")
             pairs = cv.asset_copies(vault, graph, plans)
-            self.assertEqual(pairs, [(vault / "pic.png",
-                                      graph / "assets" / "pic.png")])
+            self.assertEqual(pairs, [(vault / "pic.png", graph / "assets" / "pic.png")])
             gone = next(p for p in plans if p.page_name == "sub/Gone")
             self.assertTrue(any("nope.png" in w for w in gone.warnings))
             dests = cv.copy_assets(pairs)
-            self.assertEqual((graph / "assets" / "pic.png").read_bytes(),
-                             b"PNG")
+            self.assertEqual((graph / "assets" / "pic.png").read_bytes(), b"PNG")
             self.assertEqual(dests, [str(graph / "assets" / "pic.png")])
 
 
@@ -2196,8 +2173,7 @@ def _vault_notes(vault: Path, scope: Path | None):
     if scope and scope.is_file():
         return [scope]
     base = scope if scope else vault
-    return [f for f in sorted(base.rglob("*.md"))
-            if not (set(f.relative_to(vault).parts) & SKIP_DIRS)]
+    return [f for f in sorted(base.rglob("*.md")) if not (set(f.relative_to(vault).parts) & SKIP_DIRS)]
 
 
 def _existing_import_hash(target: Path) -> str | None:
@@ -2228,22 +2204,20 @@ def plan_import(vault: Path, graph: Path, scope: Path | None = None):
             status = "collision"
         else:
             status = "changed"
-        plan = NotePlan(source=src, page_name=page_name, target=target,
-                        status=status)
+        plan = NotePlan(source=src, page_name=page_name, target=target, status=status)
         if status in ("new", "changed"):
             r = convert_note(text, page_name)
             plan.warnings = r.warnings
             plan.assets = r.assets
-            plan.content = (f"imported-from:: {rel}\n"
-                            f"import-hash:: {h}\n\n{r.content}")
+            plan.content = f"imported-from:: {rel}\nimport-hash:: {h}\n\n{r.content}"
         plans.append(plan)
     return plans
 
 
 def import_changes(plans):
     from .apply import Change
-    return [Change(p.target, p.content) for p in plans
-            if p.status in ("new", "changed")]
+
+    return [Change(p.target, p.content) for p in plans if p.status in ("new", "changed")]
 
 
 def _find_asset(vault: Path, ref: str) -> Path | None:
@@ -2251,8 +2225,7 @@ def _find_asset(vault: Path, ref: str) -> Path | None:
     if direct.is_file():
         return direct
     name = PurePosixPath(ref).name
-    hits = [f for f in vault.rglob(name)
-            if not (set(f.relative_to(vault).parts) & SKIP_DIRS)]
+    hits = [f for f in vault.rglob(name) if not (set(f.relative_to(vault).parts) & SKIP_DIRS)]
     return hits[0] if hits else None
 
 
@@ -2347,8 +2320,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "logseq" / "scripts"))
 
-spec = importlib.util.spec_from_file_location(
-    "logseq_cli", ROOT / "logseq" / "scripts" / "logseq-cli.py")
+spec = importlib.util.spec_from_file_location("logseq_cli", ROOT / "logseq" / "scripts" / "logseq-cli.py")
 cli = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cli)
 
@@ -2370,11 +2342,15 @@ def setup_env(td: str):
     (g / "pages" / "Foo.md").write_text("- see [[Bar]]\n")
     (g / "pages" / "Bar.md").write_text("- hi\n")
     cfgp = root / "config.json"
-    cfgp.write_text(json.dumps({
-        "graphs": {"main": {"path": str(g)}},
-        "default_graph": "main",
-        "api": {"url": "http://127.0.0.1:1", "token_env": "NO_SUCH_TOKEN"},
-    }))
+    cfgp.write_text(
+        json.dumps(
+            {
+                "graphs": {"main": {"path": str(g)}},
+                "default_graph": "main",
+                "api": {"url": "http://127.0.0.1:1", "token_env": "NO_SUCH_TOKEN"},
+            }
+        )
+    )
     return g, cfgp
 
 
@@ -2399,8 +2375,7 @@ class TestCli(unittest.TestCase):
         self.assertFalse(out["api_up"])
 
     def test_append_journal_files_fallback(self):
-        code, out = self._run("append", "--journal", "--text", "note",
-                              "--date", "2026-07-17")
+        code, out = self._run("append", "--journal", "--text", "note", "--date", "2026-07-17")
         self.assertEqual(code, 0)
         self.assertEqual(out["via"], "files")
         f = self.g / "journals" / "2026_07_17.md"
@@ -2415,20 +2390,16 @@ class TestCli(unittest.TestCase):
         self.assertEqual(out["pages"]["foo"]["links"], ["Bar"])
 
     def test_rename_refs_dry_then_apply(self):
-        code, out = self._run("rename-refs", "--old", "Bar", "--new", "Baz",
-                              "--dry-run")
+        code, out = self._run("rename-refs", "--old", "Bar", "--new", "Baz", "--dry-run")
         self.assertEqual(code, 0)
         self.assertTrue(out["dry_run"])
-        self.assertEqual((self.g / "pages" / "Foo.md").read_text(),
-                         "- see [[Bar]]\n")
+        self.assertEqual((self.g / "pages" / "Foo.md").read_text(), "- see [[Bar]]\n")
         code, out = self._run("rename-refs", "--old", "Bar", "--new", "Baz")
         self.assertEqual(code, 0)
-        self.assertEqual((self.g / "pages" / "Foo.md").read_text(),
-                         "- see [[Baz]]\n")
+        self.assertEqual((self.g / "pages" / "Foo.md").read_text(), "- see [[Baz]]\n")
 
     def test_error_is_json_exit_1(self):
-        code, out = self._run("merge", "--source", "Nope", "--target", "Bar",
-                              "--content-file", "/dev/null")
+        code, out = self._run("merge", "--source", "Nope", "--target", "Bar", "--content-file", "/dev/null")
         self.assertEqual(code, 1)
         self.assertIn("error", out)
 
@@ -2461,6 +2432,7 @@ Expected: FAIL — the placeholder script raises `SystemExit` at import time.
 ```python
 #!/usr/bin/env python3
 """CLI over logseqlib. One JSON value per invocation; errors -> {"error"} + rc 1."""
+
 import argparse
 import datetime
 import json
@@ -2474,25 +2446,24 @@ from logseqlib import convert as cv, page as pg, refactor, scan  # noqa: E402
 
 
 def _stamp():
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y%m%dT%H%M%SZ")
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _resolve(args):
-    return cfg.resolve(graph=args.graph,
-                       config_path=Path(args.config) if args.config
-                       else cfg.CONFIG_PATH)
+    return cfg.resolve(graph=args.graph, config_path=Path(args.config) if args.config else cfg.CONFIG_PATH)
 
 
 def cmd_resolve(args):
     r = _resolve(args)
     if args.write_config and r.source == "discovered":
-        cfg.write_config(r, config_path=Path(args.config) if args.config
-                         else cfg.CONFIG_PATH)
-    return {"name": r.name, "path": str(r.path), "source": r.source,
-            "api_up": api.probe(r),
-            "obsidian_vault": str(r.obsidian_vault) if r.obsidian_vault
-            else None}
+        cfg.write_config(r, config_path=Path(args.config) if args.config else cfg.CONFIG_PATH)
+    return {
+        "name": r.name,
+        "path": str(r.path),
+        "source": r.source,
+        "api_up": api.probe(r),
+        "obsidian_vault": str(r.obsidian_vault) if r.obsidian_vault else None,
+    }
 
 
 def cmd_append(args):
@@ -2505,24 +2476,30 @@ def cmd_append(args):
 
 def cmd_create_page(args):
     r = _resolve(args)
-    content = (Path(args.content_file).read_text() if args.content_file
-               else args.text)
+    content = Path(args.content_file).read_text() if args.content_file else args.text
     return api.create_page(r, args.page, content)
 
 
 def cmd_scan(args):
     index = scan.scan_graph(_resolve(args).path)
-    return {"pages": {k: {"path": str(v.path), "is_journal": v.is_journal,
-                          "links": sorted(v.links), "tags": sorted(v.tags),
-                          "properties": v.properties,
-                          "parse_error": v.parse_error}
-                      for k, v in sorted(index.pages.items())}}
+    return {
+        "pages": {
+            k: {
+                "path": str(v.path),
+                "is_journal": v.is_journal,
+                "links": sorted(v.links),
+                "tags": sorted(v.tags),
+                "properties": v.properties,
+                "parse_error": v.parse_error,
+            }
+            for k, v in sorted(index.pages.items())
+        }
+    }
 
 
 def cmd_backlinks(args):
     index = scan.scan_graph(_resolve(args).path)
-    return {"page": args.page,
-            "backlinks": sorted(scan.backlinks(index, args.page))}
+    return {"page": args.page, "backlinks": sorted(scan.backlinks(index, args.page))}
 
 
 def cmd_lint(args):
@@ -2534,31 +2511,26 @@ def cmd_lint(args):
 
 
 def _apply(graph, changes, args):
-    return ap.apply_changeset(graph, changes, _stamp(),
-                              dry_run=args.dry_run, force=args.force)
+    return ap.apply_changeset(graph, changes, _stamp(), dry_run=args.dry_run, force=args.force)
 
 
 def cmd_rename_refs(args):
     r = _resolve(args)
     index = scan.scan_graph(r.path)
-    return _apply(r.path, refactor.rename_refs(index, args.old, args.new),
-                  args)
+    return _apply(r.path, refactor.rename_refs(index, args.old, args.new), args)
 
 
 def cmd_merge(args):
     r = _resolve(args)
     index = scan.scan_graph(r.path)
     merged = Path(args.content_file).read_text()
-    return _apply(r.path,
-                  refactor.merge_pages(index, args.source, args.target,
-                                       merged), args)
+    return _apply(r.path, refactor.merge_pages(index, args.source, args.target, merged), args)
 
 
 def cmd_apply(args):
     r = _resolve(args)
     data = json.loads(Path(args.changeset_file).read_text())
-    changes = [ap.Change(r.path / c["path"], c["content"])
-               for c in data["changes"]]
+    changes = [ap.Change(r.path / c["path"], c["content"]) for c in data["changes"]]
     return _apply(r.path, changes, args)
 
 
@@ -2567,8 +2539,7 @@ def _vault(args, r):
         return Path(args.vault)
     if r.obsidian_vault:
         return r.obsidian_vault
-    raise cfg.ConfigError("no Obsidian vault: pass --vault or set "
-                          "obsidian_vault in the config")
+    raise cfg.ConfigError("no Obsidian vault: pass --vault or set obsidian_vault in the config")
 
 
 def cmd_convert_plan(args):
@@ -2576,10 +2547,19 @@ def cmd_convert_plan(args):
     vault = _vault(args, r)
     scope = Path(args.scope) if args.scope else None
     plans = cv.plan_import(vault, r.path, scope)
-    return {"plans": [{"source": str(p.source), "page_name": p.page_name,
-                       "target": str(p.target), "status": p.status,
-                       "warnings": p.warnings, "assets": p.assets}
-                      for p in plans]}
+    return {
+        "plans": [
+            {
+                "source": str(p.source),
+                "page_name": p.page_name,
+                "target": str(p.target),
+                "status": p.status,
+                "warnings": p.warnings,
+                "assets": p.assets,
+            }
+            for p in plans
+        ]
+    }
 
 
 def cmd_convert_import(args):
@@ -2669,8 +2649,15 @@ def main(argv=None):
     try:
         out = args.fn(args)
         rc = 0
-    except (cfg.ConfigError, ap.ApplyError, pg.PageParseError,
-            FileExistsError, KeyError, OSError, json.JSONDecodeError) as e:
+    except (
+        cfg.ConfigError,
+        ap.ApplyError,
+        pg.PageParseError,
+        FileExistsError,
+        KeyError,
+        OSError,
+        json.JSONDecodeError,
+    ) as e:
         out, rc = {"error": str(e)}, 1
     json.dump(out, sys.stdout, indent=2)
     print()

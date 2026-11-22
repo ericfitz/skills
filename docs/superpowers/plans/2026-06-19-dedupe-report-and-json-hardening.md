@@ -40,6 +40,7 @@ class TestRunSemGraphJSON(unittest.TestCase):
             returncode = 0
             stdout = "{not json"
             stderr = ""
+
         self._orig = dd.subprocess.run
         dd.subprocess.run = lambda *a, **k: FakeProc()
         with self.assertRaises(dd.SemError):
@@ -50,6 +51,7 @@ class TestRunSemGraphJSON(unittest.TestCase):
             returncode = 0
             stdout = '{"entities": [], "edges": []}'
             stderr = ""
+
         self._orig = dd.subprocess.run
         dd.subprocess.run = lambda *a, **k: FakeProc()
         self.assertEqual(dd.run_sem_graph([]), {"entities": [], "edges": []})
@@ -108,6 +110,7 @@ Add to `tests/test_dedupe.py` (uses `io`/`json`/`re`/`tempfile`; add any missing
 class TestReportFilename(unittest.TestCase):
     def test_report_filename_is_timestamped(self):
         import io, json, re, tempfile, os as _os
+
         with tempfile.TemporaryDirectory() as d:
             db = _os.path.join(d, "dedupe.db")
             # initialize the db so the report subcommand can connect/query
@@ -140,8 +143,7 @@ In `dev/scripts/dedupe.py`:
 (b) In the `report` branch of `main`, replace:
 
 ```python
-        path = os.path.join(os.path.dirname(ns.db) or ".", "reports",
-                            "dedupe-report.md")
+path = os.path.join(os.path.dirname(ns.db) or ".", "reports", "dedupe-report.md")
 ```
 
 with:

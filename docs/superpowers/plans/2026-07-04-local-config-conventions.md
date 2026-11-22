@@ -67,11 +67,11 @@ with:
 
 ```python
 LOCAL_DIR = ".local"
-REPOS_FILENAME = "repos.json"                 # canonical registry
-CACHE_FILENAME = "gh-projects.json"           # canonical cache
+REPOS_FILENAME = "repos.json"  # canonical registry
+CACHE_FILENAME = "gh-projects.json"  # canonical cache
 LEGACY_CACHE_FILENAME = "project-cache.json"  # legacy .local/ cache name
-LEGACY_LOCAL_CONFIG = "projects.json"         # legacy .local/projects.json
-LEGACY_ROOT_CONFIG = ".local-projects.json"   # legacy repo-root registry
+LEGACY_LOCAL_CONFIG = "projects.json"  # legacy .local/projects.json
+LEGACY_ROOT_CONFIG = ".local-projects.json"  # legacy repo-root registry
 ```
 
 - [ ] **Step 3: Update the module docstring**
@@ -164,25 +164,27 @@ Add to `~/Scripts/test_provision_repo_config.py`:
 class TestNormalizeRegistry(unittest.TestCase):
     def test_bare_list(self):
         raw = [{"name": "tmi", "path": "/p", "github": {"owner": "e", "repo": "tmi"}}]
-        self.assertEqual(prc.normalize_registry(raw),
-                         {"tmi": {"path": "/p", "github": {"owner": "e", "repo": "tmi"}}})
+        self.assertEqual(prc.normalize_registry(raw), {"tmi": {"path": "/p", "github": {"owner": "e", "repo": "tmi"}}})
 
     def test_wrapped_list(self):
         raw = {"projects": [{"name": "tmi", "github": {"repo": "tmi"}}]}
-        self.assertEqual(prc.normalize_registry(raw),
-                         {"tmi": {"github": {"repo": "tmi"}}})
+        self.assertEqual(prc.normalize_registry(raw), {"tmi": {"github": {"repo": "tmi"}}})
 
     def test_already_keyed_passthrough(self):
         raw = {"tmi": {"path": "/p", "github": {"repo": "tmi"}}}
         self.assertEqual(prc.normalize_registry(raw), raw)
 
     def test_drops_issues_project(self):
-        raw = {"projects": [{"name": "tmi", "github": {
-            "owner": "e", "repo": "tmi", "project": "Roadmap",
-            "issues_project": {"id": "PVT_x"}}}]}
+        raw = {
+            "projects": [
+                {
+                    "name": "tmi",
+                    "github": {"owner": "e", "repo": "tmi", "project": "Roadmap", "issues_project": {"id": "PVT_x"}},
+                }
+            ]
+        }
         out = prc.normalize_registry(raw)
-        self.assertEqual(out["tmi"]["github"],
-                         {"owner": "e", "repo": "tmi", "project": "Roadmap"})
+        self.assertEqual(out["tmi"]["github"], {"owner": "e", "repo": "tmi", "project": "Roadmap"})
 
     def test_skips_entries_without_name(self):
         raw = [{"github": {}}, {"name": "ok", "github": {}}]
@@ -298,8 +300,7 @@ class TestFindRegistry(unittest.TestCase):
             (root / ".local" / "repos.json").write_text("{}")
             (root / ".local" / "projects.json").write_text("{}")
             (root / ".local-projects.json").write_text("[]")
-            self.assertEqual(prc.find_registry(root),
-                             (root / ".local" / "repos.json", "current"))
+            self.assertEqual(prc.find_registry(root), (root / ".local" / "repos.json", "current"))
 
     def test_legacy_local(self):
         with tempfile.TemporaryDirectory() as d:
@@ -307,15 +308,13 @@ class TestFindRegistry(unittest.TestCase):
             (root / ".local").mkdir()
             (root / ".local" / "projects.json").write_text("{}")
             (root / ".local-projects.json").write_text("[]")
-            self.assertEqual(prc.find_registry(root),
-                             (root / ".local" / "projects.json", "legacy_local"))
+            self.assertEqual(prc.find_registry(root), (root / ".local" / "projects.json", "legacy_local"))
 
     def test_legacy_root(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".local-projects.json").write_text("[]")
-            self.assertEqual(prc.find_registry(root),
-                             (root / ".local-projects.json", "legacy_root"))
+            self.assertEqual(prc.find_registry(root), (root / ".local-projects.json", "legacy_root"))
 
     def test_walks_up(self):
         with tempfile.TemporaryDirectory() as d:
@@ -324,8 +323,7 @@ class TestFindRegistry(unittest.TestCase):
             (root / ".local" / "repos.json").write_text("{}")
             nested = root / "a" / "b"
             nested.mkdir(parents=True)
-            self.assertEqual(prc.find_registry(nested),
-                             (root / ".local" / "repos.json", "current"))
+            self.assertEqual(prc.find_registry(nested), (root / ".local" / "repos.json", "current"))
 
     def test_none(self):
         with tempfile.TemporaryDirectory() as d:
@@ -336,8 +334,7 @@ class TestLoadOrInit(unittest.TestCase):
     def test_init_from_git_remote(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            with mock.patch.object(prc, "git_remote_url",
-                                   return_value="git@github.com:ericfitz/tmi.git"):
+            with mock.patch.object(prc, "git_remote_url", return_value="git@github.com:ericfitz/tmi.git"):
                 config, path = prc.load_or_init_config(root)
             self.assertEqual(config, {"tmi": {"github": {"owner": "ericfitz", "repo": "tmi"}}})
             self.assertEqual(path, root / ".local" / "repos.json")
@@ -345,10 +342,15 @@ class TestLoadOrInit(unittest.TestCase):
     def test_migrates_legacy_root_to_canonical_path(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            (root / ".local-projects.json").write_text(json.dumps(
-                {"projects": [{"name": "tmi", "github": {
-                    "owner": "e", "repo": "tmi",
-                    "issues_project": {"id": "PVT_x"}}}]}))
+            (root / ".local-projects.json").write_text(
+                json.dumps(
+                    {
+                        "projects": [
+                            {"name": "tmi", "github": {"owner": "e", "repo": "tmi", "issues_project": {"id": "PVT_x"}}}
+                        ]
+                    }
+                )
+            )
             config, path = prc.load_or_init_config(root)
             self.assertEqual(path, root / ".local" / "repos.json")
             self.assertEqual(config, {"tmi": {"github": {"owner": "e", "repo": "tmi"}}})
@@ -357,8 +359,9 @@ class TestLoadOrInit(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".local").mkdir()
-            (root / ".local" / "projects.json").write_text(json.dumps(
-                {"projects": [{"name": "tmi", "github": {"repo": "tmi"}}]}))
+            (root / ".local" / "projects.json").write_text(
+                json.dumps({"projects": [{"name": "tmi", "github": {"repo": "tmi"}}]})
+            )
             config, path = prc.load_or_init_config(root)
             self.assertEqual(path, root / ".local" / "repos.json")
             self.assertEqual(config, {"tmi": {"github": {"repo": "tmi"}}})
@@ -516,20 +519,18 @@ class TestEnsureLocalFields(unittest.TestCase):
 
 class TestProcessEntryKeyed(unittest.TestCase):
     def _paths(self, d):
-        return (Path(d) / ".local" / "repos.json",
-                Path(d) / ".local" / "gh-projects.json",
-                Path(d) / ".gitignore")
+        return (Path(d) / ".local" / "repos.json", Path(d) / ".local" / "gh-projects.json", Path(d) / ".gitignore")
 
     def test_resolved_writes_keyed_files(self):
         with tempfile.TemporaryDirectory() as d:
             cfg_p, cache_p, gi_p = self._paths(d)
             config = {"tmi": {"github": {"owner": "e", "repo": "tmi"}}}
             linked = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "e"}]
-            with mock.patch.object(prc, "discover_linked_projects", return_value=linked), \
-                 mock.patch.object(prc, "enumerate_project",
-                                   return_value={"cached_at": "t", "project": linked[0]}):
-                res = prc.process_entry("tmi", config["tmi"], {}, "t", config,
-                                        cfg_p, cache_p, gi_p)
+            with (
+                mock.patch.object(prc, "discover_linked_projects", return_value=linked),
+                mock.patch.object(prc, "enumerate_project", return_value={"cached_at": "t", "project": linked[0]}),
+            ):
+                res = prc.process_entry("tmi", config["tmi"], {}, "t", config, cfg_p, cache_p, gi_p)
             self.assertEqual(res, {"name": "tmi", "status": "resolved", "title": "Roadmap"})
             written = json.loads(cfg_p.read_text())
             self.assertEqual(written["tmi"]["github"]["project"], "Roadmap")
@@ -542,8 +543,7 @@ class TestProcessEntryKeyed(unittest.TestCase):
             cfg_p, cache_p, gi_p = self._paths(d)
             config = {"tmi": {"github": {"owner": "e", "repo": "tmi"}}}
             with mock.patch.object(prc, "discover_linked_projects", return_value=[]):
-                res = prc.process_entry("tmi", config["tmi"], {}, "t", config,
-                                        cfg_p, cache_p, gi_p)
+                res = prc.process_entry("tmi", config["tmi"], {}, "t", config, cfg_p, cache_p, gi_p)
             self.assertEqual(res["status"], "none")
             self.assertEqual(json.loads(cfg_p.read_text())["tmi"]["github"]["project"], "")
             self.assertFalse(cache_p.exists())
@@ -552,11 +552,12 @@ class TestProcessEntryKeyed(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cfg_p, cache_p, gi_p = self._paths(d)
             config = {"tmi": {"github": {"owner": "e", "repo": "tmi"}}}
-            linked = [{"number": 2, "id": "a", "title": "R", "owner": "e"},
-                      {"number": 5, "id": "b", "title": "S", "owner": "e"}]
+            linked = [
+                {"number": 2, "id": "a", "title": "R", "owner": "e"},
+                {"number": 5, "id": "b", "title": "S", "owner": "e"},
+            ]
             with mock.patch.object(prc, "discover_linked_projects", return_value=linked):
-                res = prc.process_entry("tmi", config["tmi"], {}, "t", config,
-                                        cfg_p, cache_p, gi_p)
+                res = prc.process_entry("tmi", config["tmi"], {}, "t", config, cfg_p, cache_p, gi_p)
             self.assertEqual(res["status"], "needs_selection")
             self.assertEqual(len(res["candidates"]), 2)
             self.assertFalse(cfg_p.exists())
@@ -567,15 +568,17 @@ class TestMainKeyed(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".local").mkdir()
-            (root / ".local" / "projects.json").write_text(json.dumps(
-                {"projects": [{"name": "tmi", "github": {"owner": "e", "repo": "tmi"}}]}))
+            (root / ".local" / "projects.json").write_text(
+                json.dumps({"projects": [{"name": "tmi", "github": {"owner": "e", "repo": "tmi"}}]})
+            )
             (root / ".local" / "project-cache.json").write_text('{"old": {"cached_at": "x"}}')
             linked = [{"number": 2, "id": "a", "title": "Roadmap", "owner": "e"}]
             buf = io.StringIO()
-            with mock.patch.object(prc, "discover_linked_projects", return_value=linked), \
-                 mock.patch.object(prc, "enumerate_project",
-                                   return_value={"cached_at": "t", "project": linked[0]}), \
-                 contextlib.redirect_stdout(buf):
+            with (
+                mock.patch.object(prc, "discover_linked_projects", return_value=linked),
+                mock.patch.object(prc, "enumerate_project", return_value={"cached_at": "t", "project": linked[0]}),
+                contextlib.redirect_stdout(buf),
+            ):
                 rc = prc.main(["update", "--name", "tmi", "--dir", str(root)])
             self.assertEqual(rc, 0)
             self.assertEqual(json.loads(buf.getvalue())["results"][0]["status"], "resolved")
@@ -587,12 +590,12 @@ class TestMainKeyed(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".local").mkdir()
-            (root / ".local" / "repos.json").write_text(json.dumps(
-                {"tmi": {"github": {"owner": "e", "repo": "tmi"}}}))
+            (root / ".local" / "repos.json").write_text(json.dumps({"tmi": {"github": {"owner": "e", "repo": "tmi"}}}))
             buf = io.StringIO()
-            with mock.patch.object(prc, "discover_linked_projects",
-                                   side_effect=prc.GhError("boom")), \
-                 contextlib.redirect_stdout(buf):
+            with (
+                mock.patch.object(prc, "discover_linked_projects", side_effect=prc.GhError("boom")),
+                contextlib.redirect_stdout(buf),
+            ):
                 rc = prc.main(["update", "--name", "tmi", "--dir", str(root)])
             self.assertEqual(rc, 0)
             out = json.loads(buf.getvalue())
@@ -645,8 +648,7 @@ def prompt_project_choice(name, candidates):
         return None
 
 
-def process_entry(name, entry, selection, now_iso, config,
-                  config_path, cache_path, gitignore_path, interactive=False):
+def process_entry(name, entry, selection, now_iso, config, config_path, cache_path, gitignore_path, interactive=False):
     """Resolve one entry's project and update cache/registry. Returns a result dict."""
     gh = entry.get("github", {})
     owner, repo = gh.get("owner"), gh.get("repo")
@@ -655,8 +657,11 @@ def process_entry(name, entry, selection, now_iso, config,
         owner = owner or o2
         repo = repo or r2
     if not owner or not repo:
-        return {"name": name, "status": "error",
-                "message": "no owner/repo in config and none derivable from git remote"}
+        return {
+            "name": name,
+            "status": "error",
+            "message": "no owner/repo in config and none derivable from git remote",
+        }
 
     repo_root = config_path.parent.parent
     ensure_local_fields(entry, repo_root, interactive)
@@ -671,9 +676,11 @@ def process_entry(name, entry, selection, now_iso, config,
     )
 
     if status == "needs_selection":
-        return {"name": name, "status": "needs_selection",
-                "candidates": [{"number": p["number"], "title": p["title"]}
-                               for p in payload]}
+        return {
+            "name": name,
+            "status": "needs_selection",
+            "candidates": [{"number": p["number"], "title": p["title"]} for p in payload],
+        }
     if status == "none":
         set_project_title(config, name, "")
         write_json(config_path, config)
@@ -695,8 +702,7 @@ Replace the whole `main` function (currently ~lines 388–427) with:
 
 ```python
 def main(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Provision a repo's .local/ registry and GitHub Project cache.")
+    parser = argparse.ArgumentParser(description="Provision a repo's .local/ registry and GitHub Project cache.")
     parser.add_argument("command", choices=["update"])
     parser.add_argument("--name", help="Only process the entry with this name.")
     parser.add_argument("--dir", default=".", help="Directory to resolve config from.")
@@ -705,7 +711,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     config, config_path = load_or_init_config(args.dir)
-    local_dir = config_path.parent            # <repo-root>/.local
+    local_dir = config_path.parent  # <repo-root>/.local
     migrate_cache_file(local_dir)
     cache_path = local_dir / CACHE_FILENAME
     gitignore_path = local_dir.parent / ".gitignore"
@@ -722,23 +728,38 @@ def main(argv=None):
     names = list(config.keys())
     if args.name:
         if args.name not in config:
-            print(json.dumps({"results": [
-                {"name": args.name, "status": "error", "message": "entry not found"}]}))
+            print(json.dumps({"results": [{"name": args.name, "status": "error", "message": "entry not found"}]}))
             return 1
         names = [args.name]
 
     results = []
     for name in names:
         try:
-            res = process_entry(name, config[name], selection, now_iso, config,
-                                config_path, cache_path, gitignore_path,
-                                interactive=interactive)
+            res = process_entry(
+                name,
+                config[name],
+                selection,
+                now_iso,
+                config,
+                config_path,
+                cache_path,
+                gitignore_path,
+                interactive=interactive,
+            )
             if res.get("status") == "needs_selection" and interactive:
                 choice = prompt_project_choice(name, res["candidates"])
                 if choice is not None:
-                    res = process_entry(name, config[name], {"number": choice}, now_iso,
-                                        config, config_path, cache_path, gitignore_path,
-                                        interactive=interactive)
+                    res = process_entry(
+                        name,
+                        config[name],
+                        {"number": choice},
+                        now_iso,
+                        config,
+                        config_path,
+                        cache_path,
+                        gitignore_path,
+                        interactive=interactive,
+                    )
             results.append(res)
         except GhError as exc:
             results.append({"name": name, "status": "error", "message": str(exc)})

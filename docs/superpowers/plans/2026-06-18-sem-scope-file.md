@@ -67,7 +67,7 @@ class TestGlobMatch(unittest.TestCase):
     def test_question_mark(self):
         self.assertTrue(ss.glob_match("a.ts", "?.ts"))
         self.assertFalse(ss.glob_match("ab.ts", "?.ts"))
-        self.assertFalse(ss.glob_match("a/c", "a?c"))   # ? must not cross '/'
+        self.assertFalse(ss.glob_match("a/c", "a?c"))  # ? must not cross '/'
 
 
 class TestIsExcluded(unittest.TestCase):
@@ -145,6 +145,7 @@ Create `dev/scripts/sem_scope.py`:
 When a tool is invoked with no explicit path argument it consults this file for default
 include/exclude globs. Explicit path arguments always fully override the file.
 """
+
 import json
 import os
 import re
@@ -191,7 +192,7 @@ def _compile(pattern):
                 while j < n and pattern[j] == "*":
                     j += 1
                 if j - i >= 2:  # '**'
-                    if pattern[j:j + 1] == "/":
+                    if pattern[j : j + 1] == "/":
                         out.append("(?:.*/)?")
                         j += 1
                     else:
@@ -272,10 +273,8 @@ Add to `tests/test_sem_annotate.py` (inside the existing scan test class or a ne
 class TestScanScope(unittest.TestCase):
     def setUp(self):
         # No markers => both entities classify as "missing" (surfaced by scan).
-        self.files = {"src/a.ts": "function A() {}\n",
-                      "scripts/b.ts": "function B() {}\n"}
-        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame,
-                      sa.logic_changed_entities, sa.sem_scope.load_scope)
+        self.files = {"src/a.ts": "function A() {}\n", "scripts/b.ts": "function B() {}\n"}
+        self._orig = (sa._read_text, sa.sem_entities, sa.sem_blame, sa.logic_changed_entities, sa.sem_scope.load_scope)
         sa._read_text = lambda p: self.files[p]
         sa.sem_entities = lambda paths, cwd=None: [
             {"name": "A", "type": "function", "file": "src/a.ts", "start_line": 1, "end_line": 1},
@@ -285,25 +284,25 @@ class TestScanScope(unittest.TestCase):
         sa.logic_changed_entities = lambda base, f, cwd=None: set()
 
     def tearDown(self):
-        (sa._read_text, sa.sem_entities, sa.sem_blame,
-         sa.logic_changed_entities, sa.sem_scope.load_scope) = self._orig
+        (sa._read_text, sa.sem_entities, sa.sem_blame, sa.logic_changed_entities, sa.sem_scope.load_scope) = self._orig
 
     def test_scope_exclude_drops_entities(self):
-        sa.sem_scope.load_scope = lambda cwd=None: {"include": ["src/", "scripts/"],
-                                                    "exclude": ["scripts/"]}
+        sa.sem_scope.load_scope = lambda cwd=None: {"include": ["src/", "scripts/"], "exclude": ["scripts/"]}
         work = sa.scan(None)
         names = {w["name"] for w in work}
-        self.assertIn("A", names)            # src/ kept (missing marker -> surfaced)
-        self.assertNotIn("B", names)         # scripts/ excluded by scope
+        self.assertIn("A", names)  # src/ kept (missing marker -> surfaced)
+        self.assertNotIn("B", names)  # scripts/ excluded by scope
 
     def test_explicit_paths_ignore_scope(self):
         called = {"n": 0}
+
         def boom(cwd=None):
             called["n"] += 1
             return {"exclude": ["**/*"]}
+
         sa.sem_scope.load_scope = boom
         sa.scan(["src/a.ts"])
-        self.assertEqual(called["n"], 0)     # explicit args => scope file never consulted
+        self.assertEqual(called["n"], 0)  # explicit args => scope file never consulted
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -429,14 +428,14 @@ c. Thread `exclude` through `_filter_graph(graph, scope_paths, exts, exclude=Non
 d. In `main`'s `load` branch, when the `scope` positional is empty, consult the scope file:
 
 ```python
-    scope_paths = list(ns.scope)
-    exclude = None
-    if not scope_paths:
-        scope_file = sem_scope.load_scope(ns.cwd)
-        if scope_file:
-            scope_paths = list(scope_file.get("include") or [])   # [] => whole repo
-            exclude = scope_file.get("exclude") or None
-    # then pass scope_paths + exclude into load_graph(...)
+scope_paths = list(ns.scope)
+exclude = None
+if not scope_paths:
+    scope_file = sem_scope.load_scope(ns.cwd)
+    if scope_file:
+        scope_paths = list(scope_file.get("include") or [])  # [] => whole repo
+        exclude = scope_file.get("exclude") or None
+# then pass scope_paths + exclude into load_graph(...)
 ```
 
 - [ ] **Step 5: Run scope tests + full suite**

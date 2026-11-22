@@ -5,9 +5,16 @@ from tempfile import TemporaryDirectory
 
 from bumplib.gitfiles import changed_files
 
-GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00",
-           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00",
-           "HOME": "/dev/null", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+GIT_ENV = {
+    "GIT_AUTHOR_NAME": "t",
+    "GIT_AUTHOR_EMAIL": "t@t",
+    "GIT_AUTHOR_DATE": "2026-01-01T00:00:00",
+    "GIT_COMMITTER_NAME": "t",
+    "GIT_COMMITTER_EMAIL": "t@t",
+    "GIT_COMMITTER_DATE": "2026-01-01T00:00:00",
+    "HOME": "/dev/null",
+    "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+}
 
 
 def _git(cwd, *args):

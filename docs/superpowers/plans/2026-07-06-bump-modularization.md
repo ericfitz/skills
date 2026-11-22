@@ -72,34 +72,64 @@ from bumplib import contracts as c
 
 class TestContracts(unittest.TestCase):
     def test_update_record_defaults(self):
-        r = c.UpdateRecord(name="eslint", current="9.38.0", latest="9.39.2",
-                           wanted="9.39.2", bump=c.BUMP_MINOR, kind="direct",
-                           location="package.json")
+        r = c.UpdateRecord(
+            name="eslint",
+            current="9.38.0",
+            latest="9.39.2",
+            wanted="9.39.2",
+            bump=c.BUMP_MINOR,
+            kind="direct",
+            location="package.json",
+        )
         self.assertFalse(r.pinned)
         self.assertEqual(r.meta, {})
         self.assertEqual(r.ecosystem, "")
 
     def test_dump_is_stable_json(self):
-        r = c.UpdateRecord(name="a", current="1.0.0", latest="1.0.1",
-                           wanted="1.0.1", bump=c.BUMP_PATCH, kind="direct",
-                           location="go.mod")
+        r = c.UpdateRecord(
+            name="a",
+            current="1.0.0",
+            latest="1.0.1",
+            wanted="1.0.1",
+            bump=c.BUMP_PATCH,
+            kind="direct",
+            location="go.mod",
+        )
         parsed = json.loads(c.dump(r))
         self.assertEqual(parsed["name"], "a")
         self.assertEqual(parsed["bump"], "patch")
         self.assertEqual(parsed["pinned"], False)
 
     def test_dump_list_roundtrips_records(self):
-        recs = [c.UpdateRecord(name="a", current="1.0.0", latest="2.0.0",
-                               wanted="1.0.0", bump=c.BUMP_MAJOR, kind="direct",
-                               location="go.mod")]
+        recs = [
+            c.UpdateRecord(
+                name="a",
+                current="1.0.0",
+                latest="2.0.0",
+                wanted="1.0.0",
+                bump=c.BUMP_MAJOR,
+                kind="direct",
+                location="go.mod",
+            )
+        ]
         back = c.load_records(c.dump(recs))
         self.assertEqual(back[0].name, "a")
         self.assertEqual(back[0].bump, "major")
 
     def test_load_advisories(self):
-        s = c.dump([c.Advisory(package="qs", ecosystem="node", severity="HIGH",
-                               current="6.14.1", fixed="6.14.2", ids=["CVE-1"],
-                               source="audit")])
+        s = c.dump(
+            [
+                c.Advisory(
+                    package="qs",
+                    ecosystem="node",
+                    severity="HIGH",
+                    current="6.14.1",
+                    fixed="6.14.2",
+                    ids=["CVE-1"],
+                    source="audit",
+                )
+            ]
+        )
         adv = c.load_advisories(s)
         self.assertEqual(adv[0].ids, ["CVE-1"])
 
@@ -127,6 +157,7 @@ __version__ = "2.0.0"
 Every adapter verb emits one of these shapes; the categorizer and orchestrator
 consume them without knowing which provider produced the data.
 """
+
 import json
 from dataclasses import dataclass, field, is_dataclass, asdict
 
@@ -247,11 +278,16 @@ from bumplib import categorize as cat
 
 def rec(name, current, latest, **kw):
     bump = cat.classify_bump(current, latest)
-    return c.UpdateRecord(name=name, current=current, latest=latest,
-                          wanted=kw.get("wanted", latest), bump=bump,
-                          kind=kw.get("kind", "direct"),
-                          location=kw.get("location", "manifest"),
-                          pinned=kw.get("pinned", False))
+    return c.UpdateRecord(
+        name=name,
+        current=current,
+        latest=latest,
+        wanted=kw.get("wanted", latest),
+        bump=bump,
+        kind=kw.get("kind", "direct"),
+        location=kw.get("location", "manifest"),
+        pinned=kw.get("pinned", False),
+    )
 
 
 class TestSemver(unittest.TestCase):
@@ -284,8 +320,9 @@ class TestCategorize(unittest.TestCase):
         self.assertEqual(out.safe[0]["reason"], "minor update")
 
     def test_security_patch(self):
-        adv = [c.Advisory(package="qs", ecosystem="node", severity="HIGH",
-                          current="6.14.1", fixed="6.14.2", ids=["CVE-1"])]
+        adv = [
+            c.Advisory(package="qs", ecosystem="node", severity="HIGH", current="6.14.1", fixed="6.14.2", ids=["CVE-1"])
+        ]
         out = cat.categorize([rec("qs", "6.14.1", "6.14.2")], adv, [], {}, set())
         self.assertEqual(len(out.securityFixes), 1)
 
@@ -295,24 +332,20 @@ class TestCategorize(unittest.TestCase):
         self.assertIn("Major", out.needsPlan[0]["reason"])
 
     def test_excluded_needs_plan(self):
-        out = cat.categorize([rec("@angular/core", "20.2.0", "20.3.0")], [],
-                             ["@angular/*"], {}, set())
+        out = cat.categorize([rec("@angular/core", "20.2.0", "20.3.0")], [], ["@angular/*"], {}, set())
         self.assertEqual(len(out.needsPlan), 1)
         self.assertIn("Excluded", out.needsPlan[0]["reason"])
 
     def test_pinned_needs_plan(self):
-        out = cat.categorize([rec("requests", "2.28.0", "2.29.0", pinned=True)], [],
-                             [], {}, set())
+        out = cat.categorize([rec("requests", "2.28.0", "2.29.0", pinned=True)], [], [], {}, set())
         self.assertEqual(out.needsPlan[0]["reason"], "pinned")
 
     def test_hold_needs_plan(self):
-        out = cat.categorize([rec("@antv/x6", "2.19.2", "2.20.0")], [], [],
-                             {"@antv/x6": "v3 breaking"}, set())
+        out = cat.categorize([rec("@antv/x6", "2.19.2", "2.20.0")], [], [], {"@antv/x6": "v3 breaking"}, set())
         self.assertIn("Hold", out.needsPlan[0]["reason"])
 
     def test_replace_target_skipped(self):
-        out = cat.categorize([rec("local/mod", "1.0.0", "1.1.0")], [], [], {},
-                             {"local/mod"})
+        out = cat.categorize([rec("local/mod", "1.0.0", "1.1.0")], [], [], {}, {"local/mod"})
         self.assertEqual(len(out.skipped), 1)
 
     def test_uptodate_skipped(self):
@@ -320,8 +353,9 @@ class TestCategorize(unittest.TestCase):
         self.assertEqual(len(out.skipped), 1)
 
     def test_major_security_goes_to_plan(self):
-        adv = [c.Advisory(package="pgx", ecosystem="go", severity="HIGH",
-                          current="4.18.3", fixed="5.0.0", ids=["CVE-9"])]
+        adv = [
+            c.Advisory(package="pgx", ecosystem="go", severity="HIGH", current="4.18.3", fixed="5.0.0", ids=["CVE-9"])
+        ]
         out = cat.categorize([rec("pgx", "4.18.3", "5.8.0")], adv, [], {}, set())
         self.assertEqual(len(out.needsPlan), 1)
         self.assertIn("Major security", out.needsPlan[0]["reason"])
@@ -341,6 +375,7 @@ Expected: FAIL — `No module named 'bumplib.categorize'`.
 ```python
 # deps/scripts/bumplib/categorize.py
 """Agnostic categorizer: semver comparison + glob exclusion, no provider knowledge."""
+
 import re
 from dataclasses import asdict
 
@@ -458,8 +493,7 @@ from bumplib import config as cfg
 
 class TestClaudeExclusions(unittest.TestCase):
     def test_parses_bullets_under_heading(self):
-        text = ("# Project\n\n## Bump Exclusions\n"
-                "- @angular/*\n- zone.js\n\n## Other\n- not-this\n")
+        text = "# Project\n\n## Bump Exclusions\n- @angular/*\n- zone.js\n\n## Other\n- not-this\n"
         self.assertEqual(cfg.parse_claude_exclusions(text), ["@angular/*", "zone.js"])
 
     def test_no_heading_returns_empty(self):
@@ -477,8 +511,9 @@ class TestMerge(unittest.TestCase):
 
     def test_merges_both_sources(self):
         with tempfile.TemporaryDirectory() as td:
-            root = self._root(td, claude="## Bump Exclusions\n- a/*\n",
-                              bump_cfg={"exclude": ["b"], "hold": {"c": "later"}})
+            root = self._root(
+                td, claude="## Bump Exclusions\n- a/*\n", bump_cfg={"exclude": ["b"], "hold": {"c": "later"}}
+            )
             excl, holds = cfg.merged_exclusions(root)
             self.assertIn("a/*", excl)
             self.assertIn("b", excl)
@@ -517,15 +552,31 @@ Expected: FAIL — `No module named 'bumplib.config'`.
 ```python
 # deps/scripts/bumplib/config.py
 """Load and merge bump configuration: exclusions, adapter selection, command overrides."""
+
 import json
 from pathlib import Path
 
 DEFAULT_COMMANDS = {
     ("go", ""): {"cacheClear": "", "build": "go build ./...", "test": "go test ./...", "lint": "go vet ./..."},
-    ("python", "uv"): {"cacheClear": "uv cache clean", "build": "", "test": "uv run pytest", "lint": "uv run ruff check ."},
+    ("python", "uv"): {
+        "cacheClear": "uv cache clean",
+        "build": "",
+        "test": "uv run pytest",
+        "lint": "uv run ruff check .",
+    },
     ("python", "pip"): {"cacheClear": "pip cache purge", "build": "", "test": "pytest", "lint": "ruff check ."},
-    ("node", "pnpm"): {"cacheClear": "pnpm store prune && npm cache clean --force", "build": "pnpm run build", "test": "pnpm test", "lint": "pnpm run lint:all"},
-    ("node", "npm"): {"cacheClear": "npm cache clean --force", "build": "npm run build", "test": "npm test", "lint": "npm run lint"},
+    ("node", "pnpm"): {
+        "cacheClear": "pnpm store prune && npm cache clean --force",
+        "build": "pnpm run build",
+        "test": "pnpm test",
+        "lint": "pnpm run lint:all",
+    },
+    ("node", "npm"): {
+        "cacheClear": "npm cache clean --force",
+        "build": "npm run build",
+        "test": "npm test",
+        "lint": "npm run lint",
+    },
 }
 
 
@@ -665,6 +716,7 @@ Expected: FAIL — `No module named 'bumplib.dispatch'`.
 ```python
 # deps/scripts/bumplib/dispatch.py
 """Resolve axis+name to an adapter module and invoke a verb; handle the 'none' provider."""
+
 import importlib
 
 from . import contracts as c
@@ -698,6 +750,7 @@ def run(axis, name, verb, argv):
 # requires-python = ">=3.10"
 # ///
 """bump: unified CLI over bump adapters. Usage: bump.py <axis> <name> <verb> [args...]"""
+
 import sys
 from pathlib import Path
 
@@ -775,8 +828,10 @@ class TestGoOutdated(unittest.TestCase):
         self.assertNotIn("golang.org/x/sys", names)
 
     def test_replace_and_pinned(self):
-        gomod = ("module x\nrequire (\n\tgithub.com/foo/bar v1.2.3 // pinned: compat\n)\n"
-                 "replace github.com/foo/bar => ./local\n")
+        gomod = (
+            "module x\nrequire (\n\tgithub.com/foo/bar v1.2.3 // pinned: compat\n)\n"
+            "replace github.com/foo/bar => ./local\n"
+        )
         self.assertIn("github.com/foo/bar", go.replace_targets(gomod))
         self.assertIn("github.com/foo/bar", go.pinned_names(gomod))
 
@@ -803,6 +858,7 @@ Expected: FAIL — `No module named 'bumplib.ecosystems.go'`.
 ```python
 # deps/scripts/bumplib/ecosystems/go.py
 """Go ecosystem adapter."""
+
 import re
 import subprocess
 from pathlib import Path
@@ -820,9 +876,18 @@ def parse_outdated(text: str) -> list:
         if not m:
             continue
         name, cur, lat = m.group(1), m.group(2), m.group(3)
-        recs.append(c.UpdateRecord(name=name, current=cur, latest=lat, wanted=lat,
-                                   bump=classify_bump(cur, lat), kind="direct",
-                                   location="go.mod", ecosystem="go"))
+        recs.append(
+            c.UpdateRecord(
+                name=name,
+                current=cur,
+                latest=lat,
+                wanted=lat,
+                bump=classify_bump(cur, lat),
+                kind="direct",
+                location="go.mod",
+                ecosystem="go",
+            )
+        )
     return recs
 
 
@@ -831,7 +896,7 @@ def replace_targets(gomod_text: str) -> set:
     for line in gomod_text.splitlines():
         s = line.strip()
         if s.startswith("replace "):
-            body = s[len("replace "):].split("=>")[0].strip()
+            body = s[len("replace ") :].split("=>")[0].strip()
             out.add(body.split()[0])
     return out
 
@@ -846,6 +911,7 @@ def pinned_names(gomod_text: str) -> set:
 
 def parse_vuln(json_text: str) -> list:
     import json
+
     advs = []
     for line in json_text.splitlines():
         line = line.strip()
@@ -857,10 +923,18 @@ def parse_vuln(json_text: str) -> list:
             continue
         osv = obj.get("osv") or obj.get("finding")
         if isinstance(osv, dict) and osv.get("id"):
-            advs.append(c.Advisory(package=osv.get("affected", [{}])[0].get("package", {}).get("name", ""),
-                                   ecosystem="go", severity=osv.get("database_specific", {}).get("severity", ""),
-                                   current="", fixed="", ids=[osv["id"]],
-                                   summary=osv.get("summary", ""), source="govulncheck"))
+            advs.append(
+                c.Advisory(
+                    package=osv.get("affected", [{}])[0].get("package", {}).get("name", ""),
+                    ecosystem="go",
+                    severity=osv.get("database_specific", {}).get("severity", ""),
+                    current="",
+                    fixed="",
+                    ids=[osv["id"]],
+                    summary=osv.get("summary", ""),
+                    source="govulncheck",
+                )
+            )
     return advs
 
 
@@ -880,8 +954,7 @@ def handle(verb, argv):
     root = Path(".")
     if verb == "detect":
         present = (root / "go.mod").exists()
-        return {"present": present, "ecosystem": "go", "packageManager": "",
-                "workspace": (root / "go.work").exists()}
+        return {"present": present, "ecosystem": "go", "packageManager": "", "workspace": (root / "go.work").exists()}
     if verb == "cache-clear":
         return {"warnings": []}  # go refreshes via `go list`; no aggressive clean
     if verb == "outdated":
@@ -893,7 +966,7 @@ def handle(verb, argv):
             return []
         return parse_vuln(out.stdout)
     if verb == "apply":
-        for spec in argv:               # spec e.g. "github.com/foo/bar@v1.2.3"
+        for spec in argv:  # spec e.g. "github.com/foo/bar@v1.2.3"
             _run(["go", "get", spec])
         _run(["go", "mod", "tidy"])
         if (root / "go.work").exists():
@@ -902,7 +975,7 @@ def handle(verb, argv):
     if verb == "validate":
         results = {}
         for step, cmd in (("build", "go build ./..."), ("test", "go test ./..."), ("lint", "go vet ./...")):
-            r = _run_shell(cmd)         # trusted config/default strings
+            r = _run_shell(cmd)  # trusted config/default strings
             results[step] = "pass" if r.returncode == 0 else "fail"
             results[step + "_output"] = (r.stdout + r.stderr)[-4000:]
         return results
@@ -991,6 +1064,7 @@ Expected: FAIL — module not found.
 ```python
 # deps/scripts/bumplib/ecosystems/node.py
 """Node ecosystem adapter (pnpm / npm)."""
+
 import json
 import subprocess
 from pathlib import Path
@@ -1015,10 +1089,19 @@ def parse_outdated(json_text: str, manager: str) -> list:
         lat = info.get("latest", "")
         wanted = info.get("wanted", lat)
         kind = "direct"
-        recs.append(c.UpdateRecord(name=name, current=cur, latest=lat, wanted=wanted,
-                                   bump=classify_bump(cur, lat), kind=kind,
-                                   location="package.json", ecosystem="node",
-                                   meta={"dependencyType": info.get("dependencyType", "")}))
+        recs.append(
+            c.UpdateRecord(
+                name=name,
+                current=cur,
+                latest=lat,
+                wanted=wanted,
+                bump=classify_bump(cur, lat),
+                kind=kind,
+                location="package.json",
+                ecosystem="node",
+                meta={"dependencyType": info.get("dependencyType", "")},
+            )
+        )
     return recs
 
 
@@ -1035,10 +1118,18 @@ def parse_audit(json_text: str, manager: str) -> list:
         for via in v.get("via", []):
             if isinstance(via, dict) and via.get("url"):
                 ids.append(via["url"])
-        advs.append(c.Advisory(package=name, ecosystem="node",
-                               severity=v.get("severity", "").upper(),
-                               current="", fixed=fixed, ids=ids,
-                               summary=v.get("range", ""), source="audit"))
+        advs.append(
+            c.Advisory(
+                package=name,
+                ecosystem="node",
+                severity=v.get("severity", "").upper(),
+                current="",
+                fixed=fixed,
+                ids=ids,
+                summary=v.get("range", ""),
+                source="audit",
+            )
+        )
     return advs
 
 
@@ -1083,10 +1174,13 @@ def handle(verb, argv):
         return {"applied": argv, "filesModified": ["package.json", lock]}
     if verb == "validate":
         results = {}
-        cmds = (("build", f"{mgr} run build"), ("test", f"{mgr} test"),
-                ("lint", f"{mgr} run lint:all || {mgr} run lint"))
+        cmds = (
+            ("build", f"{mgr} run build"),
+            ("test", f"{mgr} test"),
+            ("lint", f"{mgr} run lint:all || {mgr} run lint"),
+        )
         for step, cmd in cmds:
-            r = _run_shell(cmd)          # trusted: mgr is 'pnpm'|'npm', not user data
+            r = _run_shell(cmd)  # trusted: mgr is 'pnpm'|'npm', not user data
             results[step] = "pass" if r.returncode == 0 else "fail"
             results[step + "_output"] = (r.stdout + r.stderr)[-4000:]
         return results
@@ -1170,6 +1264,7 @@ Expected: FAIL — module not found.
 ```python
 # deps/scripts/bumplib/ecosystems/python.py
 """Python ecosystem adapter (uv / pip)."""
+
 import json
 import shutil
 import subprocess
@@ -1198,9 +1293,18 @@ def parse_outdated(json_text: str) -> list:
         name = info["name"]
         cur = info.get("version", "")
         lat = info.get("latest_version", "")
-        recs.append(c.UpdateRecord(name=name, current=cur, latest=lat, wanted=lat,
-                                   bump=classify_bump(cur, lat), kind="direct",
-                                   location="pyproject.toml", ecosystem="python"))
+        recs.append(
+            c.UpdateRecord(
+                name=name,
+                current=cur,
+                latest=lat,
+                wanted=lat,
+                bump=classify_bump(cur, lat),
+                kind="direct",
+                location="pyproject.toml",
+                ecosystem="python",
+            )
+        )
     return recs
 
 
@@ -1210,10 +1314,18 @@ def parse_audit(json_text: str) -> list:
     for dep in data.get("dependencies", []):
         for v in dep.get("vulns", []):
             fixes = v.get("fix_versions", [])
-            advs.append(c.Advisory(package=dep.get("name", ""), ecosystem="python",
-                                   severity="", current=dep.get("version", ""),
-                                   fixed=fixes[0] if fixes else "", ids=[v.get("id", "")],
-                                   summary=v.get("description", ""), source="pip-audit"))
+            advs.append(
+                c.Advisory(
+                    package=dep.get("name", ""),
+                    ecosystem="python",
+                    severity="",
+                    current=dep.get("version", ""),
+                    fixed=fixes[0] if fixes else "",
+                    ids=[v.get("id", "")],
+                    summary=v.get("description", ""),
+                    source="pip-audit",
+                )
+            )
     return advs
 
 
@@ -1236,32 +1348,39 @@ def handle(verb, argv):
         _run(["uv", "cache", "clean"] if mgr == "uv" else ["pip", "cache", "purge"])
         return {"warnings": []}
     if verb == "outdated":
-        cmd = (["uv", "pip", "list", "--outdated", "--format", "json"] if mgr == "uv"
-               else ["pip", "list", "--outdated", "--format", "json"])
+        cmd = (
+            ["uv", "pip", "list", "--outdated", "--format", "json"]
+            if mgr == "uv"
+            else ["pip", "list", "--outdated", "--format", "json"]
+        )
         out = _run(cmd)
         return parse_outdated(out.stdout)
     if verb == "audit":
-        out = _run(["uv", "run", "pip-audit", "--format", "json"] if mgr == "uv"
-                   else ["pip-audit", "--format", "json"])
+        out = _run(["uv", "run", "pip-audit", "--format", "json"] if mgr == "uv" else ["pip-audit", "--format", "json"])
         if out.returncode == 127:
             return []
         return parse_audit(out.stdout)
     if verb == "apply":
         if mgr == "uv":
             flags = []
-            for a in argv:              # a e.g. "requests==2.31.0"
+            for a in argv:  # a e.g. "requests==2.31.0"
                 flags += ["--upgrade-package", a.split("==")[0]]
             _run(["uv", "lock", *flags])
             _run(["uv", "sync"])
         else:
             _run(["pip", "install", *argv])
-        return {"applied": argv, "filesModified": ["pyproject.toml", "uv.lock"] if mgr == "uv" else ["requirements.txt"]}
+        return {
+            "applied": argv,
+            "filesModified": ["pyproject.toml", "uv.lock"] if mgr == "uv" else ["requirements.txt"],
+        }
     if verb == "validate":
         results = {}
-        cmds = (("test", "uv run pytest" if mgr == "uv" else "pytest"),
-                ("lint", "uv run ruff check ." if mgr == "uv" else "ruff check ."))
+        cmds = (
+            ("test", "uv run pytest" if mgr == "uv" else "pytest"),
+            ("lint", "uv run ruff check ." if mgr == "uv" else "ruff check ."),
+        )
         for step, cmd in cmds:
-            r = _run_shell(cmd)          # trusted default/config strings
+            r = _run_shell(cmd)  # trusted default/config strings
             results[step] = "pass" if r.returncode == 0 else "fail"
             results[step + "_output"] = (r.stdout + r.stderr)[-4000:]
         return results
@@ -1320,8 +1439,7 @@ class TestGitHubCodeHost(unittest.TestCase):
         self.assertEqual(ctx.pullRequests[0]["id"], "#42")
 
     def test_merge_cmd(self):
-        self.assertEqual(gh.merge_cmd(42),
-                         ["gh", "pr", "merge", "42", "--squash", "--delete-branch"])
+        self.assertEqual(gh.merge_cmd(42), ["gh", "pr", "merge", "42", "--squash", "--delete-branch"])
 
     def test_open_pr_cmd_passes_title_as_arg(self):
         # title with shell metacharacters must appear as its own list element, unescaped
@@ -1357,6 +1475,7 @@ Expected: FAIL — module not found.
 ```python
 # deps/scripts/bumplib/codehosts/github.py
 """GitHub code-host adapter: Dependabot alerts, dependency PRs, PR lifecycle."""
+
 import json
 import subprocess
 
@@ -1372,24 +1491,39 @@ def parse_alerts(json_text: str) -> list:
         sa = a.get("security_advisory", {})
         dep = a.get("dependency", {}).get("package", {})
         fixed = a.get("security_vulnerability", {}).get("first_patched_version", {}).get("identifier", "")
-        advs.append(c.Advisory(package=dep.get("name", ""), ecosystem=dep.get("ecosystem", ""),
-                               severity=sa.get("severity", "").upper(), current="", fixed=fixed,
-                               ids=[], summary=sa.get("summary", ""), source="dependabot"))
+        advs.append(
+            c.Advisory(
+                package=dep.get("name", ""),
+                ecosystem=dep.get("ecosystem", ""),
+                severity=sa.get("severity", "").upper(),
+                current="",
+                fixed=fixed,
+                ids=[],
+                summary=sa.get("summary", ""),
+                source="dependabot",
+            )
+        )
     return advs
 
 
 def parse_prs(json_text: str) -> c.Context:
     data = json.loads(json_text or "[]")
-    prs = [{"id": f"#{p['number']}", "title": p.get("title", ""),
-            "head": p.get("headRefName", ""), "url": p.get("url", "")} for p in data]
+    prs = [
+        {
+            "id": f"#{p['number']}",
+            "title": p.get("title", ""),
+            "head": p.get("headRefName", ""),
+            "url": p.get("url", ""),
+        }
+        for p in data
+    ]
     return c.Context(pullRequests=prs)
 
 
 def open_pr_cmd(branch, title, body):
     """Return an argv list — title/body are passed as separate args, never shell-interpolated,
     so a PR title containing shell metacharacters cannot inject."""
-    return ["gh", "pr", "create", "--base", "main", "--head", branch,
-            "--title", title, "--body", body]
+    return ["gh", "pr", "create", "--base", "main", "--head", branch, "--title", title, "--body", body]
 
 
 def merge_cmd(number):
@@ -1412,8 +1546,9 @@ def handle(verb, argv):
             return []
         return parse_alerts(r.stdout)
     if verb == "prs":
-        r = _run(["gh", "pr", "list", "--label", "dependencies",
-                  "--json", "number,title,headRefName,url", "--limit", "20"])
+        r = _run(
+            ["gh", "pr", "list", "--label", "dependencies", "--json", "number,title,headRefName,url", "--limit", "20"]
+        )
         return parse_prs(r.stdout if r.returncode == 0 else "[]")
     if verb == "open-pr":
         branch, title, body = argv[0], argv[1], argv[2]
@@ -1421,8 +1556,7 @@ def handle(verb, argv):
         return {"output": r.stdout.strip(), "ok": r.returncode == 0}
     if verb == "pr-status":
         number = argv[0]
-        r = _run(["gh", "pr", "view", str(number), "--json",
-                  "state,mergeable,mergeStateStatus,reviewDecision"])
+        r = _run(["gh", "pr", "view", str(number), "--json", "state,mergeable,mergeStateStatus,reviewDecision"])
         return json.loads(r.stdout) if r.returncode == 0 else {"error": r.stderr.strip()}
     if verb == "merge-pr":
         r = _run(merge_cmd(argv[0]))
@@ -1496,6 +1630,7 @@ Expected: FAIL — module not found.
 ```python
 # deps/scripts/bumplib/trackers/github.py
 """GitHub issue-tracker adapter: dependency-related issues."""
+
 import json
 import subprocess
 
@@ -1504,9 +1639,15 @@ from .. import contracts as c
 
 def parse_issues(json_text: str) -> c.Context:
     data = json.loads(json_text or "[]")
-    issues = [{"id": f"#{i['number']}", "title": i.get("title", ""),
-               "url": i.get("url", ""),
-               "labels": [l.get("name", "") for l in i.get("labels", [])]} for i in data]
+    issues = [
+        {
+            "id": f"#{i['number']}",
+            "title": i.get("title", ""),
+            "url": i.get("url", ""),
+            "labels": [l.get("name", "") for l in i.get("labels", [])],
+        }
+        for i in data
+    ]
     return c.Context(issues=issues)
 
 
@@ -1517,8 +1658,21 @@ def _run(args):
 
 def handle(verb, argv):
     if verb == "issues":
-        r = _run(["gh", "issue", "list", "--label", "dependencies", "--state", "open",
-                  "--json", "number,title,labels,url", "--limit", "20"])
+        r = _run(
+            [
+                "gh",
+                "issue",
+                "list",
+                "--label",
+                "dependencies",
+                "--state",
+                "open",
+                "--json",
+                "number,title,labels,url",
+                "--limit",
+                "20",
+            ]
+        )
         return parse_issues(r.stdout if r.returncode == 0 else "[]")
     raise ValueError(f"github tracker: unknown verb {verb}")
 ```
@@ -1562,6 +1716,7 @@ Step-by-step: (1) pick the axis package (`ecosystems`/`codehosts`/`trackers`); (
 
 ```python
 from .. import contracts as c
+
 
 def handle(verb, argv):
     if verb == "issues":

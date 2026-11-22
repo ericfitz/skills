@@ -141,16 +141,13 @@ Append to the test file:
 ```python
 class TestParseGitRemote(unittest.TestCase):
     def test_https_with_git_suffix(self):
-        self.assertEqual(upc.parse_git_remote("https://github.com/ericfitz/tmi.git"),
-                         ("ericfitz", "tmi"))
+        self.assertEqual(upc.parse_git_remote("https://github.com/ericfitz/tmi.git"), ("ericfitz", "tmi"))
 
     def test_https_no_suffix(self):
-        self.assertEqual(upc.parse_git_remote("https://github.com/ericfitz/tmi"),
-                         ("ericfitz", "tmi"))
+        self.assertEqual(upc.parse_git_remote("https://github.com/ericfitz/tmi"), ("ericfitz", "tmi"))
 
     def test_ssh_form(self):
-        self.assertEqual(upc.parse_git_remote("git@github.com:ericfitz/tmi.git"),
-                         ("ericfitz", "tmi"))
+        self.assertEqual(upc.parse_git_remote("git@github.com:ericfitz/tmi.git"), ("ericfitz", "tmi"))
 
     def test_empty(self):
         self.assertEqual(upc.parse_git_remote(""), (None, None))
@@ -214,10 +211,8 @@ class TestParseLinkedProjects(unittest.TestCase):
             "repository": {
                 "projectsV2": {
                     "nodes": [
-                        {"number": 2, "id": "PVT_a", "title": "TMI Roadmap",
-                         "owner": {"login": "ericfitz"}},
-                        {"number": 5, "id": "PVT_b", "title": "Security",
-                         "owner": {"login": "ericfitz"}},
+                        {"number": 2, "id": "PVT_a", "title": "TMI Roadmap", "owner": {"login": "ericfitz"}},
+                        {"number": 5, "id": "PVT_b", "title": "Security", "owner": {"login": "ericfitz"}},
                     ]
                 }
             }
@@ -226,10 +221,13 @@ class TestParseLinkedProjects(unittest.TestCase):
 
     def test_parses_nodes(self):
         out = upc.parse_linked_projects(self.SAMPLE)
-        self.assertEqual(out, [
-            {"number": 2, "id": "PVT_a", "title": "TMI Roadmap", "owner": "ericfitz"},
-            {"number": 5, "id": "PVT_b", "title": "Security", "owner": "ericfitz"},
-        ])
+        self.assertEqual(
+            out,
+            [
+                {"number": 2, "id": "PVT_a", "title": "TMI Roadmap", "owner": "ericfitz"},
+                {"number": 5, "id": "PVT_b", "title": "Security", "owner": "ericfitz"},
+            ],
+        )
 
     def test_empty_repo(self):
         self.assertEqual(upc.parse_linked_projects({"data": {"repository": None}}), [])
@@ -254,12 +252,14 @@ def parse_linked_projects(data):
     for n in nodes:
         if not n:
             continue
-        out.append({
-            "number": n.get("number"),
-            "id": n.get("id"),
-            "title": n.get("title"),
-            "owner": (n.get("owner") or {}).get("login"),
-        })
+        out.append(
+            {
+                "number": n.get("number"),
+                "id": n.get("id"),
+                "title": n.get("title"),
+                "owner": (n.get("owner") or {}).get("login"),
+            }
+        )
     return out
 ```
 
@@ -407,17 +407,27 @@ class TestParseFields(unittest.TestCase):
     SAMPLE = {
         "fields": [
             {"id": "PVTF_title", "name": "Title", "type": "ProjectV2Field"},
-            {"id": "PVTSSF_s", "name": "Status", "type": "ProjectV2SingleSelectField",
-             "options": [
-                 {"id": "o1", "name": "Backlog"},
-                 {"id": "o2", "name": "This milestone"},
-                 {"id": "o3", "name": "Done"},
-             ]},
-            {"id": "PVTIF_sp", "name": "Sprint", "type": "ProjectV2IterationField",
-             "configuration": {"iterations": [
-                 {"id": "it1", "title": "Sprint 1"},
-                 {"id": "it2", "title": "Sprint 2"},
-             ]}},
+            {
+                "id": "PVTSSF_s",
+                "name": "Status",
+                "type": "ProjectV2SingleSelectField",
+                "options": [
+                    {"id": "o1", "name": "Backlog"},
+                    {"id": "o2", "name": "This milestone"},
+                    {"id": "o3", "name": "Done"},
+                ],
+            },
+            {
+                "id": "PVTIF_sp",
+                "name": "Sprint",
+                "type": "ProjectV2IterationField",
+                "configuration": {
+                    "iterations": [
+                        {"id": "it1", "title": "Sprint 1"},
+                        {"id": "it2", "title": "Sprint 2"},
+                    ]
+                },
+            },
         ],
         "totalCount": 3,
     }
@@ -433,19 +443,25 @@ class TestParseFields(unittest.TestCase):
     def test_single_select_options_ordered(self):
         fields = upc.parse_fields(self.SAMPLE)
         self.assertEqual(fields["Status"]["type"], "single_select")
-        self.assertEqual(fields["Status"]["options"], [
-            {"name": "Backlog", "id": "o1"},
-            {"name": "This milestone", "id": "o2"},
-            {"name": "Done", "id": "o3"},
-        ])
+        self.assertEqual(
+            fields["Status"]["options"],
+            [
+                {"name": "Backlog", "id": "o1"},
+                {"name": "This milestone", "id": "o2"},
+                {"name": "Done", "id": "o3"},
+            ],
+        )
 
     def test_iteration_options_from_configuration(self):
         fields = upc.parse_fields(self.SAMPLE)
         self.assertEqual(fields["Sprint"]["type"], "iteration")
-        self.assertEqual(fields["Sprint"]["options"], [
-            {"name": "Sprint 1", "id": "it1"},
-            {"name": "Sprint 2", "id": "it2"},
-        ])
+        self.assertEqual(
+            fields["Sprint"]["options"],
+            [
+                {"name": "Sprint 1", "id": "it1"},
+                {"name": "Sprint 2", "id": "it2"},
+            ],
+        )
 
     def test_empty(self):
         self.assertEqual(upc.parse_fields({}), {})
@@ -476,13 +492,11 @@ def parse_fields(data):
         ftype = FIELD_TYPE_MAP.get(f.get("type"), "field")
         entry = {"id": f.get("id"), "type": ftype}
         if f.get("options"):
-            entry["options"] = [{"name": o.get("name"), "id": o.get("id")}
-                                for o in f["options"]]
+            entry["options"] = [{"name": o.get("name"), "id": o.get("id")} for o in f["options"]]
         elif ftype == "iteration":
             iters = (f.get("configuration") or {}).get("iterations") or []
             if iters:
-                entry["options"] = [{"name": it.get("title"), "id": it.get("id")}
-                                    for it in iters]
+                entry["options"] = [{"name": it.get("title"), "id": it.get("id")} for it in iters]
         fields[name] = entry
     return fields
 ```
@@ -522,10 +536,13 @@ class TestParseRepoMetadata(unittest.TestCase):
             {"title": "release/1.4.0", "number": 6, "node_id": "MI_b"},
             {"number": 7, "node_id": "MI_c"},  # no title -> dropped
         ]
-        self.assertEqual(upc.parse_milestones(data), [
-            {"title": "release/1.3.0", "number": 5, "id": "MI_a"},
-            {"title": "release/1.4.0", "number": 6, "id": "MI_b"},
-        ])
+        self.assertEqual(
+            upc.parse_milestones(data),
+            [
+                {"title": "release/1.3.0", "number": 5, "id": "MI_a"},
+                {"title": "release/1.4.0", "number": 6, "id": "MI_b"},
+            ],
+        )
 
     def test_milestones_empty(self):
         self.assertEqual(upc.parse_milestones([]), [])
@@ -535,12 +552,10 @@ class TestParseRepoMetadata(unittest.TestCase):
         self.assertEqual(upc.parse_labels(data), ["bug", "api"])
 
     def test_issue_types_list_of_objects(self):
-        self.assertEqual(upc.parse_issue_types([{"name": "Bug"}, {"name": "Feature"}]),
-                         ["Bug", "Feature"])
+        self.assertEqual(upc.parse_issue_types([{"name": "Bug"}, {"name": "Feature"}]), ["Bug", "Feature"])
 
     def test_issue_types_wrapped(self):
-        self.assertEqual(upc.parse_issue_types({"issue_types": [{"name": "Task"}]}),
-                         ["Task"])
+        self.assertEqual(upc.parse_issue_types({"issue_types": [{"name": "Task"}]}), ["Task"])
 
     def test_issue_types_empty(self):
         self.assertEqual(upc.parse_issue_types(None), [])
@@ -556,8 +571,11 @@ Expected: FAIL — no attribute `parse_milestones`.
 ```python
 def parse_milestones(data):
     """Map `gh api repos/{o}/{r}/milestones` output to ordered {title, number, id}."""
-    return [{"title": m.get("title"), "number": m.get("number"), "id": m.get("node_id")}
-            for m in (data or []) if m.get("title")]
+    return [
+        {"title": m.get("title"), "number": m.get("number"), "id": m.get("node_id")}
+        for m in (data or [])
+        if m.get("title")
+    ]
 
 
 def parse_labels(data):
@@ -569,8 +587,7 @@ def parse_issue_types(data):
     """Best-effort: accept a list of {name} or a {issue_types|data: [...]} wrapper."""
     if isinstance(data, dict):
         data = data.get("issue_types") or data.get("data") or []
-    return [t.get("name") for t in (data or [])
-            if isinstance(t, dict) and t.get("name")]
+    return [t.get("name") for t in (data or []) if isinstance(t, dict) and t.get("name")]
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -688,23 +705,30 @@ class TestConfigHelpers(unittest.TestCase):
     def test_set_title_creates_entry(self):
         cfg = {}
         upc.set_project_title(cfg, "newrepo", "")
-        self.assertEqual(cfg["projects"][0],
-                         {"name": "newrepo", "github": {"project": ""}})
+        self.assertEqual(cfg["projects"][0], {"name": "newrepo", "github": {"project": ""}})
 
     def test_migrate_drops_legacy_ids_keeps_title(self):
-        entry = {"name": "tmi", "github": {
-            "owner": "ericfitz", "repo": "tmi", "project": "Roadmap",
-            "issues_project": {"id": "PVT_x", "number": 2, "fields": {"status": {}}},
-        }}
+        entry = {
+            "name": "tmi",
+            "github": {
+                "owner": "ericfitz",
+                "repo": "tmi",
+                "project": "Roadmap",
+                "issues_project": {"id": "PVT_x", "number": 2, "fields": {"status": {}}},
+            },
+        }
         out = upc.migrate_entry(entry)
-        self.assertEqual(out["github"],
-                         {"owner": "ericfitz", "repo": "tmi", "project": "Roadmap"})
+        self.assertEqual(out["github"], {"owner": "ericfitz", "repo": "tmi", "project": "Roadmap"})
 
     def test_migrate_legacy_without_title_leaves_project_unset(self):
-        entry = {"name": "tmi", "github": {
-            "owner": "ericfitz", "repo": "tmi",
-            "issues_project": {"id": "PVT_x", "number": 2},
-        }}
+        entry = {
+            "name": "tmi",
+            "github": {
+                "owner": "ericfitz",
+                "repo": "tmi",
+                "issues_project": {"id": "PVT_x", "number": 2},
+            },
+        }
         out = upc.migrate_entry(entry)
         self.assertNotIn("project", out["github"])
         self.assertNotIn("issues_project", out["github"])
@@ -778,13 +802,11 @@ import tempfile
 class TestLocationAndIO(unittest.TestCase):
     def test_ensure_gitignore_adds_when_missing(self):
         self.assertEqual(upc.ensure_gitignore_text(""), ".local/\n")
-        self.assertEqual(upc.ensure_gitignore_text("node_modules\n"),
-                         "node_modules\n.local/\n")
+        self.assertEqual(upc.ensure_gitignore_text("node_modules\n"), "node_modules\n.local/\n")
 
     def test_ensure_gitignore_idempotent(self):
         self.assertEqual(upc.ensure_gitignore_text(".local/\n"), ".local/\n")
-        self.assertEqual(upc.ensure_gitignore_text("foo\n.local\nbar\n"),
-                         "foo\n.local\nbar\n")
+        self.assertEqual(upc.ensure_gitignore_text("foo\n.local\nbar\n"), "foo\n.local\nbar\n")
 
     def test_ensure_gitignore_adds_trailing_newline(self):
         self.assertEqual(upc.ensure_gitignore_text("foo"), "foo\n.local/\n")
@@ -968,9 +990,17 @@ from unittest import mock
 
 class TestEnumeration(unittest.TestCase):
     def test_discover_linked_projects(self):
-        sample = {"data": {"repository": {"projectsV2": {"nodes": [
-            {"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": {"login": "ericfitz"}},
-        ]}}}}
+        sample = {
+            "data": {
+                "repository": {
+                    "projectsV2": {
+                        "nodes": [
+                            {"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": {"login": "ericfitz"}},
+                        ]
+                    }
+                }
+            }
+        }
         with mock.patch.object(upc, "run_gh_graphql", return_value=sample):
             out = upc.discover_linked_projects("ericfitz", "tmi")
         self.assertEqual(out[0]["title"], "Roadmap")
@@ -980,9 +1010,16 @@ class TestEnumeration(unittest.TestCase):
 
         def fake_run_gh_json(args):
             if args[:2] == ["project", "field-list"]:
-                return {"fields": [{"id": "PVTSSF_s", "name": "Status",
-                                    "type": "ProjectV2SingleSelectField",
-                                    "options": [{"id": "o1", "name": "Backlog"}]}]}
+                return {
+                    "fields": [
+                        {
+                            "id": "PVTSSF_s",
+                            "name": "Status",
+                            "type": "ProjectV2SingleSelectField",
+                            "options": [{"id": "o1", "name": "Backlog"}],
+                        }
+                    ]
+                }
             if "milestones" in args[1]:
                 return [{"title": "release/1.3.0", "number": 5, "node_id": "MI_a"}]
             if "/labels" in args[1]:
@@ -1051,8 +1088,7 @@ def run_gh(args):
         result = subprocess.run(["gh"] + args, capture_output=True, text=True, check=True)
         return result.stdout
     except FileNotFoundError:
-        print("Error: 'gh' CLI not found. Install it from https://cli.github.com/",
-              file=sys.stderr)
+        print("Error: 'gh' CLI not found. Install it from https://cli.github.com/", file=sys.stderr)
         sys.exit(1)
     except subprocess.CalledProcessError as e:
         raise GhError(e.stderr.strip()) from e
@@ -1074,8 +1110,7 @@ def run_gh_graphql(query, variables):
 def git_remote_url():
     """Return the origin remote URL, or '' if unavailable."""
     try:
-        result = subprocess.run(["git", "remote", "get-url", "origin"],
-                                capture_output=True, text=True, check=True)
+        result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=True)
         return result.stdout.strip()
     except (FileNotFoundError, subprocess.CalledProcessError):
         return ""
@@ -1089,22 +1124,44 @@ def discover_linked_projects(owner, repo):
 
 def enumerate_project(owner, repo, project, now_iso):
     """Gather all metadata for the chosen project and assemble a cache entry."""
-    field_data = run_gh_json([
-        "project", "field-list", str(project["number"]),
-        "--owner", project["owner"], "--format", "json",
-    ])
+    field_data = run_gh_json(
+        [
+            "project",
+            "field-list",
+            str(project["number"]),
+            "--owner",
+            project["owner"],
+            "--format",
+            "json",
+        ]
+    )
     fields = parse_fields(field_data)
 
-    milestones = parse_milestones(run_gh_json([
-        "api", f"repos/{owner}/{repo}/milestones?state=all&per_page=100",
-    ]))
-    labels = parse_labels(run_gh_json([
-        "api", f"repos/{owner}/{repo}/labels?per_page=100",
-    ]))
+    milestones = parse_milestones(
+        run_gh_json(
+            [
+                "api",
+                f"repos/{owner}/{repo}/milestones?state=all&per_page=100",
+            ]
+        )
+    )
+    labels = parse_labels(
+        run_gh_json(
+            [
+                "api",
+                f"repos/{owner}/{repo}/labels?per_page=100",
+            ]
+        )
+    )
     try:
-        issue_types = parse_issue_types(run_gh_json([
-            "api", f"repos/{owner}/{repo}/issue-types",
-        ]))
+        issue_types = parse_issue_types(
+            run_gh_json(
+                [
+                    "api",
+                    f"repos/{owner}/{repo}/issue-types",
+                ]
+            )
+        )
     except GhError:
         issue_types = []  # issue types not enabled / endpoint unavailable
 
@@ -1150,49 +1207,50 @@ class TestProcessEntry(unittest.TestCase):
     def test_resolved_writes_cache_config_and_gitignore(self):
         with tempfile.TemporaryDirectory() as d:
             paths = self._paths(d)
-            config = {"projects": [{"name": "tmi",
-                                    "github": {"owner": "ericfitz", "repo": "tmi"}}]}
+            config = {"projects": [{"name": "tmi", "github": {"owner": "ericfitz", "repo": "tmi"}}]}
             entry = config["projects"][0]
             linked = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"}]
-            with mock.patch.object(upc, "discover_linked_projects", return_value=linked), \
-                 mock.patch.object(upc, "enumerate_project",
-                                   return_value={"cached_at": "t", "project": linked[0]}):
-                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
-                                           paths["cache_path"], paths["gitignore_path"])
+            with (
+                mock.patch.object(upc, "discover_linked_projects", return_value=linked),
+                mock.patch.object(upc, "enumerate_project", return_value={"cached_at": "t", "project": linked[0]}),
+            ):
+                result = upc.process_entry(
+                    entry, {}, "t", config, paths["config_path"], paths["cache_path"], paths["gitignore_path"]
+                )
             self.assertEqual(result["status"], "resolved")
             self.assertEqual(result["title"], "Roadmap")
-            self.assertEqual(json.loads(paths["config_path"].read_text())
-                             ["projects"][0]["github"]["project"], "Roadmap")
+            self.assertEqual(
+                json.loads(paths["config_path"].read_text())["projects"][0]["github"]["project"], "Roadmap"
+            )
             self.assertIn("tmi", json.loads(paths["cache_path"].read_text()))
             self.assertIn(".local/", paths["gitignore_path"].read_text())
 
     def test_none_writes_empty_marker_no_cache(self):
         with tempfile.TemporaryDirectory() as d:
             paths = self._paths(d)
-            config = {"projects": [{"name": "tmi",
-                                    "github": {"owner": "ericfitz", "repo": "tmi"}}]}
+            config = {"projects": [{"name": "tmi", "github": {"owner": "ericfitz", "repo": "tmi"}}]}
             entry = config["projects"][0]
             with mock.patch.object(upc, "discover_linked_projects", return_value=[]):
-                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
-                                           paths["cache_path"], paths["gitignore_path"])
+                result = upc.process_entry(
+                    entry, {}, "t", config, paths["config_path"], paths["cache_path"], paths["gitignore_path"]
+                )
             self.assertEqual(result["status"], "none")
-            self.assertEqual(json.loads(paths["config_path"].read_text())
-                             ["projects"][0]["github"]["project"], "")
+            self.assertEqual(json.loads(paths["config_path"].read_text())["projects"][0]["github"]["project"], "")
             self.assertFalse(paths["cache_path"].exists())
 
     def test_needs_selection_writes_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             paths = self._paths(d)
-            config = {"projects": [{"name": "tmi",
-                                    "github": {"owner": "ericfitz", "repo": "tmi"}}]}
+            config = {"projects": [{"name": "tmi", "github": {"owner": "ericfitz", "repo": "tmi"}}]}
             entry = config["projects"][0]
             linked = [
                 {"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"},
                 {"number": 5, "id": "PVT_b", "title": "Security", "owner": "ericfitz"},
             ]
             with mock.patch.object(upc, "discover_linked_projects", return_value=linked):
-                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
-                                           paths["cache_path"], paths["gitignore_path"])
+                result = upc.process_entry(
+                    entry, {}, "t", config, paths["config_path"], paths["cache_path"], paths["gitignore_path"]
+                )
             self.assertEqual(result["status"], "needs_selection")
             self.assertEqual(len(result["candidates"]), 2)
             self.assertFalse(paths["config_path"].exists())
@@ -1204,8 +1262,9 @@ class TestProcessEntry(unittest.TestCase):
             config = {"projects": [{"name": "tmi", "github": {}}]}
             entry = config["projects"][0]
             with mock.patch.object(upc, "git_remote_url", return_value=""):
-                result = upc.process_entry(entry, {}, "t", config, paths["config_path"],
-                                           paths["cache_path"], paths["gitignore_path"])
+                result = upc.process_entry(
+                    entry, {}, "t", config, paths["config_path"], paths["cache_path"], paths["gitignore_path"]
+                )
             self.assertEqual(result["status"], "error")
 ```
 
@@ -1236,8 +1295,11 @@ def process_entry(entry, selection, now_iso, config, config_path, cache_path, gi
         owner = owner or o2
         repo = repo or r2
     if not owner or not repo:
-        return {"name": name, "status": "error",
-                "message": "no owner/repo in config and none derivable from git remote"}
+        return {
+            "name": name,
+            "status": "error",
+            "message": "no owner/repo in config and none derivable from git remote",
+        }
 
     linked = discover_linked_projects(owner, repo)
     status, payload = select_project(
@@ -1248,9 +1310,11 @@ def process_entry(entry, selection, now_iso, config, config_path, cache_path, gi
     )
 
     if status == "needs_selection":
-        return {"name": name, "status": "needs_selection",
-                "candidates": [{"number": p["number"], "title": p["title"]}
-                               for p in payload]}
+        return {
+            "name": name,
+            "status": "needs_selection",
+            "candidates": [{"number": p["number"], "title": p["title"]} for p in payload],
+        }
     if status == "none":
         set_project_title(config, name, "")
         write_json(config_path, config)
@@ -1302,15 +1366,16 @@ class TestMain(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".local").mkdir()
-            (root / ".local" / "projects.json").write_text(json.dumps(
-                {"projects": [{"name": "tmi",
-                               "github": {"owner": "ericfitz", "repo": "tmi"}}]}))
+            (root / ".local" / "projects.json").write_text(
+                json.dumps({"projects": [{"name": "tmi", "github": {"owner": "ericfitz", "repo": "tmi"}}]})
+            )
             linked = [{"number": 2, "id": "PVT_a", "title": "Roadmap", "owner": "ericfitz"}]
             buf = io.StringIO()
-            with mock.patch.object(upc, "discover_linked_projects", return_value=linked), \
-                 mock.patch.object(upc, "enumerate_project",
-                                   return_value={"cached_at": "t", "project": linked[0]}), \
-                 contextlib.redirect_stdout(buf):
+            with (
+                mock.patch.object(upc, "discover_linked_projects", return_value=linked),
+                mock.patch.object(upc, "enumerate_project", return_value={"cached_at": "t", "project": linked[0]}),
+                contextlib.redirect_stdout(buf),
+            ):
                 rc = upc.main(["update", "--name", "tmi", "--dir", str(root)])
             self.assertEqual(rc, 0)
             out = json.loads(buf.getvalue())
@@ -1319,10 +1384,22 @@ class TestMain(unittest.TestCase):
     def test_main_migrates_legacy_root_file(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            (root / ".local-projects.json").write_text(json.dumps(
-                {"projects": [{"name": "tmi", "github": {
-                    "owner": "ericfitz", "repo": "tmi",
-                    "issues_project": {"id": "PVT_x", "number": 2}}}]}))
+            (root / ".local-projects.json").write_text(
+                json.dumps(
+                    {
+                        "projects": [
+                            {
+                                "name": "tmi",
+                                "github": {
+                                    "owner": "ericfitz",
+                                    "repo": "tmi",
+                                    "issues_project": {"id": "PVT_x", "number": 2},
+                                },
+                            }
+                        ]
+                    }
+                )
+            )
             with mock.patch.object(upc, "discover_linked_projects", return_value=[]):
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
@@ -1369,8 +1446,7 @@ def _load_or_init_config(start_dir):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Resolve a repo's GitHub Project and cache its metadata.")
+    parser = argparse.ArgumentParser(description="Resolve a repo's GitHub Project and cache its metadata.")
     parser.add_argument("command", choices=["update"])
     parser.add_argument("--name", help="Only process the entry with this name.")
     parser.add_argument("--dir", default=".", help="Directory to resolve config from.")
@@ -1393,13 +1469,10 @@ def main(argv=None):
     if args.name:
         entries = [e for e in entries if e.get("name") == args.name]
         if not entries:
-            print(json.dumps({"results": [
-                {"name": args.name, "status": "error", "message": "entry not found"}]}))
+            print(json.dumps({"results": [{"name": args.name, "status": "error", "message": "entry not found"}]}))
             return 1
 
-    results = [process_entry(e, selection, now_iso, config, config_path,
-                             cache_path, gitignore_path)
-               for e in entries]
+    results = [process_entry(e, selection, now_iso, config, config_path, cache_path, gitignore_path) for e in entries]
     print(json.dumps({"results": results}, indent=2))
     return 0
 

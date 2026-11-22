@@ -29,8 +29,7 @@ def hook_files():
 class TestPluginStructure(unittest.TestCase):
     def test_every_plugin_is_registered_in_the_marketplace(self):
         registered = {
-            entry["source"].lstrip("./")
-            for entry in json.loads(MARKETPLACE.read_text(encoding="utf-8"))["plugins"]
+            entry["source"].lstrip("./") for entry in json.loads(MARKETPLACE.read_text(encoding="utf-8"))["plugins"]
         }
         for plugin in plugin_dirs():
             with self.subTest(plugin=plugin.name):
@@ -39,8 +38,7 @@ class TestPluginStructure(unittest.TestCase):
     def test_every_plugin_manifest_has_name_and_description(self):
         for plugin in plugin_dirs():
             with self.subTest(plugin=plugin.name):
-                data = json.loads(
-                    (plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+                data = json.loads((plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
                 self.assertEqual(data["name"], plugin.name)
                 self.assertTrue(data["description"].strip())
 
@@ -74,8 +72,7 @@ class TestPluginStructure(unittest.TestCase):
             plugin = skill.parents[2]
             for ref in PLUGIN_ROOT_REF.findall(skill.read_text(encoding="utf-8")):
                 with self.subTest(skill=skill.parent.name, ref=ref):
-                    self.assertTrue((plugin / ref.lstrip("/")).exists(),
-                                    f"{skill} references missing {ref}")
+                    self.assertTrue((plugin / ref.lstrip("/")).exists(), f"{skill} references missing {ref}")
 
     def test_hooks_json_parses(self):
         for hooks_file in hook_files():
@@ -87,8 +84,7 @@ class TestPluginStructure(unittest.TestCase):
             plugin = hooks_file.parents[1]
             for ref in PLUGIN_ROOT_REF.findall(hooks_file.read_text(encoding="utf-8")):
                 with self.subTest(hooks=plugin.name, ref=ref):
-                    self.assertTrue((plugin / ref.lstrip("/")).exists(),
-                                    f"{hooks_file} references missing {ref}")
+                    self.assertTrue((plugin / ref.lstrip("/")).exists(), f"{hooks_file} references missing {ref}")
 
 
 MD_LINK = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)#]+?)(?:#[^)]*)?\)")
@@ -104,8 +100,7 @@ class TestCodexParity(unittest.TestCase):
                 if "${" in target:
                     continue  # env-var paths are covered by test_plugin_root_references_resolve
                 with self.subTest(skill=str(skill.relative_to(REPO)), link=target):
-                    self.assertTrue((skill.parent / target).exists(),
-                                    f"dangling relative link: {target}")
+                    self.assertTrue((skill.parent / target).exists(), f"dangling relative link: {target}")
 
     def test_dispatching_skills_declare_no_subagent_fallback(self):
         for skill in skill_files():
@@ -113,8 +108,7 @@ class TestCodexParity(unittest.TestCase):
             if not SUBAGENT_REF.search(text):
                 continue
             with self.subTest(skill=str(skill.relative_to(REPO))):
-                self.assertIn(FALLBACK_MARKER, text,
-                              "skill dispatches subagents but has no fallback note")
+                self.assertIn(FALLBACK_MARKER, text, "skill dispatches subagents but has no fallback note")
 
 
 if __name__ == "__main__":

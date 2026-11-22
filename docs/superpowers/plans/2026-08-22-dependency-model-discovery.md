@@ -107,11 +107,13 @@ class TestResolveRefs(unittest.TestCase):
     def test_sibling_properties_merge_and_keep_the_core(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
-            resolved = resolve_refs({
-                "$ref": "core.schema.json",
-                "properties": {"details": {"type": "object",
-                                           "required": ["kind"]}},
-            }, base)
+            resolved = resolve_refs(
+                {
+                    "$ref": "core.schema.json",
+                    "properties": {"details": {"type": "object", "required": ["kind"]}},
+                },
+                base,
+            )
             self.assertIn("id", resolved["properties"])
             self.assertIn("name", resolved["properties"])
             self.assertEqual(resolved["properties"]["details"]["required"], ["kind"])
@@ -119,29 +121,34 @@ class TestResolveRefs(unittest.TestCase):
     def test_sibling_required_unions_without_duplicates(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
-            resolved = resolve_refs({
-                "$ref": "core.schema.json",
-                "required": ["name", "details"],
-            }, base)
+            resolved = resolve_refs(
+                {
+                    "$ref": "core.schema.json",
+                    "required": ["name", "details"],
+                },
+                base,
+            )
             self.assertEqual(resolved["required"], ["id", "name", "details"])
 
     def test_resolves_refs_nested_under_items(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
-            resolved = resolve_refs(
-                {"type": "array", "items": {"$ref": "core.schema.json"}}, base)
-            self.assertEqual(resolved["items"]["properties"]["id"],
-                             {"type": "string"})
+            resolved = resolve_refs({"type": "array", "items": {"$ref": "core.schema.json"}}, base)
+            self.assertEqual(resolved["items"]["properties"]["id"], {"type": "string"})
 
     def test_resolves_a_ref_inside_a_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
-            base = write_schemas(tmp, {"outer.schema.json": {
-                "type": "object",
-                "properties": {"dep": {"$ref": "core.schema.json"}},
-            }})
+            base = write_schemas(
+                tmp,
+                {
+                    "outer.schema.json": {
+                        "type": "object",
+                        "properties": {"dep": {"$ref": "core.schema.json"}},
+                    }
+                },
+            )
             resolved = resolve_refs({"$ref": "outer.schema.json"}, base)
-            self.assertEqual(resolved["properties"]["dep"]["required"],
-                             ["id", "name"])
+            self.assertEqual(resolved["properties"]["dep"]["required"], ["id", "name"])
 
     def test_remote_ref_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -158,10 +165,8 @@ class TestResolveRefs(unittest.TestCase):
     def test_circular_ref_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            (base / "a.schema.json").write_text(
-                json.dumps({"$ref": "b.schema.json"}), encoding="utf-8")
-            (base / "b.schema.json").write_text(
-                json.dumps({"$ref": "a.schema.json"}), encoding="utf-8")
+            (base / "a.schema.json").write_text(json.dumps({"$ref": "b.schema.json"}), encoding="utf-8")
+            (base / "b.schema.json").write_text(json.dumps({"$ref": "a.schema.json"}), encoding="utf-8")
             with self.assertRaises(ValueError):
                 resolve_refs({"$ref": "a.schema.json"}, base)
 
@@ -171,8 +176,7 @@ class TestValidateWithBaseDir(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = write_schemas(tmp)
             schema = {"type": "array", "items": {"$ref": "core.schema.json"}}
-            self.assertEqual(
-                validate([{"id": "a", "name": "b"}], schema, base_dir=base), [])
+            self.assertEqual(validate([{"id": "a", "name": "b"}], schema, base_dir=base), [])
 
     def test_base_dir_reports_violations_inside_the_referenced_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -183,8 +187,7 @@ class TestValidateWithBaseDir(unittest.TestCase):
             self.assertIn("name", errors[0])
 
     def test_without_base_dir_behaviour_is_unchanged(self):
-        schema = {"type": "object", "required": ["a"],
-                  "properties": {"a": {"type": "string"}}}
+        schema = {"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}}
         self.assertEqual(validate({"a": "x"}, schema), [])
         self.assertEqual(len(validate({}, schema)), 1)
 
@@ -232,13 +235,11 @@ def resolve_refs(schema, base_dir, _seen=None):
     if not isinstance(schema, dict):
         return schema
     if "$ref" not in schema:
-        return {key: resolve_refs(value, base_dir, _seen)
-                for key, value in schema.items()}
+        return {key: resolve_refs(value, base_dir, _seen) for key, value in schema.items()}
 
     ref = schema["$ref"]
     if "://" in ref or ref.startswith("#"):
-        raise ValueError(
-            f"unsupported $ref {ref!r}: only local file refs are supported")
+        raise ValueError(f"unsupported $ref {ref!r}: only local file refs are supported")
     seen = set(_seen or ())
     if ref in seen:
         raise ValueError(f"circular $ref: {ref!r}")
@@ -335,8 +336,7 @@ CONTRACTS = REPO / "dependency-model" / "references" / "contracts"
 EXAMPLES = CONTRACTS / "examples"
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
 
-VALUE_SHAPED = ("value", "secret", "token", "password", "passwd",
-                "credential", "content", "material")
+VALUE_SHAPED = ("value", "secret", "token", "password", "passwd", "credential", "content", "material")
 
 
 def load(path):
@@ -347,8 +347,8 @@ class TestContractFilesExist(unittest.TestCase):
     def test_every_expected_schema_is_present(self):
         names = sorted(p.name for p in CONTRACTS.glob("*.schema.json"))
         expected = sorted(
-            ["dependency-core.schema.json", "discovery.schema.json"]
-            + [f"{c}.schema.json" for c in CATEGORIES])
+            ["dependency-core.schema.json", "discovery.schema.json"] + [f"{c}.schema.json" for c in CATEGORIES]
+        )
         self.assertEqual(names, expected)
 
     def test_every_category_has_an_example(self):
@@ -371,8 +371,7 @@ class TestEnvelope(unittest.TestCase):
         self.assertEqual(sorted(refs), CATEGORIES)
         for category in CATEGORIES:
             with self.subTest(category=category):
-                self.assertEqual(refs[category]["$ref"],
-                                 f"{category}.schema.json")
+                self.assertEqual(refs[category]["$ref"], f"{category}.schema.json")
 
     def test_envelope_resolves_without_error(self):
         resolved = resolve_refs(load(CONTRACTS / "discovery.schema.json"), CONTRACTS)
@@ -408,9 +407,7 @@ class TestExamplesValidate(unittest.TestCase):
     def test_every_example_declares_contract_version_1_0_0(self):
         for category in CATEGORIES:
             with self.subTest(category=category):
-                self.assertEqual(
-                    load(EXAMPLES / f"{category}.example.json")["contract_version"],
-                    "1.0.0")
+                self.assertEqual(load(EXAMPLES / f"{category}.example.json")["contract_version"], "1.0.0")
 
 
 class TestSharedCore(unittest.TestCase):
@@ -425,8 +422,7 @@ class TestSharedCore(unittest.TestCase):
         """A skill must state 'no declaration found' explicitly, not by omission."""
         core = load(CONTRACTS / "dependency-core.schema.json")
         resilience = core["properties"]["resilience"]
-        self.assertEqual(sorted(resilience["required"]),
-                         ["fallback", "health_check", "on_path", "retry", "timeout"])
+        self.assertEqual(sorted(resilience["required"]), ["fallback", "health_check", "on_path", "retry", "timeout"])
 
     def test_each_resilience_fact_accepts_null(self):
         core = load(CONTRACTS / "dependency-core.schema.json")
@@ -436,8 +432,7 @@ class TestSharedCore(unittest.TestCase):
                 self.assertIn("null", props[fact]["type"])
 
     def test_core_documents_that_null_is_not_confirmed_absent(self):
-        text = (CONTRACTS / "dependency-core.schema.json").read_text(
-            encoding="utf-8").lower()
+        text = (CONTRACTS / "dependency-core.schema.json").read_text(encoding="utf-8").lower()
         self.assertIn("no declaration was found", text)
         self.assertIn("never", text)
 
@@ -445,8 +440,7 @@ class TestSharedCore(unittest.TestCase):
         for category in CATEGORIES:
             with self.subTest(category=category):
                 schema = load(CONTRACTS / f"{category}.schema.json")
-                self.assertEqual(schema["properties"]["status"]["enum"],
-                                 ["discovered", "not-applicable", "failed"])
+                self.assertEqual(schema["properties"]["status"]["enum"], ["discovered", "not-applicable", "failed"])
 
     def test_every_category_requires_assumptions(self):
         for category in CATEGORIES:
@@ -478,8 +472,7 @@ class TestContractStaysInItsLayer(unittest.TestCase):
     def test_no_criticality_or_remediation_vocabulary(self):
         """Layers 2-4 judge; layer 1 reports. Banned words keep that boundary
         visible in review."""
-        banned = ("criticality", "severity", "blast_radius", "remediation",
-                  "recommendation", "risk_score", "priority")
+        banned = ("criticality", "severity", "blast_radius", "remediation", "recommendation", "risk_score", "priority")
         for path in sorted(CONTRACTS.glob("*.schema.json")):
             text = path.read_text(encoding="utf-8").lower()
             for word in banned:
@@ -488,8 +481,7 @@ class TestContractStaysInItsLayer(unittest.TestCase):
 
     def test_no_probing_vocabulary(self):
         """D3: nothing is measured, so nothing names a measurement."""
-        banned = ("measured", "observed_latency", "reachable", "resolved_ip",
-                  "ping", "probe_result")
+        banned = ("measured", "observed_latency", "reachable", "resolved_ip", "ping", "probe_result")
         for path in sorted(CONTRACTS.glob("*.schema.json")):
             text = path.read_text(encoding="utf-8").lower()
             for word in banned:
@@ -898,8 +890,7 @@ from repobuilder import build_repo, git_commit_all, git_init
 class TestWalkRepo(unittest.TestCase):
     def test_lists_files_relative_and_sorted(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {"b.py": "x = 1\n", "a.py": "y = 2\n",
-                                    "pkg/c.py": "z = 3\n"})
+            root = build_repo(tmp, {"b.py": "x = 1\n", "a.py": "y = 2\n", "pkg/c.py": "z = 3\n"})
             files, method = walk_repo(root)
             self.assertEqual(files, ["a.py", "b.py", "pkg/c.py"])
             self.assertEqual(method, "walk")
@@ -908,21 +899,23 @@ class TestWalkRepo(unittest.TestCase):
         """D7: an unscoped scan of this repo reported 270 packages against 2
         declared deps, 188 of them from a nested virtualenv."""
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {
-                "app.py": "x = 1\n",
-                "node_modules/left-pad/index.js": "//\n",
-                ".venv/lib/python3.11/site-packages/thing.py": "x = 1\n",
-                "sub/.venv/lib/other.py": "x = 1\n",
-                "vendor/lib/thing.go": "package lib\n",
-                "dist/bundle.js": "//\n",
-            })
+            root = build_repo(
+                tmp,
+                {
+                    "app.py": "x = 1\n",
+                    "node_modules/left-pad/index.js": "//\n",
+                    ".venv/lib/python3.11/site-packages/thing.py": "x = 1\n",
+                    "sub/.venv/lib/other.py": "x = 1\n",
+                    "vendor/lib/thing.go": "package lib\n",
+                    "dist/bundle.js": "//\n",
+                },
+            )
             files, _ = walk_repo(root)
             self.assertEqual(files, ["app.py"])
 
     def test_uses_git_listing_and_honors_gitignore(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {".gitignore": "ignored.txt\n",
-                                    "app.py": "x = 1\n", "ignored.txt": "x\n"})
+            root = build_repo(tmp, {".gitignore": "ignored.txt\n", "app.py": "x = 1\n", "ignored.txt": "x\n"})
             git_init(root)
             files, method = walk_repo(root)
             self.assertEqual(method, "git")
@@ -931,8 +924,7 @@ class TestWalkRepo(unittest.TestCase):
 
     def test_git_listing_still_filters_excluded_dirs(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {"app.py": "x = 1\n",
-                                    "vendor/lib/thing.go": "package lib\n"})
+            root = build_repo(tmp, {"app.py": "x = 1\n", "vendor/lib/thing.go": "package lib\n"})
             git_init(root)
             git_commit_all(root)
             files, method = walk_repo(root)
@@ -940,8 +932,7 @@ class TestWalkRepo(unittest.TestCase):
             self.assertEqual(files, ["app.py"])
 
     def test_exclude_dirs_covers_the_trees_syft_would_otherwise_catalogue(self):
-        for name in (".venv", "venv", "node_modules", "vendor",
-                     "site-packages", "dist", ".git"):
+        for name in (".venv", "venv", "node_modules", "vendor", "site-packages", "dist", ".git"):
             with self.subTest(directory=name):
                 self.assertIn(name, EXCLUDE_DIRS)
 
@@ -988,14 +979,12 @@ class TestClassifyFiles(unittest.TestCase):
         self.assertEqual(result["compose"], [])
 
     def test_detects_compose_by_name(self):
-        for name in ("docker-compose.yml", "docker-compose.yaml",
-                     "compose.yml", "compose.yaml"):
+        for name in ("docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"):
             with self.subTest(name=name):
                 self.assertEqual(classify({name: COMPOSE})["compose"], [name])
 
     def test_detects_kubernetes_by_content_not_name(self):
-        result = classify({"deploy/api.yaml": K8S_DEPLOYMENT,
-                           "config/settings.yaml": "debug: true\n"})
+        result = classify({"deploy/api.yaml": K8S_DEPLOYMENT, "config/settings.yaml": "debug: true\n"})
         self.assertEqual(result["k8s"], ["deploy/api.yaml"])
 
     def test_compose_is_never_also_classified_as_kubernetes(self):
@@ -1004,31 +993,31 @@ class TestClassifyFiles(unittest.TestCase):
         self.assertEqual(result["k8s"], [])
 
     def test_detects_iac_by_extension_and_by_name(self):
-        result = classify({"infra/main.tf": "resource \"aws_db_instance\" \"x\" {}\n",
-                           "infra/vars.tfvars": "region = \"us-east-1\"\n",
-                           "chart/Chart.yaml": "name: api\nversion: 0.1.0\n",
-                           "cdk.json": "{\"app\": \"node bin/app.js\"}\n"})
-        self.assertEqual(result["iac"],
-                         ["cdk.json", "chart/Chart.yaml", "infra/main.tf",
-                          "infra/vars.tfvars"])
+        result = classify(
+            {
+                "infra/main.tf": 'resource "aws_db_instance" "x" {}\n',
+                "infra/vars.tfvars": 'region = "us-east-1"\n',
+                "chart/Chart.yaml": "name: api\nversion: 0.1.0\n",
+                "cdk.json": '{"app": "node bin/app.js"}\n',
+            }
+        )
+        self.assertEqual(result["iac"], ["cdk.json", "chart/Chart.yaml", "infra/main.tf", "infra/vars.tfvars"])
 
     def test_template_yaml_is_iac_only_when_its_content_says_so(self):
         self.assertEqual(classify({"template.yaml": SAM})["iac"], ["template.yaml"])
-        self.assertEqual(
-            classify({".github/ISSUE_TEMPLATE/template.yaml": ISSUE_FORM})["iac"], [])
+        self.assertEqual(classify({".github/ISSUE_TEMPLATE/template.yaml": ISSUE_FORM})["iac"], [])
 
     def test_detects_env_files(self):
-        result = classify({".env": "A=1\n", ".env.example": "A=\n",
-                           "config/local.env": "B=2\n", "environment.md": "# no\n"})
-        self.assertEqual(result["env"],
-                         [".env", ".env.example", "config/local.env"])
+        result = classify(
+            {".env": "A=1\n", ".env.example": "A=\n", "config/local.env": "B=2\n", "environment.md": "# no\n"}
+        )
+        self.assertEqual(result["env"], [".env", ".env.example", "config/local.env"])
 
     def test_detects_ci_config(self):
-        result = classify({".github/workflows/ci.yml": WORKFLOW,
-                           ".gitlab-ci.yml": "stages: [test]\n",
-                           "Jenkinsfile": "pipeline {}\n"})
-        self.assertEqual(result["ci"],
-                         [".github/workflows/ci.yml", ".gitlab-ci.yml", "Jenkinsfile"])
+        result = classify(
+            {".github/workflows/ci.yml": WORKFLOW, ".gitlab-ci.yml": "stages: [test]\n", "Jenkinsfile": "pipeline {}\n"}
+        )
+        self.assertEqual(result["ci"], [".github/workflows/ci.yml", ".gitlab-ci.yml", "Jenkinsfile"])
 
     def test_every_list_is_sorted(self):
         result = classify({"b/compose.yml": COMPOSE, "a/compose.yml": COMPOSE})
@@ -1061,8 +1050,14 @@ from repobuilder import build_repo
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "dependency-model" / "scripts" / "depscan.py"
 
-FINDING_KEYS = ["env_refs", "host_port_literals", "resilience_calls",
-                "resource_limits", "secret_shaped_keys", "url_literals"]
+FINDING_KEYS = [
+    "env_refs",
+    "host_port_literals",
+    "resilience_calls",
+    "resource_limits",
+    "secret_shaped_keys",
+    "url_literals",
+]
 
 
 class TestBuildScan(unittest.TestCase):
@@ -1070,9 +1065,10 @@ class TestBuildScan(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"app.py": "x = 1\n"})
             scan = build_scan(root)
-            self.assertEqual(sorted(scan),
-                             ["coverage", "exclusions", "files", "findings",
-                              "listing_method", "scan_version", "target"])
+            self.assertEqual(
+                sorted(scan),
+                ["coverage", "exclusions", "files", "findings", "listing_method", "scan_version", "target"],
+            )
             self.assertEqual(scan["scan_version"], "1.0.0")
             self.assertEqual(scan["target"], str(Path(root).resolve()))
 
@@ -1106,10 +1102,10 @@ class TestBuildScan(unittest.TestCase):
 
     def test_output_is_deterministic(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {"a.py": "x = 1\n", "docker-compose.yml":
-                                    "services:\n  db:\n    image: postgres:16\n"})
-            self.assertEqual(json.dumps(build_scan(root), sort_keys=True),
-                             json.dumps(build_scan(root), sort_keys=True))
+            root = build_repo(
+                tmp, {"a.py": "x = 1\n", "docker-compose.yml": "services:\n  db:\n    image: postgres:16\n"}
+            )
+            self.assertEqual(json.dumps(build_scan(root), sort_keys=True), json.dumps(build_scan(root), sort_keys=True))
 
 
 class TestCli(unittest.TestCase):
@@ -1121,8 +1117,8 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"app.py": "x = 1\n"})
             proc = subprocess.run(
-                [sys.executable, str(SCRIPT), str(root)],
-                capture_output=True, text=True, timeout=60, check=False)
+                [sys.executable, str(SCRIPT), str(root)], capture_output=True, text=True, timeout=60, check=False
+            )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertEqual(json.loads(proc.stdout)["scan_version"], "1.0.0")
 
@@ -1131,7 +1127,11 @@ class TestCli(unittest.TestCase):
             root = build_repo(tmp, {"app.py": "x = 1\n"})
             proc = subprocess.run(
                 [sys.executable, str(SCRIPT), str(root), "--indent", "0"],
-                capture_output=True, text=True, timeout=60, check=False)
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertNotIn("\n  ", proc.stdout)
 
@@ -1176,10 +1176,29 @@ from pathlib import Path
 # Unscoped, syft catalogues an installed tree as though it were the project's
 # dependency set — 270 packages against 2 declared ones, measured on this repo.
 EXCLUDE_DIRS = {
-    ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "env",
-    "vendor", "dist", "build", "target", "out", "__pycache__",
-    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".next",
-    ".gradle", "site-packages", ".idea", ".terraform", "Pods",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    ".venv",
+    "venv",
+    "env",
+    "vendor",
+    "dist",
+    "build",
+    "target",
+    "out",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".next",
+    ".gradle",
+    "site-packages",
+    ".idea",
+    ".terraform",
+    "Pods",
 }
 
 
@@ -1191,9 +1210,11 @@ def _git_files(root):
     """Return git's view of the repo, or None if root is not a usable git repo."""
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--cached", "--others",
-             "--exclude-standard"],
-            capture_output=True, text=True, timeout=30, check=False,
+            ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -1242,12 +1263,17 @@ from pathlib import PurePosixPath
 
 from depscanlib.walk import read_text
 
-COMPOSE_NAMES = {"docker-compose.yml", "docker-compose.yaml",
-                 "compose.yml", "compose.yaml"}
+COMPOSE_NAMES = {"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
 
-IAC_NAMES = {"cdk.json", "serverless.yml", "serverless.yaml",
-             "Chart.yaml", "kustomization.yaml", "kustomization.yml",
-             "Pulumi.yaml"}
+IAC_NAMES = {
+    "cdk.json",
+    "serverless.yml",
+    "serverless.yaml",
+    "Chart.yaml",
+    "kustomization.yaml",
+    "kustomization.yml",
+    "Pulumi.yaml",
+}
 IAC_EXTS = {".tf", ".tfvars", ".bicep"}
 
 # template.yaml proves nothing by its name — a GitHub issue form, a Backstage
@@ -1256,8 +1282,7 @@ TEMPLATE_NAMES = {"template.yaml", "template.yml"}
 SAM_TRANSFORM = "AWS::Serverless-2016-10-31"
 CFN_MARKER = "AWSTemplateFormatVersion"
 
-CI_NAMES = {".gitlab-ci.yml", "azure-pipelines.yml", "Jenkinsfile",
-            ".travis.yml", "bitbucket-pipelines.yml"}
+CI_NAMES = {".gitlab-ci.yml", "azure-pipelines.yml", "Jenkinsfile", ".travis.yml", "bitbucket-pipelines.yml"}
 CI_PATHS = {".circleci/config.yml", ".circleci/config.yaml"}
 
 YAML_EXTS = {".yaml", ".yml"}
@@ -1321,8 +1346,14 @@ from depscanlib import VERSION
 from depscanlib.files import classify_files
 from depscanlib.walk import EXCLUDE_DIRS, walk_repo
 
-EMPTY_FINDINGS = ("env_refs", "url_literals", "host_port_literals",
-                  "secret_shaped_keys", "resource_limits", "resilience_calls")
+EMPTY_FINDINGS = (
+    "env_refs",
+    "url_literals",
+    "host_port_literals",
+    "secret_shaped_keys",
+    "resource_limits",
+    "resilience_calls",
+)
 
 
 def build_coverage(paths, skipped):
@@ -1335,8 +1366,7 @@ def build_coverage(paths, skipped):
     if not paths:
         return {"files_scanned": 0, "skipped": skipped, "confidence": "low"}
     confidence = "partial" if skipped else "high"
-    return {"files_scanned": len(paths), "skipped": skipped,
-            "confidence": confidence}
+    return {"files_scanned": len(paths), "skipped": skipped, "confidence": confidence}
 
 
 def build_scan(root):
@@ -1392,14 +1422,11 @@ from depscanlib.report import build_scan
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="depscan.py",
-        description="Emit a deterministic JSON dependency-evidence index.")
-    parser.add_argument("path", nargs="?", default=".",
-                        help="repo root to scan (default: current directory)")
-    parser.add_argument("--json", action="store_true",
-                        help="emit JSON (default; accepted for explicitness)")
-    parser.add_argument("--indent", type=int, default=2,
-                        help="JSON indent; 0 for compact output")
+        prog="depscan.py", description="Emit a deterministic JSON dependency-evidence index."
+    )
+    parser.add_argument("path", nargs="?", default=".", help="repo root to scan (default: current directory)")
+    parser.add_argument("--json", action="store_true", help="emit JSON (default; accepted for explicitness)")
+    parser.add_argument("--indent", type=int, default=2, help="JSON indent; 0 for compact output")
     args = parser.parse_args(argv)
 
     root = Path(args.path)
@@ -1521,32 +1548,34 @@ def kinds(findings):
 
 class TestEnvRefs(unittest.TestCase):
     def test_go_getenv_and_lookupenv(self):
-        findings, _ = scan({"main.go":
-            'package main\n\nfunc a() {\n\tx := os.Getenv("DATABASE_URL")\n'
-            '\ty, ok := os.LookupEnv("REDIS_ADDR")\n}\n'})
+        findings, _ = scan(
+            {
+                "main.go": 'package main\n\nfunc a() {\n\tx := os.Getenv("DATABASE_URL")\n'
+                '\ty, ok := os.LookupEnv("REDIS_ADDR")\n}\n'
+            }
+        )
         self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "REDIS_ADDR"])
 
     def test_python_environ_forms(self):
-        findings, _ = scan({"app.py":
-            'import os\nA = os.environ["DATABASE_URL"]\n'
-            'B = os.environ.get("REDIS_ADDR")\nC = os.getenv("QUEUE_URL")\n'})
-        self.assertEqual(names(findings, "env_refs"),
-                         ["DATABASE_URL", "QUEUE_URL", "REDIS_ADDR"])
+        findings, _ = scan(
+            {
+                "app.py": 'import os\nA = os.environ["DATABASE_URL"]\n'
+                'B = os.environ.get("REDIS_ADDR")\nC = os.getenv("QUEUE_URL")\n'
+            }
+        )
+        self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "QUEUE_URL", "REDIS_ADDR"])
 
     def test_javascript_process_env_forms(self):
-        findings, _ = scan({"server.js":
-            'const a = process.env.DATABASE_URL;\n'
-            'const b = process.env["REDIS_ADDR"];\n'})
+        findings, _ = scan({"server.js": 'const a = process.env.DATABASE_URL;\nconst b = process.env["REDIS_ADDR"];\n'})
         self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "REDIS_ADDR"])
 
     def test_typescript_is_scanned_like_javascript(self):
-        findings, _ = scan({"src/config.ts": 'export const u = process.env.API_URL;\n'})
+        findings, _ = scan({"src/config.ts": "export const u = process.env.API_URL;\n"})
         self.assertEqual(names(findings, "env_refs"), ["API_URL"])
 
     def test_records_file_and_one_indexed_line(self):
         findings, _ = scan({"app.py": 'import os\n\nX = os.getenv("A_KEY")\n'})
-        self.assertEqual(findings["env_refs"],
-                         [{"name": "A_KEY", "file": "app.py", "line": 3}])
+        self.assertEqual(findings["env_refs"], [{"name": "A_KEY", "file": "app.py", "line": 3}])
 
     def test_same_name_twice_is_two_records(self):
         findings, _ = scan({"app.py": 'os.getenv("A")\nos.getenv("A")\n'})
@@ -1559,37 +1588,45 @@ class TestEnvRefs(unittest.TestCase):
 
 class TestResilienceCalls(unittest.TestCase):
     def test_go_context_with_timeout_and_deadline(self):
-        findings, _ = scan({"db.go":
-            'ctx, cancel := context.WithTimeout(parent, 5*time.Second)\n'
-            'ctx2, c2 := context.WithDeadline(parent, t)\n'})
+        findings, _ = scan(
+            {
+                "db.go": "ctx, cancel := context.WithTimeout(parent, 5*time.Second)\n"
+                "ctx2, c2 := context.WithDeadline(parent, t)\n"
+            }
+        )
         self.assertEqual(kinds(findings), ["deadline", "timeout"])
 
     def test_go_struct_timeout_field(self):
-        findings, _ = scan({"client.go": 'c := &http.Client{Timeout: 3 * time.Second}\n'})
+        findings, _ = scan({"client.go": "c := &http.Client{Timeout: 3 * time.Second}\n"})
         self.assertIn("timeout", kinds(findings))
 
     def test_python_timeout_kwarg_and_retry_decorator(self):
-        findings, _ = scan({"client.py":
-            'import requests\nfrom tenacity import retry\n\n'
-            '@retry\ndef get():\n    return requests.get(url, timeout=5)\n'})
+        findings, _ = scan(
+            {
+                "client.py": "import requests\nfrom tenacity import retry\n\n"
+                "@retry\ndef get():\n    return requests.get(url, timeout=5)\n"
+            }
+        )
         self.assertEqual(kinds(findings), ["retry", "timeout"])
 
     def test_javascript_abort_signal_and_axios_timeout(self):
-        findings, _ = scan({"api.ts":
-            'const s = AbortSignal.timeout(2000);\n'
-            'const c = axios.create({ timeout: 3000 });\n'})
+        findings, _ = scan(
+            {"api.ts": "const s = AbortSignal.timeout(2000);\nconst c = axios.create({ timeout: 3000 });\n"}
+        )
         self.assertEqual(kinds(findings), ["timeout"])
 
     def test_circuit_breaker_libraries_are_recognised(self):
-        findings, _ = scan({
-            "b.go": 'import "github.com/sony/gobreaker"\n',
-            "b.py": 'import pybreaker\n',
-            "b.js": 'const CircuitBreaker = require("opossum");\n',
-        })
+        findings, _ = scan(
+            {
+                "b.go": 'import "github.com/sony/gobreaker"\n',
+                "b.py": "import pybreaker\n",
+                "b.js": 'const CircuitBreaker = require("opossum");\n',
+            }
+        )
         self.assertEqual(kinds(findings), ["circuit-breaker"])
 
     def test_records_the_matched_text_verbatim_as_raw(self):
-        findings, _ = scan({"db.go": 'context.WithTimeout(parent, 5*time.Second)\n'})
+        findings, _ = scan({"db.go": "context.WithTimeout(parent, 5*time.Second)\n"})
         record = findings["resilience_calls"][0]
         self.assertIn("WithTimeout", record["raw"])
         self.assertEqual(record["file"], "db.go")
@@ -1597,8 +1634,7 @@ class TestResilienceCalls(unittest.TestCase):
         self.assertEqual(record["language"], "go")
 
     def test_findings_are_sorted_by_file_then_line(self):
-        findings, _ = scan({"b.py": 'requests.get(u, timeout=1)\n',
-                            "a.py": 'requests.get(u, timeout=2)\n'})
+        findings, _ = scan({"b.py": "requests.get(u, timeout=1)\n", "a.py": "requests.get(u, timeout=2)\n"})
         files = [r["file"] for r in findings["resilience_calls"]]
         self.assertEqual(files, ["a.py", "b.py"])
 
@@ -1606,11 +1642,11 @@ class TestResilienceCalls(unittest.TestCase):
 class TestSkippedLanguages(unittest.TestCase):
     def test_out_of_scope_source_is_reported_not_silently_dropped(self):
         """D9: the gap must be visible in the contract."""
-        _, skipped = scan({"main.rs": "fn main() {}\n", "lib.rs": "pub fn a() {}\n",
-                           "app.py": "x = 1\n"})
-        self.assertEqual(skipped, [{
-            "reason": "source-literal scanning covers go, js, python, and ts only",
-            "language": "rust", "count": 2}])
+        _, skipped = scan({"main.rs": "fn main() {}\n", "lib.rs": "pub fn a() {}\n", "app.py": "x = 1\n"})
+        self.assertEqual(
+            skipped,
+            [{"reason": "source-literal scanning covers go, js, python, and ts only", "language": "rust", "count": 2}],
+        )
 
     def test_in_scope_only_repo_reports_nothing_skipped(self):
         _, skipped = scan({"app.py": "x = 1\n", "main.go": "package main\n"})
@@ -1621,8 +1657,7 @@ class TestSkippedLanguages(unittest.TestCase):
         self.assertEqual(skipped, [])
 
     def test_the_three_in_scope_ecosystems_are_the_documented_ones(self):
-        self.assertEqual(sorted(set(SOURCE_LANGUAGES.values())),
-                         ["go", "js", "python", "ts"])
+        self.assertEqual(sorted(set(SOURCE_LANGUAGES.values())), ["go", "js", "python", "ts"])
 
 
 if __name__ == "__main__":
@@ -1666,19 +1701,40 @@ from depscanlib.walk import read_text
 
 SOURCE_LANGUAGES = {
     ".go": "go",
-    ".ts": "ts", ".tsx": "ts",
-    ".js": "js", ".jsx": "js", ".mjs": "js", ".cjs": "js",
-    ".py": "python", ".pyi": "python",
+    ".ts": "ts",
+    ".tsx": "ts",
+    ".js": "js",
+    ".jsx": "js",
+    ".mjs": "js",
+    ".cjs": "js",
+    ".py": "python",
+    ".pyi": "python",
 }
 
 # Languages we can name but deliberately do not scan. Anything not listed
 # here and not in SOURCE_LANGUAGES is not source, so it is not "skipped".
 OTHER_LANGUAGES = {
-    ".rs": "rust", ".java": "java", ".kt": "kotlin", ".rb": "ruby",
-    ".php": "php", ".cs": "csharp", ".swift": "swift", ".scala": "scala",
-    ".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".hpp": "cpp",
-    ".ex": "elixir", ".exs": "elixir", ".erl": "erlang", ".dart": "dart",
-    ".pl": "perl", ".lua": "lua", ".r": "r", ".m": "objc",
+    ".rs": "rust",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".rb": "ruby",
+    ".php": "php",
+    ".cs": "csharp",
+    ".swift": "swift",
+    ".scala": "scala",
+    ".c": "c",
+    ".h": "c",
+    ".cc": "cpp",
+    ".cpp": "cpp",
+    ".hpp": "cpp",
+    ".ex": "elixir",
+    ".exs": "elixir",
+    ".erl": "erlang",
+    ".dart": "dart",
+    ".pl": "perl",
+    ".lua": "lua",
+    ".r": "r",
+    ".m": "objc",
 }
 
 SKIP_REASON = "source-literal scanning covers go, js, python, and ts only"
@@ -1693,7 +1749,7 @@ ENV_PATTERNS = {
         re.compile(r'os\.getenv\(\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
     ],
     "js": [
-        re.compile(r'process\.env\.([A-Za-z_][A-Za-z0-9_]*)'),
+        re.compile(r"process\.env\.([A-Za-z_][A-Za-z0-9_]*)"),
         re.compile(r'process\.env\[\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']'),
     ],
 }
@@ -1703,23 +1759,23 @@ ENV_PATTERNS["ts"] = ENV_PATTERNS["js"]
 # references/resilience-signatures.md — keep the two in step.
 RESILIENCE_PATTERNS = {
     "go": [
-        (re.compile(r'context\.WithTimeout\([^)]*\)'), "timeout"),
-        (re.compile(r'context\.WithDeadline\([^)]*\)'), "deadline"),
-        (re.compile(r'\bTimeout:\s*[^,\n}]+'), "timeout"),
-        (re.compile(r'\b(?:backoff|retry)\.[A-Za-z]+\([^)]*\)'), "retry"),
-        (re.compile(r'\bgobreaker\b[^\n]*'), "circuit-breaker"),
+        (re.compile(r"context\.WithTimeout\([^)]*\)"), "timeout"),
+        (re.compile(r"context\.WithDeadline\([^)]*\)"), "deadline"),
+        (re.compile(r"\bTimeout:\s*[^,\n}]+"), "timeout"),
+        (re.compile(r"\b(?:backoff|retry)\.[A-Za-z]+\([^)]*\)"), "retry"),
+        (re.compile(r"\bgobreaker\b[^\n]*"), "circuit-breaker"),
     ],
     "python": [
-        (re.compile(r'\btimeout\s*=\s*[^,)\n]+'), "timeout"),
-        (re.compile(r'@retry\b[^\n]*'), "retry"),
-        (re.compile(r'\btenacity\b[^\n]*'), "retry"),
-        (re.compile(r'\bpybreaker\b[^\n]*'), "circuit-breaker"),
+        (re.compile(r"\btimeout\s*=\s*[^,)\n]+"), "timeout"),
+        (re.compile(r"@retry\b[^\n]*"), "retry"),
+        (re.compile(r"\btenacity\b[^\n]*"), "retry"),
+        (re.compile(r"\bpybreaker\b[^\n]*"), "circuit-breaker"),
     ],
     "js": [
-        (re.compile(r'AbortSignal\.timeout\([^)]*\)'), "timeout"),
-        (re.compile(r'\btimeout\s*:\s*[^,\n}]+'), "timeout"),
-        (re.compile(r'\bp-retry\b[^\n]*'), "retry"),
-        (re.compile(r'\bopossum\b[^\n]*'), "circuit-breaker"),
+        (re.compile(r"AbortSignal\.timeout\([^)]*\)"), "timeout"),
+        (re.compile(r"\btimeout\s*:\s*[^,\n}]+"), "timeout"),
+        (re.compile(r"\bp-retry\b[^\n]*"), "retry"),
+        (re.compile(r"\bopossum\b[^\n]*"), "circuit-breaker"),
     ],
 }
 RESILIENCE_PATTERNS["ts"] = RESILIENCE_PATTERNS["js"]
@@ -1737,13 +1793,12 @@ def _scan_file(root, path, language, env_out, resilience_out):
     for number, line in enumerate(text.splitlines(), start=1):
         for pattern in ENV_PATTERNS.get(language, []):
             for match in pattern.finditer(line):
-                env_out.append({"name": match.group(1), "file": path,
-                                "line": number})
+                env_out.append({"name": match.group(1), "file": path, "line": number})
         for pattern, kind in RESILIENCE_PATTERNS.get(language, []):
             for match in pattern.finditer(line):
-                resilience_out.append({"kind": kind, "raw": match.group(0).strip(),
-                                       "file": path, "line": number,
-                                       "language": language})
+                resilience_out.append(
+                    {"kind": kind, "raw": match.group(0).strip(), "file": path, "line": number, "language": language}
+                )
 
 
 def scan_source(root, paths):
@@ -1763,8 +1818,9 @@ def scan_source(root, paths):
         elif suffix in OTHER_LANGUAGES:
             unscanned[OTHER_LANGUAGES[suffix]] += 1
 
-    skipped = [{"reason": SKIP_REASON, "language": language, "count": count}
-               for language, count in sorted(unscanned.items())]
+    skipped = [
+        {"reason": SKIP_REASON, "language": language, "count": count} for language, count in sorted(unscanned.items())
+    ]
     return {"env_refs": env_refs, "resilience_calls": resilience_calls}, skipped
 ```
 
@@ -1848,35 +1904,39 @@ def scan(files):
 class TestUrlLiterals(unittest.TestCase):
     def test_extracts_scheme_and_host(self):
         findings = scan({"client.go": 'const base = "https://api.stripe.com/v1"\n'})
-        self.assertEqual(findings["url_literals"], [{
-            "value": "https://api.stripe.com/v1", "scheme": "https",
-            "host": "api.stripe.com", "file": "client.go", "line": 1}])
+        self.assertEqual(
+            findings["url_literals"],
+            [
+                {
+                    "value": "https://api.stripe.com/v1",
+                    "scheme": "https",
+                    "host": "api.stripe.com",
+                    "file": "client.go",
+                    "line": 1,
+                }
+            ],
+        )
 
     def test_extracts_non_http_schemes(self):
-        findings = scan({".env": "DATABASE_URL=postgres://user@db:5432/app\n"
-                                 "AMQP=amqp://guest@rabbit:5672\n"})
-        self.assertEqual(sorted(u["scheme"] for u in findings["url_literals"]),
-                         ["amqp", "postgres"])
+        findings = scan({".env": "DATABASE_URL=postgres://user@db:5432/app\nAMQP=amqp://guest@rabbit:5672\n"})
+        self.assertEqual(sorted(u["scheme"] for u in findings["url_literals"]), ["amqp", "postgres"])
 
     def test_strips_trailing_quotes_and_punctuation(self):
         findings = scan({"a.py": 'URL = "https://example.com/x",\n'})
-        self.assertEqual(findings["url_literals"][0]["value"],
-                         "https://example.com/x")
+        self.assertEqual(findings["url_literals"][0]["value"], "https://example.com/x")
 
     def test_ignores_schema_urls_in_json_documents(self):
         """A $schema pointer is a document identifier, not a dependency."""
-        findings = scan({"c.json": json.dumps(
-            {"$schema": "https://json-schema.org/draft/2020-12/schema"}) + "\n"})
+        findings = scan({"c.json": json.dumps({"$schema": "https://json-schema.org/draft/2020-12/schema"}) + "\n"})
         self.assertEqual(findings["url_literals"], [])
 
 
 class TestHostPortLiterals(unittest.TestCase):
     def test_extracts_hostname_and_port(self):
-        findings = scan({"docker-compose.yml":
-            'services:\n  app:\n    environment:\n      REDIS: "redis:6379"\n'})
-        self.assertEqual(findings["host_port_literals"], [{
-            "host": "redis", "port": 6379,
-            "file": "docker-compose.yml", "line": 4}])
+        findings = scan({"docker-compose.yml": 'services:\n  app:\n    environment:\n      REDIS: "redis:6379"\n'})
+        self.assertEqual(
+            findings["host_port_literals"], [{"host": "redis", "port": 6379, "file": "docker-compose.yml", "line": 4}]
+        )
 
     def test_extracts_ipv4_and_port(self):
         findings = scan({"conf.ini": "backend = 10.0.1.5:8080\n"})
@@ -1888,8 +1948,7 @@ class TestHostPortLiterals(unittest.TestCase):
 
     def test_ignores_an_image_tag(self):
         """postgres:16 is a version, not an endpoint."""
-        findings = scan({"docker-compose.yml":
-            "services:\n  db:\n    image: postgres:16\n"})
+        findings = scan({"docker-compose.yml": "services:\n  db:\n    image: postgres:16\n"})
         self.assertEqual(findings["host_port_literals"], [])
 
     def test_port_is_an_integer_not_a_string(self):
@@ -1899,19 +1958,19 @@ class TestHostPortLiterals(unittest.TestCase):
 
 class TestSecretShapedKeys(unittest.TestCase):
     def test_finds_secret_shaped_env_keys(self):
-        findings = scan({".env": "STRIPE_API_KEY=sk_live_abc123\n"
-                                 "DB_PASSWORD=hunter2\n"
-                                 "LOG_LEVEL=debug\n"})
-        self.assertEqual(sorted(k["name"] for k in findings["secret_shaped_keys"]),
-                         ["DB_PASSWORD", "STRIPE_API_KEY"])
+        findings = scan({".env": "STRIPE_API_KEY=sk_live_abc123\nDB_PASSWORD=hunter2\nLOG_LEVEL=debug\n"})
+        self.assertEqual(sorted(k["name"] for k in findings["secret_shaped_keys"]), ["DB_PASSWORD", "STRIPE_API_KEY"])
 
     def test_never_records_the_value(self):
         """A discovery skill that writes credentials into a contract is a leak.
         The scanner must not hand it one to write."""
-        findings = scan({".env": "STRIPE_API_KEY=sk_live_abc123\n",
-                         "app.py": 'TOKEN = "ghp_realtokenvalue"\n',
-                         "k8s.yaml": "apiVersion: v1\nkind: Secret\n"
-                                     "data:\n  password: aHVudGVyMg==\n"})
+        findings = scan(
+            {
+                ".env": "STRIPE_API_KEY=sk_live_abc123\n",
+                "app.py": 'TOKEN = "ghp_realtokenvalue"\n',
+                "k8s.yaml": "apiVersion: v1\nkind: Secret\ndata:\n  password: aHVudGVyMg==\n",
+            }
+        )
         blob = json.dumps(findings)
         for secret in ("sk_live_abc123", "ghp_realtokenvalue", "aHVudGVyMg=="):
             with self.subTest(secret=secret):
@@ -1919,25 +1978,24 @@ class TestSecretShapedKeys(unittest.TestCase):
 
     def test_records_only_name_file_and_line(self):
         findings = scan({".env": "API_KEY=x\n"})
-        self.assertEqual(sorted(findings["secret_shaped_keys"][0]),
-                         ["file", "line", "name"])
+        self.assertEqual(sorted(findings["secret_shaped_keys"][0]), ["file", "line", "name"])
 
     def test_matches_yaml_and_source_keys_not_only_env_files(self):
-        findings = scan({"k8s.yaml": "apiVersion: v1\nkind: Secret\n"
-                                     "stringData:\n  client_secret: x\n",
-                         "app.py": 'PRIVATE_KEY = load()\n'})
-        self.assertEqual(sorted(k["name"] for k in findings["secret_shaped_keys"]),
-                         ["PRIVATE_KEY", "client_secret"])
+        findings = scan(
+            {
+                "k8s.yaml": "apiVersion: v1\nkind: Secret\nstringData:\n  client_secret: x\n",
+                "app.py": "PRIVATE_KEY = load()\n",
+            }
+        )
+        self.assertEqual(sorted(k["name"] for k in findings["secret_shaped_keys"]), ["PRIVATE_KEY", "client_secret"])
 
     def test_key_shaped_words_in_prose_are_not_matched(self):
-        findings = scan({"README.md":
-            "The api key is supplied by the operator at deploy time.\n"})
+        findings = scan({"README.md": "The api key is supplied by the operator at deploy time.\n"})
         self.assertEqual(findings["secret_shaped_keys"], [])
 
     def test_findings_are_sorted_by_file_then_line(self):
         findings = scan({"b.env": "API_KEY=1\n", "a.env": "API_KEY=2\n"})
-        self.assertEqual([k["file"] for k in findings["secret_shaped_keys"]],
-                         ["a.env", "b.env"])
+        self.assertEqual([k["file"] for k in findings["secret_shaped_keys"]], ["a.env", "b.env"])
 
 
 class TestBinaryAndLargeFiles(unittest.TestCase):
@@ -1976,9 +2034,30 @@ import re
 from depscanlib.walk import read_text
 
 TEXT_SUFFIXES_SKIPPED = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".gz", ".tar",
-    ".woff", ".woff2", ".ttf", ".eot", ".so", ".dylib", ".dll", ".exe",
-    ".class", ".jar", ".wasm", ".bin", ".db", ".sqlite", ".sqlite3",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".so",
+    ".dylib",
+    ".dll",
+    ".exe",
+    ".class",
+    ".jar",
+    ".wasm",
+    ".bin",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
 }
 
 URL_RE = re.compile(r'\b([a-z][a-z0-9+.\-]{1,15})://([^\s"\'`<>,)\]}]+)')
@@ -1986,10 +2065,11 @@ URL_RE = re.compile(r'\b([a-z][a-z0-9+.\-]{1,15})://([^\s"\'`<>,)\]}]+)')
 # host:port, not image:tag and not a clock. The port must be 2-5 digits and
 # the whole match must not be followed by another colon-separated token.
 HOST_PORT_RE = re.compile(
-    r'(?<![\w.:/@-])'
-    r'((?:\d{1,3}(?:\.\d{1,3}){3})|(?:[a-z][a-z0-9\-]*(?:\.[a-z0-9\-]+)*))'
-    r':(\d{2,5})(?![\w.:])',
-    re.IGNORECASE)
+    r"(?<![\w.:/@-])"
+    r"((?:\d{1,3}(?:\.\d{1,3}){3})|(?:[a-z][a-z0-9\-]*(?:\.[a-z0-9\-]+)*))"
+    r":(\d{2,5})(?![\w.:])",
+    re.IGNORECASE,
+)
 
 # A port is a port. 16 is an image tag, 30 is half past the hour.
 MIN_PORT = 80
@@ -2001,12 +2081,13 @@ MAX_PORT = 65535
 # the list -- it fires on `authors = [...]` in every pyproject.toml, and
 # AUTH_TOKEN is already caught by TOKEN.
 SECRET_NAME_RE = re.compile(
-    r'\b((?:[A-Za-z][A-Za-z0-9_]*?)?'
-    r'(?:SECRET|TOKEN|PASSWORD|PASSWD|API[_]?KEY|APIKEY|CREDENTIAL|'
-    r'PRIVATE[_]?KEY|ACCESS[_]?KEY|CLIENT[_]?SECRET)'
-    r'[A-Za-z0-9_]*)\b'
-    r'(?=\s*[:=])',
-    re.IGNORECASE)
+    r"\b((?:[A-Za-z][A-Za-z0-9_]*?)?"
+    r"(?:SECRET|TOKEN|PASSWORD|PASSWD|API[_]?KEY|APIKEY|CREDENTIAL|"
+    r"PRIVATE[_]?KEY|ACCESS[_]?KEY|CLIENT[_]?SECRET)"
+    r"[A-Za-z0-9_]*)\b"
+    r"(?=\s*[:=])",
+    re.IGNORECASE,
+)
 
 SCHEMA_KEYS = ('"$schema"', "'$schema'", "$schema:")
 
@@ -2023,7 +2104,7 @@ def _url_host(rest):
 
 
 def _strip_trailing(value):
-    return value.rstrip('.,;:"\'`)]}>')
+    return value.rstrip(".,;:\"'`)]}>")
 
 
 def scan_literals(root, paths):
@@ -2040,20 +2121,23 @@ def scan_literals(root, paths):
             if not any(marker in line for marker in SCHEMA_KEYS):
                 for match in URL_RE.finditer(line):
                     value = _strip_trailing(match.group(0))
-                    urls.append({"value": value, "scheme": match.group(1),
-                                 "host": _url_host(match.group(2)),
-                                 "file": path, "line": number})
+                    urls.append(
+                        {
+                            "value": value,
+                            "scheme": match.group(1),
+                            "host": _url_host(match.group(2)),
+                            "file": path,
+                            "line": number,
+                        }
+                    )
             for match in HOST_PORT_RE.finditer(line):
                 port = int(match.group(2))
                 if MIN_PORT <= port <= MAX_PORT:
-                    host_ports.append({"host": match.group(1), "port": port,
-                                       "file": path, "line": number})
+                    host_ports.append({"host": match.group(1), "port": port, "file": path, "line": number})
             for match in SECRET_NAME_RE.finditer(line):
-                secret_keys.append({"name": match.group(1), "file": path,
-                                    "line": number})
+                secret_keys.append({"name": match.group(1), "file": path, "line": number})
 
-    return {"url_literals": urls, "host_port_literals": host_ports,
-            "secret_shaped_keys": secret_keys}
+    return {"url_literals": urls, "host_port_literals": host_ports, "secret_shaped_keys": secret_keys}
 ```
 
 Note on `HOST_PORT_RE`: URLs are matched by `URL_RE` as well and will also produce a `host_port_literals` record when they carry an explicit port. That is intentional — the network skill wants both readings and correlates them by `file:line`.
@@ -2129,7 +2213,7 @@ K8S = (
     "        - name: api\n"
     "          resources:\n"
     "            limits:\n"
-    "              cpu: \"2\"\n"
+    '              cpu: "2"\n'
     "              memory: 512Mi\n"
     "              nvidia.com/gpu: 1\n"
     "            requests:\n"
@@ -2148,10 +2232,7 @@ COMPOSE = (
     "          memory: 2G\n"
 )
 
-DOCKERFILE = (
-    "FROM --platform=linux/amd64 python:3.11-slim\n"
-    "RUN pip install -r requirements.txt\n"
-)
+DOCKERFILE = "FROM --platform=linux/amd64 python:3.11-slim\nRUN pip install -r requirements.txt\n"
 
 
 def scan(files):
@@ -2189,8 +2270,7 @@ class TestComposeResources(unittest.TestCase):
     def test_extracts_short_form_and_deploy_form(self):
         records = scan({"docker-compose.yml": COMPOSE})
         self.assertEqual(kinds(records), ["cpu", "memory"])
-        self.assertEqual(sorted(r["raw"] for r in records if r["kind"] == "memory"),
-                         ["1g", "2G"])
+        self.assertEqual(sorted(r["raw"] for r in records if r["kind"] == "memory"), ["1g", "2G"])
 
     def test_source_is_compose(self):
         records = scan({"docker-compose.yml": COMPOSE})
@@ -2218,8 +2298,7 @@ class TestNoise(unittest.TestCase):
 
     def test_sorted_by_file_then_line(self):
         records = scan({"b/Dockerfile": DOCKERFILE, "a/Dockerfile": DOCKERFILE})
-        self.assertEqual([r["file"] for r in records][:2],
-                         ["a/Dockerfile", "a/Dockerfile"])
+        self.assertEqual([r["file"] for r in records][:2], ["a/Dockerfile", "a/Dockerfile"])
 
 
 if __name__ == "__main__":
@@ -2254,8 +2333,7 @@ DOCKERFILE_NAMES = {"Dockerfile", "Containerfile"}
 
 K8S_CPU_RE = re.compile(r'^\s*cpu:\s*["\']?([^"\'\n#]+?)["\']?\s*$')
 K8S_MEMORY_RE = re.compile(r'^\s*memory:\s*["\']?([^"\'\n#]+?)["\']?\s*$')
-K8S_GPU_RE = re.compile(r'^\s*[\w.\-/]*gpu:\s*["\']?([^"\'\n#]+?)["\']?\s*$',
-                        re.IGNORECASE)
+K8S_GPU_RE = re.compile(r'^\s*[\w.\-/]*gpu:\s*["\']?([^"\'\n#]+?)["\']?\s*$', re.IGNORECASE)
 K8S_STORAGE_RE = re.compile(r'^\s*(?:ephemeral-)?storage:\s*["\']?([^"\'\n#]+?)["\']?\s*$')
 
 COMPOSE_RES_RES = (
@@ -2267,14 +2345,11 @@ COMPOSE_RES_RES = (
     (re.compile(r'^\s*shm_size:\s*["\']?([^"\'\n#]+?)["\']?\s*$'), "memory"),
 )
 
-FROM_RE = re.compile(
-    r'^\s*FROM\s+(?:--platform=(?P<platform>\S+)\s+)?(?P<image>\S+)',
-    re.IGNORECASE)
+FROM_RE = re.compile(r"^\s*FROM\s+(?:--platform=(?P<platform>\S+)\s+)?(?P<image>\S+)", re.IGNORECASE)
 
 
 def _record(kind, raw, path, line, source):
-    return {"kind": kind, "raw": raw.strip(), "file": path, "line": line,
-            "source": source}
+    return {"kind": kind, "raw": raw.strip(), "file": path, "line": line, "source": source}
 
 
 def _scan_dockerfile(root, path, out):
@@ -2283,20 +2358,21 @@ def _scan_dockerfile(root, path, out):
         if not match:
             continue
         if match.group("platform"):
-            out.append(_record("arch", match.group("platform"), path, number,
-                               "dockerfile"))
-        out.append(_record("runtime-version", match.group("image"), path, number,
-                           "dockerfile"))
+            out.append(_record("arch", match.group("platform"), path, number, "dockerfile"))
+        out.append(_record("runtime-version", match.group("image"), path, number, "dockerfile"))
 
 
 def _scan_kubernetes(root, path, out):
     for number, line in enumerate(read_text(root, path).splitlines(), start=1):
-        for pattern, kind in ((K8S_GPU_RE, "gpu"), (K8S_CPU_RE, "cpu"),
-                              (K8S_MEMORY_RE, "memory"), (K8S_STORAGE_RE, "disk")):
+        for pattern, kind in (
+            (K8S_GPU_RE, "gpu"),
+            (K8S_CPU_RE, "cpu"),
+            (K8S_MEMORY_RE, "memory"),
+            (K8S_STORAGE_RE, "disk"),
+        ):
             match = pattern.match(line)
             if match:
-                out.append(_record(kind, match.group(1), path, number,
-                                   "kubernetes"))
+                out.append(_record(kind, match.group(1), path, number, "kubernetes"))
                 break
 
 
@@ -2394,8 +2470,7 @@ CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
 
 class TestReferencesExist(unittest.TestCase):
     def test_the_three_references_are_present(self):
-        for name in ("categories.md", "resilience-signatures.md",
-                     "running-discovery.md"):
+        for name in ("categories.md", "resilience-signatures.md", "running-discovery.md"):
             with self.subTest(reference=name):
                 self.assertTrue((REFERENCES / name).exists())
 
@@ -2416,15 +2491,13 @@ class TestCategoriesReference(unittest.TestCase):
 
 class TestResilienceSignatures(unittest.TestCase):
     def test_documents_all_three_in_scope_ecosystems(self):
-        text = (REFERENCES / "resilience-signatures.md").read_text(
-            encoding="utf-8").lower()
+        text = (REFERENCES / "resilience-signatures.md").read_text(encoding="utf-8").lower()
         for language in ("go", "typescript", "python"):
             with self.subTest(language=language):
                 self.assertIn(language, text)
 
     def test_states_that_null_is_not_confirmed_absent(self):
-        text = (REFERENCES / "resilience-signatures.md").read_text(
-            encoding="utf-8").lower()
+        text = (REFERENCES / "resilience-signatures.md").read_text(encoding="utf-8").lower()
         self.assertIn("no declaration was found", text)
 
 
@@ -2902,8 +2975,7 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
                 self.assertIn("legitimate finding", text)
 
     def test_no_skill_promises_criticality_or_remediation(self):
-        banned = ("criticality", "blast radius", "remediation",
-                  "monitoring gap", "chaos test")
+        banned = ("criticality", "blast radius", "remediation", "monitoring gap", "chaos test")
         for skill in SKILLS:
             text = body(skill).lower()
             for word in banned:
@@ -2912,9 +2984,9 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
                     if word in text:
                         line = next(ln for ln in text.splitlines() if word in ln)
                         self.assertTrue(
-                            any(marker in line
-                                for marker in ("no ", "not ", "never", "do not")),
-                            f"{skill.parent.name} promises {word!r}: {line}")
+                            any(marker in line for marker in ("no ", "not ", "never", "do not")),
+                            f"{skill.parent.name} promises {word!r}: {line}",
+                        )
 
 
 class TestSecuritySkillCarriesTheCredentialRule(unittest.TestCase):
@@ -2939,23 +3011,19 @@ class TestPackageSkillHonoursSyftsLimits(unittest.TestCase):
 
 class TestRegistration(unittest.TestCase):
     def test_plugin_manifest_is_semver_and_named_for_its_directory(self):
-        data = json.loads(
-            (PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        data = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
         self.assertEqual(data["name"], "dependency-model")
         self.assertRegex(data["version"], r"^\d+\.\d+\.\d+$")
 
     def test_marketplace_entry_exists_in_the_development_category(self):
-        data = json.loads(
-            (REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        data = json.loads((REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
         entry = next(p for p in data["plugins"] if p["name"] == "dependency-model")
         self.assertEqual(entry["source"], "./dependency-model")
         self.assertEqual(entry["category"], "development")
 
     def test_verify_script_declares_the_plugin_with_all_six_skills(self):
         text = (REPO / "scripts" / "verify-marketplace.sh").read_text(encoding="utf-8")
-        self.assertIn(
-            '"dependency-model:development:config,network,package,platform,security,service"',
-            text)
+        self.assertIn('"dependency-model:development:config,network,package,platform,security,service"', text)
         self.assertIn("dependency-model/scripts/depscan.py", text)
 
     def test_requirements_declare_syft_as_required(self):

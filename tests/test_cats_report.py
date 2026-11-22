@@ -21,9 +21,11 @@ def _set_run_meta(db, **columns):
 class TestSummary(unittest.TestCase):
     def setUp(self):
         self.db = build_db([cats_json(), cats_json(testId="Test 2", fuzzer="Other")])
-        C.classify_db(self.db, write_rules(
-            "version: 1\nrules:\n  - id: ONLY_HAPPY\n    why: w\n    when: {fuzzer: HappyPath}\n"),
-            allow_5xx=False)
+        C.classify_db(
+            self.db,
+            write_rules("version: 1\nrules:\n  - id: ONLY_HAPPY\n    why: w\n    when: {fuzzer: HappyPath}\n"),
+            allow_5xx=False,
+        )
 
     def test_counts_split_by_classification(self):
         s = Rep.summary(self.db)
@@ -33,9 +35,11 @@ class TestSummary(unittest.TestCase):
         self.assertEqual(s["true_positives"][0]["fuzzer"], "Other")
 
     def test_zero_match_rules_listed(self):
-        C.classify_db(self.db, write_rules(
-            "version: 1\nrules:\n  - id: NEVER\n    why: w\n    when: {response_code: 418}\n"),
-            allow_5xx=False)
+        C.classify_db(
+            self.db,
+            write_rules("version: 1\nrules:\n  - id: NEVER\n    why: w\n    when: {response_code: 418}\n"),
+            allow_5xx=False,
+        )
         self.assertEqual(Rep.summary(self.db)["zero_match_rules"], ["NEVER"])
 
 
@@ -90,8 +94,7 @@ class TestEscapingAcrossSites(unittest.TestCase):
     def test_zero_match_rule_id_escaped_in_li(self):
         db = build_db([cats_json()])
         rules = write_rules(
-            'version: 1\nrules:\n  - id: "<img src=x onerror=alert(2)>"\n'
-            "    why: w\n    when: {response_code: 418}\n"
+            'version: 1\nrules:\n  - id: "<img src=x onerror=alert(2)>"\n    why: w\n    when: {response_code: 418}\n'
         )
         C.classify_db(db, rules, allow_5xx=False)
         html = Rep.render_html(db)

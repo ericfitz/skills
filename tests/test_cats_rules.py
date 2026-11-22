@@ -7,11 +7,21 @@ from catslib import rules as R
 
 def rec(**over):
     base = {
-        "result": "error", "response_code": 400, "fuzzer": "HappyPath",
-        "path": "/things", "contract_path": "/things", "method": "POST",
-        "url": "http://h/things", "scenario": "s", "result_reason": "",
-        "result_details": "", "response_body": "", "response_content_type": "application/json",
-        "request_body": "", "json_body": None, "request_headers": {},
+        "result": "error",
+        "response_code": 400,
+        "fuzzer": "HappyPath",
+        "path": "/things",
+        "contract_path": "/things",
+        "method": "POST",
+        "url": "http://h/things",
+        "scenario": "s",
+        "result_reason": "",
+        "result_details": "",
+        "response_body": "",
+        "response_content_type": "application/json",
+        "request_body": "",
+        "json_body": None,
+        "request_headers": {},
     }
     base.update(over)
     return base
@@ -38,7 +48,9 @@ class TestOperators(unittest.TestCase):
         self.assertFalse(R.match_rule(r, rec(response_code=400)))
 
     def test_contains_any_is_case_insensitive(self):
-        r = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {result_reason: {contains_any: [unauthorized]}}\n")[0]
+        r = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {result_reason: {contains_any: [unauthorized]}}\n"
+        )[0]
         self.assertTrue(R.match_rule(r, rec(result_reason="UNAUTHORIZED access")))
 
     def test_equals_is_case_sensitive(self):
@@ -51,12 +63,16 @@ class TestOperators(unittest.TestCase):
         self.assertFalse(R.match_rule(r, rec(fuzzer="happypath")))
 
     def test_contains_all(self):
-        r = rules_from('version: 1\nrules:\n  - id: A\n    why: w\n    when: {path: {contains_all: ["/admin/", "/metadata"]}}\n')[0]
+        r = rules_from(
+            'version: 1\nrules:\n  - id: A\n    why: w\n    when: {path: {contains_all: ["/admin/", "/metadata"]}}\n'
+        )[0]
         self.assertTrue(R.match_rule(r, rec(path="/admin/surveys/1/metadata")))
         self.assertFalse(R.match_rule(r, rec(path="/admin/surveys/1")))
 
     def test_starts_with_any_and_ends_with(self):
-        r = rules_from('version: 1\nrules:\n  - id: A\n    why: w\n    when: {path: {starts_with_any: ["/admin/", "/me/"]}}\n')[0]
+        r = rules_from(
+            'version: 1\nrules:\n  - id: A\n    why: w\n    when: {path: {starts_with_any: ["/admin/", "/me/"]}}\n'
+        )[0]
         self.assertTrue(R.match_rule(r, rec(path="/me/preferences")))
         r2 = rules_from('version: 1\nrules:\n  - id: A\n    why: w\n    when: {url: {ends_with: "/"}}\n')[0]
         self.assertTrue(R.match_rule(r2, rec(url="http://h/things/")))
@@ -72,7 +88,9 @@ class TestOperators(unittest.TestCase):
         self.assertFalse(R.match_rule(r, rec(url="http://h/other")))
 
     def test_matches_regex_case_insensitive(self):
-        r = rules_from('version: 1\nrules:\n  - id: A\n    why: w\n    when: {result_reason: {matches: "code: 4\\\\d\\\\d"}}\n')[0]
+        r = rules_from(
+            'version: 1\nrules:\n  - id: A\n    why: w\n    when: {result_reason: {matches: "code: 4\\\\d\\\\d"}}\n'
+        )[0]
         self.assertTrue(R.match_rule(r, rec(result_reason="Unexpected Response CODE: 404")))
 
     def test_matches_invalid_regex_rejected_at_load(self):
@@ -83,18 +101,24 @@ class TestOperators(unittest.TestCase):
         self.assertIn("A", str(ctx.exception))
 
     def test_exists_operator(self):
-        r = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {exists: true}}\n")[0]
+        r = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {exists: true}}\n"
+        )[0]
         self.assertTrue(R.match_rule(r, rec(json_body={"error_description": "bad"})))
         self.assertFalse(R.match_rule(r, rec(json_body={})))
 
     def test_exists_true_is_false_for_present_but_null_value(self):
         # exists collapses "absent" and "present but JSON null" into one state
         # (documented on _apply); this pins that behavior down with a test.
-        r = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {exists: true}}\n")[0]
+        r = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {exists: true}}\n"
+        )[0]
         self.assertFalse(R.match_rule(r, rec(json_body={"error_description": None})))
 
     def test_exists_false_matches_both_absent_and_null(self):
-        r = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {exists: false}}\n")[0]
+        r = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {exists: false}}\n"
+        )[0]
         self.assertTrue(R.match_rule(r, rec(json_body={})))
         self.assertTrue(R.match_rule(r, rec(json_body={"error_description": None})))
 
@@ -112,7 +136,9 @@ class TestVirtualFields(unittest.TestCase):
         self.assertFalse(R.match_rule(r, rec()))
 
     def test_dotted_json_body_path(self):
-        r = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {contains: enum_values}}\n")[0]
+        r = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {json_body.error_description: {contains: enum_values}}\n"
+        )[0]
         self.assertTrue(R.match_rule(r, rec(json_body={"error_description": "bad ENUM_VALUES here"})))
         self.assertFalse(R.match_rule(r, rec(json_body={"error_description": "other"})))
 
@@ -121,13 +147,17 @@ class TestVirtualFields(unittest.TestCase):
         self.assertTrue(R.match_rule(r, rec(json_body={"error": {"code": "E1"}})))
 
     def test_request_header_lookup_is_case_insensitive_on_name(self):
-        r = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {request_header.Transfer-Encoding: {contains: chunked}}\n")[0]
+        r = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {request_header.Transfer-Encoding: {contains: chunked}}\n"
+        )[0]
         self.assertTrue(R.match_rule(r, rec(request_headers={"transfer-encoding": "chunked"})))
 
     def test_request_header_lookup_normalizes_record_side_too(self):
         # The record contract lowercases header keys, but field_value() must not
         # depend on that — a mixed-case key in the record must still be found.
-        r = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {request_header.transfer-encoding: {contains: chunked}}\n")[0]
+        r = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {request_header.transfer-encoding: {contains: chunked}}\n"
+        )[0]
         self.assertTrue(R.match_rule(r, rec(request_headers={"Transfer-Encoding": "chunked"})))
 
 
@@ -138,8 +168,10 @@ class TestConjunctionAndDisjunction(unittest.TestCase):
         self.assertFalse(R.match_rule(r, rec(response_code=409, method="GET")))
 
     def test_any_of_is_ored(self):
-        text = ("version: 1\nrules:\n  - id: A\n    why: w\n"
-                "    any_of:\n      - {response_code: 429}\n      - {response_code: 503}\n")
+        text = (
+            "version: 1\nrules:\n  - id: A\n    why: w\n"
+            "    any_of:\n      - {response_code: 429}\n      - {response_code: 503}\n"
+        )
         r = rules_from(text)[0]
         self.assertTrue(R.match_rule(r, rec(response_code=429)))
         self.assertTrue(R.match_rule(r, rec(response_code=503)))
@@ -172,8 +204,7 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(rule_id, "SECOND")
 
     def test_no_match(self):
-        is_fp, rule_id, _ = R.classify_record(
-            self._two(), rec(response_code=404, fuzzer="Other"), allow_5xx=False)
+        is_fp, rule_id, _ = R.classify_record(self._two(), rec(response_code=404, fuzzer="Other"), allow_5xx=False)
         self.assertFalse(is_fp)
         self.assertIsNone(rule_id)
 
@@ -188,7 +219,9 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(rule_id, "FIRST")
 
     def test_disabled_rules_are_skipped(self):
-        rs = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    enabled: false\n    when: {response_code: 400}\n")
+        rs = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    enabled: false\n    when: {response_code: 400}\n"
+        )
         is_fp, rule_id, _ = R.classify_record(rs, rec(), allow_5xx=False)
         self.assertFalse(is_fp)
         self.assertIsNone(rule_id)
@@ -220,8 +253,10 @@ class TestClassify(unittest.TestCase):
 class TestLoadValidation(unittest.TestCase):
     def test_duplicate_rule_id_rejected(self):
         with self.assertRaises(R.RuleError) as ctx:
-            rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {response_code: 400}\n"
-                       "  - id: A\n    why: w\n    when: {response_code: 401}\n")
+            rules_from(
+                "version: 1\nrules:\n  - id: A\n    why: w\n    when: {response_code: 400}\n"
+                "  - id: A\n    why: w\n    when: {response_code: 401}\n"
+            )
         self.assertIn("A", str(ctx.exception))
 
     def test_unknown_field_rejected(self):
@@ -243,8 +278,10 @@ class TestLoadValidation(unittest.TestCase):
             rules_from("version: 1\nrules:\n  - id: A\n    why: w\n")
 
     def test_order_index_preserved(self):
-        rs = rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    when: {response_code: 400}\n"
-                        "  - id: B\n    why: w\n    when: {response_code: 401}\n")
+        rs = rules_from(
+            "version: 1\nrules:\n  - id: A\n    why: w\n    when: {response_code: 400}\n"
+            "  - id: B\n    why: w\n    when: {response_code: 401}\n"
+        )
         self.assertEqual([r.id for r in rs], ["A", "B"])
         self.assertEqual([r.order_index for r in rs], [0, 1])
 
@@ -273,7 +310,9 @@ class TestLoadValidationMalformedShapes(unittest.TestCase):
 
     def test_tags_not_a_list_rejected(self):
         with self.assertRaises(R.RuleError) as ctx:
-            rules_from("version: 1\nrules:\n  - id: A\n    why: w\n    tags: not_a_list\n    when: {response_code: 400}\n")
+            rules_from(
+                "version: 1\nrules:\n  - id: A\n    why: w\n    tags: not_a_list\n    when: {response_code: 400}\n"
+            )
         self.assertIn("tags", str(ctx.exception))
 
     def test_in_operand_not_a_list_rejected(self):
@@ -318,7 +357,9 @@ class TestLoadValidationMalformedShapes(unittest.TestCase):
         # `enabled: "false"` parses to a truthy non-empty string, which used to be
         # silently coerced to True (enabling the rule) via bool("false").
         with self.assertRaises(R.RuleError) as ctx:
-            rules_from('version: 1\nrules:\n  - id: A\n    why: w\n    enabled: "false"\n    when: {response_code: 400}\n')
+            rules_from(
+                'version: 1\nrules:\n  - id: A\n    why: w\n    enabled: "false"\n    when: {response_code: 400}\n'
+            )
         self.assertIn("enabled", str(ctx.exception))
 
     def test_bare_list_on_scalar_field_rejected(self):

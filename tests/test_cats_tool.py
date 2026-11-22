@@ -109,9 +109,7 @@ class TestClassifyDryRun(unittest.TestCase):
     def test_dry_run_still_reports_flagged_count(self):
         config = make_config(self)
         root = config.repo_root
-        (root / "fp.yaml").write_text(
-            "version: 1\nrules:\n  - id: R1\n    why: test\n    when: {response_code: 400}\n"
-        )
+        (root / "fp.yaml").write_text("version: 1\nrules:\n  - id: R1\n    why: test\n    when: {response_code: 400}\n")
         db = make_db(self, config)
 
         args = argparse.Namespace(db=str(db), dry_run=True, rules=None)
@@ -123,9 +121,7 @@ class TestClassifyDryRun(unittest.TestCase):
     def test_non_dry_run_mutates_db(self):
         config = make_config(self)
         root = config.repo_root
-        (root / "fp.yaml").write_text(
-            "version: 1\nrules:\n  - id: R1\n    why: test\n    when: {response_code: 400}\n"
-        )
+        (root / "fp.yaml").write_text("version: 1\nrules:\n  - id: R1\n    why: test\n    when: {response_code: 400}\n")
         db = make_db(self, config)
         before = db.read_bytes()
 
@@ -147,9 +143,7 @@ class TestClassifyDryRun(unittest.TestCase):
         before_configured_rules = (root / "fp.yaml").read_text()
 
         draft = root / "draft-rules.yaml"
-        draft.write_text(
-            "version: 1\nrules:\n  - id: DRAFT\n    why: test\n    when: {response_code: 400}\n"
-        )
+        draft.write_text("version: 1\nrules:\n  - id: DRAFT\n    why: test\n    when: {response_code: 400}\n")
 
         args = argparse.Namespace(db=str(db), dry_run=True, rules=str(draft))
         out = io.StringIO()
@@ -160,7 +154,8 @@ class TestClassifyDryRun(unittest.TestCase):
         self.assertIn("DRAFT", out.getvalue())
         self.assertEqual(db.read_bytes(), before_db, "dry-run must not mutate the real database")
         self.assertEqual(
-            (root / "fp.yaml").read_text(), before_configured_rules,
+            (root / "fp.yaml").read_text(),
+            before_configured_rules,
             "--rules must not modify the configured rules file",
         )
 
@@ -253,8 +248,12 @@ class TestTypedErrorsReachExit2(unittest.TestCase):
         bad_db = config.results_dir / "bad.db"
         bad_db.write_text("not a real sqlite database")
         result = run.RunResult(
-            run_id="R1", db_path=bad_db, report_dir=config.results_dir,
-            cats_exit_code=0, parse_stats=P.ParseStats(processed=1), classify_result=None,
+            run_id="R1",
+            db_path=bad_db,
+            report_dir=config.results_dir,
+            cats_exit_code=0,
+            parse_stats=P.ParseStats(processed=1),
+            classify_result=None,
         )
         with (
             mock.patch.object(CT, "load", return_value=config),
@@ -423,9 +422,13 @@ class TestCmdInit(unittest.TestCase):
 
     def _args(self, **over):
         base = {
-            "spec": None, "server": CT.DEFAULT_SERVER, "health_url": None,
-            "results_dir": CT.DEFAULT_RESULTS_DIR, "rules": CT.DEFAULT_RULES,
-            "non_interactive": True, "force": False,
+            "spec": None,
+            "server": CT.DEFAULT_SERVER,
+            "health_url": None,
+            "results_dir": CT.DEFAULT_RESULTS_DIR,
+            "rules": CT.DEFAULT_RULES,
+            "non_interactive": True,
+            "force": False,
         }
         base.update(over)
         return argparse.Namespace(**base)
@@ -482,8 +485,13 @@ class TestCmdRunPruning(unittest.TestCase):
 
     def _args(self, **over):
         base = {
-            "identity": None, "path": None, "rate": None, "blackbox": False,
-            "skip_seed": False, "skip_parse": False, "allow_port_forward": False,
+            "identity": None,
+            "path": None,
+            "rate": None,
+            "blackbox": False,
+            "skip_seed": False,
+            "skip_parse": False,
+            "allow_port_forward": False,
             "no_prune": False,
         }
         base.update(over)
@@ -493,8 +501,12 @@ class TestCmdRunPruning(unittest.TestCase):
         # Annotated because callers splat arbitrary overrides in via **over;
         # without it each **base kwarg is checked against the union of values.
         base: dict[str, Any] = {
-            "run_id": "R1", "db_path": db, "report_dir": config.results_dir,
-            "cats_exit_code": 0, "parse_stats": P.ParseStats(processed=1), "classify_result": None,
+            "run_id": "R1",
+            "db_path": db,
+            "report_dir": config.results_dir,
+            "cats_exit_code": 0,
+            "parse_stats": P.ParseStats(processed=1),
+            "classify_result": None,
         }
         base.update(over)
         return run.RunResult(**base)
@@ -541,8 +553,10 @@ class TestCmdRunPruning(unittest.TestCase):
         config = make_config(self)
         db = make_db(self, config)
         result = self._result(
-            config, db,
-            pruned=[config.results_dir / "cats-results-OLD.db"], pruned_bytes=4_500_000_000,
+            config,
+            db,
+            pruned=[config.results_dir / "cats-results-OLD.db"],
+            pruned_bytes=4_500_000_000,
         )
         out = io.StringIO()
         with (

@@ -266,10 +266,14 @@ def schema_drift(contracts_dir: Path, listed: Iterable[str]) -> tuple[list[str],
 - [ ] **Step 1: Write the failing tests** in `tests/test_discover_origins.py`:
 
 ```python
-def test_unlisted_schema_is_reported(self):      # tmp dir holding a.schema.json and rogue.schema.json
+def test_unlisted_schema_is_reported(self):  # tmp dir holding a.schema.json and rogue.schema.json
     self.assertEqual(schema_drift(tmp, ["a"]), (["rogue"], []))
-def test_missing_schema_is_reported(self):       # tmp dir holding only a.schema.json
+
+
+def test_missing_schema_is_reported(self):  # tmp dir holding only a.schema.json
     self.assertEqual(schema_drift(tmp, ["a", "b"]), ([], ["b"]))
+
+
 def test_real_contract_dirs_match_the_origin_lists(self):
     self.assertTrue(set(PROFILE_SCHEMAS).isdisjoint(DEPENDENCY_SCHEMAS))
     self.assertEqual(schema_drift(REPO / "profile" / "references" / "contracts", PROFILE_SCHEMAS), ([], []))
@@ -316,7 +320,7 @@ def test_real_contract_dirs_match_the_origin_lists(self):
 ```python
 def test_seeded_by_label_is_not_validated(self):
     schema = resolve_refs(load(CONTRACTS / "discovery.schema.json"), CONTRACTS)
-    for label in ("discover:topology", "profile" + ":topology"):   # split: keeps the retired-name sweeps empty
+    for label in ("discover:topology", "profile" + ":topology"):  # split: keeps the retired-name sweeps empty
         instance = load(EXAMPLES / "service.example.json")
         instance["seeded_by"]["contract"] = label
         self.assertEqual(validate(instance, schema), [])
@@ -350,7 +354,8 @@ SHORTCUTS = {
     ("test-api-fuzzing", "api-fuzz"): ["init", "run", "report", "analyze"],
     ("test-api-workflows", "api-workflows"): ["init", "arazzo"],
 }
-REF = re.compile(r"`/?([a-z0-9-]+):([a-z0-9-]+)`")   # backticked plugin:skill tokens in the body
+REF = re.compile(r"`/?([a-z0-9-]+):([a-z0-9-]+)`")  # backticked plugin:skill tokens in the body
+
 
 class TestShortcutSkills(unittest.TestCase):
     def test_frontmatter_disables_model_invocation(self):

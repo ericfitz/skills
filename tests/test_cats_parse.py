@@ -15,9 +15,7 @@ class TestRecordNormalization(unittest.TestCase):
         self.assertEqual(r["method"], "POST")
         self.assertEqual(r["path"], "/things")
         self.assertEqual(r["json_body"], {"error": "bad", "error_description": "bad enum_values"})
-        self.assertEqual(
-            json.loads(r["response_body"]), {"error": "bad", "error_description": "bad enum_values"}
-        )
+        self.assertEqual(json.loads(r["response_body"]), {"error": "bad", "error_description": "bad enum_values"})
         self.assertEqual(r["request_body"], '{"a":1}')
         self.assertEqual(r["request_headers"], {"accept": "application/json"})
 
@@ -93,11 +91,14 @@ class TestParseReport(unittest.TestCase):
         return conn
 
     def test_parses_files_into_db(self):
-        report = self._report({
-            "Test1.json": cats_json(),
-            "Test2.json": cats_json(testId="Test 2", result="success",
-                                    response={**cats_json()["response"], "responseCode": 200}),
-        })
+        report = self._report(
+            {
+                "Test1.json": cats_json(),
+                "Test2.json": cats_json(
+                    testId="Test 2", result="success", response={**cats_json()["response"], "responseCode": 200}
+                ),
+            }
+        )
         db = self._db_path()
         stats = P.parse_report(report, db, {"run_id": "R1", "server": "http://h"})
         self.assertEqual(stats.processed, 2)
@@ -106,30 +107,38 @@ class TestParseReport(unittest.TestCase):
         self.assertEqual(conn.execute("SELECT run_id FROM run_meta").fetchone()[0], "R1")
 
     def test_bodies_stored_only_for_error_and_warn(self):
-        report = self._report({
-            "Test1.json": cats_json(),                       # error -> body stored
-            "Test2.json": cats_json(testId="Test 2", result="success"),
-        })
+        report = self._report(
+            {
+                "Test1.json": cats_json(),  # error -> body stored
+                "Test2.json": cats_json(testId="Test 2", result="success"),
+            }
+        )
         db = self._db_path()
         P.parse_report(report, db, {"run_id": "R1"})
         conn = self._connect(db)
-        rows = dict(conn.execute(
-            "SELECT t.test_id, r.response_body FROM tests t JOIN responses r ON r.test_id = t.id"
-        ).fetchall())
+        rows = dict(
+            conn.execute(
+                "SELECT t.test_id, r.response_body FROM tests t JOIN responses r ON r.test_id = t.id"
+            ).fetchall()
+        )
         self.assertIn("bad", rows["Test 1"])
         self.assertIsNone(rows["Test 2"])
 
     def test_request_body_stored_only_for_error_and_warn(self):
-        report = self._report({
-            "Test1.json": cats_json(),                       # error -> body stored
-            "Test2.json": cats_json(testId="Test 2", result="success"),
-        })
+        report = self._report(
+            {
+                "Test1.json": cats_json(),  # error -> body stored
+                "Test2.json": cats_json(testId="Test 2", result="success"),
+            }
+        )
         db = self._db_path()
         P.parse_report(report, db, {"run_id": "R1"})
         conn = self._connect(db)
-        rows = dict(conn.execute(
-            "SELECT t.test_id, req.request_body FROM tests t JOIN requests req ON req.test_id = t.id"
-        ).fetchall())
+        rows = dict(
+            conn.execute(
+                "SELECT t.test_id, req.request_body FROM tests t JOIN requests req ON req.test_id = t.id"
+            ).fetchall()
+        )
         self.assertEqual(rows["Test 1"], '{"a":1}')
         self.assertIsNone(rows["Test 2"])
 
@@ -139,8 +148,7 @@ class TestParseReport(unittest.TestCase):
         P.parse_report(report, db, {"run_id": "R1"})
         conn = self._connect(db)
         row = conn.execute(
-            "SELECT r.response_body FROM responses r "
-            "JOIN result_types rt ON rt.name = 'warn'"
+            "SELECT r.response_body FROM responses r JOIN result_types rt ON rt.name = 'warn'"
         ).fetchone()
         self.assertIsNotNone(row)
         self.assertIn("bad", row[0])
@@ -164,9 +172,7 @@ class TestParseReport(unittest.TestCase):
         db = self._db_path()
         P.parse_report(report, db, {"run_id": "R1"})
         conn = self._connect(db)
-        is_fp, fp_rule = conn.execute(
-            "SELECT is_false_positive, fp_rule FROM tests"
-        ).fetchone()
+        is_fp, fp_rule = conn.execute("SELECT is_false_positive, fp_rule FROM tests").fetchone()
         self.assertEqual(is_fp, 0)
         self.assertIsNone(fp_rule)
 
@@ -279,8 +285,7 @@ class TestParseReport(unittest.TestCase):
         db = self._db_path()
         P.parse_report(report, db, {"run_id": "R1"})
         conn = self._connect(db)
-        names = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='view'").fetchall()}
+        names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='view'").fetchall()}
         self.assertIn("true_positives_view", names)
         self.assertIn("test_results_filtered_view", names)
 
@@ -321,22 +326,33 @@ class TestSecretHeaderRedaction(unittest.TestCase):
         )
 
     def test_non_secret_headers_are_stored_verbatim(self):
-        record = P.record_from_json(cats_json(request={
-            "headers": [
-                {"key": "Content-Type", "value": "application/json"},
-                {"key": "Authorization", "value": "Bearer secret-value"},
-            ],
-        }))
+        record = P.record_from_json(
+            cats_json(
+                request={
+                    "headers": [
+                        {"key": "Content-Type", "value": "application/json"},
+                        {"key": "Authorization", "value": "Bearer secret-value"},
+                    ],
+                }
+            )
+        )
         headers = record["request_headers"]
         self.assertEqual(headers["content-type"], "application/json")
         self.assertNotIn("secret-value", headers["authorization"])
 
     def test_token_never_reaches_the_database(self):
         report = _tmp_dir(self)
-        (report / "Test1.json").write_text(json.dumps(cats_json(request={
-            "httpMethod": "POST", "url": "http://h/things",
-            "headers": [{"key": "Authorization", "value": "Bearer super-secret-jwt"}],
-        })))
+        (report / "Test1.json").write_text(
+            json.dumps(
+                cats_json(
+                    request={
+                        "httpMethod": "POST",
+                        "url": "http://h/things",
+                        "headers": [{"key": "Authorization", "value": "Bearer super-secret-jwt"}],
+                    }
+                )
+            )
+        )
         db = _tmp_dir(self) / "r.db"
         P.parse_report(report, db, {"run_id": "R1"})
         conn = sqlite3.connect(db)

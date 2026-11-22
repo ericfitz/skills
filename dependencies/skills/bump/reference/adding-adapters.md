@@ -23,28 +23,29 @@ Create `<name>.py` in the appropriate directory and expose a `handle(verb, argv)
 ```python
 from .. import contracts as c
 
+
 def handle(verb, argv):
     """Main entry point for <name> adapter.
-    
+
     Args:
         verb: Operation verb (e.g., "detect", "outdated", "audit", ...)
         argv: List of string arguments specific to the verb
-    
+
     Returns:
         The contract shape for the verb (see contracts.md)
     """
     if verb == "detect":
         # Return detect shape: {"present": bool, "ecosystem": str, "packageManager": str, ...}
         return {"present": False, "ecosystem": "my_ecosystem"}
-    
+
     if verb == "outdated":
         # Return list of UpdateRecord objects
         return []
-    
+
     if verb == "audit":
         # Return list of Advisory objects
         return []
-    
+
     raise ValueError(f"<name>: unknown verb {verb}")
 ```
 
@@ -63,32 +64,32 @@ def handle(verb, argv):
     if verb == "detect":
         # Return: {"present": bool, "ecosystem": str, "packageManager": str, "workspace"?: bool}
         ...
-    
+
     if verb == "cache-clear":
         # Return: {"warnings": []}
         return {"warnings": []}
-    
+
     if verb == "outdated":
         # Return: [UpdateRecord, ...]
         ...
-    
+
     if verb == "audit":
         # Return: [Advisory, ...]
         ...
-    
+
     if verb == "apply":
         # argv: list of specs to apply (e.g., ["requests==2.31.0", "flask==3.0.0"])
         # Return: {"applied": [spec, ...], "filesModified": [path, ...]}
         # On failure: {"applied": [], "filesModified": [], "error": "<failed command>: <output tail>"}
         # filesModified must list only files that actually changed (git-verified).
         ...
-    
+
     if verb == "validate":
-        # Return: {"build": "pass"/"fail", "build_output": "...", 
+        # Return: {"build": "pass"/"fail", "build_output": "...",
         #          "test": "pass"/"fail", "test_output": "...",
         #          "lint": "pass"/"fail", "lint_output": "..."}
         ...
-    
+
     raise ValueError(f"<name>: unknown verb {verb}")
 ```
 
@@ -178,6 +179,7 @@ OUTDATED_JSON_FIXTURE = """
 ]
 """
 
+
 def test_parse_outdated():
     """Test parse_outdated handles valid JSON."""
     records = parse_outdated(OUTDATED_JSON_FIXTURE)
@@ -185,10 +187,12 @@ def test_parse_outdated():
     assert records[0].name == "pkg1"
     assert records[0].bump == "major"
 
+
 def test_parse_outdated_empty():
     """Test parse_outdated handles empty input."""
     records = parse_outdated("[]")
     assert records == []
+
 
 def test_handle_detect(tmp_path, monkeypatch):
     """Test detect verb returns correct shape."""
@@ -218,9 +222,11 @@ For anything that interpolates **package specs, versions, branch names, or PR te
 ```python
 import subprocess
 
+
 def _run(args):
     """Safe subprocess call: args is a list, no shell."""
     return subprocess.run(args, capture_output=True, text=True)
+
 
 # CORRECT: Package name and version cannot inject
 spec = "requests==2.31.0"  # From argv, could be malicious
@@ -237,11 +243,11 @@ Create a separate helper **only** for fixed default/config strings that need she
 ```python
 def _run_shell(cmd):
     """ONLY for trusted, config-sourced command strings.
-    
+
     Never pass per-run/user data here. Examples of safe usage:
     - Makefile-like targets: "go build ./...", "pytest", "npm run build"
     - Config defaults: "ruff check . || true"
-    
+
     DO NOT pass:
     - Package specs from argv
     - Branch names from PRs
@@ -249,6 +255,7 @@ def _run_shell(cmd):
     - User input
     """
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
 
 # CORRECT: Fixed config string
 _run_shell("go build ./...")
@@ -268,20 +275,21 @@ When an external tool is required, check if it's installed before using it:
 ```python
 import shutil
 
+
 def handle(verb, argv):
     if verb == "audit":
         # Guard: if tool not installed, return empty contract shape
         if shutil.which("pip-audit") is None:
             return []  # Empty Advisory list, no error
-        
+
         result = _run(["pip-audit", "--format", "json"])
         return parse_audit(result.stdout)
-    
+
     # For codeHost/tracker verbs:
     if verb == "alerts":
         if shutil.which("gh") is None:
             return []  # Empty Advisory list
-        
+
         result = _run(["gh", "api", "repos/{owner}/{repo}/dependabot/alerts"])
         return parse_alerts(result.stdout if result.returncode == 0 else "[]")
 ```
@@ -383,6 +391,7 @@ NONE_RESULTS = {
     "issues": c.Context(),
 }
 
+
 def run(axis, name, verb, argv):
     if axis not in AXES:
         raise ValueError(f"unknown axis: {axis}")
@@ -390,7 +399,7 @@ def run(axis, name, verb, argv):
         if verb not in NONE_RESULTS:
             raise ValueError(f"'none' adapter has no verb '{verb}' on axis {axis}")
         return NONE_RESULTS[verb]
-    
+
     # Dynamically import: bumplib.ecosystems.<name>, bumplib.codehosts.<name>, etc.
     mod = importlib.import_module(f"bumplib.{AXES[axis]}.{name}")
     return mod.handle(verb, argv)

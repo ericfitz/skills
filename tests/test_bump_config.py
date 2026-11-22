@@ -9,8 +9,7 @@ from bumplib import config as cfg
 
 class TestClaudeExclusions(unittest.TestCase):
     def test_parses_bullets_under_heading(self):
-        text = ("# Project\n\n## Bump Exclusions\n"
-                "- @angular/*\n- zone.js\n\n## Other\n- not-this\n")
+        text = "# Project\n\n## Bump Exclusions\n- @angular/*\n- zone.js\n\n## Other\n- not-this\n"
         self.assertEqual(cfg.parse_claude_exclusions(text), ["@angular/*", "zone.js"])
 
     def test_no_heading_returns_empty(self):
@@ -28,8 +27,9 @@ class TestMerge(unittest.TestCase):
 
     def test_merges_both_sources(self):
         with tempfile.TemporaryDirectory() as td:
-            root = self._root(td, claude="## Bump Exclusions\n- a/*\n",
-                              bump_cfg={"exclude": ["b"], "hold": {"c": "later"}})
+            root = self._root(
+                td, claude="## Bump Exclusions\n- a/*\n", bump_cfg={"exclude": ["b"], "hold": {"c": "later"}}
+            )
             excl, holds = cfg.merged_exclusions(root)
             self.assertIn("a/*", excl)
             self.assertIn("b", excl)

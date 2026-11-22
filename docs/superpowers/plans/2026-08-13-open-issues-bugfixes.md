@@ -64,9 +64,16 @@ from tempfile import TemporaryDirectory
 
 from bumplib.gitfiles import changed_files
 
-GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00",
-           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00",
-           "HOME": "/dev/null", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+GIT_ENV = {
+    "GIT_AUTHOR_NAME": "t",
+    "GIT_AUTHOR_EMAIL": "t@t",
+    "GIT_AUTHOR_DATE": "2026-01-01T00:00:00",
+    "GIT_COMMITTER_NAME": "t",
+    "GIT_COMMITTER_EMAIL": "t@t",
+    "GIT_COMMITTER_DATE": "2026-01-01T00:00:00",
+    "HOME": "/dev/null",
+    "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+}
 
 
 def _git(cwd, *args):
@@ -117,6 +124,7 @@ Create `deps/scripts/bumplib/gitfiles.py`:
 
 ```python
 """Which candidate files actually changed, according to git."""
+
 import subprocess
 
 
@@ -128,8 +136,9 @@ def changed_files(candidates, cwd="."):
     binary) degrade to the candidates unchanged -- the old behavior beats crashing.
     """
     try:
-        r = subprocess.run(["git", "status", "--porcelain", "--", *candidates],
-                           cwd=cwd, capture_output=True, text=True, check=True)
+        r = subprocess.run(
+            ["git", "status", "--porcelain", "--", *candidates], cwd=cwd, capture_output=True, text=True, check=True
+        )
     except (OSError, subprocess.CalledProcessError):
         return list(candidates)
     dirty = {line[3:].strip().strip('"') for line in r.stdout.splitlines() if len(line) > 3}
@@ -175,13 +184,15 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         (self.root / "pyproject.toml").write_text("[project]\nname='x'\n")
         self.calls = []
-        self.fail_on = None          # substring of argv marking the command that fails
+        self.fail_on = None  # substring of argv marking the command that fails
         self.enterContext(mock.patch("bumplib.ecosystems.python.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.python._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
-        self.enterContext(mock.patch("bumplib.ecosystems.python.detect",
-                                     return_value={"packageManager": "uv", "present": True}))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "uv", "present": True})
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
@@ -199,7 +210,7 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.assertEqual(res["applied"], [])
         self.assertEqual(res["filesModified"], [])
         self.assertIn("unsatisfiable", res["error"])
-        self.assertFalse(any("sync" in c for c in self.calls))   # stops at first failure
+        self.assertFalse(any("sync" in c for c in self.calls))  # stops at first failure
 
     def test_uv_sync_failure_surfaces_error(self):
         self.fail_on = "sync"
@@ -214,8 +225,7 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.assertNotIn("error", res)
 
     def test_pip_install_failure_surfaces_error(self):
-        with mock.patch("bumplib.ecosystems.python.detect",
-                        return_value={"packageManager": "pip", "present": True}):
+        with mock.patch("bumplib.ecosystems.python.detect", return_value={"packageManager": "pip", "present": True}):
             self.fail_on = "install"
             res = py.handle("apply", ["tqdm==4.70.0"])
         self.assertEqual(res["applied"], [])
@@ -238,22 +248,21 @@ from ..gitfiles import changed_files
 Replace the `apply` branch (currently lines 151-161):
 
 ```python
-    if verb == "apply":
-        if mgr == "uv":
-            flags = []
-            for a in argv:              # a e.g. "requests==2.31.0"
-                flags += ["--upgrade-package", a.split("==")[0]]
-            steps = [["uv", "lock", *flags], ["uv", "sync"]]
-            candidates = ["pyproject.toml", "uv.lock"]
-        else:
-            steps = [["pip", "install", *argv]]
-            candidates = ["requirements.txt"]
-        for cmd in steps:
-            r = _run(cmd)
-            if r.returncode != 0:
-                return {"applied": [], "filesModified": [],
-                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
-        return {"applied": argv, "filesModified": changed_files(candidates, cwd=root)}
+if verb == "apply":
+    if mgr == "uv":
+        flags = []
+        for a in argv:  # a e.g. "requests==2.31.0"
+            flags += ["--upgrade-package", a.split("==")[0]]
+        steps = [["uv", "lock", *flags], ["uv", "sync"]]
+        candidates = ["pyproject.toml", "uv.lock"]
+    else:
+        steps = [["pip", "install", *argv]]
+        candidates = ["requirements.txt"]
+    for cmd in steps:
+        r = _run(cmd)
+        if r.returncode != 0:
+            return {"applied": [], "filesModified": [], "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+    return {"applied": argv, "filesModified": changed_files(candidates, cwd=root)}
 ```
 
 Note: `_run` gains an `env=None` parameter in Task 6; writing `def _run(args, env=None)` now with `env=env` passed through is fine and keeps the mock signature above valid. If doing Task 2 standalone, keep `_run(args)` and drop `env=None` from `_record` — but the plan executes Tasks 2 and 6 on the same branch, so use the two-parameter form from the start:
@@ -309,8 +318,9 @@ class TestApplyReportsFailure(unittest.TestCase):
         self.fail_on = None
         self.enterContext(mock.patch("bumplib.ecosystems.go.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.go._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.go.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.go.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else _P(p)
@@ -355,17 +365,16 @@ Expected: new tests FAIL
 In `deps/scripts/bumplib/ecosystems/go.py`, add import `from ..gitfiles import changed_files` next to the existing relative imports, then replace the `apply` branch:
 
 ```python
-    if verb == "apply":
-        steps = [["go", "get", spec] for spec in argv]   # spec e.g. "github.com/foo/bar@v1.2.3"
-        steps.append(["go", "mod", "tidy"])
-        if (root / "go.work").exists():
-            steps.append(["go", "work", "sync"])
-        for cmd in steps:
-            r = _run(cmd)
-            if r.returncode != 0:
-                return {"applied": [], "filesModified": [],
-                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
-        return {"applied": argv, "filesModified": changed_files(["go.mod", "go.sum"], cwd=root)}
+if verb == "apply":
+    steps = [["go", "get", spec] for spec in argv]  # spec e.g. "github.com/foo/bar@v1.2.3"
+    steps.append(["go", "mod", "tidy"])
+    if (root / "go.work").exists():
+        steps.append(["go", "work", "sync"])
+    for cmd in steps:
+        r = _run(cmd)
+        if r.returncode != 0:
+            return {"applied": [], "filesModified": [], "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+    return {"applied": argv, "filesModified": changed_files(["go.mod", "go.sum"], cwd=root)}
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -404,15 +413,15 @@ class TestApplyReportsFailure(unittest.TestCase):
         self._tmp = TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        _write(self.root / "package.json",
-               {"name": "monorepo", "devDependencies": {"eslint": "^10.3.0"}})
+        _write(self.root / "package.json", {"name": "monorepo", "devDependencies": {"eslint": "^10.3.0"}})
         (self.root / "package-lock.json").write_text("{}")
         self.calls = []
         self.fail_on = None
         self.enterContext(mock.patch("bumplib.ecosystems.node.Path", side_effect=self._path))
         self.enterContext(mock.patch("bumplib.ecosystems.node._run", side_effect=self._record))
-        self.enterContext(mock.patch("bumplib.ecosystems.node.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
+        self.enterContext(
+            mock.patch("bumplib.ecosystems.node.changed_files", side_effect=lambda cands, cwd=None: list(cands))
+        )
 
     def _path(self, p):
         return self.root if str(p) == "." else Path(p)
@@ -448,8 +457,7 @@ class TestApplyReportsFailure(unittest.TestCase):
 Also update the existing `TestApply.setUp` to add the same `changed_files` passthrough patch (its `test_files_modified_reports_real_manifests` and `test_pnpm_targets_workspace_by_name` assert `filesModified` contents, which now flow through `changed_files`):
 
 ```python
-        self.enterContext(mock.patch("bumplib.ecosystems.node.changed_files",
-                                     side_effect=lambda cands, cwd=None: list(cands)))
+self.enterContext(mock.patch("bumplib.ecosystems.node.changed_files", side_effect=lambda cands, cwd=None: list(cands)))
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -462,42 +470,41 @@ Expected: new tests FAIL (attribute to patch missing)
 In `deps/scripts/bumplib/ecosystems/node.py`, add import `from ..gitfiles import changed_files` next to the existing relative imports. In the `apply` branch, define a local checker and route every `_run` through it:
 
 ```python
-    if verb == "apply":
-        declared = dep_index(root)
-        lock = "pnpm-lock.yaml" if mgr == "pnpm" else "package-lock.json"
-        modified, update_names = {lock}, []
+if verb == "apply":
+    declared = dep_index(root)
+    lock = "pnpm-lock.yaml" if mgr == "pnpm" else "package-lock.json"
+    modified, update_names = {lock}, []
 
-        def _checked(cmd):
-            r = _run(cmd)
-            if r.returncode != 0:
-                return {"applied": [], "filesModified": [],
-                        "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
-            return None
+    def _checked(cmd):
+        r = _run(cmd)
+        if r.returncode != 0:
+            return {"applied": [], "filesModified": [], "error": f"{' '.join(cmd)}: " + (r.stdout + r.stderr)[-4000:]}
+        return None
 
-        for spec in argv:
-            name, version = split_spec(spec)
-            decl = declared.get(name)
-            if decl:
-                modified.add(decl["location"])
-            # Rewrite a manifest only for a declared dependency whose target is PROVABLY
-            # outside its range -- `update` alone can never cross that boundary, which is
-            # why an out-of-range spec used to be silently dropped. Bare names, transitive
-            # packages and unrecognized range forms all stay on `update`, which touches
-            # only the lockfile.
-            if version and decl and satisfies(version, decl.get("range", "")) is False:
-                err = _checked(_install_cmd(mgr, name, version, decl))
-                if err:
-                    return err
-            else:
-                update_names.append(name)
-        if update_names:
-            err = _checked([mgr, "update", *update_names])
+    for spec in argv:
+        name, version = split_spec(spec)
+        decl = declared.get(name)
+        if decl:
+            modified.add(decl["location"])
+        # Rewrite a manifest only for a declared dependency whose target is PROVABLY
+        # outside its range -- `update` alone can never cross that boundary, which is
+        # why an out-of-range spec used to be silently dropped. Bare names, transitive
+        # packages and unrecognized range forms all stay on `update`, which touches
+        # only the lockfile.
+        if version and decl and satisfies(version, decl.get("range", "")) is False:
+            err = _checked(_install_cmd(mgr, name, version, decl))
             if err:
                 return err
-        err = _checked([mgr, "install"])
+        else:
+            update_names.append(name)
+    if update_names:
+        err = _checked([mgr, "update", *update_names])
         if err:
             return err
-        return {"applied": list(argv), "filesModified": changed_files(sorted(modified), cwd=root)}
+    err = _checked([mgr, "install"])
+    if err:
+        return err
+    return {"applied": list(argv), "filesModified": changed_files(sorted(modified), cwd=root)}
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -566,56 +573,60 @@ In `tests/test_bump_eco_python.py`, class `TestProjectEnvironmentTargeting`:
 Replace `test_outdated_without_venv_omits_flag` (it asserts the buggy fallback) with:
 
 ```python
-    def test_no_venv_with_lockfile_auto_syncs_then_targets_venv(self):
-        """#28: a fresh clone has uv.lock but no .venv; querying the ambient env returns
-        [] for every project. outdated must create the env, then ask it."""
-        (self.root / "uv.lock").write_text("")
-        exe_holder = {}
+def test_no_venv_with_lockfile_auto_syncs_then_targets_venv(self):
+    """#28: a fresh clone has uv.lock but no .venv; querying the ambient env returns
+    [] for every project. outdated must create the env, then ask it."""
+    (self.root / "uv.lock").write_text("")
+    exe_holder = {}
 
-        def record(args, env=None):
-            args = list(args)
-            self.calls.append(args)
-            if args[:2] == ["uv", "sync"]:
-                exe_holder["exe"] = _make_venv(self.root)
-            return mock.Mock(returncode=0, stdout="", stderr="")
+    def record(args, env=None):
+        args = list(args)
+        self.calls.append(args)
+        if args[:2] == ["uv", "sync"]:
+            exe_holder["exe"] = _make_venv(self.root)
+        return mock.Mock(returncode=0, stdout="", stderr="")
 
-        with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
-            py.handle("outdated", [])
-        self.assertEqual(self.calls[0][:2], ["uv", "sync"])
-        listing = self.calls[1]
-        self.assertIn("--python", listing)
-        self.assertEqual(listing[listing.index("--python") + 1], str(exe_holder["exe"]))
+    with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
+        py.handle("outdated", [])
+    self.assertEqual(self.calls[0][:2], ["uv", "sync"])
+    listing = self.calls[1]
+    self.assertIn("--python", listing)
+    self.assertEqual(listing[listing.index("--python") + 1], str(exe_holder["exe"]))
 
-    def test_no_venv_no_lockfile_skips_sync_and_strips_virtual_env(self):
-        """Lockless project: don't create an env, but never let the ephemeral
-        VIRTUAL_ENV answer 'what is installed?'."""
-        captured = {}
 
-        def record(args, env=None):
-            self.calls.append(list(args))
-            captured["env"] = env
-            return mock.Mock(returncode=0, stdout="", stderr="")
+def test_no_venv_no_lockfile_skips_sync_and_strips_virtual_env(self):
+    """Lockless project: don't create an env, but never let the ephemeral
+    VIRTUAL_ENV answer 'what is installed?'."""
+    captured = {}
 
-        with mock.patch("bumplib.ecosystems.python._run", side_effect=record), \
-                mock.patch.dict(os.environ, {"VIRTUAL_ENV": "/ephemeral"}):
-            py.handle("outdated", [])
-        self.assertFalse(any(c[:2] == ["uv", "sync"] for c in self.calls))
-        self.assertNotIn("--python", self.calls[0])
-        self.assertIsNotNone(captured["env"])
-        self.assertNotIn("VIRTUAL_ENV", captured["env"])
+    def record(args, env=None):
+        self.calls.append(list(args))
+        captured["env"] = env
+        return mock.Mock(returncode=0, stdout="", stderr="")
 
-    def test_sync_failure_still_queries_without_virtual_env(self):
-        (self.root / "uv.lock").write_text("")
+    with (
+        mock.patch("bumplib.ecosystems.python._run", side_effect=record),
+        mock.patch.dict(os.environ, {"VIRTUAL_ENV": "/ephemeral"}),
+    ):
+        py.handle("outdated", [])
+    self.assertFalse(any(c[:2] == ["uv", "sync"] for c in self.calls))
+    self.assertNotIn("--python", self.calls[0])
+    self.assertIsNotNone(captured["env"])
+    self.assertNotIn("VIRTUAL_ENV", captured["env"])
 
-        def record(args, env=None):
-            args = list(args)
-            self.calls.append(args)
-            rc = 1 if args[:2] == ["uv", "sync"] else 0
-            return mock.Mock(returncode=rc, stdout="", stderr="boom")
 
-        with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
-            py.handle("outdated", [])
-        self.assertNotIn("--python", self.calls[1])
+def test_sync_failure_still_queries_without_virtual_env(self):
+    (self.root / "uv.lock").write_text("")
+
+    def record(args, env=None):
+        args = list(args)
+        self.calls.append(args)
+        rc = 1 if args[:2] == ["uv", "sync"] else 0
+        return mock.Mock(returncode=rc, stdout="", stderr="boom")
+
+    with mock.patch("bumplib.ecosystems.python._run", side_effect=record):
+        py.handle("outdated", [])
+    self.assertNotIn("--python", self.calls[1])
 ```
 
 Also update the class's shared `_record` signature to `def _record(self, args, env=None):` so the venv-present tests keep passing.
@@ -630,30 +641,32 @@ Expected: the three new/changed tests FAIL
 In `deps/scripts/bumplib/ecosystems/python.py`, add `import sys` to the imports. Replace the `outdated` branch:
 
 ```python
-    if verb == "outdated":
-        if mgr == "uv":
-            venv = _project_python(root)
-            if venv is None and (root / "uv.lock").exists():
-                # Fresh clone / rm -rf .venv: there is a lockfile to honor but no
-                # environment to inspect. Create it -- `uv sync` runs later in the
-                # flow anyway -- rather than silently querying the ephemeral env (#28).
-                if _run(["uv", "sync"]).returncode == 0:
-                    venv = _project_python(root)
-            cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
-            env = None
-            if venv:
-                cmd += ["--python", str(venv)]
-            else:
-                # Without an explicit interpreter uv answers for VIRTUAL_ENV, which under
-                # `uv run bump.py` is the empty PEP 723 ephemeral env -- strip it so
-                # discovery can never resolve there, and say so.
-                print("warning: no project environment found; outdated results may be "
-                      "incomplete (run `uv sync`)", file=sys.stderr)
-                env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
-            out = _run(cmd, env=env)
+if verb == "outdated":
+    if mgr == "uv":
+        venv = _project_python(root)
+        if venv is None and (root / "uv.lock").exists():
+            # Fresh clone / rm -rf .venv: there is a lockfile to honor but no
+            # environment to inspect. Create it -- `uv sync` runs later in the
+            # flow anyway -- rather than silently querying the ephemeral env (#28).
+            if _run(["uv", "sync"]).returncode == 0:
+                venv = _project_python(root)
+        cmd = ["uv", "pip", "list", "--outdated", "--format", "json"]
+        env = None
+        if venv:
+            cmd += ["--python", str(venv)]
         else:
-            out = _run(["pip", "list", "--outdated", "--format", "json"])
-        return parse_outdated(out.stdout)
+            # Without an explicit interpreter uv answers for VIRTUAL_ENV, which under
+            # `uv run bump.py` is the empty PEP 723 ephemeral env -- strip it so
+            # discovery can never resolve there, and say so.
+            print(
+                "warning: no project environment found; outdated results may be incomplete (run `uv sync`)",
+                file=sys.stderr,
+            )
+            env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        out = _run(cmd, env=env)
+    else:
+        out = _run(["pip", "list", "--outdated", "--format", "json"])
+    return parse_outdated(out.stdout)
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -753,13 +766,17 @@ class TestShaReachable(unittest.TestCase):
     """Squash-merge orphans branch commits: they resolve as objects but are not
     ancestors of HEAD, and sem diff against them silently reports nothing (#30)."""
 
-    GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
-               "HOME": "/dev/null", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+    GIT_ENV = {
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+        "HOME": "/dev/null",
+        "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+    }
 
     def _git(self, *args):
-        r = subprocess.run(["git", *args], cwd=self.root, env=self.GIT_ENV,
-                           capture_output=True, text=True, check=True)
+        r = subprocess.run(["git", *args], cwd=self.root, env=self.GIT_ENV, capture_output=True, text=True, check=True)
         return r.stdout.strip()
 
     def setUp(self):
@@ -768,7 +785,8 @@ class TestShaReachable(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self._git("init", "-q", "-b", "main")
         (self.root / "a.txt").write_text("1\n")
-        self._git("add", "a.txt"); self._git("commit", "-qm", "base")
+        self._git("add", "a.txt")
+        self._git("commit", "-qm", "base")
         self.base = self._git("rev-parse", "HEAD")
         self._git("checkout", "-qb", "feat")
         (self.root / "a.txt").write_text("2\n")
@@ -784,8 +802,7 @@ class TestShaReachable(unittest.TestCase):
 
     def test_orphaned_commit_resolves_but_is_unreachable(self):
         # the object still exists...
-        subprocess.run(["git", "cat-file", "-e", self.branch_sha], cwd=self.root,
-                       env=self.GIT_ENV, check=True)
+        subprocess.run(["git", "cat-file", "-e", self.branch_sha], cwd=self.root, env=self.GIT_ENV, check=True)
         # ...but must be treated as unreachable
         self.assertFalse(sa.sha_reachable(self.branch_sha, cwd=self.root))
 
@@ -798,13 +815,13 @@ class TestScanClassifiesOrphaned(unittest.TestCase):
     against it, so the silent no-op previously hid every squash-merged stale marker."""
 
     def setUp(self):
-        ent = {"name": "F", "type": "function", "file": "a.go",
-               "start_line": 2, "end_line": 4}
+        ent = {"name": "F", "type": "function", "file": "a.go", "start_line": 2, "end_line": 4}
         self.enterContext(mock.patch.object(sa, "sem_entities", return_value=[ent]))
         self.enterContext(mock.patch.object(sa, "sem_blame", return_value=[]))
         self.enterContext(mock.patch.object(sa, "entity_logic_sha", return_value="a1b2c3d4e5"))
-        self.enterContext(mock.patch.object(
-            sa, "_read_text", return_value="// SEM@deadbee: does a thing\nfunc F() {}\n"))
+        self.enterContext(
+            mock.patch.object(sa, "_read_text", return_value="// SEM@deadbee: does a thing\nfunc F() {}\n")
+        )
         self.diff = self.enterContext(mock.patch.object(sa, "logic_changed_entities"))
 
     def test_unreachable_anchor_yields_orphaned_not_fresh(self):
@@ -813,13 +830,13 @@ class TestScanClassifiesOrphaned(unittest.TestCase):
         self.assertEqual(len(work), 1)
         self.assertEqual(work[0]["status"], "orphaned")
         self.assertEqual(work[0]["bad_sha"], "deadbee")
-        self.diff.assert_not_called()          # sem diff against an orphan is meaningless
+        self.diff.assert_not_called()  # sem diff against an orphan is meaningless
 
     def test_reachable_anchor_still_uses_sem_diff(self):
-        self.diff.return_value = set()          # cosmetic-only change
+        self.diff.return_value = set()  # cosmetic-only change
         with mock.patch.object(sa, "sha_reachable", return_value=True):
             work = sa.scan(["a.go"])
-        self.assertEqual(work, [])              # fresh: not in worklist
+        self.assertEqual(work, [])  # fresh: not in worklist
         self.diff.assert_called_once()
 ```
 
@@ -843,33 +860,40 @@ def sha_reachable(sha, cwd=None):
     stale markers as fresh (issue #30). An anchor we cannot compare against must be
     re-anchored, never trusted.
     """
-    r = subprocess.run(["git", "merge-base", "--is-ancestor", sha, "HEAD"],
-                       cwd=cwd, capture_output=True, text=True)
+    r = subprocess.run(["git", "merge-base", "--is-ancestor", sha, "HEAD"], cwd=cwd, capture_output=True, text=True)
     return r.returncode == 0
 ```
 
 In `scan()`, inside the block guarded by `if existing_sha and not _is_uncommitted(anchor_sha) and not anchor_sha.startswith(existing_sha):`, insert BEFORE the `try: logic = ...` call:
 
 ```python
-                    if not sha_reachable(existing_sha, cwd=cwd):
-                        work.append({
-                            "file": f, "name": e["name"],
-                            "start_line": e["start_line"], "end_line": e["end_line"],
-                            "status": "orphaned", "anchor_sha": anchor_sha,
-                            "existing_desc": existing_desc, "bad_sha": existing_sha,
-                        })
-                        continue
+if not sha_reachable(existing_sha, cwd=cwd):
+    work.append(
+        {
+            "file": f,
+            "name": e["name"],
+            "start_line": e["start_line"],
+            "end_line": e["end_line"],
+            "status": "orphaned",
+            "anchor_sha": anchor_sha,
+            "existing_desc": existing_desc,
+            "bad_sha": existing_sha,
+        }
+    )
+    continue
 ```
 
 At the end of `scan()`, before `return work`:
 
 ```python
-    orphans = sum(1 for w in work if w["status"] == "orphaned")
-    if orphans:
-        print(f"warning: {orphans} marker(s) anchored to commits unreachable from HEAD "
-              "(orphaned by squash-merge or history rewrite); staleness could not be "
-              "computed against them, so they are queued for re-annotation.",
-              file=sys.stderr)
+orphans = sum(1 for w in work if w["status"] == "orphaned")
+if orphans:
+    print(
+        f"warning: {orphans} marker(s) anchored to commits unreachable from HEAD "
+        "(orphaned by squash-merge or history rewrite); staleness could not be "
+        "computed against them, so they are queued for re-annotation.",
+        file=sys.stderr,
+    )
 ```
 
 - [ ] **Step 5: Run tests to verify they pass**

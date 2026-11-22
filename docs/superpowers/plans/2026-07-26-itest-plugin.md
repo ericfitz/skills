@@ -170,10 +170,15 @@ ISSUE_TYPES = [
 class TestItestContracts(unittest.TestCase):
     def test_expected_contracts_exist_with_metadata(self):
         names = sorted(p.name for p in CONTRACTS.glob("*.schema.json"))
-        self.assertEqual(names, [
-            "conventions.schema.json", "critique.schema.json",
-            "scenario.schema.json", "state.schema.json",
-        ])
+        self.assertEqual(
+            names,
+            [
+                "conventions.schema.json",
+                "critique.schema.json",
+                "scenario.schema.json",
+                "state.schema.json",
+            ],
+        )
         for path in CONTRACTS.glob("*.schema.json"):
             with self.subTest(schema=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))
@@ -186,14 +191,14 @@ class TestItestContracts(unittest.TestCase):
             example = CONTRACTS / "examples" / ("%s.example.json" % name)
             with self.subTest(contract=name):
                 self.assertTrue(example.exists(), "missing example for %s" % name)
-                errors = validate(json.loads(example.read_text(encoding="utf-8")),
-                                  json.loads(path.read_text(encoding="utf-8")))
+                errors = validate(
+                    json.loads(example.read_text(encoding="utf-8")), json.loads(path.read_text(encoding="utf-8"))
+                )
                 self.assertEqual(errors, [])
 
     def test_critique_issue_types_match_the_doctrine(self):
         schema = json.loads((CONTRACTS / "critique.schema.json").read_text(encoding="utf-8"))
-        enum = (schema["properties"]["assessed"]["items"]["properties"]["issues"]
-                ["items"]["properties"]["type"]["enum"])
+        enum = schema["properties"]["assessed"]["items"]["properties"]["issues"]["items"]["properties"]["type"]["enum"]
         self.assertEqual(sorted(enum), sorted(ISSUE_TYPES))
 
     def test_doctrine_documents_every_issue_type(self):
@@ -210,8 +215,7 @@ class TestItestContracts(unittest.TestCase):
         self.assertIn("must be asserted on", text)
 
     def test_conventions_contract_requires_integration_separation(self):
-        schema = json.loads(
-            (CONTRACTS / "conventions.schema.json").read_text(encoding="utf-8"))
+        schema = json.loads((CONTRACTS / "conventions.schema.json").read_text(encoding="utf-8"))
         self.assertIn("integration_separation", schema["required"])
         separation = schema["properties"]["integration_separation"]
         self.assertEqual(sorted(separation["required"]), ["how_to_add", "mechanism"])
@@ -889,8 +893,7 @@ Append to `tests/test_itest_contracts.py`:
 ```python
 class TestScenarioContract(unittest.TestCase):
     def setUp(self):
-        self.schema = json.loads(
-            (CONTRACTS / "scenario.schema.json").read_text(encoding="utf-8"))
+        self.schema = json.loads((CONTRACTS / "scenario.schema.json").read_text(encoding="utf-8"))
         self.scenario = self.schema["properties"]["scenarios"]["items"]
 
     def test_scenario_carries_placement_and_runner(self):
@@ -902,8 +905,7 @@ class TestScenarioContract(unittest.TestCase):
 
     def test_preconditions_record_method_and_assertion(self):
         precondition = self.scenario["properties"]["preconditions"]["items"]
-        self.assertEqual(precondition["properties"]["method"]["enum"],
-                         ["compose", "inject"])
+        self.assertEqual(precondition["properties"]["method"]["enum"], ["compose", "inject"])
         self.assertIn("assert_established", precondition["required"])
 
     def test_open_assumptions_survive_into_every_scenario(self):
@@ -913,25 +915,19 @@ class TestScenarioContract(unittest.TestCase):
         required = self.scenario["required"]
         self.assertIn("provenance", required)
         self.assertIn("requirement_ids", required)
-        self.assertEqual(self.scenario["properties"]["provenance"]["enum"],
-                         ["journey", "requirement", "both"])
+        self.assertEqual(self.scenario["properties"]["provenance"]["enum"], ["journey", "requirement", "both"])
 
     def test_cross_cutting_scenarios_may_have_no_journey(self):
         """A requirement no journey owns still produces a scenario."""
-        self.assertEqual(self.scenario["properties"]["journey_id"]["type"],
-                         ["string", "null"])
+        self.assertEqual(self.scenario["properties"]["journey_id"]["type"], ["string", "null"])
 
     def test_example_has_a_composed_and_an_injected_precondition(self):
-        example = json.loads(
-            (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
-        methods = {p["method"]
-                   for scenario in example["scenarios"]
-                   for p in scenario["preconditions"]}
+        example = json.loads((CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
+        methods = {p["method"] for scenario in example["scenarios"] for p in scenario["preconditions"]}
         self.assertEqual(methods, {"compose", "inject"})
 
     def test_example_demonstrates_a_cross_cutting_scenario(self):
-        example = json.loads(
-            (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
+        example = json.loads((CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
         by_provenance = {s["provenance"]: s for s in example["scenarios"]}
         self.assertIn("requirement", by_provenance)
         self.assertIsNone(by_provenance["requirement"]["journey_id"])
@@ -1213,20 +1209,19 @@ PROFILE_SKILLS = sorted((REPO / "profile" / "skills").glob("*/SKILL.md"))
 
 class TestCrossPluginCoupling(unittest.TestCase):
     def test_itest_skills_exist(self):
-        self.assertEqual([p.parent.name for p in ITEST_SKILLS],
-                         ["conventions", "critique", "design", "state"])
+        self.assertEqual([p.parent.name for p in ITEST_SKILLS], ["conventions", "critique", "design", "state"])
 
     def test_itest_never_references_the_inventory_script(self):
         for skill in ITEST_SKILLS:
             with self.subTest(skill=skill.parent.name):
                 text = skill.read_text(encoding="utf-8")
-                self.assertNotIn("profile_inventory.py", text.replace(
-                    "Never invoke `profile`'s inventory script by path.", ""))
+                self.assertNotIn(
+                    "profile_inventory.py", text.replace("Never invoke `profile`'s inventory script by path.", "")
+                )
 
     def test_itest_plugin_root_refs_stay_inside_itest(self):
         for skill in ITEST_SKILLS:
-            for ref in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)",
-                                  skill.read_text(encoding="utf-8")):
+            for ref in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)", skill.read_text(encoding="utf-8")):
                 with self.subTest(skill=skill.parent.name, ref=ref):
                     # Without this, ../profile/... resolves and passes exists().
                     self.assertNotIn("..", ref)
@@ -1238,30 +1233,25 @@ class TestCrossPluginCoupling(unittest.TestCase):
                 self.assertNotIn("itest", skill.read_text(encoding="utf-8"))
 
     def test_design_preflights_all_four_profile_skills(self):
-        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
-            encoding="utf-8")
-        for name in ("profile:stack", "profile:docs", "profile:topology",
-                     "profile:journeys"):
+        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(encoding="utf-8")
+        for name in ("profile:stack", "profile:docs", "profile:topology", "profile:journeys"):
             with self.subTest(skill=name):
                 self.assertIn(name, text)
 
     def test_design_documents_the_human_gate(self):
-        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
-            encoding="utf-8").lower()
+        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(encoding="utf-8").lower()
         self.assertIn("gate", text)
         self.assertIn("subagents cannot ask", text)
 
     def test_design_maps_requirements_to_journeys_before_the_gate(self):
         """Cross-cutting requirements only exist relative to the journey set, so the
         mapping has to happen in the main context before the user is asked."""
-        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
-            encoding="utf-8").lower()
+        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(encoding="utf-8").lower()
         self.assertIn("gate prep", text)
         self.assertIn("cross-cutting", text)
 
     def test_design_offers_conflict_disposition_without_building_a_mechanism(self):
-        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
-            encoding="utf-8").lower()
+        text = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(encoding="utf-8").lower()
         self.assertIn("doc_code_conflicts", text)
         self.assertIn("github:create-issue", text)
         self.assertIn("no new issue-creation mechanism", text)

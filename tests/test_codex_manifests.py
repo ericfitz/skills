@@ -30,15 +30,16 @@ def build_repo(root: Path, plugins: dict[str, dict], market_entries: list[dict] 
             no_skills = manifest.pop("_no_skills", False)
             if no_skills:
                 import shutil
+
                 shutil.rmtree(plugin_dir / "skills")
             (plugin_dir / ".claude-plugin").mkdir(parents=True, exist_ok=True)
-            (plugin_dir / ".claude-plugin" / "plugin.json").write_text(
-                json.dumps(manifest), encoding="utf-8")
+            (plugin_dir / ".claude-plugin" / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
         entries.append({"name": name, "description": "d", "source": f"./{name}", "category": "development"})
     (root / ".claude-plugin").mkdir()
     (root / ".claude-plugin" / "marketplace.json").write_text(
         json.dumps({"name": "test-market", "plugins": market_entries if market_entries is not None else entries}),
-        encoding="utf-8")
+        encoding="utf-8",
+    )
     return root
 
 
@@ -59,18 +60,29 @@ class TestGenerate(unittest.TestCase):
         out = gcm.generate(self.root)
         self.assertEqual(
             set(out),
-            {self.root / ".agents" / "plugins" / "marketplace.json",
-             self.root / "alpha" / ".codex-plugin" / "plugin.json",
-             self.root / "beta" / ".codex-plugin" / "plugin.json"})
+            {
+                self.root / ".agents" / "plugins" / "marketplace.json",
+                self.root / "alpha" / ".codex-plugin" / "plugin.json",
+                self.root / "beta" / ".codex-plugin" / "plugin.json",
+            },
+        )
         market = json.loads(out[self.root / ".agents" / "plugins" / "marketplace.json"])
         self.assertEqual(market["name"], "test-market")
         self.assertEqual(
             market["plugins"][0],
-            {"name": "alpha", "category": "development",
-             "source": {"source": "local", "path": "./alpha"}})
+            {"name": "alpha", "category": "development", "source": {"source": "local", "path": "./alpha"}},
+        )
         alpha = json.loads(out[self.root / "alpha" / ".codex-plugin" / "plugin.json"])
-        self.assertEqual(alpha, {"name": "alpha", "version": "1.0.0", "description": "does things",
-                                 "author": {"name": "efitz"}, "skills": "./skills/"})
+        self.assertEqual(
+            alpha,
+            {
+                "name": "alpha",
+                "version": "1.0.0",
+                "description": "does things",
+                "author": {"name": "efitz"},
+                "skills": "./skills/",
+            },
+        )
 
     def test_rendered_json_is_two_space_indented_with_trailing_newline(self):
         build_repo(self.root, {"alpha": manifest("alpha")})
@@ -92,7 +104,8 @@ class TestGenerate(unittest.TestCase):
         build_repo(self.root, {"alpha": manifest("alpha")})
         entries = json.loads((self.root / ".claude-plugin" / "marketplace.json").read_text())["plugins"]
         (self.root / ".claude-plugin" / "marketplace.json").write_text(
-            json.dumps({"name": "test-market", "plugins": entries + entries}), encoding="utf-8")
+            json.dumps({"name": "test-market", "plugins": entries + entries}), encoding="utf-8"
+        )
         with self.assertRaisesRegex(gcm.GenerationError, "duplicate.*alpha"):
             gcm.generate(self.root)
 
@@ -129,9 +142,11 @@ class TestGenerate(unittest.TestCase):
 
     def test_cli_exits_2_on_structural_error(self):
         proc = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "gen_codex_manifests.py"),
-             "--repo", str(self.root), "--check"],
-            capture_output=True, text=True, timeout=60)
+            [sys.executable, str(REPO / "scripts" / "gen_codex_manifests.py"), "--repo", str(self.root), "--check"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
         self.assertEqual(proc.returncode, 2, proc.stderr)
         self.assertIn("FAIL:", proc.stderr)
 
@@ -163,7 +178,9 @@ class TestCommittedCodexManifests(unittest.TestCase):
     def test_check_flag_passes_on_committed_tree(self):
         proc = subprocess.run(
             [sys.executable, str(REPO / "scripts" / "gen_codex_manifests.py"), "--check"],
-            capture_output=True, text=True)
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
 

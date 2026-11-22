@@ -29,12 +29,14 @@ def git_commit_all(base, message="init"):
     """Commit everything under base. Requires git_init to have run. Returns base."""
     base = Path(base)
     env = {
-        "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.com",
-        "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.com",
-        "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_AUTHOR_NAME": "test",
+        "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "test",
+        "GIT_COMMITTER_EMAIL": "test@example.com",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
         "PATH": os.environ.get("PATH", ""),
     }
     subprocess.run(["git", "-C", str(base), "add", "-A"], check=True, env=env)
-    subprocess.run(["git", "-C", str(base), "commit", "-q", "-m", message],
-                   check=True, env=env)
+    subprocess.run(["git", "-C", str(base), "commit", "-q", "-m", message], check=True, env=env)
     return base
