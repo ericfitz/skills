@@ -9,7 +9,7 @@ or a helm template with `{{ }}` control flow is read best-effort.
 
 import re
 
-from depscanlib.walk import read_text
+from repowalk import read_text
 
 NETWORK_KINDS = {"Service", "Ingress", "NetworkPolicy"}
 KIND_RE = re.compile(r'^kind:\s*["\']?(\w+)')

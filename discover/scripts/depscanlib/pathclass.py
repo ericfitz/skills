@@ -10,7 +10,7 @@ vendored, generated, test, docs, first-party.
 import re
 from pathlib import PurePosixPath
 
-from depscanlib.walk import read_text
+from repowalk import read_text
 
 VENDORED_DIRS = {"vendor", "vendored", "node_modules", "third_party", "third-party", "thirdparty", "external"}
 TEST_DIRS = {"test", "tests", "__tests__", "testdata", "fixtures", "e2e", "spec", "specs"}

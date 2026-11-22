@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scrip
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depscanlib.files import classify_files
-from depscanlib.walk import EXCLUDE_DIRS, _split_git_z, read_text, walk_repo
+from repowalk import EXCLUDE_DIRS, _split_git_z, read_text, walk_repo
 from repobuilder import build_repo, git_commit_all, git_init
 
 

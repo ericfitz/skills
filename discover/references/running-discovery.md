@@ -150,9 +150,9 @@ in prose.
 ## `exclusions[]` is the single source of truth
 
 `depscan.py`'s output carries an `exclusions[]` list — a fixed set, not a
-configurable one: `EXCLUDE_DIRS` in `walk.py` is the sole source, and
+configurable one: `EXCLUDE_DIRS` in `repowalk.py` is the sole source, and
 `depscan.py` takes no `--exclude` flag or other config input to extend it.
-See `walk.py` for the current membership; this document does not restate it,
+See `repowalk.py` for the current membership; this document does not restate it,
 so it cannot go stale against the code. This fixed list is the single source
 of truth for both tools that need to skip the same noise:
 

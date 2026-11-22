@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depscanlib.files import classify_files
 from depscanlib.resources import scan_resources
-from depscanlib.walk import walk_repo
+from repowalk import walk_repo
 from repobuilder import build_repo
 
 K8S = (

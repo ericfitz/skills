@@ -10,7 +10,7 @@ runs under bare python3 with no dependencies.
 import re
 from pathlib import PurePosixPath
 
-from depscanlib.walk import read_text
+from repowalk import read_text
 
 # A trailing `# ...` comment is ordinary on a hand-maintained resource line
 # (`memory: 2Gi  # raised after OOM`); every pattern below tolerates one so a

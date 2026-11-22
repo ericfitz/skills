@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scrip
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depscanlib.literals import scan_literals
-from depscanlib.walk import walk_repo
+from repowalk import walk_repo
 from repobuilder import build_repo
 
 

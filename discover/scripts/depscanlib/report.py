@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from repowalk import EXCLUDE_DIRS, git_ignored, walk_repo_and_links
+
 from depscanlib import VERSION
 from depscanlib.files import classify_files
 from depscanlib.k8s import scan_k8s
@@ -9,7 +11,6 @@ from depscanlib.literals import scan_literals
 from depscanlib.pathclass import classify_path, tag_paths
 from depscanlib.resources import scan_resources
 from depscanlib.source import scan_source
-from depscanlib.walk import EXCLUDE_DIRS, git_ignored, walk_repo_and_links
 
 EMPTY_FINDINGS = (
     "env_refs",

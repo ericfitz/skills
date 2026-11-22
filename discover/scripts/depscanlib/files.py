@@ -2,7 +2,7 @@
 
 from pathlib import PurePosixPath
 
-from depscanlib.walk import read_text
+from repowalk import read_text
 
 COMPOSE_NAMES = {"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
 

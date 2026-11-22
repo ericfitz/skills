@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scrip
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depscanlib.files import classify_files
-from depscanlib.walk import walk_repo
+from repowalk import walk_repo
 from repobuilder import build_repo
 
 K8S_DEPLOYMENT = "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\n"

@@ -2,13 +2,14 @@
 
 from pathlib import Path
 
+from repowalk import walk_repo
+
 from inventorylib import VERSION
 from inventorylib.docs import detect_docs
 from inventorylib.infra import detect_infra
 from inventorylib.languages import classify_languages
 from inventorylib.manifests import detect_manifests
 from inventorylib.testfiles import classify_test_files, test_dirs
-from inventorylib.walk import walk_repo
 
 UNCLASSIFIED_LIMIT = 200
 DOCS_LIMIT = 200

@@ -8,7 +8,7 @@ value would first be read.
 
 import re
 
-from depscanlib.walk import read_text
+from repowalk import read_text
 
 TEXT_SUFFIXES_SKIPPED = {
     ".png",

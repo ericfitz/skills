@@ -1,14 +1,14 @@
 """Repo file listing: git-aware, with a filesystem fallback.
 
-Deliberately duplicates the walk in inventorylib rather than importing it, so
-depscanlib has no dependency on inventorylib.
+The one walk shared by the project inventory (inventorylib) and the
+dependency scanner (depscanlib), so both list the same files.
 """
 
 import os
 import subprocess
 from pathlib import Path
 
-# The single source of truth for what neither this scanner nor syft looks at.
+# The single source of truth for what neither the inventory, the scanner, nor syft looks at.
 # Unscoped, syft catalogues an installed tree as though it were the project's
 # dependency set — 270 packages against 2 declared ones, measured on this repo.
 EXCLUDE_DIRS = {

@@ -9,7 +9,7 @@ gap lands in the contract instead of vanishing.
 import re
 from collections import Counter
 
-from depscanlib.walk import read_text
+from repowalk import read_text
 
 SOURCE_LANGUAGES = {
     ".go": "go",
