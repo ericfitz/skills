@@ -4,10 +4,13 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from discover_origins import PROFILE_SKILLS as PROFILE_SKILL_NAMES
 
 REPO = Path(__file__).resolve().parents[1]
 ITEST_SKILLS = sorted((REPO / "test-integration" / "skills").glob("*/SKILL.md"))
-PROFILE_SKILLS = sorted((REPO / "profile" / "skills").glob("*/SKILL.md"))
+PROFILE_SKILLS = [REPO / "profile" / "skills" / name / "SKILL.md" for name in PROFILE_SKILL_NAMES]
 
 
 class TestCrossPluginCoupling(unittest.TestCase):

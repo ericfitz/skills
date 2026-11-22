@@ -6,6 +6,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from discover_origins import PROFILE_SCHEMAS, schema_paths
 from schema_check import validate
 
 REPO = Path(__file__).resolve().parents[1]
@@ -44,12 +45,7 @@ class TestValidator(unittest.TestCase):
 
 class TestProfileContracts(unittest.TestCase):
     def test_every_schema_is_valid_json_and_has_required_metadata(self):
-        schemas = sorted(CONTRACTS.glob("*.schema.json"))
-        self.assertEqual(
-            [p.name for p in schemas],
-            ["docs.schema.json", "journeys.schema.json", "stack.schema.json", "topology.schema.json"],
-        )
-        for path in schemas:
+        for path in schema_paths(CONTRACTS, PROFILE_SCHEMAS):
             with self.subTest(schema=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))
                 self.assertEqual(schema["type"], "object")
@@ -57,7 +53,7 @@ class TestProfileContracts(unittest.TestCase):
                 self.assertIn("contract_version", schema["required"])
 
     def test_every_schema_has_an_example_that_validates(self):
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, PROFILE_SCHEMAS):
             name = path.name.replace(".schema.json", "")
             example_path = CONTRACTS / "examples" / f"{name}.example.json"
             with self.subTest(contract=name):

@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
+from discover_origins import PROFILE_SCHEMAS, schema_paths
 
 REPO = Path(__file__).resolve().parents[1]
 CONTRACTS = REPO / "profile" / "references" / "contracts"
@@ -213,7 +214,7 @@ def test_explicit_support_only(artifacts, monkeypatch):
     support.write_text("explicit support\n", encoding="utf-8")
     change_contract(artifacts, "topology", lambda data: data["components"][0].update(evidence=[str(evidence)]))
     allowed = {artifacts / f"{name}.json" for name in ("stack", "docs", "journeys", "topology")}
-    allowed.update(CONTRACTS.glob("*.schema.json"))
+    allowed.update(schema_paths(CONTRACTS, PROFILE_SCHEMAS))
     allowed.add(support)
     allowed = {item.resolve() for item in allowed}
     original_open = Path.open

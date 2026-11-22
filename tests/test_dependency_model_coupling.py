@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import ClassVar
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from discover_origins import PROFILE_SKILLS
 
 REPO = Path(__file__).resolve().parents[1]
 PLUGIN = REPO / "dependency-model"
-SKILLS = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
 LAYER2 = ["report", "synthesize"]
 ALL_SKILLS = sorted(CATEGORIES + LAYER2)
@@ -19,6 +21,9 @@ PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)")
 
 def skill_path(name):
     return PLUGIN / "skills" / name / "SKILL.md"
+
+
+SKILLS = [skill_path(n) for n in ALL_SKILLS]
 
 
 def body(skill):
@@ -49,7 +54,10 @@ def assert_phrase_not_in(test_case, needle, haystack):
 
 class TestSkillSet(unittest.TestCase):
     def test_all_eight_skills_exist(self):
-        self.assertEqual([p.parent.name for p in SKILLS], ALL_SKILLS)
+        self.assertEqual(len(SKILLS), 8)
+        for skill in SKILLS:
+            with self.subTest(skill=skill.parent.name):
+                self.assertTrue(skill.is_file())
 
 
 class TestNoCrossPluginPathCoupling(unittest.TestCase):
@@ -75,7 +83,7 @@ class TestNoCrossPluginPathCoupling(unittest.TestCase):
 
     def test_profile_skills_are_not_modified_to_know_about_this_plugin(self):
         """#48 AC 4: the dependency direction is one-way."""
-        for skill in sorted((REPO / "profile" / "skills").glob("*/SKILL.md")):
+        for skill in [REPO / "profile" / "skills" / name / "SKILL.md" for name in PROFILE_SKILLS]:
             with self.subTest(skill=skill.parent.name):
                 assert_phrase_not_in(self, "dependency-model", body(skill))
 

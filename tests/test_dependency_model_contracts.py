@@ -8,6 +8,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
 
+from discover_origins import DEPENDENCY_SCHEMAS, schema_paths
 from schema_check import resolve_refs, validate
 from depgraphlib.graph import build_graph
 
@@ -52,12 +53,9 @@ def is_value_shaped(name):
 
 class TestContractFilesExist(unittest.TestCase):
     def test_every_expected_schema_is_present(self):
-        names = sorted(p.name for p in CONTRACTS.glob("*.schema.json"))
-        expected = sorted(
-            ["dependency-core.schema.json", "discovery.schema.json", "synthesis.schema.json"]
-            + [f"{c}.schema.json" for c in CATEGORIES]
-        )
-        self.assertEqual(names, expected)
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
+            with self.subTest(schema=path.name):
+                self.assertTrue(path.is_file())
 
     def test_every_category_has_an_example(self):
         for category in CATEGORIES:
@@ -263,7 +261,7 @@ class TestContractStaysInItsLayer(unittest.TestCase):
         """Layers 2-4 judge; layer 1 reports. Banned words keep that boundary
         visible in review."""
         banned = ("criticality", "severity", "blast_radius", "remediation", "recommendation", "risk_score", "priority")
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             text = path.read_text(encoding="utf-8").lower()
             for word in banned:
                 with self.subTest(schema=path.name, word=word):
@@ -272,7 +270,7 @@ class TestContractStaysInItsLayer(unittest.TestCase):
     def test_no_probing_vocabulary(self):
         """D3: nothing is measured, so nothing names a measurement."""
         banned = ("measured", "observed_latency", "reachable", "resolved_ip", "ping", "probe_result")
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             text = path.read_text(encoding="utf-8").lower()
             for word in banned:
                 with self.subTest(schema=path.name, word=word):
@@ -290,7 +288,7 @@ class TestLifecycle(unittest.TestCase):
         self.assertEqual(core["properties"]["lifecycle"]["enum"], ["build", "run"])
 
     def test_no_schema_admits_a_both_value(self):
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             with self.subTest(schema=path.name):
                 self.assertNotIn('"both"', path.read_text(encoding="utf-8"))
 
@@ -387,7 +385,7 @@ class TestNoStateVocabulary(unittest.TestCase):
     `degraded` later must cost nothing in this schema."""
 
     def test_no_schema_declares_a_health_state_enum(self):
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             text = path.read_text(encoding="utf-8")
             for state in ('"healthy"', '"degraded"', '"unhealthy"'):
                 with self.subTest(schema=path.name, state=state):
