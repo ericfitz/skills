@@ -1,6 +1,6 @@
 ---
 name: integration-test-plan
-description: Design an integration test suite for a project — discovering its stack, its documented requirements, deployment shape, customer journeys, test conventions, existing-test quality, and state affordances, then synthesizing a prioritized scenario plan. Use when asked to design, plan, or scope integration tests, or to find gaps in an existing integration suite. Requires the profile plugin.
+description: Design an integration test suite for a project — discovering its stack, its documented requirements, deployment shape, customer journeys, test conventions, existing-test quality, and state affordances, then synthesizing a prioritized scenario plan. Use when asked to design, plan, or scope integration tests, or to find gaps in an existing integration suite. Requires the discover plugin.
 ---
 
 # integration-test-plan
@@ -18,13 +18,13 @@ Worked example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/scenario.ex
 
 ## Phase 0 — Preflight
 
-Check your available skills for `profile:stack`, `profile:docs`, `profile:topology`,
-and `profile:journeys`. If any is missing, stop and tell the user:
+Check your available skills for `discover:stack`, `discover:docs`, `discover:topology`,
+and `discover:journeys`. If any is missing, stop and tell the user:
 
-> This skill needs the `profile` plugin, which is not installed. Install it from the
+> This skill needs the `discover` plugin, which is not installed. Install it from the
 > `estack` marketplace and run `/test-integration:integration-test-plan` again.
 
-Do not attempt to reach `profile`'s files by path, and do not proceed with partial
+Do not attempt to reach `discover`'s files by path, and do not proceed with partial
 discovery. Failing here costs nothing; failing three subagents deep wastes the run.
 
 Then ask the user one question, and accept "none":
@@ -37,7 +37,7 @@ subagent and cannot ask anything.
 
 ## Phase 1 — Stack gate
 
-Invoke `profile:stack` for the target path. Every other phase depends on knowing the
+Invoke `discover:stack` for the target path. Every other phase depends on knowing the
 ecosystem, and its contract carries the repo inventory that all later phases use.
 
 If its `confidence` is `low`, say so before continuing — everything downstream inherits
@@ -45,7 +45,7 @@ that uncertainty.
 
 ## Phase 2 — Documentation gate
 
-Invoke `profile:docs`, handing it the `stack` contract and any external pointers the
+Invoke `discover:docs`, handing it the `stack` contract and any external pointers the
 user gave in Phase 0.
 
 This is a gate rather than a parallel peer because all five phases below read from it,
@@ -71,8 +71,8 @@ and the `docs` contract:
 
 | Subagent | Invokes | Returns |
 |---|---|---|
-| topology | `profile:topology` | topology contract |
-| journeys | `profile:journeys` | journeys contract |
+| topology | `discover:topology` | topology contract |
+| journeys | `discover:journeys` | journeys contract |
 | conventions | `test-integration:conventions` | conventions contract |
 | critique | `test-integration:critique` | critique contract |
 | state | `test-integration:state` | state contract |
@@ -91,7 +91,7 @@ journey candidates it plausibly belongs to. A requirement that maps to none is
 "tenant data never crosses tenants". These are real integration-tier concerns that no
 single journey owns, and they would otherwise vanish.
 
-This mapping happens here, not inside `profile:docs`, because cross-cutting-ness is a
+This mapping happens here, not inside `discover:docs`, because cross-cutting-ness is a
 judgment about the journey set, which does not exist when that phase runs.
 
 ## Phase 5 — Human gate
@@ -122,7 +122,7 @@ overwriting. The doc contains:
   outcome), rank, `depends_on` edges, and evidence anchors — journeys the user added at
   the gate without code evidence are marked "(user-supplied)";
 - one fenced ```json block at the end holding the confirmed set in the
-  `profile:journeys` contract shape, with user edits applied. User-added entries carry
+  `discover:journeys` contract shape, with user edits applied. User-added entries carry
   `"evidence": []` and `"user_supplied": true`.
 
 This doc is the durable output of the gate — downstream consumers (workflow-spec
@@ -199,7 +199,7 @@ Work through these eight steps in order, presenting each and checking before mov
 ## Rules
 
 - Nothing in this workflow executes anything. No builds, no test runs, no containers.
-- Never invoke `profile`'s inventory script by path. Inventory reaches this plugin only
+- Never invoke `discover`'s inventory script by path. Inventory reaches this plugin only
   inside the `stack` contract.
 - Never work around an unreachable document. Report it with its remedy and move on.
 - Every scenario must carry `placement` and `runner_invocation`. A scenario the runner

@@ -10,7 +10,7 @@ from discover_origins import PROFILE_SKILLS as PROFILE_SKILL_NAMES
 
 REPO = Path(__file__).resolve().parents[1]
 ITEST_SKILLS = sorted((REPO / "test-integration" / "skills").glob("*/SKILL.md"))
-PROFILE_SKILLS = [REPO / "profile" / "skills" / name / "SKILL.md" for name in PROFILE_SKILL_NAMES]
+PROFILE_SKILLS = [REPO / "discover" / "skills" / name / "SKILL.md" for name in PROFILE_SKILL_NAMES]
 
 
 class TestCrossPluginCoupling(unittest.TestCase):
@@ -24,14 +24,14 @@ class TestCrossPluginCoupling(unittest.TestCase):
             with self.subTest(skill=skill.parent.name):
                 text = skill.read_text(encoding="utf-8")
                 self.assertNotIn(
-                    "profile_inventory.py", text.replace("Never invoke `profile`'s inventory script by path.", "")
+                    "profile_inventory.py", text.replace("Never invoke `discover`'s inventory script by path.", "")
                 )
 
     def test_itest_plugin_root_refs_stay_inside_itest(self):
         for skill in ITEST_SKILLS:
             for ref in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)", skill.read_text(encoding="utf-8")):
                 with self.subTest(skill=skill.parent.name, ref=ref):
-                    # Without this, ../profile/... resolves and passes exists().
+                    # Without this, ../discover/... resolves and passes exists().
                     self.assertNotIn("..", ref)
                     self.assertTrue((REPO / "test-integration" / ref.lstrip("/")).exists())
 
@@ -42,7 +42,7 @@ class TestCrossPluginCoupling(unittest.TestCase):
 
     def test_design_preflights_all_four_profile_skills(self):
         text = (REPO / "test-integration" / "skills" / "integration-test-plan" / "SKILL.md").read_text(encoding="utf-8")
-        for name in ("profile:stack", "profile:docs", "profile:topology", "profile:journeys"):
+        for name in ("discover:stack", "discover:docs", "discover:topology", "discover:journeys"):
             with self.subTest(skill=name):
                 self.assertIn(name, text)
 
@@ -68,7 +68,7 @@ class TestCrossPluginCoupling(unittest.TestCase):
 
     def test_design_writes_confirmed_journeys_doc_after_the_gate(self):
         """Issue #45: the confirmed journeys must be persisted to docs/journeys.md
-        after the Phase 5 human gate, not left in chat (profile:journeys stays a
+        after the Phase 5 human gate, not left in chat (discover:journeys stays a
         pure proposer)."""
         text = (REPO / "test-integration" / "skills" / "integration-test-plan" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("docs/journeys.md", text)

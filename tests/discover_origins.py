@@ -7,7 +7,7 @@ glob, so a schema or skill added without declaring its origin fails a test.
 from collections.abc import Iterable
 from pathlib import Path
 
-PROFILE_SKILLS: tuple[str, ...] = ("docs", "journeys", "report", "stack", "topology")
+PROFILE_SKILLS: tuple[str, ...] = ("docs", "journeys", "project-report", "stack", "topology")
 PROFILE_SCHEMAS = ("docs", "journeys", "stack", "topology")
 DEPENDENCY_SCHEMAS = (
     "config",

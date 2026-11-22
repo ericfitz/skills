@@ -17,20 +17,20 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/conventions.exampl
 
 ## Input
 
-You are normally handed a `profile:stack` contract. Use its `inventory` for
+You are normally handed a `discover:stack` contract. Use its `inventory` for
 `test_files`, `test_dirs`, `test_config`, and `ci`.
 
-You may also be handed a `profile:docs` contract. Its corpus often contains a
+You may also be handed a `discover:docs` contract. Its corpus often contains a
 CONTRIBUTING file or a testing guide, which is the most direct statement of house style
 and runner commands available anywhere. Prefer it over inference — then check it against
 what CI actually runs, because guides go stale and CI does not.
 
-**Standalone invocation:** if you were not handed one, invoke the `profile:stack`
-skill and use its output. If the `profile` plugin is not available, read the repo
+**Standalone invocation:** if you were not handed one, invoke the `discover:stack`
+skill and use its output. If the `discover` plugin is not available, read the repo
 directly using the fingerprint tables in `references/test-frameworks.md`, and say
 in your summary that you ran without an inventory.
 
-Never invoke `profile`'s inventory script by path. Inventory data reaches this
+Never invoke `discover`'s inventory script by path. Inventory data reaches this
 plugin only through the `stack` contract.
 
 ## Procedure

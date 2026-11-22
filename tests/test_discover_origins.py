@@ -29,9 +29,9 @@ class TestDiscoverOrigins(unittest.TestCase):
 
     def test_real_contract_dirs_match_the_origin_lists(self):
         self.assertTrue(set(PROFILE_SCHEMAS).isdisjoint(DEPENDENCY_SCHEMAS))
-        self.assertEqual(schema_drift(REPO / "profile" / "references" / "contracts", PROFILE_SCHEMAS), ([], []))
         self.assertEqual(
-            schema_drift(REPO / "dependency-model" / "references" / "contracts", DEPENDENCY_SCHEMAS), ([], [])
+            schema_drift(REPO / "discover" / "references" / "contracts", PROFILE_SCHEMAS + DEPENDENCY_SCHEMAS),
+            ([], []),
         )
 
 

@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "profile" / "scripts"
+SCRIPTS = Path(__file__).resolve().parents[1] / "discover" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 
@@ -40,7 +40,7 @@ def test_cli_default_and_explicit_output(cli, artifacts, tmp_path, monkeypatch, 
     monkeypatch.setenv("HOME", str(home))
     destinations = [None, str(tmp_path / "custom report.html"), "~/home report.htm", "relative report.html"]
     expected = [
-        artifacts / "profile-report.html",
+        artifacts / "project-report.html",
         tmp_path / "custom report.html",
         home / "home report.htm",
         caller / "relative report.html",
@@ -173,7 +173,7 @@ def test_support_arguments_are_forwarded(cli, artifacts, tmp_path):
     assert (
         cli.main([str(artifacts), "--support", str(text), "--support", str(markdown), "--support", str(recorded)]) == 0
     )
-    html = (artifacts / "profile-report.html").read_text(encoding="utf-8")
+    html = (artifacts / "project-report.html").read_text(encoding="utf-8")
     assert "recorded text sentinel" in html
     assert "recorded markdown sentinel" in html
     assert "recorded JSON sentinel" in html

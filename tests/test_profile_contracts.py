@@ -10,7 +10,7 @@ from discover_origins import PROFILE_SCHEMAS, schema_paths
 from schema_check import validate
 
 REPO = Path(__file__).resolve().parents[1]
-CONTRACTS = REPO / "profile" / "references" / "contracts"
+CONTRACTS = REPO / "discover" / "references" / "contracts"
 
 
 class TestValidator(unittest.TestCase):
@@ -80,7 +80,7 @@ class TestProfileContracts(unittest.TestCase):
             self.assertNotIn(banned, text, f"docs contract mentions {banned!r}")
 
     def test_docs_contract_emits_evidence_not_journey_candidates(self):
-        """Ownership boundary: profile:journeys alone forms and ranks candidates."""
+        """Ownership boundary: discover:journeys alone forms and ranks candidates."""
         schema = json.loads((CONTRACTS / "docs.schema.json").read_text(encoding="utf-8"))
         properties = schema["properties"]
         self.assertIn("journey_evidence", properties)

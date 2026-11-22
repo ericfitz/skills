@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import depscan
@@ -15,7 +15,7 @@ from depscanlib.report import build_scan
 from repobuilder import build_repo
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPT = REPO / "dependency-model" / "scripts" / "depscan.py"
+SCRIPT = REPO / "discover" / "scripts" / "depscan.py"
 
 FINDING_KEYS = [
     "env_refs",

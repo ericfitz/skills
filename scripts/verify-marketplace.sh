@@ -45,11 +45,10 @@ declare -a PLUGINS=(
   "test-ui:development:vrt"
   "dependencies:development:bump"
   "test-api-fuzzing:testing:analyze,fp,init,report,run"
-  "profile:development:docs,journeys,report,stack,topology"
+  "discover:development:config,dependency-report,docs,journeys,network,package,platform,project-report,security,service,stack,synthesize,topology"
   "test-integration:development:conventions,critique,integration-test-plan,state"
   "test-api-workflows:development:arazzo,init"
   "environment:development:check"
-  "dependency-model:development:config,network,package,platform,report,security,service,synthesize"
   "session:productivity:go,handoff"
 )
 
@@ -117,10 +116,10 @@ declare -a SCRIPTS=(
   "localization/scripts/check-i18n.py"
   "localization/scripts/find_duplicate_localizations.py"
   "issues/scripts/gh-issues.py"
-  "dependency-model/scripts/depscan.py"
-  "dependency-model/scripts/depgraph.py"
-  "dependency-model/scripts/health.py"
-  "dependency-model/scripts/pkglifecycle.py"
+  "discover/scripts/depscan.py"
+  "discover/scripts/depgraph.py"
+  "discover/scripts/health.py"
+  "discover/scripts/pkglifecycle.py"
 )
 for s in "${SCRIPTS[@]}"; do
   if [ -f "$s" ]; then ok "$s exists"; else bad "$s missing"; fi

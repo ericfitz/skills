@@ -11,8 +11,8 @@ import pytest
 from discover_origins import PROFILE_SCHEMAS, schema_paths
 
 REPO = Path(__file__).resolve().parents[1]
-CONTRACTS = REPO / "profile" / "references" / "contracts"
-sys.path.insert(0, str(REPO / "profile" / "scripts"))
+CONTRACTS = REPO / "discover" / "references" / "contracts"
+sys.path.insert(0, str(REPO / "discover" / "scripts"))
 
 from reportlib.inputs import ReportInputError, load_profile
 from reportlib.render import render_report

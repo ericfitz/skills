@@ -5,12 +5,12 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 
 from depscanlib.source import RESILIENCE_PATTERNS
 
 REPO = Path(__file__).resolve().parents[1]
-REFERENCES = REPO / "dependency-model" / "references"
+REFERENCES = REPO / "discover" / "references"
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
 
 
@@ -127,11 +127,11 @@ class TestResilienceSignaturesMatchCode(unittest.TestCase):
 class TestRunningDiscovery(unittest.TestCase):
     def test_documents_the_sequence_and_the_deferred_orchestrator(self):
         text = (REFERENCES / "running-discovery.md").read_text(encoding="utf-8")
-        self.assertIn("profile:topology", text)
+        self.assertIn("discover:topology", text)
         self.assertIn("depscan.py", text)
         for category in CATEGORIES:
             with self.subTest(category=category):
-                self.assertIn(f"/dependency-model:{category}", text)
+                self.assertIn(f"/discover:{category}", text)
         self.assertIn("no orchestrator", text.lower())
 
     def test_documents_the_python3_fallback(self):

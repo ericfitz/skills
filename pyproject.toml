@@ -51,7 +51,7 @@ known-first-party = ["inventorylib", "depscanlib", "depgraphlib", "jsonargs"]
 extra-paths = [
     "test-api-fuzzing/scripts",
     "dependencies/scripts",
-    "dependency-model/scripts",
+    "discover/scripts",
     "tests",
 ]
 

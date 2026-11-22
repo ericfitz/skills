@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import depscan
@@ -17,7 +17,7 @@ from depscanlib.report import build_scan
 from depscanlib.run import RefError, prepare
 from repobuilder import build_repo, git_commit_all, git_init
 
-SCRIPT = Path(__file__).resolve().parents[1] / "dependency-model" / "scripts" / "depscan.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "discover" / "scripts" / "depscan.py"
 
 
 def committed_repo(tmp):

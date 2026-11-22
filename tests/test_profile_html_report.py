@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "profile" / "scripts"
+SCRIPTS = Path(__file__).resolve().parents[1] / "discover" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 from reportlib.inputs import Artifact, ProfileBundle, load_profile
 

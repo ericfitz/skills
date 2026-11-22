@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal agent-skills marketplace (`estack`). Eleven plugins,
+efitz's personal agent-skills marketplace (`estack`). Ten plugins,
 each bundling one or more skills, installable into **Claude Code** or
 **OpenAI Codex CLI** — the repo carries native manifests for both harnesses.
 Invoke a skill as `/<plugin>:<skill>`.
@@ -35,14 +35,14 @@ auth sessions the plugins depend on are present.
 
 ## Architecture
 
-Several plugins build on each other: `test-integration` runs on `profile`'s contracts,
+Several plugins build on each other: `test-integration` runs on `discover`'s contracts,
 `test-api-workflows:arazzo` reads the journeys doc `test-integration:integration-test-plan` writes. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps
 those edges as a graph, says what each skill produces and consumes, and lists the
 recommended entry point for common goals.
 
 ## Plugins
 
-### localization — localization / i18n
+### localization — i18n
 
 - **analyze** — Build a translation task manifest: per-language lists of missing keys with their source values, via the bundled `check-i18n.py` script.
 - **coverage** — Audit translation completeness across all target locales; per-locale and summary coverage report with threshold flagging.
@@ -76,21 +76,40 @@ recommended entry point for common goals.
 Portable across repos: setup is gitignored and repo-local; false-positive
 rules are committed.
 
-### profile — project discovery
+### discover — project and dependency discovery
 
 - **docs** — Read the documentary record (PRDs, requirements, specs, ADRs, wiki pages) and extract requirements, user-workflow evidence, domain vocabulary, and invariants.
 - **journeys** — Identify the key workflows users actually perform, mined from documentation, routes, CLI commands, and UI entry points, ranked by business criticality with dependency edges.
-- **report** — Turn saved profile contracts and optional explicit JSON, text or Markdown support into one offline HTML report with expandable evidence, tables and diagrams. Honors an explicit output path and requests browser opening unless `--no-open` is supplied.
+- **project-report** — Turn saved project contracts and optional explicit JSON, text or Markdown support into one offline HTML report with expandable evidence, tables and diagrams. Honors an explicit output path and requests browser opening unless `--no-open` is supplied.
 - **stack** — Identify what a codebase is built with: languages, runtimes, package managers, build commands, and monorepo layout.
 - **topology** — Determine how the system deploys and what it depends on: components, real dependencies, third-party services, configuration, startup order, and standup difficulty.
 
-Read-only inference backed by `scripts/profile_inventory.py`, a deterministic
+The project skills (`stack`, `docs`, `topology`, `journeys`, `project-report`) are read-only inference backed by `scripts/profile_inventory.py`, a deterministic
 repo census. Discovery skills emit versioned JSON contracts under
 `references/contracts/`; those contracts are the supported interface for other
-plugins. `report` consumes saved contracts without running discovery. Its default
-destination is `<artifact_dir>/profile-report.html`; `--out ~/Downloads/name.html`
+plugins. `project-report` consumes saved contracts without running discovery. Its default
+destination is `<artifact_dir>/project-report.html`; `--out ~/Downloads/name.html`
 uses that exact location. Destination failures stop generation; browser-opening
 failures are reported separately after the report is saved.
+
+- **package** — Inventory the libraries the project ships with, across every ecosystem syft catalogues, with declared/locked/installed resolution and the dependency edges between them.
+- **service** — Identify out-of-project services: databases, caches, queues, object stores, search engines, and APIs, with how each is brought up and what config points at it.
+- **config** — Enumerate the configuration the system must be supplied with: environment variables, files, flags, and remote config, with what reads each key and what default it declares.
+- **security** — Enumerate the secrets and permissions the system requires, recording what each credential is named and where it is read — never its value.
+- **platform** — Enumerate the declared OS and cloud resources: CPU, memory, disk, GPU, architecture, runtime versions, and managed services.
+- **network** — Enumerate the names, hosts, and ports that must resolve and connect, inbound and outbound, with how each name is expected to resolve.
+- **synthesize** — Gather the six discovery skills' output into one merged inventory and dependency graph, and derive which dependencies carry a failure-relevant health condition. Emits the `synthesis` contract.
+- **dependency-report** — Render the `synthesis` contract into `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`): a human-readable inventory summary, health definitions, Mermaid dependency graph, cycles, and assumptions.
+
+The dependency skills (`package`, `service`, `config`, `security`, `platform`, `network`, `synthesize`, `dependency-report`) are static and read-only: nothing is executed, resolved, or probed, because these
+skills run on a developer's machine or in CI rather than inside the environment
+the code runs in — a measured latency or a resolved hostname would be
+confidently wrong. Each dependency carries the timeout, retry, fallback, and
+health-check declarations found for it; a `null` means no declaration was found,
+never that the behaviour is confirmed absent. The six discovery skills emit the
+same `discovery` envelope with one category populated, so their output merges
+by key union; `synthesize` and `dependency-report` consume that merged output. Requires
+`syft`; seeded by the `discover:topology` contract.
 
 ### test-integration — integration test design
 
@@ -99,7 +118,7 @@ failures are reported separately after the report is saved.
 - **critique** — Assess existing integration tests for over-mocking, implementation-detail assertions, non-determinism, shared state, and missing failure paths; recommends keep, repair, replace, or delete for each.
 - **state** — Discover how test state can be established: writable stores, factories and builders, seed tooling, test-only endpoints, ID generation, and teardown affordances.
 
-Requires the `profile` plugin. Discovery is read-only: nothing is built,
+Requires the `discover` plugin. Discovery is read-only: nothing is built,
 booted, or run, and every unproven inference is carried into the plan as an
 explicit assumption. Where a normative document and the code disagree, the
 plan reports the conflict and both readings. Output conforms to
@@ -116,27 +135,6 @@ the `docs/journeys.md` written by `/test-integration:integration-test-plan`.
 ### environment
 
 - **check** — Preflight the environment for this marketplace's plugins: required CLI tools, config files, and auth sessions. Reports hard failures, degraded (optional) capability loss, and undeclared plugins; supports checking a single plugin and an explicit `--fix` mode.
-
-### dependency-model — dependency discovery
-
-- **package** — Inventory the libraries the project ships with, across every ecosystem syft catalogues, with declared/locked/installed resolution and the dependency edges between them.
-- **service** — Identify out-of-project services: databases, caches, queues, object stores, search engines, and APIs, with how each is brought up and what config points at it.
-- **config** — Enumerate the configuration the system must be supplied with: environment variables, files, flags, and remote config, with what reads each key and what default it declares.
-- **security** — Enumerate the secrets and permissions the system requires, recording what each credential is named and where it is read — never its value.
-- **platform** — Enumerate the declared OS and cloud resources: CPU, memory, disk, GPU, architecture, runtime versions, and managed services.
-- **network** — Enumerate the names, hosts, and ports that must resolve and connect, inbound and outbound, with how each name is expected to resolve.
-- **synthesize** — Gather the six discovery skills' output into one merged inventory and dependency graph, and derive which dependencies carry a failure-relevant health condition. Emits the `synthesis` contract.
-- **report** — Render the `synthesis` contract into `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`): a human-readable inventory summary, health definitions, Mermaid dependency graph, cycles, and assumptions.
-
-Static and read-only: nothing is executed, resolved, or probed, because these
-skills run on a developer's machine or in CI rather than inside the environment
-the code runs in — a measured latency or a resolved hostname would be
-confidently wrong. Each dependency carries the timeout, retry, fallback, and
-health-check declarations found for it; a `null` means no declaration was found,
-never that the behaviour is confirmed absent. The six discovery skills emit the
-same `discovery` envelope with one category populated, so their output merges
-by key union; `synthesize` and `report` consume that merged output. Requires
-`syft`; seeded by the `profile:topology` contract.
 
 ### session — session continuity
 

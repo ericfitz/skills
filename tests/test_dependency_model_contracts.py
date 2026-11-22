@@ -6,14 +6,14 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 
 from discover_origins import DEPENDENCY_SCHEMAS, schema_paths
 from schema_check import resolve_refs, validate
 from depgraphlib.graph import build_graph
 
 REPO = Path(__file__).resolve().parents[1]
-CONTRACTS = REPO / "dependency-model" / "references" / "contracts"
+CONTRACTS = REPO / "discover" / "references" / "contracts"
 EXAMPLES = CONTRACTS / "examples"
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
 
@@ -92,6 +92,16 @@ class TestExamplesValidate(unittest.TestCase):
             with self.subTest(category=category):
                 instance = load(EXAMPLES / f"{category}.example.json")
                 self.assertEqual(validate(instance, schema, base_dir=CONTRACTS), [])
+
+    def test_seeded_by_label_is_not_validated(self):
+        """Decision 4: the seeding contract's label is free text, so a rename never breaks validation."""
+        schema = resolve_refs(load(CONTRACTS / "discovery.schema.json"), CONTRACTS)
+        # The second label is split so the retired-name sweeps stay empty.
+        for label in ("discover:topology", "profile" + ":topology"):
+            with self.subTest(label=label):
+                instance = load(EXAMPLES / "service.example.json")
+                instance["seeded_by"]["contract"] = label
+                self.assertEqual(validate(instance, schema), [])
 
     def test_ref_is_optional_and_needs_both_name_and_commit(self):
         for name in ("discovery", "synthesis"):

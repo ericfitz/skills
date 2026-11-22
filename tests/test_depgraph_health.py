@@ -9,14 +9,14 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 REPO = Path(__file__).resolve().parents[1]
-SCRIPTS = REPO / "dependency-model" / "scripts"
+SCRIPTS = REPO / "discover" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from depgraphlib.graph import link_graph
 from depgraphlib.health import derive_health
 from depgraphlib.merge import merge_envelopes
 
-EXAMPLES = REPO / "dependency-model" / "references" / "contracts" / "examples"
+EXAMPLES = REPO / "discover" / "references" / "contracts" / "examples"
 
 
 def dep(id_, lifecycle="run", related=None, evidence=None, resilience=None, **details):

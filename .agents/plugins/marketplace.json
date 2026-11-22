@@ -42,11 +42,11 @@
       }
     },
     {
-      "name": "profile",
+      "name": "discover",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./profile"
+        "path": "./discover"
       }
     },
     {
@@ -63,14 +63,6 @@
       "source": {
         "source": "local",
         "path": "./environment"
-      }
-    },
-    {
-      "name": "dependency-model",
-      "category": "development",
-      "source": {
-        "source": "local",
-        "path": "./dependency-model"
       }
     },
     {

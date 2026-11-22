@@ -21,16 +21,16 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/state.example.json
 
 ## Input
 
-You are normally handed a `profile:stack` contract; use its `inventory` to locate
+You are normally handed a `discover:stack` contract; use its `inventory` to locate
 migrations, models, seed scripts, and test helpers.
 
-You may also be handed a `profile:docs` contract. Its `domain_invariants` and `glossary`
+You may also be handed a `discover:docs` contract. Its `domain_invariants` and `glossary`
 describe what valid state actually looks like in this domain, which is what turns
 `direct_write_possible` from a literal answer into a useful one: a store you can write
 to but cannot write *validly* is worth reporting as such.
 
-**Standalone invocation:** if you were not handed one, invoke `profile:stack` and use
-its output. If `profile` is unavailable, locate schema sources yourself using the
+**Standalone invocation:** if you were not handed one, invoke `discover:stack` and use
+its output. If `discover` is unavailable, locate schema sources yourself using the
 tables in `references/state-and-fixtures.md`.
 
 ## Procedure

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import ClassVar
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pkglifecycle

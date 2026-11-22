@@ -7,8 +7,8 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPT = REPO / "dependency-model" / "scripts" / "validate.py"
-EXAMPLES = REPO / "dependency-model" / "references" / "contracts" / "examples"
+SCRIPT = REPO / "discover" / "scripts" / "validate.py"
+EXAMPLES = REPO / "discover" / "references" / "contracts" / "examples"
 
 
 def run(contract, path):

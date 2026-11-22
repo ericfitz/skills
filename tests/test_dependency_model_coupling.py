@@ -12,9 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from discover_origins import PROFILE_SKILLS
 
 REPO = Path(__file__).resolve().parents[1]
-PLUGIN = REPO / "dependency-model"
+PLUGIN = REPO / "discover"
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
-LAYER2 = ["report", "synthesize"]
+LAYER2 = ["dependency-report", "synthesize"]
 ALL_SKILLS = sorted(CATEGORIES + LAYER2)
 PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[A-Za-z0-9_./-]+)")
 
@@ -61,29 +61,33 @@ class TestSkillSet(unittest.TestCase):
 
 
 class TestNoCrossPluginPathCoupling(unittest.TestCase):
-    def test_no_skill_reaches_into_profile_by_path(self):
+    def test_no_skill_runs_the_inventory_script_by_path(self):
+        """Before the merge this guarded against reaching into the other plugin's scripts by path. Both halves now live
+        in one plugin, so a plugin-name path is no longer coupling; the guard that still means
+        something is that dependency skills never run the project inventory script or import its
+        library, and reach topology only by skill name."""
         for skill in SKILLS:
             with self.subTest(skill=skill.parent.name):
                 text = body(skill)
-                assert_phrase_not_in(self, "profile/scripts", text)
                 assert_phrase_not_in(self, "profile_inventory.py", text)
+                assert_phrase_not_in(self, "inventorylib", text)
 
     def test_every_skill_names_profile_topology_as_a_skill(self):
         for skill in SKILLS:
             with self.subTest(skill=skill.parent.name):
-                assert_phrase_in(self, "profile:topology", body(skill))
+                assert_phrase_in(self, "discover:topology", body(skill))
 
     def test_plugin_root_refs_stay_inside_this_plugin(self):
         for skill in SKILLS:
             for ref in PLUGIN_ROOT_REF.findall(body(skill)):
                 with self.subTest(skill=skill.parent.name, ref=ref):
-                    # Without this, ../profile/... resolves and passes exists().
+                    # Without this, ../discover/... resolves and passes exists().
                     self.assertNotIn("..", ref)
                     self.assertTrue((PLUGIN / ref.lstrip("/")).exists())
 
     def test_profile_skills_are_not_modified_to_know_about_this_plugin(self):
         """#48 AC 4: the dependency direction is one-way."""
-        for skill in [REPO / "profile" / "skills" / name / "SKILL.md" for name in PROFILE_SKILLS]:
+        for skill in [REPO / "discover" / "skills" / name / "SKILL.md" for name in PROFILE_SKILLS]:
             with self.subTest(skill=skill.parent.name):
                 assert_phrase_not_in(self, "dependency-model", body(skill))
 
@@ -114,7 +118,7 @@ class TestLayer2SkillsNameTheirDependencies(unittest.TestCase):
                 assert_phrase_in(self, "synthesis.schema.json", body(skill_path(skill)))
 
     def test_report_names_synthesize(self):
-        assert_phrase_in(self, "synthesize", body(skill_path("report")))
+        assert_phrase_in(self, "synthesize", body(skill_path("dependency-report")))
 
     def test_synthesize_names_depgraph(self):
         assert_phrase_in(self, "depgraph.py", body(skill_path("synthesize")))
@@ -257,28 +261,30 @@ class TestFailabilityRuleIsStated(unittest.TestCase):
 class TestRegistration(unittest.TestCase):
     def test_plugin_manifest_is_semver_and_named_for_its_directory(self):
         data = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["name"], "dependency-model")
+        self.assertEqual(data["name"], "discover")
         self.assertRegex(data["version"], r"^\d+\.\d+\.\d+$")
 
     def test_marketplace_entry_exists_in_the_development_category(self):
         data = json.loads((REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
-        entry = next(p for p in data["plugins"] if p["name"] == "dependency-model")
-        self.assertEqual(entry["source"], "./dependency-model")
+        entry = next(p for p in data["plugins"] if p["name"] == "discover")
+        self.assertEqual(entry["source"], "./discover")
         self.assertEqual(entry["category"], "development")
 
     def test_verify_script_declares_the_plugin_with_all_eight_skills(self):
         text = (REPO / "scripts" / "verify-marketplace.sh").read_text(encoding="utf-8")
         self.assertIn(
-            '"dependency-model:development:config,network,package,platform,report,security,service,synthesize"', text
+            '"discover:development:config,dependency-report,docs,journeys,network,package,platform,project-report,'
+            'security,service,stack,synthesize,topology"',
+            text,
         )
-        self.assertIn("dependency-model/scripts/depscan.py", text)
-        self.assertIn("dependency-model/scripts/depgraph.py", text)
-        self.assertIn("dependency-model/scripts/health.py", text)
-        self.assertIn("dependency-model/scripts/pkglifecycle.py", text)
+        self.assertIn("discover/scripts/depscan.py", text)
+        self.assertIn("discover/scripts/depgraph.py", text)
+        self.assertIn("discover/scripts/health.py", text)
+        self.assertIn("discover/scripts/pkglifecycle.py", text)
 
     def test_requirements_declare_syft_as_required(self):
         data = json.loads((PLUGIN / "requirements.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["plugin"], "dependency-model")
+        self.assertEqual(data["plugin"], "discover")
         syft = next(t for t in data["tools"] if t["name"] == "syft")
         self.assertTrue(syft["required"])
         self.assertIsInstance(syft["probe"], list)
@@ -291,8 +297,8 @@ class TestRegistration(unittest.TestCase):
 
     def test_readme_documents_the_plugin(self):
         text = (REPO / "README.md").read_text(encoding="utf-8")
-        self.assertIn("### dependency-model", text)
-        self.assertIn("Eleven plugins", text)
+        self.assertIn("### discover", text)
+        self.assertIn("Ten plugins", text)
         for skill in ALL_SKILLS:
             with self.subTest(skill=skill):
                 self.assertIn(f"**{skill}**", text)
@@ -323,22 +329,22 @@ class TestSharedIdList(unittest.TestCase):
         text = (PLUGIN / "references" / "running-discovery.md").read_text(encoding="utf-8")
         text = text[text.index("## The sequence") :]
         scan = text.index("depscan.py")
-        topology = text.index("profile:topology", scan)
+        topology = text.index("discover:topology", scan)
         idmap = text.index("idmap.py", topology)
         self.assertLess(scan, topology)
         self.assertLess(topology, idmap)
 
     def test_report_documents_out(self):
-        text = collapse_ws(body(skill_path("report")))
+        text = collapse_ws(body(skill_path("dependency-report")))
         self.assertIn("--out", text)
         self.assertIn("does not end in `.md`", text)
         self.assertIn("parent directory does not exist", text)
 
     def test_report_frontmatter_and_catalog_mention_out(self):
-        head = body(skill_path("report")).split("---")[1]
+        head = body(skill_path("dependency-report")).split("---")[1]
         self.assertIn("--out", head)
         arch = (REPO / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
-        row = next(ln for ln in arch.splitlines() if ln.startswith("| `report` | Renders"))
+        row = next(ln for ln in arch.splitlines() if ln.startswith("| `dependency-report` | Renders"))
         self.assertIn("--out", row)
 
     def test_architecture_states_who_fills_required_for(self):

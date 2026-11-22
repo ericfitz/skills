@@ -18,16 +18,16 @@ Example: `${CLAUDE_PLUGIN_ROOT}/references/contracts/examples/critique.example.j
 
 ## Input
 
-You are normally handed a `profile:stack` contract; use `inventory.test_files` and
+You are normally handed a `discover:stack` contract; use `inventory.test_files` and
 select the records whose `kind` is `integration` or `e2e`.
 
-You may also be handed a `profile:docs` contract. Its `requirements[]` tell you which
+You may also be handed a `discover:docs` contract. Its `requirements[]` tell you which
 failure paths the project committed to handling. A test that covers only the happy path
 of a documented `must` requirement is a `missing-failure-path` issue with evidence
 behind it, not a matter of taste.
 
-**Standalone invocation:** if you were not handed one, invoke `profile:stack` and use
-its output. If `profile` is unavailable, find test files yourself and say so.
+**Standalone invocation:** if you were not handed one, invoke `discover:stack` and use
+its output. If `discover` is unavailable, find test files yourself and say so.
 
 You run in parallel with `/test-integration:conventions` and do not depend on it. If the census
 disagrees with your own reading about which tests are integration tests, assess the
