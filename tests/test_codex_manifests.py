@@ -151,6 +151,90 @@ class TestGenerate(unittest.TestCase):
         self.assertIn("FAIL:", proc.stderr)
 
 
+def write_skill(root: Path, plugin: str, skill: str, frontmatter: str) -> Path:
+    skill_dir = root / plugin / "skills" / skill
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(f"---\nname: {skill}\n{frontmatter}---\n\n# {skill}\n", encoding="utf-8")
+    return skill_dir
+
+
+def run_cli(root: Path, *flags: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "gen_codex_manifests.py"), "--repo", str(root), *flags],
+        capture_output=True,
+        text=True,
+    )
+
+
+class TestSkillPolicy(unittest.TestCase):
+    """disable-model-invocation: true maps to Codex's agents/openai.yaml allow_implicit_invocation: false."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+        build_repo(self.root, {"alpha": manifest("alpha")})
+
+    def test_flagged_skill_gets_policy_file(self):
+        skill = write_skill(self.root, "alpha", "shortcut", "disable-model-invocation: true\n")
+        out = gcm.generate(self.root)
+        content = out[skill / "agents" / "openai.yaml"]
+        self.assertTrue(content.startswith(gcm.SKILL_POLICY_HEADER))
+        self.assertIn("policy:\n  allow_implicit_invocation: false\n", content)
+
+    def test_unflagged_false_and_missing_skill_md_get_none(self):
+        write_skill(self.root, "alpha", "plain", "description: d\n")
+        write_skill(self.root, "alpha", "off", "disable-model-invocation: false\n")
+        out = gcm.generate(self.root)
+        self.assertEqual([p for p in out if p.name == "openai.yaml"], [])
+
+    def test_flag_outside_frontmatter_is_ignored(self):
+        skill = write_skill(self.root, "alpha", "body", "description: d\n")
+        (skill / "SKILL.md").write_text("---\nname: body\n---\n\ndisable-model-invocation: true\n", encoding="utf-8")
+        self.assertNotIn(skill / "agents" / "openai.yaml", gcm.generate(self.root))
+
+    def test_unrecognized_flag_value_fails(self):
+        write_skill(self.root, "alpha", "bad", "disable-model-invocation: yes\n")
+        with self.assertRaisesRegex(gcm.GenerationError, "alpha/bad.*true or false.*'yes'"):
+            gcm.generate(self.root)
+
+    def test_hand_written_openai_yaml_is_not_overwritten(self):
+        skill = write_skill(self.root, "alpha", "shortcut", "disable-model-invocation: true\n")
+        (skill / "agents").mkdir()
+        (skill / "agents" / "openai.yaml").write_text("interface:\n  display_name: X\n", encoding="utf-8")
+        with self.assertRaisesRegex(gcm.GenerationError, "hand-written"):
+            gcm.generate(self.root)
+
+    def test_check_detects_missing_policy_then_passes_after_write(self):
+        write_skill(self.root, "alpha", "shortcut", "disable-model-invocation: true\n")
+        self.assertEqual(run_cli(self.root).returncode, 0)
+        (self.root / "alpha" / "skills" / "shortcut" / "agents" / "openai.yaml").unlink()
+        proc = run_cli(self.root, "--check")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("DRIFT: alpha/skills/shortcut/agents/openai.yaml", proc.stderr)
+        self.assertEqual(run_cli(self.root).returncode, 0)
+        self.assertEqual(run_cli(self.root, "--check").returncode, 0)
+
+    def test_policy_left_after_flag_removed_is_stale_then_removed(self):
+        skill = write_skill(self.root, "alpha", "shortcut", "disable-model-invocation: true\n")
+        self.assertEqual(run_cli(self.root).returncode, 0)
+        write_skill(self.root, "alpha", "shortcut", "description: d\n")
+        proc = run_cli(self.root, "--check")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("STALE: alpha/skills/shortcut/agents/openai.yaml", proc.stderr)
+        self.assertEqual(run_cli(self.root).returncode, 0)
+        self.assertFalse((skill / "agents").exists())
+        self.assertEqual(run_cli(self.root, "--check").returncode, 0)
+
+    def test_hand_written_openai_yaml_without_flag_is_never_stale(self):
+        skill = write_skill(self.root, "alpha", "plain", "description: d\n")
+        (skill / "agents").mkdir()
+        (skill / "agents" / "openai.yaml").write_text("interface:\n  display_name: X\n", encoding="utf-8")
+        run_cli(self.root)
+        self.assertEqual(run_cli(self.root, "--check").returncode, 0)
+        self.assertTrue((skill / "agents" / "openai.yaml").is_file())
+
+
 CLAUDE_MARKETPLACE = REPO / ".claude-plugin" / "marketplace.json"
 CODEX_MARKETPLACE = REPO / ".agents" / "plugins" / "marketplace.json"
 
@@ -174,6 +258,17 @@ class TestCommittedCodexManifests(unittest.TestCase):
             with self.subTest(plugin=entry["name"]):
                 self.assertEqual(data["skills"], "./skills/")
                 self.assertTrue((plugin_dir / "skills").is_dir())
+
+    def test_every_flagged_skill_has_a_committed_policy(self):
+        flagged = []
+        for skill_md in REPO.glob("*/skills/*/SKILL.md"):
+            if "\ndisable-model-invocation: true\n" in skill_md.read_text(encoding="utf-8").split("\n---", 1)[0] + "\n":
+                flagged.append(skill_md.parent)
+        self.assertTrue(flagged)
+        for skill_dir in flagged:
+            with self.subTest(skill=str(skill_dir.relative_to(REPO))):
+                policy = skill_dir / "agents" / "openai.yaml"
+                self.assertEqual(policy.read_text(encoding="utf-8"), gcm.SKILL_POLICY)
 
     def test_check_flag_passes_on_committed_tree(self):
         proc = subprocess.run(

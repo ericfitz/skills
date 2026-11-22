@@ -28,7 +28,10 @@ codex plugin install <plugin>@estack
 The Claude Code manifests (`.claude-plugin/`) are the source of truth; the
 Codex manifests (`.agents/plugins/marketplace.json` and each plugin's
 `.codex-plugin/plugin.json`) are generated from them by
-`scripts/gen_codex_manifests.py` and verified in CI with `--check`.
+`scripts/gen_codex_manifests.py` and verified in CI with `--check`. A skill
+with `disable-model-invocation: true` also gets a generated
+`agents/openai.yaml` setting `policy.allow_implicit_invocation: false`, so
+Codex invokes it only when asked by name.
 
 Run `/environment:check` after installing to confirm the CLI tools, config files, and
 auth sessions the plugins depend on are present.
