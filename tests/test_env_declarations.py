@@ -11,7 +11,7 @@ from schema_check import validate
 
 REPO = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO / "env" / "references" / "requirements.schema.json"
-EXEMPLAR_PLUGINS = ["dev", "env", "github"]
+EXEMPLAR_PLUGINS = ["env", "github"]
 
 # Known keys per shape, kept in sync with requirements.schema.json by hand.
 # schema_check.py ignores unknown keywords and the schema has no
@@ -35,7 +35,7 @@ class TestExemplarDeclarationsExist(unittest.TestCase):
     def test_schema_exists(self):
         self.assertTrue(SCHEMA_PATH.exists(), f"missing {SCHEMA_PATH}")
 
-    def test_three_exemplar_declarations_exist(self):
+    def test_exemplar_declarations_exist(self):
         for plugin in EXEMPLAR_PLUGINS:
             with self.subTest(plugin=plugin):
                 path = REPO / plugin / "requirements.json"

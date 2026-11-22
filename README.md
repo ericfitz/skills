@@ -1,6 +1,6 @@
 # skills
 
-efitz's personal agent-skills marketplace (`estack`). Twelve plugins,
+efitz's personal agent-skills marketplace (`estack`). Eleven plugins,
 each bundling one or more skills, installable into **Claude Code** or
 **OpenAI Codex CLI** — the repo carries native manifests for both harnesses.
 Invoke a skill as `/<plugin>:<skill>`.
@@ -36,8 +36,7 @@ auth sessions the plugins depend on are present.
 ## Architecture
 
 Several plugins build on each other: `itest` runs on `profile`'s contracts,
-`openapi:arazzo` reads the journeys doc `itest:design` writes, `dev:dedupe` reads the
-markers `dev:sem-annotate` writes. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps
+`openapi:arazzo` reads the journeys doc `itest:design` writes. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps
 those edges as a graph, says what each skill produces and consumes, and lists the
 recommended entry point for common goals.
 
@@ -61,14 +60,6 @@ recommended entry point for common goals.
 ### ui
 
 - **vrt** — Triage Playwright visual-regression (screenshot) failures: presents baseline, actual, and diff images framed against the current task context to decide bug vs. expected change.
-
-### dev — sem-powered developer toolkit
-
-- **sem-annotate** — Generate and refresh durable `SEM@<sha>` intent markers on code entities using the sem CLI. Modes: full-scope, `--update <files>`, `--rebuild`.
-- **sem-auto** — Set up a project so SEM markers stay maintained: installs a SEM-marker convention block into the project's CLAUDE.md so markers are updated as part of normal editing.
-- **dedupe** — Find dead code and duplication across a codebase using the sem CLI, then produce a ranked, risk-assessed plan and optionally apply it. Takes a path scope to exclude unrelated tools/scripts.
-
-All three support Go, TypeScript/JavaScript, and Python.
 
 ### deps
 

@@ -43,7 +43,6 @@ declare -a PLUGINS=(
   "loc:localization:analyze,coverage,detect-nonloc,translate-to,update-json,validate-translation,backfill"
   "github:development:backlog,create-issue"
   "ui:development:vrt"
-  "dev:development:dedupe,sem-annotate,sem-auto"
   "deps:development:bump"
   "cats:testing:analyze,fp,init,report,run"
   "profile:development:docs,journeys,report,stack,topology"
@@ -118,8 +117,6 @@ declare -a SCRIPTS=(
   "loc/scripts/check-i18n.py"
   "loc/scripts/find_duplicate_localizations.py"
   "github/scripts/gh-issues.py"
-  "dev/scripts/dedupe.py"
-  "dev/scripts/sem_annotate.py"
   "dependency-model/scripts/depscan.py"
   "dependency-model/scripts/depgraph.py"
   "dependency-model/scripts/health.py"
@@ -135,25 +132,6 @@ if ls loc/skills/analyze/scripts/check-i18n.py loc/skills/coverage/scripts/check
 else
   ok "loc: check-i18n.py is a single shared copy at loc/scripts/"
 fi
-
-# ---------- dev worker agents ----------
-hdr "dev worker agents"
-
-for agent in dedupe-verify-dead dedupe-verify-dup sem-describe; do
-  af="dev/agents/$agent.md"
-  if [ ! -f "$af" ]; then bad "dev/agents/$agent.md missing"; continue; fi
-  n=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$af")
-  if [ -z "$n" ]; then bad "dev/agents/$agent.md missing name: in frontmatter"; continue; fi
-  ok "dev/agents/$agent.md (name='$n')"
-done
-
-for agent in dedupe-verify-dead dedupe-verify-dup sem-describe; do
-  if grep -rq "\${CLAUDE_PLUGIN_ROOT}/agents/$agent.md" dev/skills/*/SKILL.md; then
-    ok "a dev SKILL.md references $agent via \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
-  else
-    bad "no dev SKILL.md references \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
-  fi
-done
 
 # ---------- Skill bodies: no legacy paths or env vars ----------
 hdr "Skill bodies: no legacy paths or env vars"

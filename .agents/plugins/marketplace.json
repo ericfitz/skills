@@ -26,14 +26,6 @@
       }
     },
     {
-      "name": "dev",
-      "category": "development",
-      "source": {
-        "source": "local",
-        "path": "./dev"
-      }
-    },
-    {
       "name": "deps",
       "category": "development",
       "source": {

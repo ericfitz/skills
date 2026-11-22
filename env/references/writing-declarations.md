@@ -70,5 +70,5 @@ when the current platform has no key.
 ## Shape reference
 
 See `requirements.schema.json` for the full contract, and `github/requirements.json` for an
-example exercising all three sections (`tools`, `config`, `auth`), or `dev/requirements.json`
+example exercising all three sections (`tools`, `config`, `auth`), or `env/requirements.json`
 for the minimal single-hard-tool case.

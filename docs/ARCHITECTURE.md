@@ -61,12 +61,6 @@ flowchart LR
     c_fp["fp"]
   end
 
-  subgraph dev["dev — sem toolkit"]
-    d_auto["sem-auto"]
-    d_annot["sem-annotate"]
-    d_dedupe["dedupe"]
-  end
-
   subgraph depmodel["dependency-model — dependency discovery and synthesis"]
     x_pkg["package"]
     x_svc["service"]
@@ -118,8 +112,6 @@ flowchart LR
   c_run  -. "latest.db" .-> c_analyze
   c_fp   -. "false-positive rules" .-> c_run
 
-  d_auto -. "CLAUDE.md convention" .-> d_annot
-  d_annot -. "SEM@sha markers" .-> d_dedupe
 
   p_topo -- "topology" --> x_pkg
   p_topo -- "topology" --> x_svc
@@ -144,7 +136,6 @@ flowchart LR
   envchk -. "requirements.json" .-> itest
   envchk -. "requirements.json" .-> openapi
   envchk -. "requirements.json" .-> cats
-  envchk -. "requirements.json" .-> dev
   envchk -. "requirements.json" .-> depmodel
 ```
 
@@ -249,14 +240,6 @@ also records the gaps the envelopes cannot — emitting the `synthesis` contract
 `docs/dependencies.md`, adding no facts of its own; a `--ref` run writes it to
 the scan's run dir instead, so the checked-out tree is never touched, and `--out <file.md>` names the file explicitly.
 
-### dev
-
-| Skill | Value produced | Outputs | Consumes |
-|---|---|---|---|
-| `sem-annotate` | Durable `SEM@<sha>` intent markers on code entities, drift-aware | markers in source | — |
-| `sem-auto` | A project that keeps its own markers fresh | a convention block in the project's `CLAUDE.md` | — |
-| `dedupe` | Ranked, risk-assessed dead-code and duplication plan, each candidate verified by a subagent | plan, optionally applied | `SEM@<sha>` markers |
-
 ### Self-contained plugins
 
 These have no cross-plugin edges. Internal orchestration is noted where it exists.
@@ -278,7 +261,6 @@ These have no cross-plugin edges. Internal orchestration is noted where it exist
 | Design an integration test suite | `/itest:design` | It runs the whole `profile` + `itest` chain and gates on your confirmation |
 | Generate an Arazzo workflow spec | `/itest:design` | `/openapi:init`, then `/openapi:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
 | Fuzz an API | `/cats:init` | `/cats:run`, then `/cats:analyze`; `/cats:fp` to suppress confirmed false positives |
-| Find dead code and duplication | `/dev:sem-annotate` | `/dev:dedupe`; `/dev:sem-auto` to keep markers fresh afterwards |
 | Audit a system's deployment shape and dependencies | `/profile:stack` | `/profile:topology`, then `/dependency-model:synthesize` and `/dependency-model:report` |
 | Update dependencies | `/deps:bump` | — |
 | Confirm the tooling is installed | `/env:check` | `--fix` for declared remedies |

@@ -51,14 +51,13 @@ known-first-party = ["inventorylib", "depscanlib", "depgraphlib", "jsonargs"]
 extra-paths = [
     "cats/scripts",
     "deps/scripts",
-    "dev/scripts",
     "dependency-model/scripts",
     "tests",
 ]
 
 [[tool.ty.overrides]]
 # The suites monkeypatch module-level functions with lambdas
-# (`sa.sem_blame = lambda ...`) to stub out the `sem`/`gh` CLIs. ty flags each
+# (`mod.fn = lambda ...`) to stub out the `gh` CLI. ty flags each
 # as an invalid assignment because the lambda's signature is not the declared
 # function type. That is the intended idiom here, not a defect.
 include = ["tests/**"]
@@ -74,6 +73,5 @@ testpaths = ["tests"]
 pythonpath = [
     "cats/scripts",
     "deps/scripts",
-    "dev/scripts",
     "tests",
 ]
