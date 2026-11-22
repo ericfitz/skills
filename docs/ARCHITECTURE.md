@@ -210,7 +210,7 @@ the scan's run dir instead, so the checked-out tree is never touched, and `--out
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
-| `integration-test-plan` | A prioritized integration-test scenario plan, with a chosen boundary, a gap map, and recorded doc/code conflicts | `scenario` contract, printed plan, `docs/journeys.md` | orchestrates all four `discover` skills and the three below |
+| `integration-test-plan` | A prioritized integration-test scenario plan, with a chosen boundary, a gap map, and recorded doc/code conflicts | `scenario` contract, printed plan, `docs/journeys.md` | orchestrates the four project skills (`stack`, `docs`, `topology`, `journeys`) and the three below |
 | `conventions` | How tests are written and run here — frameworks, runner commands, unit/integration separation, house style | `conventions` contract | `stack`; `docs` optional |
 | `critique` | Which existing tests mislead — over-mocking, implementation-detail assertions, non-determinism; keep/repair/replace/delete per test | `critique` contract | `stack`; `docs` optional |
 | `state` | How test state can be established and torn down — writable stores, factories, seeds, test-only endpoints | `state` contract | `stack`; `docs` optional |

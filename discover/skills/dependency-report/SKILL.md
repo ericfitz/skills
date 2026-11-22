@@ -33,7 +33,7 @@ file there is overwritten, as the defaults are.
 Bootstrap: if you were not handed a `synthesis` contract, invoke `synthesize`
 by name, passing the same `--ref`, and take the contract it emits. `synthesize` in turn invokes
 `discover:topology` and the six discovery skills by name to build one — never
-invoke any of them yourself, and never invoke another plugin's script by
+invoke any of them yourself, and never run the inventory script by
 path.
 
 ## Procedure
@@ -152,5 +152,5 @@ path.
 - The report is a rendering. It adds no facts the contract does not carry —
   no criticality, ranking, or blast radius judgment, and no health state
   beyond what `health[]` already states.
-- Never invoke another plugin's script by path; obtain the contract from
+- Never run the inventory script by path; obtain the contract from
   `synthesize` by name.

@@ -36,7 +36,7 @@ then write the shared id list the six skills read:
 then invoke the six discovery skills **by name** — `/discover:service`,
 `/discover:package`, `/discover:config`,
 `/discover:security`, `/discover:platform`,
-`/discover:network` — in any order. Never invoke another plugin's
+`/discover:network` — in any order. Never run the inventory
 script by path, and never reach into a discovery skill's internals; invoke
 each skill by name and take its envelope.
 
@@ -175,4 +175,4 @@ each skill by name and take its envelope.
   which callers need a condition met, not how important any of them are — that
   judgment belongs to a later layer.
 - Invoke the six discovery skills, and `discover:topology`, by name — never by
-  reaching into another plugin's directory by path.
+  running the inventory script by path.

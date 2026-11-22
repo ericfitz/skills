@@ -24,7 +24,7 @@ Sequence: `${CLAUDE_PLUGIN_ROOT}/references/running-discovery.md`
 
 Standalone invocation: if you were not handed a `discover:topology` contract,
 invoke `discover:topology` first and use its output as `seeded_by`. Never invoke
-another plugin's script by path.
+the inventory script by path.
 
 `syft` is required. If it is not on PATH, emit the envelope with
 `status: "failed"`, an assumption saying so, and stop — do not substitute a

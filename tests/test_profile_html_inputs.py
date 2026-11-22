@@ -8,6 +8,9 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from discover_origins import PROFILE_SCHEMAS, schema_paths
 
 REPO = Path(__file__).resolve().parents[1]
