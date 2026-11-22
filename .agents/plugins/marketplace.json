@@ -2,91 +2,75 @@
   "name": "estack",
   "plugins": [
     {
-      "name": "loc",
+      "name": "localization",
       "category": "localization",
       "source": {
         "source": "local",
-        "path": "./loc"
+        "path": "./localization"
       }
     },
     {
-      "name": "github",
+      "name": "issues",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./github"
+        "path": "./issues"
       }
     },
     {
-      "name": "ui",
+      "name": "test-ui",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./ui"
+        "path": "./test-ui"
       }
     },
     {
-      "name": "dev",
+      "name": "dependencies",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./dev"
+        "path": "./dependencies"
       }
     },
     {
-      "name": "deps",
-      "category": "development",
-      "source": {
-        "source": "local",
-        "path": "./deps"
-      }
-    },
-    {
-      "name": "cats",
+      "name": "test-api-fuzzing",
       "category": "testing",
       "source": {
         "source": "local",
-        "path": "./cats"
+        "path": "./test-api-fuzzing"
       }
     },
     {
-      "name": "profile",
+      "name": "discover",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./profile"
+        "path": "./discover"
       }
     },
     {
-      "name": "itest",
+      "name": "test-integration",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./itest"
+        "path": "./test-integration"
       }
     },
     {
-      "name": "env",
+      "name": "environment",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./env"
+        "path": "./environment"
       }
     },
     {
-      "name": "dependency-model",
+      "name": "test-api-workflows",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./dependency-model"
-      }
-    },
-    {
-      "name": "openapi",
-      "category": "development",
-      "source": {
-        "source": "local",
-        "path": "./openapi"
+        "path": "./test-api-workflows"
       }
     },
     {

@@ -1,5 +1,6 @@
 # tests/test_depscan_run.py
 """Git-ignored excludes, --ref snapshots, and per-run output directories."""
+
 import json
 import subprocess
 import sys
@@ -8,7 +9,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import depscan
@@ -16,22 +17,30 @@ from depscanlib.report import build_scan
 from depscanlib.run import RefError, prepare
 from repobuilder import build_repo, git_commit_all, git_init
 
-SCRIPT = Path(__file__).resolve().parents[1] / "dependency-model" / "scripts" / "depscan.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "discover" / "scripts" / "depscan.py"
 
 
 def committed_repo(tmp):
     """A git repo with one committed manifest, an ignored build dir holding a
     manifest of its own, and one untracked file."""
-    root = git_init(build_repo(Path(tmp) / "repo", {
-        ".gitignore": "junk/\nbin/app\n",
-        "requirements.txt": "flask==3.0\n",
-    }))
+    root = git_init(
+        build_repo(
+            Path(tmp) / "repo",
+            {
+                ".gitignore": "junk/\nbin/app\n",
+                "requirements.txt": "flask==3.0\n",
+            },
+        )
+    )
     git_commit_all(root)
-    build_repo(root, {
-        "junk/requirements.txt": "stale==1.0\n",
-        "bin/app": "binary\n",
-        "untracked.py": "import os\n",
-    })
+    build_repo(
+        root,
+        {
+            "junk/requirements.txt": "stale==1.0\n",
+            "bin/app": "binary\n",
+            "untracked.py": "import os\n",
+        },
+    )
     return root
 
 
@@ -76,8 +85,7 @@ class TestSymlinks(unittest.TestCase):
     def test_unsafe_links_are_listed_and_not_scanned(self):
         with tempfile.TemporaryDirectory() as tmp:
             scan = build_scan(linked_repo(tmp))
-            self.assertEqual(scan["unsafe_links"],
-                             ["absolute-inside.py", "absolute.txt", "escape.txt"])
+            self.assertEqual(scan["unsafe_links"], ["absolute-inside.py", "absolute.txt", "escape.txt"])
             self.assertEqual(scan["coverage"]["files_scanned"], 2)
             self.assertNotIn("API_KEY", json.dumps(scan["findings"]))
 
@@ -86,10 +94,8 @@ class TestSymlinks(unittest.TestCase):
             root = linked_repo(tmp)
             run = prepare(root, "HEAD", tmp_base=tmp)
             self.assertTrue((run.scan_root / "inside.py").is_symlink())
-            self.assertEqual(run.refused,
-                             ["absolute-inside.py", "absolute.txt", "escape.txt"])
-            scan = build_scan(run.scan_root, target=root, ref=run.ref,
-                              refused=run.refused)
+            self.assertEqual(run.refused, ["absolute-inside.py", "absolute.txt", "escape.txt"])
+            scan = build_scan(run.scan_root, target=root, ref=run.ref, refused=run.refused)
             self.assertEqual(scan["unsafe_links"], run.refused)
 
 
@@ -157,8 +163,12 @@ class TestWriteCli(unittest.TestCase):
             root = committed_repo(tmp)
             proc = subprocess.run(
                 [sys.executable, str(SCRIPT), str(root), "--ref", "HEAD", "--write"],
-                capture_output=True, text=True, timeout=60, check=False,
-                env={"TMPDIR": tmp, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"})
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+                env={"TMPDIR": tmp, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"},
+            )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             run_dir = Path(proc.stdout.strip())
             scan = json.loads((run_dir / "depscan.json").read_text())

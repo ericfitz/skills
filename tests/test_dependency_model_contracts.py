@@ -6,18 +6,18 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 
+from discover_origins import DEPENDENCY_SCHEMAS, schema_paths
 from schema_check import resolve_refs, validate
 from depgraphlib.graph import build_graph
 
 REPO = Path(__file__).resolve().parents[1]
-CONTRACTS = REPO / "dependency-model" / "references" / "contracts"
+CONTRACTS = REPO / "discover" / "references" / "contracts"
 EXAMPLES = CONTRACTS / "examples"
 CATEGORIES = ["config", "network", "package", "platform", "security", "service"]
 
-VALUE_SHAPED = ("value", "secret", "token", "password", "passwd",
-                "credential", "content", "material", "key")
+VALUE_SHAPED = ("value", "secret", "token", "password", "passwd", "credential", "content", "material", "key")
 
 # Enum membership pinned so a later rename (e.g. "object-store" ->
 # "objectstore") fails a test instead of silently passing every example,
@@ -26,11 +26,9 @@ CATEGORY_DETAIL_ENUMS = {
     "service": {"kind": ["database", "cache", "queue", "object-store", "search", "api"]},
     "package": {"resolution": ["declared", "locked", "installed"]},
     "config": {"mechanism": ["env", "file", "flag", "remote", "constant", "unknown"]},
-    "security": {"kind": ["secret", "credential-ref", "permission", "role", "policy",
-                          "certificate-ref"]},
+    "security": {"kind": ["secret", "credential-ref", "permission", "role", "policy", "certificate-ref"]},
     "platform": {
-        "kind": ["cpu", "memory", "disk", "gpu", "arch", "os", "runtime-version",
-                 "cloud-service"],
+        "kind": ["cpu", "memory", "disk", "gpu", "arch", "os", "runtime-version", "cloud-service"],
         "source": ["dockerfile", "compose", "kubernetes", "iac", "ci", "manifest", "docs"],
     },
     "network": {
@@ -55,12 +53,9 @@ def is_value_shaped(name):
 
 class TestContractFilesExist(unittest.TestCase):
     def test_every_expected_schema_is_present(self):
-        names = sorted(p.name for p in CONTRACTS.glob("*.schema.json"))
-        expected = sorted(
-            ["dependency-core.schema.json", "discovery.schema.json",
-             "synthesis.schema.json"]
-            + [f"{c}.schema.json" for c in CATEGORIES])
-        self.assertEqual(names, expected)
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
+            with self.subTest(schema=path.name):
+                self.assertTrue(path.is_file())
 
     def test_every_category_has_an_example(self):
         for category in CATEGORIES:
@@ -82,8 +77,7 @@ class TestEnvelope(unittest.TestCase):
         self.assertEqual(sorted(refs), CATEGORIES)
         for category in CATEGORIES:
             with self.subTest(category=category):
-                self.assertEqual(refs[category]["$ref"],
-                                 f"{category}.schema.json")
+                self.assertEqual(refs[category]["$ref"], f"{category}.schema.json")
 
     def test_envelope_resolves_without_error(self):
         resolved = resolve_refs(load(CONTRACTS / "discovery.schema.json"), CONTRACTS)
@@ -98,6 +92,16 @@ class TestExamplesValidate(unittest.TestCase):
             with self.subTest(category=category):
                 instance = load(EXAMPLES / f"{category}.example.json")
                 self.assertEqual(validate(instance, schema, base_dir=CONTRACTS), [])
+
+    def test_seeded_by_label_is_not_validated(self):
+        """Decision 4: the seeding contract's label is free text, so a rename never breaks validation."""
+        schema = resolve_refs(load(CONTRACTS / "discovery.schema.json"), CONTRACTS)
+        # The second label is split so the retired-name sweeps stay empty.
+        for label in ("discover:topology", "profile" + ":topology"):
+            with self.subTest(label=label):
+                instance = load(EXAMPLES / "service.example.json")
+                instance["seeded_by"]["contract"] = label
+                self.assertEqual(validate(instance, schema), [])
 
     def test_ref_is_optional_and_needs_both_name_and_commit(self):
         for name in ("discovery", "synthesis"):
@@ -130,9 +134,7 @@ class TestExamplesValidate(unittest.TestCase):
     def test_every_example_declares_contract_version_1_0_0(self):
         for category in CATEGORIES:
             with self.subTest(category=category):
-                self.assertEqual(
-                    load(EXAMPLES / f"{category}.example.json")["contract_version"],
-                    "1.0.0")
+                self.assertEqual(load(EXAMPLES / f"{category}.example.json")["contract_version"], "1.0.0")
 
     def test_each_example_carries_at_least_one_null_resilience_fact(self):
         """The brief requires this; nothing pinned it before now."""
@@ -140,10 +142,8 @@ class TestExamplesValidate(unittest.TestCase):
             with self.subTest(category=category):
                 instance = load(EXAMPLES / f"{category}.example.json")
                 deps = instance["categories"][category]["dependencies"]
-                facts = [dep["resilience"][fact]
-                         for dep in deps for fact in RESILIENCE_OBJECT_FACTS]
-                self.assertIn(None, facts,
-                              "example declares no 'no declaration found' fact")
+                facts = [dep["resilience"][fact] for dep in deps for fact in RESILIENCE_OBJECT_FACTS]
+                self.assertIn(None, facts, "example declares no 'no declaration found' fact")
 
 
 class TestSharedCore(unittest.TestCase):
@@ -158,8 +158,7 @@ class TestSharedCore(unittest.TestCase):
         """A skill must state 'no declaration found' explicitly, not by omission."""
         core = load(CONTRACTS / "dependency-core.schema.json")
         resilience = core["properties"]["resilience"]
-        self.assertEqual(sorted(resilience["required"]),
-                         ["fallback", "health_check", "on_path", "retry", "timeout"])
+        self.assertEqual(sorted(resilience["required"]), ["fallback", "health_check", "on_path", "retry", "timeout"])
 
     def test_each_resilience_fact_accepts_null(self):
         core = load(CONTRACTS / "dependency-core.schema.json")
@@ -169,8 +168,7 @@ class TestSharedCore(unittest.TestCase):
                 self.assertIn("null", props[fact]["type"])
 
     def test_core_documents_that_null_is_not_confirmed_absent(self):
-        text = (CONTRACTS / "dependency-core.schema.json").read_text(
-            encoding="utf-8").lower()
+        text = (CONTRACTS / "dependency-core.schema.json").read_text(encoding="utf-8").lower()
         self.assertIn("no declaration was found", text)
         self.assertIn("never", text)
 
@@ -178,8 +176,7 @@ class TestSharedCore(unittest.TestCase):
         for category in CATEGORIES:
             with self.subTest(category=category):
                 schema = load(CONTRACTS / f"{category}.schema.json")
-                self.assertEqual(schema["properties"]["status"]["enum"],
-                                 ["discovered", "not-applicable", "failed"])
+                self.assertEqual(schema["properties"]["status"]["enum"], ["discovered", "not-applicable", "failed"])
 
     def test_every_category_requires_assumptions(self):
         for category in CATEGORIES:
@@ -221,8 +218,7 @@ class TestEnumMembership(unittest.TestCase):
     def test_category_details_enums_are_pinned(self):
         for category, fields in CATEGORY_DETAIL_ENUMS.items():
             schema = load(CONTRACTS / f"{category}.schema.json")
-            details_props = (schema["properties"]["dependencies"]["items"]
-                              ["properties"]["details"]["properties"])
+            details_props = schema["properties"]["dependencies"]["items"]["properties"]["details"]["properties"]
             for field, expected in fields.items():
                 with self.subTest(category=category, field=field):
                     self.assertEqual(details_props[field]["enum"], expected)
@@ -230,8 +226,7 @@ class TestEnumMembership(unittest.TestCase):
     def test_core_on_path_enum_is_pinned(self):
         core = load(CONTRACTS / "dependency-core.schema.json")
         on_path = core["properties"]["resilience"]["properties"]["on_path"]
-        self.assertEqual(on_path["items"]["enum"],
-                         ["startup", "request", "background", "build"])
+        self.assertEqual(on_path["items"]["enum"], ["startup", "request", "background", "build"])
 
 
 class TestSecurityNeverCarriesValues(unittest.TestCase):
@@ -275,9 +270,8 @@ class TestContractStaysInItsLayer(unittest.TestCase):
     def test_no_criticality_or_remediation_vocabulary(self):
         """Layers 2-4 judge; layer 1 reports. Banned words keep that boundary
         visible in review."""
-        banned = ("criticality", "severity", "blast_radius", "remediation",
-                  "recommendation", "risk_score", "priority")
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        banned = ("criticality", "severity", "blast_radius", "remediation", "recommendation", "risk_score", "priority")
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             text = path.read_text(encoding="utf-8").lower()
             for word in banned:
                 with self.subTest(schema=path.name, word=word):
@@ -285,9 +279,8 @@ class TestContractStaysInItsLayer(unittest.TestCase):
 
     def test_no_probing_vocabulary(self):
         """D3: nothing is measured, so nothing names a measurement."""
-        banned = ("measured", "observed_latency", "reachable", "resolved_ip",
-                  "ping", "probe_result")
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        banned = ("measured", "observed_latency", "reachable", "resolved_ip", "ping", "probe_result")
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             text = path.read_text(encoding="utf-8").lower()
             for word in banned:
                 with self.subTest(schema=path.name, word=word):
@@ -305,7 +298,7 @@ class TestLifecycle(unittest.TestCase):
         self.assertEqual(core["properties"]["lifecycle"]["enum"], ["build", "run"])
 
     def test_no_schema_admits_a_both_value(self):
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             with self.subTest(schema=path.name):
                 self.assertNotIn('"both"', path.read_text(encoding="utf-8"))
 
@@ -318,11 +311,9 @@ class TestLifecycle(unittest.TestCase):
 
     def test_package_example_is_build_and_service_example_is_run(self):
         pkg = load(EXAMPLES / "package.example.json")
-        self.assertEqual(
-            pkg["categories"]["package"]["dependencies"][0]["lifecycle"], "build")
+        self.assertEqual(pkg["categories"]["package"]["dependencies"][0]["lifecycle"], "build")
         svc = load(EXAMPLES / "service.example.json")
-        self.assertEqual(
-            svc["categories"]["service"]["dependencies"][0]["lifecycle"], "run")
+        self.assertEqual(svc["categories"]["service"]["dependencies"][0]["lifecycle"], "run")
 
 
 class TestSynthesisContract(unittest.TestCase):
@@ -333,34 +324,28 @@ class TestSynthesisContract(unittest.TestCase):
 
     def test_requires_the_four_parts(self):
         schema = load(CONTRACTS / "synthesis.schema.json")
-        for field in ("contract_version", "target", "inventory", "graph", "health",
-                      "assumptions"):
+        for field in ("contract_version", "target", "inventory", "graph", "health", "assumptions"):
             self.assertIn(field, schema["required"])
 
     def test_edge_kinds_are_exactly_two(self):
         schema = load(CONTRACTS / "synthesis.schema.json")
         edge = schema["properties"]["graph"]["properties"]["edges"]["items"]
-        self.assertEqual(edge["properties"]["kind"]["enum"],
-                         ["depends_on", "relates_to"])
+        self.assertEqual(edge["properties"]["kind"]["enum"], ["depends_on", "relates_to"])
 
     def test_condition_kinds_are_the_three_documented(self):
         schema = load(CONTRACTS / "synthesis.schema.json")
-        cond = (schema["properties"]["health"]["items"]
-                ["properties"]["conditions"]["items"])
-        self.assertEqual(cond["properties"]["kind"]["enum"],
-                         ["presence", "bound", "upstream_health"])
+        cond = schema["properties"]["health"]["items"]["properties"]["conditions"]["items"]
+        self.assertEqual(cond["properties"]["kind"]["enum"], ["presence", "bound", "upstream_health"])
 
     def test_expectation_accepts_null(self):
         """null means no declaration was found -- never 'no bound needed'."""
         schema = load(CONTRACTS / "synthesis.schema.json")
-        cond = (schema["properties"]["health"]["items"]
-                ["properties"]["conditions"]["items"])
+        cond = schema["properties"]["health"]["items"]["properties"]["conditions"]["items"]
         self.assertIn("null", cond["properties"]["expectation"]["type"])
 
     def test_example_carries_a_null_expectation_and_a_declared_one(self):
         instance = load(EXAMPLES / "synthesis.example.json")
-        expectations = [c["expectation"]
-                        for h in instance["health"] for c in h["conditions"]]
+        expectations = [c["expectation"] for h in instance["health"] for c in h["conditions"]]
         self.assertIn(None, expectations)
         self.assertTrue(any(e is not None for e in expectations))
 
@@ -372,9 +357,7 @@ class TestSynthesisContract(unittest.TestCase):
         unresolved related_ids entry elsewhere."""
         instance = load(EXAMPLES / "synthesis.example.json")
         inventory_ids = {
-            dep["id"]
-            for category in instance["inventory"]["categories"].values()
-            for dep in category["dependencies"]
+            dep["id"] for category in instance["inventory"]["categories"].values() for dep in category["dependencies"]
         } | {c["id"] for c in instance["components"]}
         for node in instance["graph"]["nodes"]:
             with self.subTest(node=node["id"]):
@@ -389,8 +372,7 @@ class TestSynthesisContract(unittest.TestCase):
         over the example's own inventory, never hand-edited. A hand-edit is
         exactly what produced the drift this test guards against."""
         instance = load(EXAMPLES / "synthesis.example.json")
-        self.assertEqual(instance["graph"],
-                         build_graph(instance["inventory"], instance["components"]))
+        self.assertEqual(instance["graph"], build_graph(instance["inventory"], instance["components"]))
 
     def test_components_are_optional_first_party_nodes_and_health_anchors(self):
         """#83: a first-party component is a graph node (category component)
@@ -399,8 +381,7 @@ class TestSynthesisContract(unittest.TestCase):
         self.assertNotIn("components", schema["required"])
         node = schema["properties"]["graph"]["properties"]["nodes"]["items"]
         self.assertIn("component", node["properties"]["category"]["enum"])
-        self.assertNotIn("component", schema["properties"]["inventory"]["properties"]
-                         ["categories"]["properties"])
+        self.assertNotIn("component", schema["properties"]["inventory"]["properties"]["categories"]["properties"])
         instance = load(EXAMPLES / "synthesis.example.json")
         self.assertEqual(instance["contract_version"], "1.0.0")
         component_ids = {c["id"] for c in instance["components"]}
@@ -414,7 +395,7 @@ class TestNoStateVocabulary(unittest.TestCase):
     `degraded` later must cost nothing in this schema."""
 
     def test_no_schema_declares_a_health_state_enum(self):
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, DEPENDENCY_SCHEMAS):
             text = path.read_text(encoding="utf-8")
             for state in ('"healthy"', '"degraded"', '"unhealthy"'):
                 with self.subTest(schema=path.name, state=state):

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from inventorylib.docs import DOC_TYPES, detect_docs, guess_doc_type
@@ -61,14 +61,15 @@ class TestGuessDocType(unittest.TestCase):
 
 class TestDetectDocs(unittest.TestCase):
     def test_collects_named_docs_and_doc_directories(self):
-        found = census({
-            "README.md": "# x\n",
-            "docs/guide.md": "# y\n",
-            "specs/auth.md": "# z\n",
-            "src/app.py": "x = 1\n",
-        })
-        self.assertEqual([d["path"] for d in found["docs"]],
-                         ["README.md", "docs/guide.md", "specs/auth.md"])
+        found = census(
+            {
+                "README.md": "# x\n",
+                "docs/guide.md": "# y\n",
+                "specs/auth.md": "# z\n",
+                "src/app.py": "x = 1\n",
+            }
+        )
+        self.assertEqual([d["path"] for d in found["docs"]], ["README.md", "docs/guide.md", "specs/auth.md"])
 
     def test_markdown_beside_code_is_not_documentation(self):
         found = census({"src/notes.md": "# z\n"})
@@ -104,11 +105,11 @@ class TestDetectDocs(unittest.TestCase):
         self.assertEqual(stamps[1:], [None, None])
 
     def test_doc_sites_detected(self):
-        found = census({"mkdocs.yml": "site_name: x\n",
-                        "web/docusaurus.config.js": "module.exports = {}\n"})
+        found = census({"mkdocs.yml": "site_name: x\n", "web/docusaurus.config.js": "module.exports = {}\n"})
         self.assertEqual(
             [(s["path"], s["generator"]) for s in found["docs_sites"]],
-            [("mkdocs.yml", "mkdocs"), ("web/docusaurus.config.js", "docusaurus")])
+            [("mkdocs.yml", "mkdocs"), ("web/docusaurus.config.js", "docusaurus")],
+        )
 
     def test_sphinx_conf_counts_only_inside_a_doc_directory(self):
         found = census({"docs/conf.py": "project = 'x'\n", "src/conf.py": "X = 1\n"})

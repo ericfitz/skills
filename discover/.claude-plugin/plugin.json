@@ -1,0 +1,6 @@
+{
+  "name": "discover",
+  "version": "1.0.0",
+  "description": "Project and dependency discovery toolkit. Project side: identify what a codebase is built with (stack), what its requirements documents, PRDs, specs, and wiki pages say it must do (docs), how it deploys and what it depends on (topology), what workflows its users actually perform (journeys), and render saved artifacts as one HTML summary (project-report). Dependency side: enumerate what a system depends on across six categories, packages (package), out-of-project services (service), configuration (config), secrets and permissions (security), OS and cloud resources (platform), and network paths (network), merge them into one graph (synthesize), and render it as a document (dependency-report). The project-profile and dependency-model shortcuts chain whole runs. Static and read-only; emits versioned JSON contracts for downstream consumers.",
+  "author": { "name": "efitz" }
+}

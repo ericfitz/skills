@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depscanlib.files import classify_files
@@ -23,7 +23,7 @@ K8S = (
     "        - name: api\n"
     "          resources:\n"
     "            limits:\n"
-    "              cpu: \"2\"\n"
+    '              cpu: "2"\n'
     "              memory: 512Mi\n"
     "              nvidia.com/gpu: 1\n"
     "            requests:\n"
@@ -42,10 +42,7 @@ COMPOSE = (
     "          memory: 2G\n"
 )
 
-DOCKERFILE = (
-    "FROM --platform=linux/amd64 python:3.11-slim\n"
-    "RUN pip install -r requirements.txt\n"
-)
+DOCKERFILE = "FROM --platform=linux/amd64 python:3.11-slim\nRUN pip install -r requirements.txt\n"
 
 K8S_TRAILING_COMMENT = (
     "apiVersion: apps/v1\n"
@@ -55,15 +52,10 @@ K8S_TRAILING_COMMENT = (
     "    - resources:\n"
     "        limits:\n"
     "          memory: 512Mi  # bump later\n"
-    "          cpu: \"2\"\n"
+    '          cpu: "2"\n'
 )
 
-COMPOSE_TRAILING_COMMENT = (
-    "services:\n"
-    "  app:\n"
-    "    mem_limit: 1g  # raised after OOM\n"
-    "    cpus: 1.5\n"
-)
+COMPOSE_TRAILING_COMMENT = "services:\n  app:\n    mem_limit: 1g  # raised after OOM\n    cpus: 1.5\n"
 
 
 def scan(files):
@@ -108,8 +100,7 @@ class TestComposeResources(unittest.TestCase):
     def test_extracts_short_form_and_deploy_form(self):
         records = scan({"docker-compose.yml": COMPOSE})
         self.assertEqual(kinds(records), ["cpu", "memory"])
-        self.assertEqual(sorted(r["raw"] for r in records if r["kind"] == "memory"),
-                         ["1g", "2G"])
+        self.assertEqual(sorted(r["raw"] for r in records if r["kind"] == "memory"), ["1g", "2G"])
 
     def test_source_is_compose(self):
         records = scan({"docker-compose.yml": COMPOSE})
@@ -152,8 +143,7 @@ class TestNoise(unittest.TestCase):
 
     def test_sorted_by_file_then_line(self):
         records = scan({"b/Dockerfile": DOCKERFILE, "a/Dockerfile": DOCKERFILE})
-        self.assertEqual([r["file"] for r in records][:2],
-                         ["a/Dockerfile", "a/Dockerfile"])
+        self.assertEqual([r["file"] for r in records][:2], ["a/Dockerfile", "a/Dockerfile"])
 
 
 if __name__ == "__main__":

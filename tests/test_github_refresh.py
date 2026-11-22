@@ -10,26 +10,28 @@ from pathlib import Path
 from unittest import mock
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "github" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "issues" / "scripts"))
 
 import refresh_gh_projects as rgp
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = REPO / "github" / "scripts" / "refresh_gh_projects.py"
+SCRIPT_PATH = REPO / "issues" / "scripts" / "refresh_gh_projects.py"
 
-FIELD_LIST_JSON = json.dumps({
-    "fields": [
-        {
-            "id": "F1",
-            "name": "Status",
-            "type": "ProjectV2SingleSelectField",
-            "options": [
-                {"id": "O1", "name": "Todo"},
-                {"id": "O2", "name": "Done"},
-            ],
-        },
-    ],
-})
+FIELD_LIST_JSON = json.dumps(
+    {
+        "fields": [
+            {
+                "id": "F1",
+                "name": "Status",
+                "type": "ProjectV2SingleSelectField",
+                "options": [
+                    {"id": "O1", "name": "Todo"},
+                    {"id": "O2", "name": "Done"},
+                ],
+            },
+        ],
+    }
+)
 MILESTONES_JSON = json.dumps([{"title": "v1", "number": 1, "node_id": "MDM1"}])
 LABELS_JSON = json.dumps([{"name": "bug"}, {"name": "enhancement"}])
 ISSUE_TYPES_JSON = json.dumps([{"name": "Bug"}, {"name": "Feature"}])
@@ -37,8 +39,7 @@ ISSUE_TYPES_JSON = json.dumps([{"name": "Bug"}, {"name": "Feature"}])
 OLD_ENTRY = {
     "cached_at": "2020-01-01T00:00:00+00:00",
     "project": {"number": 3, "owner": "acme", "id": "PVT_1", "title": "Roadmap"},
-    "fields": {"Status": {"id": "F0", "type": "single_select",
-                          "options": [{"name": "Old", "id": "O0"}]}},
+    "fields": {"Status": {"id": "F0", "type": "single_select", "options": [{"name": "Old", "id": "O0"}]}},
     "milestones": [{"title": "v0", "number": 0, "id": "MDM0"}],
     "labels": ["stale"],
     "issue_types": ["Chore"],
@@ -132,10 +133,16 @@ class TestHappyPath(unittest.TestCase):
             # project identity is preserved verbatim
             self.assertEqual(entry["project"], OLD_ENTRY["project"])
             # fields/milestones/labels/issue_types reflect the fake gh's fresh data
-            self.assertEqual(entry["fields"], {
-                "Status": {"id": "F1", "type": "single_select",
-                           "options": [{"name": "Todo", "id": "O1"}, {"name": "Done", "id": "O2"}]},
-            })
+            self.assertEqual(
+                entry["fields"],
+                {
+                    "Status": {
+                        "id": "F1",
+                        "type": "single_select",
+                        "options": [{"name": "Todo", "id": "O1"}, {"name": "Done", "id": "O2"}],
+                    },
+                },
+            )
             self.assertEqual(entry["milestones"], [{"title": "v1", "number": 1, "id": "MDM1"}])
             self.assertEqual(entry["labels"], ["bug", "enhancement"])
             self.assertEqual(entry["issue_types"], ["Bug", "Feature"])
@@ -144,8 +151,7 @@ class TestHappyPath(unittest.TestCase):
 
 class TestPerEntryFailurePreservesEntry(unittest.TestCase):
     def test_failing_entry_untouched_while_others_refresh(self):
-        bad_entry = dict(OLD_ENTRY, project={"number": 999, "owner": "acme",
-                                             "id": "PVT_BAD", "title": "Broken"})
+        bad_entry = dict(OLD_ENTRY, project={"number": 999, "owner": "acme", "id": "PVT_BAD", "title": "Broken"})
         script = f"""
 case "$1" in
   project)
@@ -231,9 +237,12 @@ class TestTimeout(unittest.TestCase):
                     rc = rgp.main(["--cwd", str(root)])
                     elapsed = time.monotonic() - started
             self.assertEqual(rc, 0)
-            self.assertLess(elapsed, 7.0,
-                            "took longer than the 5s per-call timeout should allow; "
-                            "the sleeping fake gh likely ran to completion (8s)")
+            self.assertLess(
+                elapsed,
+                7.0,
+                "took longer than the 5s per-call timeout should allow; "
+                "the sleeping fake gh likely ran to completion (8s)",
+            )
             new_cache = json.loads(cache_path.read_text())
             # the entry could not be refreshed inside the per-call timeout, so
             # it must be preserved exactly as it was
@@ -250,25 +259,24 @@ class TestSoftBudget(unittest.TestCase):
         # once over_budget is already True) -- three calls for two entries:
         # elapsed=0.0 for entry "a" (under budget, gets refreshed for real),
         # elapsed=999.0 for entry "b" (over budget, preserved untouched).
-        entry_a = dict(OLD_ENTRY, project={"number": 1, "owner": "acme",
-                                           "id": "PVT_A", "title": "A"})
-        entry_b = dict(OLD_ENTRY, project={"number": 2, "owner": "acme",
-                                           "id": "PVT_B", "title": "B"})
+        entry_a = dict(OLD_ENTRY, project={"number": 1, "owner": "acme", "id": "PVT_A", "title": "A"})
+        entry_b = dict(OLD_ENTRY, project={"number": 2, "owner": "acme", "id": "PVT_B", "title": "B"})
         with rgp.tempfile.TemporaryDirectory() as d:
             root = Path(d) / "repo"
             _init_git_repo(root)
             cache_path = _write_cache(root, {"a": entry_a, "b": entry_b})
             with rgp.tempfile.TemporaryDirectory() as bindir:
                 _with_fake_gh(Path(bindir), _HAPPY_GH)
-                with mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}), \
-                        mock.patch.object(rgp, "SOFT_BUDGET_SECONDS", 0.0), \
-                        mock.patch.object(rgp.time, "monotonic",
-                                          side_effect=[0.0, 0.0, 999.0]):
+                with (
+                    mock.patch.dict(os.environ, {"PATH": f"{bindir}:{os.environ['PATH']}"}),
+                    mock.patch.object(rgp, "SOFT_BUDGET_SECONDS", 0.0),
+                    mock.patch.object(rgp.time, "monotonic", side_effect=[0.0, 0.0, 999.0]),
+                ):
                     rc = rgp.main(["--cwd", str(root)])
             self.assertEqual(rc, 0)
             new_cache = json.loads(cache_path.read_text())
             self.assertNotEqual(new_cache["a"], entry_a)  # refreshed
-            self.assertEqual(new_cache["b"], entry_b)      # preserved verbatim
+            self.assertEqual(new_cache["b"], entry_b)  # preserved verbatim
 
 
 class TestReposJsonUntouched(unittest.TestCase):
@@ -278,8 +286,7 @@ class TestReposJsonUntouched(unittest.TestCase):
             _init_git_repo(root)
             _write_cache(root, {"proj": OLD_ENTRY})
             repos_path = root / ".local" / "repos.json"
-            repos_content = json.dumps({"proj": {"path": str(root),
-                                                  "github": {"owner": "acme", "repo": "proj"}}})
+            repos_content = json.dumps({"proj": {"path": str(root), "github": {"owner": "acme", "repo": "proj"}}})
             repos_path.write_text(repos_content)
             with rgp.tempfile.TemporaryDirectory() as bindir:
                 _with_fake_gh(Path(bindir), _HAPPY_GH)
@@ -298,8 +305,11 @@ class TestUnchangedContentPreservesMtime(unittest.TestCase):
             "cached_at": "2020-01-01T00:00:00+00:00",
             "project": {"number": 3, "owner": "acme", "id": "PVT_1", "title": "Roadmap"},
             "fields": {
-                "Status": {"id": "F1", "type": "single_select",
-                           "options": [{"name": "Todo", "id": "O1"}, {"name": "Done", "id": "O2"}]},
+                "Status": {
+                    "id": "F1",
+                    "type": "single_select",
+                    "options": [{"name": "Todo", "id": "O1"}, {"name": "Done", "id": "O2"}],
+                },
             },
             "milestones": [{"title": "v1", "number": 1, "id": "MDM1"}],
             "labels": ["bug", "enhancement"],
@@ -357,10 +367,11 @@ class TestProcessLevelSmoke(unittest.TestCase):
             root.mkdir()
             result = subprocess.run(
                 [python_exe, str(SCRIPT_PATH), "--cwd", str(root)],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
-        self.assertEqual(result.returncode, 0,
-                         f"{python_exe}: stderr={result.stderr!r}")
+        self.assertEqual(result.returncode, 0, f"{python_exe}: stderr={result.stderr!r}")
 
     def test_plain_python3_exits_zero(self):
         python3 = shutil.which("python3")

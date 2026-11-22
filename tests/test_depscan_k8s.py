@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depscanlib.report import build_scan
@@ -57,12 +57,16 @@ class K8sScanTest(unittest.TestCase):
             return build_scan(root)["findings"]
 
     def test_limits_carry_bound_and_component(self):
-        got = {(r["kind"], r["bound"], r["component"], r["raw"])
-               for r in self.scan()["resource_limits"]}
-        self.assertEqual(got, {("cpu", "request", "server", "100m"),
-                               ("memory", "request", "server", "128Mi"),
-                               ("cpu", "limit", "server", "2000m"),
-                               ("memory", "limit", "server", "1Gi")})
+        got = {(r["kind"], r["bound"], r["component"], r["raw"]) for r in self.scan()["resource_limits"]}
+        self.assertEqual(
+            got,
+            {
+                ("cpu", "request", "server", "100m"),
+                ("memory", "request", "server", "128Mi"),
+                ("cpu", "limit", "server", "2000m"),
+                ("memory", "limit", "server", "1Gi"),
+            },
+        )
 
     def test_network_objects_and_container_ports(self):
         net = [(r["kind"], r["name"], r["ports"]) for r in self.scan()["k8s_network"]]
@@ -75,8 +79,7 @@ class K8sScanTest(unittest.TestCase):
 
     def test_go_env_tags(self):
         tags = {r["name"]: r["mechanism"] for r in self.scan()["env_refs"]}
-        self.assertEqual(tags, {"APP_A": "go-struct-tag:env",
-                                "APP_B": "go-struct-tag:envconfig"})
+        self.assertEqual(tags, {"APP_A": "go-struct-tag:env", "APP_B": "go-struct-tag:envconfig"})
 
 
 if __name__ == "__main__":

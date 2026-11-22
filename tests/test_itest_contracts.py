@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from schema_check import validate
 
 REPO = Path(__file__).resolve().parents[1]
-CONTRACTS = REPO / "itest" / "references" / "contracts"
-DOCTRINE = REPO / "itest" / "references" / "test-design.md"
+CONTRACTS = REPO / "test-integration" / "references" / "contracts"
+DOCTRINE = REPO / "test-integration" / "references" / "test-design.md"
 
 ISSUE_TYPES = [
     "over-mocking",
@@ -28,10 +28,15 @@ ISSUE_TYPES = [
 class TestItestContracts(unittest.TestCase):
     def test_expected_contracts_exist_with_metadata(self):
         names = sorted(p.name for p in CONTRACTS.glob("*.schema.json"))
-        self.assertEqual(names, [
-            "conventions.schema.json", "critique.schema.json",
-            "scenario.schema.json", "state.schema.json",
-        ])
+        self.assertEqual(
+            names,
+            [
+                "conventions.schema.json",
+                "critique.schema.json",
+                "scenario.schema.json",
+                "state.schema.json",
+            ],
+        )
         for path in CONTRACTS.glob("*.schema.json"):
             with self.subTest(schema=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))
@@ -44,14 +49,14 @@ class TestItestContracts(unittest.TestCase):
             example = CONTRACTS / "examples" / f"{name}.example.json"
             with self.subTest(contract=name):
                 self.assertTrue(example.exists(), f"missing example for {name}")
-                errors = validate(json.loads(example.read_text(encoding="utf-8")),
-                                  json.loads(path.read_text(encoding="utf-8")))
+                errors = validate(
+                    json.loads(example.read_text(encoding="utf-8")), json.loads(path.read_text(encoding="utf-8"))
+                )
                 self.assertEqual(errors, [])
 
     def test_critique_issue_types_match_the_doctrine(self):
         schema = json.loads((CONTRACTS / "critique.schema.json").read_text(encoding="utf-8"))
-        enum = (schema["properties"]["assessed"]["items"]["properties"]["issues"]
-                ["items"]["properties"]["type"]["enum"])
+        enum = schema["properties"]["assessed"]["items"]["properties"]["issues"]["items"]["properties"]["type"]["enum"]
         self.assertEqual(sorted(enum), sorted(ISSUE_TYPES))
 
     def test_critique_verdicts_match_the_doctrine(self):
@@ -77,8 +82,7 @@ class TestItestContracts(unittest.TestCase):
         self.assertIn("must be asserted on", text)
 
     def test_conventions_contract_requires_integration_separation(self):
-        schema = json.loads(
-            (CONTRACTS / "conventions.schema.json").read_text(encoding="utf-8"))
+        schema = json.loads((CONTRACTS / "conventions.schema.json").read_text(encoding="utf-8"))
         self.assertIn("integration_separation", schema["required"])
         separation = schema["properties"]["integration_separation"]
         self.assertEqual(sorted(separation["required"]), ["how_to_add", "mechanism"])
@@ -91,8 +95,7 @@ class TestItestContracts(unittest.TestCase):
 
 class TestScenarioContract(unittest.TestCase):
     def setUp(self):
-        self.schema = json.loads(
-            (CONTRACTS / "scenario.schema.json").read_text(encoding="utf-8"))
+        self.schema = json.loads((CONTRACTS / "scenario.schema.json").read_text(encoding="utf-8"))
         self.scenario = self.schema["properties"]["scenarios"]["items"]
 
     def test_scenario_carries_placement_and_runner(self):
@@ -104,8 +107,7 @@ class TestScenarioContract(unittest.TestCase):
 
     def test_preconditions_record_method_and_assertion(self):
         precondition = self.scenario["properties"]["preconditions"]["items"]
-        self.assertEqual(precondition["properties"]["method"]["enum"],
-                         ["compose", "inject"])
+        self.assertEqual(precondition["properties"]["method"]["enum"], ["compose", "inject"])
         self.assertIn("assert_established", precondition["required"])
 
     def test_open_assumptions_survive_into_every_scenario(self):
@@ -115,25 +117,19 @@ class TestScenarioContract(unittest.TestCase):
         required = self.scenario["required"]
         self.assertIn("provenance", required)
         self.assertIn("requirement_ids", required)
-        self.assertEqual(self.scenario["properties"]["provenance"]["enum"],
-                         ["journey", "requirement", "both"])
+        self.assertEqual(self.scenario["properties"]["provenance"]["enum"], ["journey", "requirement", "both"])
 
     def test_cross_cutting_scenarios_may_have_no_journey(self):
         """A requirement no journey owns still produces a scenario."""
-        self.assertEqual(self.scenario["properties"]["journey_id"]["type"],
-                         ["string", "null"])
+        self.assertEqual(self.scenario["properties"]["journey_id"]["type"], ["string", "null"])
 
     def test_example_has_a_composed_and_an_injected_precondition(self):
-        example = json.loads(
-            (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
-        methods = {p["method"]
-                   for scenario in example["scenarios"]
-                   for p in scenario["preconditions"]}
+        example = json.loads((CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
+        methods = {p["method"] for scenario in example["scenarios"] for p in scenario["preconditions"]}
         self.assertEqual(methods, {"compose", "inject"})
 
     def test_example_demonstrates_a_cross_cutting_scenario(self):
-        example = json.loads(
-            (CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
+        example = json.loads((CONTRACTS / "examples" / "scenario.example.json").read_text(encoding="utf-8"))
         by_provenance = {s["provenance"]: s for s in example["scenarios"]}
         self.assertIn("requirement", by_provenance)
         self.assertIsNone(by_provenance["requirement"]["journey_id"])

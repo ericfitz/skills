@@ -6,16 +6,16 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from discover_origins import PROFILE_SCHEMAS, schema_paths
 from schema_check import validate
 
 REPO = Path(__file__).resolve().parents[1]
-CONTRACTS = REPO / "profile" / "references" / "contracts"
+CONTRACTS = REPO / "discover" / "references" / "contracts"
 
 
 class TestValidator(unittest.TestCase):
     def test_accepts_valid_object(self):
-        schema = {"type": "object", "required": ["a"],
-                  "properties": {"a": {"type": "string"}}}
+        schema = {"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}}
         self.assertEqual(validate({"a": "x"}, schema), [])
 
     def test_reports_missing_required_property(self):
@@ -45,11 +45,7 @@ class TestValidator(unittest.TestCase):
 
 class TestProfileContracts(unittest.TestCase):
     def test_every_schema_is_valid_json_and_has_required_metadata(self):
-        schemas = sorted(CONTRACTS.glob("*.schema.json"))
-        self.assertEqual([p.name for p in schemas],
-                         ["docs.schema.json", "journeys.schema.json",
-                          "stack.schema.json", "topology.schema.json"])
-        for path in schemas:
+        for path in schema_paths(CONTRACTS, PROFILE_SCHEMAS):
             with self.subTest(schema=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))
                 self.assertEqual(schema["type"], "object")
@@ -57,14 +53,14 @@ class TestProfileContracts(unittest.TestCase):
                 self.assertIn("contract_version", schema["required"])
 
     def test_every_schema_has_an_example_that_validates(self):
-        for path in sorted(CONTRACTS.glob("*.schema.json")):
+        for path in schema_paths(CONTRACTS, PROFILE_SCHEMAS):
             name = path.name.replace(".schema.json", "")
             example_path = CONTRACTS / "examples" / f"{name}.example.json"
             with self.subTest(contract=name):
                 self.assertTrue(example_path.exists(), f"missing example for {name}")
                 errors = validate(
-                    json.loads(example_path.read_text(encoding="utf-8")),
-                    json.loads(path.read_text(encoding="utf-8")))
+                    json.loads(example_path.read_text(encoding="utf-8")), json.loads(path.read_text(encoding="utf-8"))
+                )
                 self.assertEqual(errors, [])
 
     def test_topology_contract_uses_no_testing_vocabulary(self):
@@ -84,7 +80,7 @@ class TestProfileContracts(unittest.TestCase):
             self.assertNotIn(banned, text, f"docs contract mentions {banned!r}")
 
     def test_docs_contract_emits_evidence_not_journey_candidates(self):
-        """Ownership boundary: profile:journeys alone forms and ranks candidates."""
+        """Ownership boundary: discover:journeys alone forms and ranks candidates."""
         schema = json.loads((CONTRACTS / "docs.schema.json").read_text(encoding="utf-8"))
         properties = schema["properties"]
         self.assertIn("journey_evidence", properties)

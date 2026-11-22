@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 
 from depgraphlib.ids import IdCollisionError, assign_ids, slug
 
@@ -14,7 +14,8 @@ class SlugTest(unittest.TestCase):
         self.assertEqual(slug("nats (JetStream)"), "nats")
         self.assertEqual(
             slug("OAuth 2.0 / OIDC identity providers (env-discovered; Google, GitHub, Microsoft etc.)"),
-            "oauth-2.0-oidc-identity-providers")
+            "oauth-2.0-oidc-identity-providers",
+        )
         self.assertEqual(slug("migrate / dbtool / genconfig"), "migrate-dbtool-genconfig")
         self.assertEqual(slug("TMI_NATS_URL"), "tmi-nats-url")
         self.assertEqual(slug("metadata 169.254.169.254"), "metadata-169.254.169.254")
@@ -40,9 +41,14 @@ class SlugTest(unittest.TestCase):
 class AssignIdsTest(unittest.TestCase):
     def test_collision_fallback(self):
         ids = assign_ids(["redis (cache)", "redis (queue)", "nats (JetStream)"], "service")
-        self.assertEqual(ids, {"redis (cache)": "service:redis-cache",
-                               "redis (queue)": "service:redis-queue",
-                               "nats (JetStream)": "service:nats"})
+        self.assertEqual(
+            ids,
+            {
+                "redis (cache)": "service:redis-cache",
+                "redis (queue)": "service:redis-queue",
+                "nats (JetStream)": "service:nats",
+            },
+        )
 
     def test_unresolvable_collision(self):
         with self.assertRaises(IdCollisionError) as cm:

@@ -14,13 +14,13 @@ determines whether you can build on the edge and expect it to keep working.
 | Coupling | Mechanism | Stability |
 |---|---|---|
 | **Contract** | A versioned JSON schema under `<plugin>/references/contracts/`. The producing skill emits exactly one conforming JSON object into the conversation; the consumer is handed it, or invokes the producer itself when running standalone. | **Supported interface.** Build on these. |
-| **Artifact** | A file on disk that one skill writes and another reads from a well-known path — `docs/journeys.md`, `results_dir/latest.db`, `SEM@<sha>` source comments. | Stable path, but the format is owned by the writer. |
+| **Artifact** | A file on disk that one skill writes and another reads from a well-known path — `docs/journeys.md`, `results_dir/latest.db`. | Stable path, but the format is owned by the writer. |
 | **Local config** | `.local/<plugin>/config.yaml` and the shared `.local/repos.json` / `.local/gh-projects.json`. Provisioned out of band or by an `init` skill; consumer skills read, never write. | Per-repo and machine-local; never committed except where noted. |
 
 Two conventions hold across every composed skill:
 
-- **A skill invoked standalone bootstraps its own inputs.** `itest:critique` handed
-  no `stack` contract invokes `profile:stack` itself. Contracts are an optimization
+- **A skill invoked standalone bootstraps its own inputs.** `test-integration:critique` handed
+  no `stack` contract invokes `discover:stack` itself. Contracts are an optimization
   against re-discovery, not a hard prerequisite.
 - **Skills call each other by name, never by path.** No skill reaches into another
   plugin's `scripts/` directory. Crossing a plugin boundary means invoking a skill or
@@ -33,41 +33,12 @@ invocations. Edge labels name what actually crosses the boundary.
 
 ```mermaid
 flowchart LR
-  subgraph profile["profile — project discovery"]
+  subgraph discover["discover — project and dependency discovery"]
     p_stack["stack"]
     p_docs["docs"]
     p_topo["topology"]
     p_journeys["journeys"]
-    p_report["report — saved artifacts only"]
-  end
-
-  subgraph itest["itest — integration test design"]
-    i_design["design"]
-    i_conv["conventions"]
-    i_crit["critique"]
-    i_state["state"]
-  end
-
-  subgraph openapi["openapi"]
-    o_init["init"]
-    o_arazzo["arazzo"]
-  end
-
-  subgraph cats["cats — API fuzzing"]
-    c_init["init"]
-    c_run["run"]
-    c_report["report"]
-    c_analyze["analyze"]
-    c_fp["fp"]
-  end
-
-  subgraph dev["dev — sem toolkit"]
-    d_auto["sem-auto"]
-    d_annot["sem-annotate"]
-    d_dedupe["dedupe"]
-  end
-
-  subgraph depmodel["dependency-model — dependency discovery and synthesis"]
+    p_report["project-report — saved artifacts only"]
     x_pkg["package"]
     x_svc["service"]
     x_cfg["config"]
@@ -75,13 +46,33 @@ flowchart LR
     x_plat["platform"]
     x_net["network"]
     x_synth["synthesize"]
-    x_report["report"]
+    x_report["dependency-report"]
   end
 
-  gh["github:create-issue"]
-  ghb["github:backlog"]
+  subgraph itest["test-integration — integration test design"]
+    i_design["integration-test-plan"]
+    i_conv["conventions"]
+    i_crit["critique"]
+    i_state["state"]
+  end
+
+  subgraph openapi["test-api-workflows"]
+    o_init["init"]
+    o_arazzo["arazzo"]
+  end
+
+  subgraph cats["test-api-fuzzing — API fuzzing"]
+    c_init["init"]
+    c_run["run"]
+    c_report["report"]
+    c_analyze["analyze"]
+    c_fp["fp"]
+  end
+
+  gh["issues:create-issue"]
+  ghb["issues:backlog"]
   sess["session:go"]
-  envchk["env:check"]
+  envchk["environment:check"]
 
   p_stack -- "stack" --> p_docs
   p_stack -- "stack" --> p_topo
@@ -118,8 +109,6 @@ flowchart LR
   c_run  -. "latest.db" .-> c_analyze
   c_fp   -. "false-positive rules" .-> c_run
 
-  d_auto -. "CLAUDE.md convention" .-> d_annot
-  d_annot -. "SEM@sha markers" .-> d_dedupe
 
   p_topo -- "topology" --> x_pkg
   p_topo -- "topology" --> x_svc
@@ -140,52 +129,51 @@ flowchart LR
   x_net -- "discovery" --> x_synth
   x_synth -- "synthesis" --> x_report
 
-  envchk -. "requirements.json" .-> profile
+  envchk -. "requirements.json" .-> discover
   envchk -. "requirements.json" .-> itest
   envchk -. "requirements.json" .-> openapi
   envchk -. "requirements.json" .-> cats
-  envchk -. "requirements.json" .-> dev
-  envchk -. "requirements.json" .-> depmodel
 ```
 
-`env:check` is drawn against whole plugins because it reads every plugin's sidecar
+`environment:check` is drawn against whole plugins because it reads every plugin's sidecar
 `requirements.json` — including the plugins omitted above. It consumes no skill output
 and produces none; it is a preflight, not a stage.
 
 ### Reading the core chain
 
-`profile:report` consumes the four saved profile contracts and optional explicitly
+`discover:project-report` consumes the four saved project contracts and optional explicitly
 supplied JSON, text or Markdown support. It writes a portable offline HTML report
 with in-page artifact provenance and evidence, without invoking discovery or
 reading referenced source paths. It honors the requested output destination and
 reports browser-opening failures separately from successful generation.
 
-`profile:stack` is the gate. Its contract carries the repo inventory produced by
-`profile_inventory.py`, so no downstream skill re-runs the census. `profile:docs` is the
-second gate: `journeys` and the `itest` discovery skills read the documentary record
+`discover:stack` is the gate. Its contract carries the repo inventory produced by
+`profile_inventory.py`, so no downstream skill re-runs the census. `discover:docs` is the
+second gate: `journeys` and the `test-integration` discovery skills read the documentary record
 from its contract rather than re-reading the documents.
 
-`itest:design` is the only orchestrator in the marketplace that spans plugins — it
-orchestrates skills in both `profile` and `itest`, where `loc:backfill` and
-`dependency-model:synthesize` each orchestrate only within their own plugin. It runs
+`test-integration:integration-test-plan` is the only orchestrator in the marketplace that spans plugins — it
+orchestrates skills in both `discover` and `test-integration`, where `localization:backfill` and
+`discover:synthesize` each orchestrate only within their own plugin. It runs
 the two gates in sequence, fans the remaining five phases out concurrently, holds a
 human confirmation gate, and emits the `scenario` contract. Its durable side effect is
-`docs/journeys.md` — the confirmed journey set, with the `profile:journeys` contract in
-a fenced JSON block at the end. That file is the handoff to `openapi:arazzo`, which is
+`docs/journeys.md` — the confirmed journey set, with the `discover:journeys` contract in
+a fenced JSON block at the end. That file is the handoff to `test-api-workflows:arazzo`, which is
 why the arazzo skill can skip discovery entirely.
 
-`profile:stack` and `profile:topology` take a path only; under `synthesize --ref` they are handed the scan's `scan_root` snapshot and their contracts are saved to `<run_dir>/stack.json` and `<run_dir>/topology.json` (invoked directly, outside the dependency-model sequence, they stay in the reply, never in the target repo). `idmap.py` then reads `topology.json` and writes `<run_dir>/ids.json`, the one list of component and service ids the six discovery skills use, so a link in one skill resolves to an entry in another; without a topology contract there is no `ids.json` and the skills slug by the rule in `categories.md`.
+`discover:stack` and `discover:topology` take a path only; under `synthesize --ref` they are handed the scan's `scan_root` snapshot and their contracts are saved to `<run_dir>/stack.json` and `<run_dir>/topology.json` (invoked directly, outside the dependency-model sequence, they stay in the reply, never in the target repo). `idmap.py` then reads `topology.json` and writes `<run_dir>/ids.json`, the one list of component and service ids the six discovery skills use, so a link in one skill resolves to an entry in another; without a topology contract there is no `ids.json` and the skills slug by the rule in `categories.md`.
 
-`profile:topology` is the seed for all six `dependency-model` discovery skills — the same
+`discover:topology` is the seed for all six dependency discovery skills — the same
 refinement-tier relationship `stack` has to `topology`, and the same one-way direction
-`itest` has to `profile`.
+`test-integration` has to `discover`. Both halves now live in one plugin, so the seed is an
+invocation by skill name inside `discover` rather than a hand-off between plugins.
 
 ## Skill catalog
 
 Skills grouped by plugin. **Outputs** names the durable result; **consumes** names what
 it needs handed to it, blank when it needs nothing from another skill.
 
-### profile
+### discover
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
@@ -193,25 +181,48 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `docs` | What the project's own record says it must do — requirements, journey evidence, glossary, invariants | `docs` contract | `stack` |
 | `topology` | How the system deploys — components, real dependencies, third parties, config mechanism, startup order, standup difficulty | `topology` contract | `stack` |
 | `journeys` | The workflows users actually perform, ranked, with dependency edges — **candidates for a human to confirm** | `journeys` contract | `stack`, `docs` |
-| `report` | A human summary with expandable evidence, tables and offline diagrams | One self-contained HTML file | Saved `stack`, `docs`, `journeys`, `topology`; optional explicit support files |
+| `project-report` | A human summary with expandable evidence, tables and offline diagrams | One self-contained HTML file | Saved `stack`, `docs`, `journeys`, `topology`; optional explicit support files |
+| `package` | The libraries the system ships with, with declared/locked/installed resolution and the dependency edges between them | `discovery` contract, `package` category | `topology`, `ids.json`; `syft` |
+| `service` | Out-of-project services — databases, caches, queues, object stores, search, APIs — with how each is brought up and how it is declared to fail | `discovery` contract, `service` category | `topology`, `ids.json`, `depscan.py` index |
+| `config` | The configuration the system must be supplied with, with what reads each key and what it declares as required or defaulted | `discovery` contract, `config` category | `topology`, `ids.json`, `depscan.py` index |
+| `security` | The credential and permission surface — what each secret is named and where it is read, never its value | `discovery` contract, `security` category | `topology`, `ids.json`, `depscan.py` index |
+| `platform` | Declared OS and cloud resources — CPU, memory, disk, GPU, architecture, runtime versions, managed services | `discovery` contract, `platform` category | `topology`, `ids.json`, `depscan.py` index |
+| `network` | The names, hosts, and ports that must resolve and connect, inbound and outbound | `discovery` contract, `network` category | `topology`, `ids.json`, `depscan.py` index |
+| `synthesize` | Merges the six discovery contracts into one inventory and graph, adds the system's own components as nodes, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts, `topology` (components), `idmap.py`, `depgraph.py`, `health.py` |
+| `dependency-report` | Renders the `synthesis` contract into a human-readable document — inventory by category, health definitions, dependency graph, cycles, and assumptions | `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`) | `synthesis` contract |
 
-### itest
+All six discovery skills emit the same `discovery` envelope with exactly one key
+under `categories` populated, so merging them is a key union rather than a
+transform. `synthesize` is the dependency half's orchestrator: it gathers all six
+contracts, merges them via `depgraph.py` into one inventory and graph — adding
+one `component:<slug>` node per first-party component in the `topology`
+contract, so the system's own parts are health anchors without ever being
+inventory entries —
+reconciles any `related_ids` that `depgraph.py` reports as `unresolved`, and
+derives the health view with `health.py` — a deterministic pass over the
+merged graph and its resilience facts — in which the script fills `required_for`
+from each service's `details.used_by` and `synthesize` may only add ids, while it
+also records the gaps the envelopes cannot — emitting the `synthesis` contract. `dependency-report` renders that contract into
+`docs/dependencies.md`, adding no facts of its own; a `--ref` run writes it to
+the scan's run dir instead, so the checked-out tree is never touched, and `--out <file.md>` names the file explicitly.
+
+### test-integration
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
-| `design` | A prioritized integration-test scenario plan, with a chosen boundary, a gap map, and recorded doc/code conflicts | `scenario` contract, printed plan, `docs/journeys.md` | orchestrates all four `profile` skills and the three below |
+| `integration-test-plan` | A prioritized integration-test scenario plan, with a chosen boundary, a gap map, and recorded doc/code conflicts | `scenario` contract, printed plan, `docs/journeys.md` | orchestrates the four project skills (`stack`, `docs`, `topology`, `journeys`) and the three below |
 | `conventions` | How tests are written and run here — frameworks, runner commands, unit/integration separation, house style | `conventions` contract | `stack`; `docs` optional |
 | `critique` | Which existing tests mislead — over-mocking, implementation-detail assertions, non-determinism; keep/repair/replace/delete per test | `critique` contract | `stack`; `docs` optional |
 | `state` | How test state can be established and torn down — writable stores, factories, seeds, test-only endpoints | `state` contract | `stack`; `docs` optional |
 
-### openapi
+### test-api-workflows
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
 | `init` | The project's OpenAPI and Arazzo spec locations, discovered and verified | `.local/openapi/config.yaml` | `.local/cats/config.yaml` as a spec hint, when present |
 | `arazzo` | Confirmed journeys expressed as an Arazzo 1.0 workflow spec bound to real operations | `arazzo.yaml` | `docs/journeys.md`, `.local/openapi/config.yaml` |
 
-### cats
+### test-api-fuzzing
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
@@ -221,67 +232,30 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `analyze` | Triage of true positives into real bug / spec gap / false-positive candidate, evidence-backed | remediation plan | `latest.db` |
 | `fp` | Declarative false-positive rules, added only after a mandatory dry run | committed rules file | `latest.db` for the dry run |
 
-### dependency-model
-
-| Skill | Value produced | Outputs | Consumes |
-|---|---|---|---|
-| `package` | The libraries the system ships with, with declared/locked/installed resolution and the dependency edges between them | `discovery` contract, `package` category | `topology`, `ids.json`; `syft` |
-| `service` | Out-of-project services — databases, caches, queues, object stores, search, APIs — with how each is brought up and how it is declared to fail | `discovery` contract, `service` category | `topology`, `ids.json`, `depscan.py` index |
-| `config` | The configuration the system must be supplied with, with what reads each key and what it declares as required or defaulted | `discovery` contract, `config` category | `topology`, `ids.json`, `depscan.py` index |
-| `security` | The credential and permission surface — what each secret is named and where it is read, never its value | `discovery` contract, `security` category | `topology`, `ids.json`, `depscan.py` index |
-| `platform` | Declared OS and cloud resources — CPU, memory, disk, GPU, architecture, runtime versions, managed services | `discovery` contract, `platform` category | `topology`, `ids.json`, `depscan.py` index |
-| `network` | The names, hosts, and ports that must resolve and connect, inbound and outbound | `discovery` contract, `network` category | `topology`, `ids.json`, `depscan.py` index |
-| `synthesize` | Merges the six discovery contracts into one inventory and graph, adds the system's own components as nodes, and derives which dependencies carry a failure-relevant health condition | `synthesis` contract | all six `discovery` contracts, `topology` (components), `idmap.py`, `depgraph.py`, `health.py` |
-| `report` | Renders the `synthesis` contract into a human-readable document — inventory by category, health definitions, dependency graph, cycles, and assumptions | `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`) | `synthesis` contract |
-
-All six discovery skills emit the same `discovery` envelope with exactly one key
-under `categories` populated, so merging them is a key union rather than a
-transform. `synthesize` is `dependency-model`'s orchestrator: it gathers all six
-contracts, merges them via `depgraph.py` into one inventory and graph — adding
-one `component:<slug>` node per first-party component in the `topology`
-contract, so the system's own parts are health anchors without ever being
-inventory entries —
-reconciles any `related_ids` that `depgraph.py` reports as `unresolved`, and
-derives the health view with `health.py` — a deterministic pass over the
-merged graph and its resilience facts — in which the script fills `required_for`
-from each service's `details.used_by` and `synthesize` may only add ids, while it
-also records the gaps the envelopes cannot — emitting the `synthesis` contract. `report` renders that contract into
-`docs/dependencies.md`, adding no facts of its own; a `--ref` run writes it to
-the scan's run dir instead, so the checked-out tree is never touched, and `--out <file.md>` names the file explicitly.
-
-### dev
-
-| Skill | Value produced | Outputs | Consumes |
-|---|---|---|---|
-| `sem-annotate` | Durable `SEM@<sha>` intent markers on code entities, drift-aware | markers in source | — |
-| `sem-auto` | A project that keeps its own markers fresh | a convention block in the project's `CLAUDE.md` | — |
-| `dedupe` | Ranked, risk-assessed dead-code and duplication plan, each candidate verified by a subagent | plan, optionally applied | `SEM@<sha>` markers |
-
 ### Self-contained plugins
 
 These have no cross-plugin edges. Internal orchestration is noted where it exists.
 
 | Plugin | Skills | Notes |
 |---|---|---|
-| `loc` | `analyze`, `coverage`, `detect-nonloc`, `translate-to`, `update-json`, `validate-translation`, `backfill` | `backfill` orchestrates the other six; `analyze` and `coverage` share the bundled `check-i18n.py` |
-| `github` | `backlog`, `create-issue` | Both read `.local/repos.json`; `create-issue` also reads `.local/gh-projects.json` |
-| `deps` | `bump` | Thin orchestrator over the `bumplib` CLI |
-| `ui` | `vrt` | Reads `.local/repos.json` when present, else falls back to `gh` defaults |
-| `env` | `check` | Reads every plugin's `requirements.json` |
-| `session` | `go`, `handoff` | Share the bundled `repo-state.sh`; `handoff` writes a machine-local `HANDOFF.md` that `go` reads; a SessionStart hook prompts `go`; `go` invokes `github:backlog` (optional) when the handoff queues no work |
+| `localization` | `analyze`, `coverage`, `detect-nonloc`, `translate-to`, `update-json`, `validate-translation`, `backfill` | `backfill` orchestrates the other six; `analyze` and `coverage` share the bundled `check-i18n.py` |
+| `issues` | `backlog`, `create-issue` | Both read `.local/repos.json`; `create-issue` also reads `.local/gh-projects.json` |
+| `dependencies` | `bump` | Thin orchestrator over the `bumplib` CLI |
+| `test-ui` | `vrt` | Reads `.local/repos.json` when present, else falls back to `gh` defaults |
+| `environment` | `check` | Reads every plugin's `requirements.json` |
+| `session` | `go`, `handoff` | Share the bundled `repo-state.sh`; `handoff` writes a machine-local `HANDOFF.md` that `go` reads; a SessionStart hook prompts `go`; `go` invokes `issues:backlog` (optional) when the handoff queues no work |
 
 ## Entry points
 
 | Goal | Start here | Then |
 |---|---|---|
-| Understand an unfamiliar repo | `/profile:stack` | `/profile:docs`, then `topology` or `journeys` as needed |
-| Design an integration test suite | `/itest:design` | It runs the whole `profile` + `itest` chain and gates on your confirmation |
-| Generate an Arazzo workflow spec | `/itest:design` | `/openapi:init`, then `/openapi:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
-| Fuzz an API | `/cats:init` | `/cats:run`, then `/cats:analyze`; `/cats:fp` to suppress confirmed false positives |
-| Find dead code and duplication | `/dev:sem-annotate` | `/dev:dedupe`; `/dev:sem-auto` to keep markers fresh afterwards |
-| Audit a system's deployment shape and dependencies | `/profile:stack` | `/profile:topology`, then `/dependency-model:synthesize` and `/dependency-model:report` |
-| Update dependencies | `/deps:bump` | — |
-| Confirm the tooling is installed | `/env:check` | `--fix` for declared remedies |
+| Understand an unfamiliar repo | `/project-profile` | Runs `/discover:stack`, `docs`, `journeys`, `topology` and `project-report`; or run `/discover:stack` then `docs`, `topology` or `journeys` as needed |
+| Design an integration test suite | `/test-integration:integration-test-plan` | It runs the whole `discover` + `test-integration` chain and gates on your confirmation |
+| Generate an Arazzo workflow spec | `/test-integration:integration-test-plan` | `/api-workflows`, or `/test-api-workflows:init` then `/test-api-workflows:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
+| Fuzz an API | `/api-fuzz` | Runs `/test-api-fuzzing:init` when needed, then `run`, `report`, `analyze`; or `/test-api-fuzzing:init`, `/test-api-fuzzing:run`, then `/test-api-fuzzing:analyze`; `/test-api-fuzzing:fp` to suppress confirmed false positives |
+| Audit a system's deployment shape and dependencies | `/dependency-model` | Runs `/discover:synthesize` then `/discover:dependency-report`; or `/discover:stack`, `/discover:topology`, then `/discover:synthesize` and `/discover:dependency-report` |
+| Update dependencies | `/dependencies:bump` | — |
+| Confirm the tooling is installed | `/environment:check` | `--fix` for declared remedies |
 
 ## Keeping this current
 
@@ -292,4 +266,4 @@ A plugin that adds a cross-plugin edge is not done until this document reflects 
 3. Add an entry-point row if the plugin serves a goal a user would state directly.
 
 New contracts live at `<plugin>/references/contracts/<name>.schema.json` with a worked
-example beside them in `examples/`, matching the `profile` and `itest` house style.
+example beside them in `examples/`, matching the `discover` and `test-integration` house style.

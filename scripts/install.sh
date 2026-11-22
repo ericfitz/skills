@@ -12,7 +12,7 @@
 #                           .local/gh-projects.json at the start of each
 #                           top-level Codex session. Codex does not execute
 #                           plugin-shipped hooks (unlike Claude Code, which
-#                           runs github/hooks/hooks.json natively), so this
+#                           runs issues/hooks/hooks.json natively), so this
 #                           is the only way to get the same refresh there.
 #                           Never applied without this flag.
 #
@@ -136,7 +136,7 @@ sys.exit(0 if '$name@$MARKETPLACE_NAME' in ids else 1)
 }
 
 # Merge a SessionStart hook into ~/.codex/hooks.json that resolves and runs
-# the highest installed github plugin version's refresh_gh_projects.py at
+# the highest installed issues plugin version's refresh_gh_projects.py at
 # run time, so plugin upgrades never leave the hook stale. Merges (never
 # clobbers) an existing hooks.json; idempotent (skips, untouched, if an
 # entry already references refresh_gh_projects.py). A backup is written to
@@ -161,7 +161,7 @@ hooks_path = Path(sys.argv[1])
 backup_path = hooks_path.parent / (hooks_path.name + ".bak")
 
 command = (
-    "bash -c 'p=$(ls -d \"$HOME\"/.codex/plugins/cache/estack/github/*/scripts/refresh_gh_projects.py "
+    "bash -c 'p=$(ls -d \"$HOME\"/.codex/plugins/cache/estack/issues/*/scripts/refresh_gh_projects.py "
     "2>/dev/null | sort -V | tail -1); [ -n \"$p\" ] && exec python3 \"$p\"; exit 0'"
 )
 

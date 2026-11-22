@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profile" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # Alias: a bare `test_dirs` in this module's namespace would be collected by
@@ -37,24 +37,30 @@ class TestClassifyTestFiles(unittest.TestCase):
         self.assertIn("dir:integration", record["signals"])
 
     def test_pytest_marker_detected_from_content(self):
-        [record] = classify({
-            "tests/test_api.py": "import pytest\n\n@pytest.mark.integration\ndef test_x(): pass\n",
-        })
+        [record] = classify(
+            {
+                "tests/test_api.py": "import pytest\n\n@pytest.mark.integration\ndef test_x(): pass\n",
+            }
+        )
         self.assertEqual(record["kind"], "integration")
         self.assertIn("marker:pytest.mark.integration", record["signals"])
 
     def test_go_build_tag_detected(self):
-        [record] = classify({
-            "api/client_test.go": "//go:build integration\n\npackage api\n",
-        })
+        [record] = classify(
+            {
+                "api/client_test.go": "//go:build integration\n\npackage api\n",
+            }
+        )
         self.assertEqual(record["kind"], "integration")
         self.assertIn("buildtag:integration", record["signals"])
         self.assertEqual(record["language"], "go")
 
     def test_e2e_content_marker_beats_integration_directory(self):
-        [record] = classify({
-            "tests/integration/test_flow.py": "import pytest\n\n@pytest.mark.e2e\ndef test_x(): pass\n",
-        })
+        [record] = classify(
+            {
+                "tests/integration/test_flow.py": "import pytest\n\n@pytest.mark.e2e\ndef test_x(): pass\n",
+            }
+        )
         self.assertEqual(record["kind"], "e2e")
         self.assertIn("marker:pytest.mark.e2e", record["signals"])
 

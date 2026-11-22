@@ -5,7 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"
+SCRIPTS = Path(__file__).resolve().parents[1] / "discover" / "scripts"
 
 # Every dependency-model CLI that reports failures as {"error": ...} on stderr.
 JSON_ERROR_CLIS = ("idmap.py", "depgraph.py", "health.py", "depscan.py", "pkglifecycle.py")
@@ -16,8 +16,7 @@ VALID_ARGS = {"pkglifecycle.py": (".", "--syft-json", "syft.json")}
 
 
 def run(script, *args):
-    return subprocess.run([sys.executable, str(SCRIPTS / script), *args],
-                          capture_output=True, text=True)
+    return subprocess.run([sys.executable, str(SCRIPTS / script), *args], capture_output=True, text=True)
 
 
 class UsageErrorsAreJsonTest(unittest.TestCase):

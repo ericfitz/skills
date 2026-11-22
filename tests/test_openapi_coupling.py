@@ -6,8 +6,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 REPO = Path(__file__).resolve().parents[1]
-INIT = REPO / "openapi" / "skills" / "init" / "SKILL.md"
-ARAZZO = REPO / "openapi" / "skills" / "arazzo" / "SKILL.md"
+INIT = REPO / "test-api-workflows" / "skills" / "init" / "SKILL.md"
+ARAZZO = REPO / "test-api-workflows" / "skills" / "arazzo" / "SKILL.md"
 
 
 class TestInitSkill(unittest.TestCase):
@@ -45,15 +45,16 @@ class TestInitSkill(unittest.TestCase):
 class TestArazzoSkill(unittest.TestCase):
     def test_arazzo_preflight_offers_to_run_init_and_itest_design(self):
         text = ARAZZO.read_text(encoding="utf-8")
-        self.assertIn("/openapi:init", text)
-        self.assertIn("/itest:design", text)
+        self.assertIn("/test-api-workflows:init", text)
+        self.assertIn("/test-integration:integration-test-plan", text)
         self.assertIn("offer", text.lower())
 
     def test_arazzo_reads_the_journeys_doc_itest_emits(self):
-        # Cross-plugin consistency: same well-known path itest:design writes.
+        # Cross-plugin consistency: same well-known path test-integration:integration-test-plan writes.
         arazzo = ARAZZO.read_text(encoding="utf-8")
-        itest = (REPO / "itest" / "skills" / "design" / "SKILL.md").read_text(
-            encoding="utf-8")
+        itest = (REPO / "test-integration" / "skills" / "integration-test-plan" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("docs/journeys.md", arazzo)
         self.assertIn("docs/journeys.md", itest)
 

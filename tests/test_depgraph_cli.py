@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dependency-model" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discover" / "scripts"))
 
 import depgraph
 
@@ -53,9 +53,17 @@ class TopologyErrorsTest(unittest.TestCase):
 
 class UsedByErrorsTest(unittest.TestCase):
     def run_with(self, used_by):
-        envelope = {"categories": {"service": {"status": "discovered", "assumptions": [],
-            "dependencies": [{"id": "service:pg", "name": "pg", "lifecycle": "run",
-                              "details": {"used_by": used_by}}]}}}
+        envelope = {
+            "categories": {
+                "service": {
+                    "status": "discovered",
+                    "assumptions": [],
+                    "dependencies": [
+                        {"id": "service:pg", "name": "pg", "lifecycle": "run", "details": {"used_by": used_by}}
+                    ],
+                }
+            }
+        }
         with tempfile.TemporaryDirectory() as d:
             env = Path(d, "env.json")
             env.write_text(json.dumps(envelope))
@@ -79,17 +87,29 @@ class UsedByErrorsTest(unittest.TestCase):
         self.assertEqual(code, 0)
         doc = json.loads(out)
         self.assertEqual(len(doc["components"]), 1)
-        self.assertEqual(len([n for n in doc["graph"]["nodes"]
-                              if n["category"] == "component"]), 1)
+        self.assertEqual(len([n for n in doc["graph"]["nodes"] if n["category"] == "component"]), 1)
 
     def test_duplicate_components_merge_and_a_role_conflict_is_reported(self):
-        code, out, err = run({"components": [
-            {"name": "api", "role": "http", "evidence": ["cmd/api/main.go:1"]},
-            {"name": "api", "role": "grpc", "evidence": ["deploy/api.yaml:3"]}]})
+        code, out, err = run(
+            {
+                "components": [
+                    {"name": "api", "role": "http", "evidence": ["cmd/api/main.go:1"]},
+                    {"name": "api", "role": "grpc", "evidence": ["deploy/api.yaml:3"]},
+                ]
+            }
+        )
         self.assertEqual(code, 0)
-        self.assertEqual(json.loads(out)["components"],
-                         [{"id": "component:api", "name": "api", "role": "http",
-                           "evidence": ["cmd/api/main.go:1", "deploy/api.yaml:3"]}])
+        self.assertEqual(
+            json.loads(out)["components"],
+            [
+                {
+                    "id": "component:api",
+                    "name": "api",
+                    "role": "http",
+                    "evidence": ["cmd/api/main.go:1", "deploy/api.yaml:3"],
+                }
+            ],
+        )
         self.assertIn("'api'", err)
         self.assertIn("'grpc'", err)
 

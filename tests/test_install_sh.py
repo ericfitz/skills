@@ -26,7 +26,8 @@ class TestInstallSh(unittest.TestCase):
             text=True,
         )
         self.assertEqual(
-            result.returncode, 0,
+            result.returncode,
+            0,
             f"bash -n failed:\nstdout: {result.stdout}\nstderr: {result.stderr}",
         )
 
@@ -34,6 +35,11 @@ class TestInstallSh(unittest.TestCase):
         text = INSTALL_SH.read_text(encoding="utf-8")
         self.assertNotIn("git add -A", text)
         self.assertNotIn("git add .", text)
+
+    def test_codex_hook_resolves_the_issues_plugin(self):
+        text = INSTALL_SH.read_text(encoding="utf-8")
+        self.assertIn("cache/estack/issues/*/scripts/refresh_gh_projects.py", text)
+        self.assertNotIn("cache/estack/github/", text)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ description = "Claude Code skills monorepo: per-tool script trees plus a shared 
 requires-python = ">=3.11"
 
 # Runtime deps needed by the tool trees that the test suite exercises.
-# PyYAML: cats/scripts/catslib/{config,rules,runner}.py, loc/scripts/find_duplicate_localizations.py
+# PyYAML: test-api-fuzzing/scripts/catslib/{config,rules,runner}.py, localization/scripts/find_duplicate_localizations.py
 dependencies = [
     "pyyaml>=6.0",
 ]
@@ -49,16 +49,15 @@ known-first-party = ["inventorylib", "depscanlib", "depgraphlib", "jsonargs"]
 # script dirs that pytest gets via pythonpath and that tests/__init__.py puts
 # on sys.path -- without these, every catslib/bumplib/... import is unresolved.
 extra-paths = [
-    "cats/scripts",
-    "deps/scripts",
-    "dev/scripts",
-    "dependency-model/scripts",
+    "test-api-fuzzing/scripts",
+    "dependencies/scripts",
+    "discover/scripts",
     "tests",
 ]
 
 [[tool.ty.overrides]]
 # The suites monkeypatch module-level functions with lambdas
-# (`sa.sem_blame = lambda ...`) to stub out the `sem`/`gh` CLIs. ty flags each
+# (`mod.fn = lambda ...`) to stub out the `gh` CLI. ty flags each
 # as an invalid assignment because the lambda's signature is not the declared
 # function type. That is the intended idiom here, not a defect.
 include = ["tests/**"]
@@ -72,8 +71,7 @@ testpaths = ["tests"]
 # each test file currently carries. Existing preambles keep working; this
 # lets them be removed incrementally.
 pythonpath = [
-    "cats/scripts",
-    "deps/scripts",
-    "dev/scripts",
+    "test-api-fuzzing/scripts",
+    "dependencies/scripts",
     "tests",
 ]

@@ -1,7 +1,7 @@
 """Test package.
 
 Each tool tree keeps its library under `<tool>/scripts/`, and the tests import
-those libraries by name (`catslib`, `bumplib`, `sem_*`). Putting
+those libraries by name (`catslib`, `bumplib`). Putting
 those directories on `sys.path` here means the individual test modules do not
 each need a `sys.path.insert()` preamble before their imports.
 
@@ -34,7 +34,7 @@ sys.dont_write_bytecode = True
 _ROOT = Path(__file__).resolve().parents[1]
 
 # `tests` itself is included so modules can `import cats_fixtures` directly.
-for _rel in ("cats/scripts", "deps/scripts", "dev/scripts", "tests"):
+for _rel in ("test-api-fuzzing/scripts", "dependencies/scripts", "tests"):
     _path = str(_ROOT / _rel)
     if _path not in sys.path:
         sys.path.insert(0, _path)

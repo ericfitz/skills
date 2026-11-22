@@ -9,9 +9,13 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from discover_origins import PROFILE_SCHEMAS, schema_paths
+
 REPO = Path(__file__).resolve().parents[1]
-CONTRACTS = REPO / "profile" / "references" / "contracts"
-sys.path.insert(0, str(REPO / "profile" / "scripts"))
+CONTRACTS = REPO / "discover" / "references" / "contracts"
+sys.path.insert(0, str(REPO / "discover" / "scripts"))
 
 from reportlib.inputs import ReportInputError, load_profile
 from reportlib.render import render_report
@@ -124,6 +128,7 @@ def test_optional_fields_preserve_absence_and_empty(artifacts):
 
 def test_cross_reference_diagnostics(artifacts):
     """Catch collapsed duplicate records and unreported dangling references."""
+
     def edit_docs(data):
         data["corpus"].append(dict(data["corpus"][0]))
         data["requirements"][0]["source_refs"][0]["corpus_id"] = "UNKNOWN_REQUIREMENT"
@@ -212,7 +217,7 @@ def test_explicit_support_only(artifacts, monkeypatch):
     support.write_text("explicit support\n", encoding="utf-8")
     change_contract(artifacts, "topology", lambda data: data["components"][0].update(evidence=[str(evidence)]))
     allowed = {artifacts / f"{name}.json" for name in ("stack", "docs", "journeys", "topology")}
-    allowed.update(CONTRACTS.glob("*.schema.json"))
+    allowed.update(schema_paths(CONTRACTS, PROFILE_SCHEMAS))
     allowed.add(support)
     allowed = {item.resolve() for item in allowed}
     original_open = Path.open
@@ -231,7 +236,11 @@ def test_explicit_support_only(artifacts, monkeypatch):
 
 @pytest.mark.parametrize(
     ("filename", "content", "context"),
-    [("support.html", b"<b>unsupported</b>", "support"), ("support.json", b"{broken", "JSON"), ("support.md", b"\xff", "UTF-8")],
+    [
+        ("support.html", b"<b>unsupported</b>", "support"),
+        ("support.json", b"{broken", "JSON"),
+        ("support.md", b"\xff", "UTF-8"),
+    ],
 )
 def test_invalid_support_fails(artifacts, filename, content, context):
     """Catch acceptance of unsupported formats or unusable support contents."""

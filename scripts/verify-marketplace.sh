@@ -40,17 +40,15 @@ hdr "Per-plugin structure (multi-skill)"
 
 # "plugin:category:skill1,skill2,..."  — skills are the dir names under <plugin>/skills/
 declare -a PLUGINS=(
-  "loc:localization:analyze,coverage,detect-nonloc,translate-to,update-json,validate-translation,backfill"
-  "github:development:backlog,create-issue"
-  "ui:development:vrt"
-  "dev:development:dedupe,sem-annotate,sem-auto"
-  "deps:development:bump"
-  "cats:testing:analyze,fp,init,report,run"
-  "profile:development:docs,journeys,report,stack,topology"
-  "itest:development:conventions,critique,design,state"
-  "openapi:development:arazzo,init"
-  "env:development:check"
-  "dependency-model:development:config,network,package,platform,report,security,service,synthesize"
+  "localization:localization:analyze,coverage,detect-nonloc,translate-to,update-json,validate-translation,backfill"
+  "issues:development:backlog,create-issue"
+  "test-ui:development:vrt"
+  "dependencies:development:bump"
+  "test-api-fuzzing:testing:analyze,api-fuzz,fp,init,report,run"
+  "discover:development:config,dependency-model,dependency-report,docs,journeys,network,package,platform,project-profile,project-report,security,service,stack,synthesize,topology"
+  "test-integration:development:conventions,critique,integration-test-plan,state"
+  "test-api-workflows:development:api-workflows,arazzo,init"
+  "environment:development:check"
   "session:productivity:go,handoff"
 )
 
@@ -115,45 +113,24 @@ done
 hdr "Bundled scripts: presence at plugin-root scripts/"
 
 declare -a SCRIPTS=(
-  "loc/scripts/check-i18n.py"
-  "loc/scripts/find_duplicate_localizations.py"
-  "github/scripts/gh-issues.py"
-  "dev/scripts/dedupe.py"
-  "dev/scripts/sem_annotate.py"
-  "dependency-model/scripts/depscan.py"
-  "dependency-model/scripts/depgraph.py"
-  "dependency-model/scripts/health.py"
-  "dependency-model/scripts/pkglifecycle.py"
+  "localization/scripts/check-i18n.py"
+  "localization/scripts/find_duplicate_localizations.py"
+  "issues/scripts/gh-issues.py"
+  "discover/scripts/depscan.py"
+  "discover/scripts/depgraph.py"
+  "discover/scripts/health.py"
+  "discover/scripts/pkglifecycle.py"
 )
 for s in "${SCRIPTS[@]}"; do
   if [ -f "$s" ]; then ok "$s exists"; else bad "$s missing"; fi
 done
 
-# Shared check-i18n.py must NOT be duplicated back under the loc skill dirs
-if ls loc/skills/analyze/scripts/check-i18n.py loc/skills/coverage/scripts/check-i18n.py >/dev/null 2>&1; then
-  bad "loc: check-i18n.py still duplicated under a skill dir (should be only loc/scripts/check-i18n.py)"
+# Shared check-i18n.py must NOT be duplicated back under the localization skill dirs
+if ls localization/skills/analyze/scripts/check-i18n.py localization/skills/coverage/scripts/check-i18n.py >/dev/null 2>&1; then
+  bad "localization: check-i18n.py still duplicated under a skill dir (should be only localization/scripts/check-i18n.py)"
 else
-  ok "loc: check-i18n.py is a single shared copy at loc/scripts/"
+  ok "localization: check-i18n.py is a single shared copy at localization/scripts/"
 fi
-
-# ---------- dev worker agents ----------
-hdr "dev worker agents"
-
-for agent in dedupe-verify-dead dedupe-verify-dup sem-describe; do
-  af="dev/agents/$agent.md"
-  if [ ! -f "$af" ]; then bad "dev/agents/$agent.md missing"; continue; fi
-  n=$(awk '/^---$/{c++; next} c==1 && /^name:/ {sub(/^name:[[:space:]]*/,""); print; exit}' "$af")
-  if [ -z "$n" ]; then bad "dev/agents/$agent.md missing name: in frontmatter"; continue; fi
-  ok "dev/agents/$agent.md (name='$n')"
-done
-
-for agent in dedupe-verify-dead dedupe-verify-dup sem-describe; do
-  if grep -rq "\${CLAUDE_PLUGIN_ROOT}/agents/$agent.md" dev/skills/*/SKILL.md; then
-    ok "a dev SKILL.md references $agent via \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
-  else
-    bad "no dev SKILL.md references \${CLAUDE_PLUGIN_ROOT}/agents/$agent.md"
-  fi
-done
 
 # ---------- Skill bodies: no legacy paths or env vars ----------
 hdr "Skill bodies: no legacy paths or env vars"

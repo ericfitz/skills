@@ -13,7 +13,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "openapi" / "scripts"))
+sys.path.insert(0, str(REPO / "test-api-workflows" / "scripts"))
 
 import find_specs
 
@@ -60,9 +60,7 @@ class TestCandidateSearch(TempTree):
         self.assertEqual([p.name for p in found], ["openapi.yaml"])
 
     def test_finds_json_openapi3(self):
-        self.write("spec.json", json.dumps(
-            {"openapi": "3.0.3", "info": {"title": "t", "version": "1"},
-             "paths": {}}))
+        self.write("spec.json", json.dumps({"openapi": "3.0.3", "info": {"title": "t", "version": "1"}, "paths": {}}))
         found = find_specs.find_candidate_files(self.root, "openapi")
         self.assertEqual([p.name for p in found], ["spec.json"])
 
@@ -86,8 +84,7 @@ class TestCandidateSearch(TempTree):
         self.write("generated/openapi.yaml", MINIMAL_OPENAPI_YAML)
         self.write("openapi.yaml", MINIMAL_OPENAPI_YAML)
         found = find_specs.find_candidate_files(self.root, "openapi")
-        self.assertEqual([str(p.relative_to(self.root)) for p in found],
-                         ["openapi.yaml"])
+        self.assertEqual([str(p.relative_to(self.root)) for p in found], ["openapi.yaml"])
 
 
 class TestVerify(TempTree):
@@ -147,15 +144,14 @@ class TestDiscoverAndMain(TempTree):
         with patch.object(find_specs.shutil, "which", lambda name: None):
             result = find_specs.discover(self.root)
         paths = [e["path"] for e in result["openapi"]]
-        self.assertEqual(paths, ["openapi.yaml",
-                                 str(Path("deep/nested/openapi.yaml")),
-                                 "openapi.json"])
+        self.assertEqual(paths, ["openapi.yaml", str(Path("deep/nested/openapi.yaml")), "openapi.json"])
 
     def test_empty_tree_exits_zero_with_empty_lists(self):
         proc = subprocess.run(
-            [sys.executable, str(REPO / "openapi" / "scripts" / "find_specs.py"),
-             str(self.root)],
-            capture_output=True, text=True)
+            [sys.executable, str(REPO / "test-api-workflows" / "scripts" / "find_specs.py"), str(self.root)],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         data = json.loads(proc.stdout)
         self.assertEqual(data, {"openapi": [], "arazzo": []})
