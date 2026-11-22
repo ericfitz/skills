@@ -44,10 +44,10 @@ declare -a PLUGINS=(
   "issues:development:backlog,create-issue"
   "test-ui:development:vrt"
   "dependencies:development:bump"
-  "test-api-fuzzing:testing:analyze,fp,init,report,run"
-  "discover:development:config,dependency-report,docs,journeys,network,package,platform,project-report,security,service,stack,synthesize,topology"
+  "test-api-fuzzing:testing:analyze,api-fuzz,fp,init,report,run"
+  "discover:development:config,dependency-model,dependency-report,docs,journeys,network,package,platform,project-profile,project-report,security,service,stack,synthesize,topology"
   "test-integration:development:conventions,critique,integration-test-plan,state"
-  "test-api-workflows:development:arazzo,init"
+  "test-api-workflows:development:api-workflows,arazzo,init"
   "environment:development:check"
   "session:productivity:go,handoff"
 )

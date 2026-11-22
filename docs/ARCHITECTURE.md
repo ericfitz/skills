@@ -249,11 +249,11 @@ These have no cross-plugin edges. Internal orchestration is noted where it exist
 
 | Goal | Start here | Then |
 |---|---|---|
-| Understand an unfamiliar repo | `/discover:stack` | `/discover:docs`, then `topology` or `journeys` as needed |
+| Understand an unfamiliar repo | `/project-profile` | Runs `/discover:stack`, `docs`, `journeys`, `topology` and `project-report`; or run `/discover:stack` then `docs`, `topology` or `journeys` as needed |
 | Design an integration test suite | `/test-integration:integration-test-plan` | It runs the whole `discover` + `test-integration` chain and gates on your confirmation |
-| Generate an Arazzo workflow spec | `/test-integration:integration-test-plan` | `/test-api-workflows:init`, then `/test-api-workflows:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
-| Fuzz an API | `/test-api-fuzzing:init` | `/test-api-fuzzing:run`, then `/test-api-fuzzing:analyze`; `/test-api-fuzzing:fp` to suppress confirmed false positives |
-| Audit a system's deployment shape and dependencies | `/discover:stack` | `/discover:topology`, then `/discover:synthesize` and `/discover:dependency-report` |
+| Generate an Arazzo workflow spec | `/test-integration:integration-test-plan` | `/api-workflows`, or `/test-api-workflows:init` then `/test-api-workflows:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
+| Fuzz an API | `/api-fuzz` | Runs `/test-api-fuzzing:init` when needed, then `run`, `report`, `analyze`; or `/test-api-fuzzing:init`, `/test-api-fuzzing:run`, then `/test-api-fuzzing:analyze`; `/test-api-fuzzing:fp` to suppress confirmed false positives |
+| Audit a system's deployment shape and dependencies | `/dependency-model` | Runs `/discover:synthesize` then `/discover:dependency-report`; or `/discover:stack`, `/discover:topology`, then `/discover:synthesize` and `/discover:dependency-report` |
 | Update dependencies | `/dependencies:bump` | — |
 | Confirm the tooling is installed | `/environment:check` | `--fix` for declared remedies |
 

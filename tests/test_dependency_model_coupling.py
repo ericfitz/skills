@@ -273,8 +273,8 @@ class TestRegistration(unittest.TestCase):
     def test_verify_script_declares_the_plugin_with_all_eight_skills(self):
         text = (REPO / "scripts" / "verify-marketplace.sh").read_text(encoding="utf-8")
         self.assertIn(
-            '"discover:development:config,dependency-report,docs,journeys,network,package,platform,project-report,'
-            'security,service,stack,synthesize,topology"',
+            '"discover:development:config,dependency-model,dependency-report,docs,journeys,network,package,platform,'
+            'project-profile,project-report,security,service,stack,synthesize,topology"',
             text,
         )
         self.assertIn("discover/scripts/depscan.py", text)

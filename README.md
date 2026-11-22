@@ -71,6 +71,7 @@ recommended entry point for common goals.
 - **run** — Execute a fuzz campaign against the repo's configured server and spec through config-declared shell hooks, via a background subagent.
 - **report** — Query and render results from SQLite; also documents the results schema (tables, views, worked queries).
 - **analyze** — Triage true positives into a remediation plan: real bug, spec gap, or false-positive candidate.
+- **api-fuzz** — Shortcut: `/api-fuzz` (Claude Code, when no other command has that name) or `/test-api-fuzzing:api-fuzz`; Codex: namespaced form only. Runs `init` when `.local/cats/config.yaml` is missing, then `run`, `report` and `analyze`.
 - **fp** — Add, review, and reclassify declarative false-positive rules (a committed YAML file).
 
 Portable across repos: setup is gitignored and repo-local; false-positive
@@ -80,6 +81,7 @@ rules are committed.
 
 - **docs** — Read the documentary record (PRDs, requirements, specs, ADRs, wiki pages) and extract requirements, user-workflow evidence, domain vocabulary, and invariants.
 - **journeys** — Identify the key workflows users actually perform, mined from documentation, routes, CLI commands, and UI entry points, ranked by business criticality with dependency edges.
+- **project-profile** — Shortcut: `/project-profile` (Claude Code, when no other command has that name) or `/discover:project-profile`; Codex: namespaced form only. Runs `stack`, `docs`, `journeys` and `topology`, saves the four contracts, then renders one offline HTML report with `project-report`.
 - **project-report** — Turn saved project contracts and optional explicit JSON, text or Markdown support into one offline HTML report with expandable evidence, tables and diagrams. Honors an explicit output path and requests browser opening unless `--no-open` is supplied.
 - **stack** — Identify what a codebase is built with: languages, runtimes, package managers, build commands, and monorepo layout.
 - **topology** — Determine how the system deploys and what it depends on: components, real dependencies, third-party services, configuration, startup order, and standup difficulty.
@@ -99,6 +101,7 @@ failures are reported separately after the report is saved.
 - **platform** — Enumerate the declared OS and cloud resources: CPU, memory, disk, GPU, architecture, runtime versions, and managed services.
 - **network** — Enumerate the names, hosts, and ports that must resolve and connect, inbound and outbound, with how each name is expected to resolve.
 - **synthesize** — Gather the six discovery skills' output into one merged inventory and dependency graph, and derive which dependencies carry a failure-relevant health condition. Emits the `synthesis` contract.
+- **dependency-model** — Shortcut: `/dependency-model` (Claude Code, when no other command has that name) or `/discover:dependency-model`; Codex: namespaced form only. Runs `synthesize`, then `dependency-report`, to build and render a system's whole dependency model in one command.
 - **dependency-report** — Render the `synthesis` contract into `docs/dependencies.md` (`<run_dir>/dependencies.md` for a `--ref` run, or the file named by `--out`): a human-readable inventory summary, health definitions, Mermaid dependency graph, cycles, and assumptions.
 
 The dependency skills (`package`, `service`, `config`, `security`, `platform`, `network`, `synthesize`, `dependency-report`) are static and read-only: nothing is executed, resolved, or probed, because these
@@ -127,6 +130,7 @@ plan reports the conflict and both readings. Output conforms to
 ### test-api-workflows
 
 - **init** — Locate and record the project's OpenAPI spec (and any Arazzo doc) in `.local/openapi/config.yaml`, verifying each before writing.
+- **api-workflows** — Shortcut: `/api-workflows` (Claude Code, when no other command has that name) or `/test-api-workflows:api-workflows`; Codex: namespaced form only. Runs `init` when no OpenAPI spec is recorded, then `arazzo`.
 - **arazzo** — Turn the confirmed customer-journeys doc into an Arazzo 1.0 workflow spec, mapping each journey's steps onto real operations in the OpenAPI spec.
 
 Prose-driven with human gates; validators are used when installed. `arazzo` reads
