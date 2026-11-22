@@ -4,16 +4,17 @@ A dual-harness agent-skills marketplace. Each top-level directory is a plugin bu
 
 ## Exit criteria
 
-Run all four CI checks (`.github/workflows/ci.yml`) before calling any change complete, whatever the change was:
+Run all five CI checks (`.github/workflows/ci.yml`) before calling any change complete, whatever the change was:
 
 ```bash
 uv run ruff check .
+uv run ruff format --check .
 uv run pytest -q
 uv run scripts/gen_codex_manifests.py --check
 bash scripts/verify-marketplace.sh
 ```
 
-This is a non-package uv project: `uv run` everything; never invoke `python`, `pytest`, or `ruff` directly. `ruff` is the sole linter.
+This is a non-package uv project: `uv run` everything; never invoke `python`, `pytest`, or `ruff` directly. `ruff` is the sole linter and formatter.
 
 Tests live in a flat `tests/` directory; `tests/repobuilder.py` builds fixture repositories and `tests/schema_check.py` is the stdlib-only schema validator.
 
