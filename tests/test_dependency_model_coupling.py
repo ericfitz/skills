@@ -2,6 +2,7 @@
 import json
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import ClassVar
@@ -9,7 +10,7 @@ from typing import ClassVar
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from discover_origins import PROFILE_SKILLS
+from discover_origins import DEPENDENCY_SKILLS, PROFILE_SKILLS, dependency_skill_refs
 
 REPO = Path(__file__).resolve().parents[1]
 PLUGIN = REPO / "discover"
@@ -85,11 +86,27 @@ class TestNoCrossPluginPathCoupling(unittest.TestCase):
                     self.assertNotIn("..", ref)
                     self.assertTrue((PLUGIN / ref.lstrip("/")).exists())
 
+    def assert_one_way(self, skill):
+        assert_phrase_not_in(self, "dependency-model", body(skill))
+        self.assertEqual(dependency_skill_refs(body(skill)), [])
+
     def test_profile_skills_are_not_modified_to_know_about_this_plugin(self):
         """#48 AC 4: the dependency direction is one-way."""
         for skill in [REPO / "discover" / "skills" / name / "SKILL.md" for name in PROFILE_SKILLS]:
             with self.subTest(skill=skill.parent.name):
-                assert_phrase_not_in(self, "dependency-model", body(skill))
+                self.assert_one_way(skill)
+
+    def test_one_way_guard_rejects_a_profile_skill_invoking_a_dependency_skill(self):
+        """Negative fixture: a profile skill that invokes discover:synthesize must fail the guard."""
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / "stack" / "SKILL.md"
+            skill.parent.mkdir()
+            skill.write_text("---\nname: stack\n---\n\nThen invoke `discover:synthesize`.\n", encoding="utf-8")
+            with self.assertRaises(AssertionError):
+                self.assert_one_way(skill)
+
+    def test_skill_list_matches_the_origin_list(self):
+        self.assertEqual(ALL_SKILLS, sorted(DEPENDENCY_SKILLS))
 
 
 class TestEachSkillOwnsItsCategory(unittest.TestCase):
