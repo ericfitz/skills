@@ -30,19 +30,19 @@ Codex manifests (`.agents/plugins/marketplace.json` and each plugin's
 `.codex-plugin/plugin.json`) are generated from them by
 `scripts/gen_codex_manifests.py` and verified in CI with `--check`.
 
-Run `/env:check` after installing to confirm the CLI tools, config files, and
+Run `/environment:check` after installing to confirm the CLI tools, config files, and
 auth sessions the plugins depend on are present.
 
 ## Architecture
 
-Several plugins build on each other: `itest` runs on `profile`'s contracts,
-`openapi:arazzo` reads the journeys doc `itest:design` writes. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps
+Several plugins build on each other: `test-integration` runs on `profile`'s contracts,
+`test-api-workflows:arazzo` reads the journeys doc `test-integration:integration-test-plan` writes. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps
 those edges as a graph, says what each skill produces and consumes, and lists the
 recommended entry point for common goals.
 
 ## Plugins
 
-### loc — localization / i18n
+### localization — localization / i18n
 
 - **analyze** — Build a translation task manifest: per-language lists of missing keys with their source values, via the bundled `check-i18n.py` script.
 - **coverage** — Audit translation completeness across all target locales; per-locale and summary coverage report with threshold flagging.
@@ -52,20 +52,20 @@ recommended entry point for common goals.
 - **validate-translation** — Verify a translated string or i18n file update: placeholder preservation, length, encoding, and common translation errors.
 - **backfill** — Translate every missing or untranslated key across all locale files using the master locale as the source. Tool-agnostic; reads the project's i18n configuration.
 
-### github
+### issues
 
 - **backlog** — Pick the next GitHub issue to work on: fetches open issues, applies exclusion rules, prioritizes by status/security/dependencies, and recommends one.
 - **create-issue** — File a detailed issue (bug, feature, task, chore) against a repo, optionally adding it to a GitHub Project (v2) with milestone and initial status, using the locally-provisioned metadata cache (`.local/gh-projects.json`).
 
-### ui
+### test-ui
 
 - **vrt** — Triage Playwright visual-regression (screenshot) failures: presents baseline, actual, and diff images framed against the current task context to decide bug vs. expected change.
 
-### deps
+### dependencies
 
 - **bump** — Update dependencies safely across Go, Python, and Node ecosystems. Auto-detects ecosystems, applies safe patch/minor updates with build+test+lint validation, bisects failures to isolate bad packages, and surfaces a prioritized plan for majors and held packages.
 
-### cats — CATS API fuzzing
+### test-api-fuzzing — CATS API fuzzing
 
 - **init** — Bootstrap per-repo CATS fuzzing configuration (`.local/cats/config.yaml`).
 - **run** — Execute a fuzz campaign against the repo's configured server and spec through config-declared shell hooks, via a background subagent.
@@ -92,9 +92,9 @@ destination is `<artifact_dir>/profile-report.html`; `--out ~/Downloads/name.htm
 uses that exact location. Destination failures stop generation; browser-opening
 failures are reported separately after the report is saved.
 
-### itest — integration test design
+### test-integration — integration test design
 
-- **design** — Orchestrates the whole workflow: discovers stack, documented requirements, deployment shape, customer journeys, test conventions, existing-test quality, and state affordances, then synthesizes a prioritized scenario plan.
+- **integration-test-plan** — Orchestrates the whole workflow: discovers stack, documented requirements, deployment shape, customer journeys, test conventions, existing-test quality, and state affordances, then synthesizes a prioritized scenario plan.
 - **conventions** — Determine how tests are written and run: frameworks, runner commands, how integration tests are separated from unit tests, house style, and reusable fixtures.
 - **critique** — Assess existing integration tests for over-mocking, implementation-detail assertions, non-determinism, shared state, and missing failure paths; recommends keep, repair, replace, or delete for each.
 - **state** — Discover how test state can be established: writable stores, factories and builders, seed tooling, test-only endpoints, ID generation, and teardown affordances.
@@ -105,15 +105,15 @@ explicit assumption. Where a normative document and the code disagree, the
 plan reports the conflict and both readings. Output conforms to
 `references/contracts/scenario.schema.json`.
 
-### openapi
+### test-api-workflows
 
 - **init** — Locate and record the project's OpenAPI spec (and any Arazzo doc) in `.local/openapi/config.yaml`, verifying each before writing.
 - **arazzo** — Turn the confirmed customer-journeys doc into an Arazzo 1.0 workflow spec, mapping each journey's steps onto real operations in the OpenAPI spec.
 
 Prose-driven with human gates; validators are used when installed. `arazzo` reads
-the `docs/journeys.md` written by `/itest:design`.
+the `docs/journeys.md` written by `/test-integration:integration-test-plan`.
 
-### env
+### environment
 
 - **check** — Preflight the environment for this marketplace's plugins: required CLI tools, config files, and auth sessions. Reports hard failures, degraded (optional) capability loss, and undeclared plugins; supports checking a single plugin and an explicit `--fix` mode.
 
@@ -141,9 +141,9 @@ by key union; `synthesize` and `report` consume that merged output. Requires
 ### session — session continuity
 
 - **handoff** — End or checkpoint a session: rewrite a machine-local, untracked `HANDOFF.md` holding only current state, route long-lived knowledge to CLAUDE.md, ADRs or the memory of an inter-agent communication mechanism (such as agentbus or agentmesh), and report everything not yet landed. Never commits, pushes, or deploys.
-- **go** — Resume from `HANDOFF.md`: compare it with live repo facts (branch, dirty files, worktrees, open PRs, main CI, optional `.local/state-checks.sh` deployed versions), report drift, propose the next action, and stop without starting work. When the handoff queues no work and there is no drift, it hands off to `github:backlog` to recommend the next issue; the same happens when every NEXT item is already confirmed done. After the user's first reply it names the session via a UserPromptSubmit hook.
+- **go** — Resume from `HANDOFF.md`: compare it with live repo facts (branch, dirty files, worktrees, open PRs, main CI, optional `.local/state-checks.sh` deployed versions), report drift, propose the next action, and stop without starting work. When the handoff queues no work and there is no drift, it hands off to `issues:backlog` to recommend the next issue; the same happens when every NEXT item is already confirmed done. After the user's first reply it names the session via a UserPromptSubmit hook.
 
-Two hooks: SessionStart prints a one-line reminder to run `go` when the repo has a `HANDOFF.md`; UserPromptSubmit applies the title `go` chose. Requires `git` and `perl`; `python3` (the title hook), `gh`, an inter-agent communication mechanism (such as agentbus or agentmesh) and the `github` plugin are optional.
+Two hooks: SessionStart prints a one-line reminder to run `go` when the repo has a `HANDOFF.md`; UserPromptSubmit applies the title `go` chose. Requires `git` and `perl`; `python3` (the title hook), `gh`, an inter-agent communication mechanism (such as agentbus or agentmesh) and the `issues` plugin are optional.
 
 ---
 

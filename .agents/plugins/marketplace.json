@@ -2,43 +2,43 @@
   "name": "estack",
   "plugins": [
     {
-      "name": "loc",
+      "name": "localization",
       "category": "localization",
       "source": {
         "source": "local",
-        "path": "./loc"
+        "path": "./localization"
       }
     },
     {
-      "name": "github",
+      "name": "issues",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./github"
+        "path": "./issues"
       }
     },
     {
-      "name": "ui",
+      "name": "test-ui",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./ui"
+        "path": "./test-ui"
       }
     },
     {
-      "name": "deps",
+      "name": "dependencies",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./deps"
+        "path": "./dependencies"
       }
     },
     {
-      "name": "cats",
+      "name": "test-api-fuzzing",
       "category": "testing",
       "source": {
         "source": "local",
-        "path": "./cats"
+        "path": "./test-api-fuzzing"
       }
     },
     {
@@ -50,19 +50,19 @@
       }
     },
     {
-      "name": "itest",
+      "name": "test-integration",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./itest"
+        "path": "./test-integration"
       }
     },
     {
-      "name": "env",
+      "name": "environment",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./env"
+        "path": "./environment"
       }
     },
     {
@@ -74,11 +74,11 @@
       }
     },
     {
-      "name": "openapi",
+      "name": "test-api-workflows",
       "category": "development",
       "source": {
         "source": "local",
-        "path": "./openapi"
+        "path": "./test-api-workflows"
       }
     },
     {

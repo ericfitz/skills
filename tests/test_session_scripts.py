@@ -53,7 +53,8 @@ class TestSessionScripts(unittest.TestCase):
                     timeout=180,
                 )
                 self.assertEqual(
-                    result.returncode, 0,
+                    result.returncode,
+                    0,
                     f"self-test failed:\nstdout: {result.stdout}\nstderr: {result.stderr}",
                 )
                 self.assertEqual(os.listdir(tmp), [], "self-test left files in its cwd")
@@ -105,11 +106,11 @@ class TestSessionSkills(unittest.TestCase):
 
     def test_go_hands_off_to_backlog(self):
         cont = (PLUGIN / "skills" / "go" / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("github:backlog", cont)
+        self.assertIn("issues:backlog", cont)
         self.assertIn("No queued work", cont)
-        self.assertIn("unavailable: github plugin not installed", cont)
-        backlog = REPO / "github" / "skills" / "backlog" / "SKILL.md"
-        self.assertTrue(backlog.is_file(), f"{backlog} missing: go invokes github:backlog")
+        self.assertIn("unavailable: issues plugin not installed", cont)
+        backlog = REPO / "issues" / "skills" / "backlog" / "SKILL.md"
+        self.assertTrue(backlog.is_file(), f"{backlog} missing: go invokes issues:backlog")
         self.assertRegex(backlog.read_text(encoding="utf-8"), r"(?m)^name: backlog$")
 
     def test_go_names_session(self):

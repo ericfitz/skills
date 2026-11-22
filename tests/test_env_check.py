@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "env" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "environment" / "scripts"))
 
 import env_check as ec
 
@@ -19,6 +19,7 @@ REPO = Path(__file__).resolve().parents[1]
 # ---------------------------------------------------------------------------
 # fixture helpers
 # ---------------------------------------------------------------------------
+
 
 def _write_requirements(path: Path, data: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,6 +56,7 @@ def _fake_probe_script(bindir: Path, filename: str, body: str) -> Path:
 # version comparison
 # ---------------------------------------------------------------------------
 
+
 class TestCompareVersions(unittest.TestCase):
     def test_higher_patch_satisfies_minimum(self):
         self.assertTrue(ec.compare_versions("2.41.1", "2.40"))
@@ -79,16 +81,18 @@ class TestCompareVersions(unittest.TestCase):
 # discovery: flat source layout
 # ---------------------------------------------------------------------------
 
+
 class TestDiscoveryFlatLayout(unittest.TestCase):
     def test_flat_layout_discovers_all_declared_plugins(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
-            _write_requirements(root / "alpha" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "alpha"})
-            _write_requirements(root / "beta" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "beta"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(
+                root / "alpha" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "alpha"}
+            )
+            _write_requirements(
+                root / "beta" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "beta"}
+            )
 
             found = ec.discover(root / "env")
 
@@ -102,8 +106,8 @@ class TestDiscoveryFlatLayout(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             self_path = _write_requirements(
-                root / "env" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "env"})
+                root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"}
+            )
 
             found = ec.discover(root / "env")
 
@@ -114,19 +118,20 @@ class TestDiscoveryFlatLayout(unittest.TestCase):
 # discovery: installed cache layout
 # ---------------------------------------------------------------------------
 
+
 class TestDiscoveryCacheLayout(unittest.TestCase):
     def test_cache_layout_picks_highest_version_and_names_it(self):
         with tempfile.TemporaryDirectory() as d:
             mkt = Path(d) / "cache" / "estack"
             self_path = _write_requirements(
-                mkt / "env" / "1.0.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "env"})
+                mkt / "env" / "1.0.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"}
+            )
             _write_requirements(
-                mkt / "ui" / "1.0.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "ui"})
+                mkt / "ui" / "1.0.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "ui"}
+            )
             newest = _write_requirements(
-                mkt / "ui" / "1.1.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "ui"})
+                mkt / "ui" / "1.1.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "ui"}
+            )
 
             found = ec.discover(mkt / "env" / "1.0.0")
 
@@ -137,14 +142,14 @@ class TestDiscoveryCacheLayout(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             mkt = Path(d) / "cache" / "estack"
             _write_requirements(
-                mkt / "env" / "1.0.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "env"})
+                mkt / "env" / "1.0.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"}
+            )
             _write_requirements(
-                mkt / "wiki" / "1.9.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "wiki"})
+                mkt / "wiki" / "1.9.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "wiki"}
+            )
             best = _write_requirements(
-                mkt / "wiki" / "1.10.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "wiki"})
+                mkt / "wiki" / "1.10.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "wiki"}
+            )
 
             found = ec.discover(mkt / "env" / "1.0.0")
 
@@ -155,8 +160,8 @@ class TestDiscoveryCacheLayout(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             mkt = Path(d) / "cache" / "estack"
             self_path = _write_requirements(
-                mkt / "env" / "1.0.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "env"})
+                mkt / "env" / "1.0.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"}
+            )
 
             found = ec.discover(mkt / "env" / "1.0.0")
 
@@ -175,14 +180,15 @@ class TestDiscoveryErrors(unittest.TestCase):
 # misclassified as neutrally "undeclared" (MINOR 3).
 # ---------------------------------------------------------------------------
 
+
 class TestBrokenDeclarations(unittest.TestCase):
     def test_flat_layout_broken_declaration_is_not_treated_as_undeclared(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
-            _write_requirements(root / "alpha" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "alpha"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(
+                root / "alpha" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "alpha"}
+            )
             _write_raw(root / "broken" / "requirements.json", "{not valid json")
             _plugin_marker(root / "env")
             _plugin_marker(root / "alpha")
@@ -204,15 +210,18 @@ class TestBrokenDeclarations(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             mkt = Path(d) / "cache" / "estack"
             _write_requirements(
-                mkt / "env" / "1.0.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "env"})
+                mkt / "env" / "1.0.0" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"}
+            )
             bindir = mkt / "bin"
             _fake_probe_script(bindir, "sem", "exit 0")
             _write_requirements(
                 mkt / "dev" / "1.0.0" / "requirements.json",
-                {"requirements_version": "1.0.0", "plugin": "dev",
-                 "tools": [{"name": "sem", "required": True, "why": "x",
-                            "probe": [str(bindir / "sem")]}]})
+                {
+                    "requirements_version": "1.0.0",
+                    "plugin": "dev",
+                    "tools": [{"name": "sem", "required": True, "why": "x", "probe": [str(bindir / "sem")]}],
+                },
+            )
             _write_raw(mkt / "ghost" / "1.0.0" / "requirements.json", "{not valid json")
 
             report = ec.build_report(root=mkt / "env" / "1.0.0")  # must not raise
@@ -229,10 +238,11 @@ class TestBrokenDeclarations(unittest.TestCase):
         # can't appear as both declared (one name) and undeclared (the other).
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
-            _write_requirements(root / "actual-dir-name" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "different-name"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(
+                root / "actual-dir-name" / "requirements.json",
+                {"requirements_version": "1.0.0", "plugin": "different-name"},
+            )
             _plugin_marker(root / "env")
             _plugin_marker(root / "actual-dir-name")
 
@@ -248,14 +258,15 @@ class TestBrokenDeclarations(unittest.TestCase):
 # undeclared plugins
 # ---------------------------------------------------------------------------
 
+
 class TestUndeclared(unittest.TestCase):
     def test_undeclared_plugin_listed_neutrally(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
-            _write_requirements(root / "alpha" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "alpha"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(
+                root / "alpha" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "alpha"}
+            )
             _plugin_marker(root / "env")
             _plugin_marker(root / "alpha")
             _plugin_marker(root / "undeclared_plugin")  # no requirements.json
@@ -267,8 +278,7 @@ class TestUndeclared(unittest.TestCase):
     def test_no_undeclared_when_all_plugins_have_declarations(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _plugin_marker(root / "env")
 
             self.assertEqual(ec.discover_undeclared(root / "env"), [])
@@ -278,8 +288,7 @@ class TestUndeclared(unittest.TestCase):
         # undeclared-plugin discovery must not claim visibility it doesn't have.
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _plugin_marker(root / "env")
 
             self.assertEqual(ec.discover_undeclared(root / "env"), [])
@@ -289,11 +298,11 @@ class TestUndeclared(unittest.TestCase):
 # run_probe: shell=False, argv safety
 # ---------------------------------------------------------------------------
 
+
 class TestRunProbe(unittest.TestCase):
     def test_shell_false_is_always_passed(self):
         with mock.patch.object(ec.subprocess, "run") as run:
-            run.return_value = subprocess.CompletedProcess(args=[], returncode=0,
-                                                             stdout="ok", stderr="")
+            run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
             ec.run_probe(["true"])
             _args, kwargs = run.call_args
             self.assertIs(kwargs["shell"], False)
@@ -316,8 +325,7 @@ class TestRunProbe(unittest.TestCase):
             self.assertEqual(code, 127)
 
     def test_timeout_returns_124(self):
-        with mock.patch.object(ec.subprocess, "run",
-                                side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30)):
+        with mock.patch.object(ec.subprocess, "run", side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30)):
             code, _output = ec.run_probe(["whatever"])
             self.assertEqual(code, 124)
 
@@ -326,11 +334,11 @@ class TestRunProbe(unittest.TestCase):
 # tool evaluation: hard vs optional, version comparison
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateTool(unittest.TestCase):
     def test_required_tool_missing_is_hard_missing(self):
         with tempfile.TemporaryDirectory() as d:
-            tool = {"name": "ghost", "required": True, "why": "x",
-                    "probe": [str(Path(d) / "nope")]}
+            tool = {"name": "ghost", "required": True, "why": "x", "probe": [str(Path(d) / "nope")]}
             status, finding = ec.evaluate_tool("dev", tool)
             self.assertEqual(status, "missing")
             self.assertEqual(finding["plugin"], "dev")
@@ -338,8 +346,7 @@ class TestEvaluateTool(unittest.TestCase):
 
     def test_optional_tool_missing_is_degraded(self):
         with tempfile.TemporaryDirectory() as d:
-            tool = {"name": "ghost", "required": False, "why": "x",
-                    "probe": [str(Path(d) / "nope")]}
+            tool = {"name": "ghost", "required": False, "why": "x", "probe": [str(Path(d) / "nope")]}
             status, _finding = ec.evaluate_tool("dev", tool)
             self.assertEqual(status, "degraded")
 
@@ -354,8 +361,14 @@ class TestEvaluateTool(unittest.TestCase):
     def test_version_above_minimum_is_ok(self):
         with tempfile.TemporaryDirectory() as d:
             script = _fake_probe_script(Path(d), "tool", 'echo "tool version 2.41.1"')
-            tool = {"name": "tool", "required": True, "why": "x", "probe": [str(script)],
-                     "version_pattern": r"tool version (\d+\.\d+\.\d+)", "min_version": "2.40"}
+            tool = {
+                "name": "tool",
+                "required": True,
+                "why": "x",
+                "probe": [str(script)],
+                "version_pattern": r"tool version (\d+\.\d+\.\d+)",
+                "min_version": "2.40",
+            }
             status, finding = ec.evaluate_tool("dev", tool)
             self.assertEqual(status, "ok")
             self.assertIsNone(finding)
@@ -363,8 +376,14 @@ class TestEvaluateTool(unittest.TestCase):
     def test_version_below_minimum_required_is_hard_missing(self):
         with tempfile.TemporaryDirectory() as d:
             script = _fake_probe_script(Path(d), "tool", 'echo "tool version 2.10.0"')
-            tool = {"name": "tool", "required": True, "why": "x", "probe": [str(script)],
-                     "version_pattern": r"tool version (\d+\.\d+\.\d+)", "min_version": "2.40"}
+            tool = {
+                "name": "tool",
+                "required": True,
+                "why": "x",
+                "probe": [str(script)],
+                "version_pattern": r"tool version (\d+\.\d+\.\d+)",
+                "min_version": "2.40",
+            }
             status, finding = ec.evaluate_tool("dev", tool)
             self.assertEqual(status, "missing")
             self.assertIn("2.10.0", finding["detail"])
@@ -372,16 +391,28 @@ class TestEvaluateTool(unittest.TestCase):
     def test_version_below_minimum_optional_is_degraded(self):
         with tempfile.TemporaryDirectory() as d:
             script = _fake_probe_script(Path(d), "tool", 'echo "tool version 2.10.0"')
-            tool = {"name": "tool", "required": False, "why": "x", "probe": [str(script)],
-                     "version_pattern": r"tool version (\d+\.\d+\.\d+)", "min_version": "2.40"}
+            tool = {
+                "name": "tool",
+                "required": False,
+                "why": "x",
+                "probe": [str(script)],
+                "version_pattern": r"tool version (\d+\.\d+\.\d+)",
+                "min_version": "2.40",
+            }
             status, _finding = ec.evaluate_tool("dev", tool)
             self.assertEqual(status, "degraded")
 
     def test_version_output_unparseable_is_ok_not_failure(self):
         with tempfile.TemporaryDirectory() as d:
             script = _fake_probe_script(Path(d), "tool", 'echo "tool version dev-build"')
-            tool = {"name": "tool", "required": True, "why": "x", "probe": [str(script)],
-                     "version_pattern": r"tool version (\S+)", "min_version": "2.40"}
+            tool = {
+                "name": "tool",
+                "required": True,
+                "why": "x",
+                "probe": [str(script)],
+                "version_pattern": r"tool version (\S+)",
+                "min_version": "2.40",
+            }
             status, finding = ec.evaluate_tool("dev", tool)
             self.assertEqual(status, "ok")
             self.assertIsNone(finding)
@@ -389,8 +420,14 @@ class TestEvaluateTool(unittest.TestCase):
     def test_version_pattern_no_match_in_output_is_ok_not_failure(self):
         with tempfile.TemporaryDirectory() as d:
             script = _fake_probe_script(Path(d), "tool", 'echo "no version info here"')
-            tool = {"name": "tool", "required": True, "why": "x", "probe": [str(script)],
-                     "version_pattern": r"tool version (\d+\.\d+)", "min_version": "2.40"}
+            tool = {
+                "name": "tool",
+                "required": True,
+                "why": "x",
+                "probe": [str(script)],
+                "version_pattern": r"tool version (\d+\.\d+)",
+                "min_version": "2.40",
+            }
             status, finding = ec.evaluate_tool("dev", tool)
             self.assertEqual(status, "ok")
             self.assertIsNone(finding)
@@ -400,36 +437,31 @@ class TestEvaluateTool(unittest.TestCase):
 # config evaluation
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateConfig(unittest.TestCase):
     def test_present_config_is_ok(self):
         with tempfile.TemporaryDirectory() as d:
             repo_root = Path(d)
             (repo_root / ".local").mkdir()
             (repo_root / ".local" / "thing.json").write_text("{}")
-            entry = {"path": ".local/thing.json", "scope": "repo", "required": False,
-                      "why": "x", "remedy": "y"}
-            status, finding = ec.evaluate_config("github", entry, repo_root=repo_root,
-                                                  home=repo_root)
+            entry = {"path": ".local/thing.json", "scope": "repo", "required": False, "why": "x", "remedy": "y"}
+            status, finding = ec.evaluate_config("github", entry, repo_root=repo_root, home=repo_root)
             self.assertEqual(status, "ok")
             self.assertIsNone(finding)
 
     def test_missing_required_config_is_hard_missing(self):
         with tempfile.TemporaryDirectory() as d:
             repo_root = Path(d)
-            entry = {"path": ".local/thing.json", "scope": "repo", "required": True,
-                      "why": "x", "remedy": "y"}
-            status, finding = ec.evaluate_config("github", entry, repo_root=repo_root,
-                                                  home=repo_root)
+            entry = {"path": ".local/thing.json", "scope": "repo", "required": True, "why": "x", "remedy": "y"}
+            status, finding = ec.evaluate_config("github", entry, repo_root=repo_root, home=repo_root)
             self.assertEqual(status, "missing")
             self.assertEqual(finding["remedy"], "y")
 
     def test_missing_optional_config_is_degraded(self):
         with tempfile.TemporaryDirectory() as d:
             repo_root = Path(d)
-            entry = {"path": ".local/thing.json", "scope": "repo", "required": False,
-                      "why": "x", "remedy": "y"}
-            status, _finding = ec.evaluate_config("github", entry, repo_root=repo_root,
-                                                   home=repo_root)
+            entry = {"path": ".local/thing.json", "scope": "repo", "required": False, "why": "x", "remedy": "y"}
+            status, _finding = ec.evaluate_config("github", entry, repo_root=repo_root, home=repo_root)
             self.assertEqual(status, "degraded")
 
     def test_home_scope_resolves_against_home_not_repo_root(self):
@@ -439,8 +471,7 @@ class TestEvaluateConfig(unittest.TestCase):
             home.mkdir()
             repo_root.mkdir()
             (home / "present.json").write_text("{}")
-            entry = {"path": "present.json", "scope": "home", "required": True,
-                      "why": "x", "remedy": "y"}
+            entry = {"path": "present.json", "scope": "home", "required": True, "why": "x", "remedy": "y"}
             status, _finding = ec.evaluate_config("env", entry, repo_root=repo_root, home=home)
             self.assertEqual(status, "ok")
 
@@ -449,6 +480,7 @@ class TestEvaluateConfig(unittest.TestCase):
 # auth evaluation: always degraded (no `required` field in the schema), and
 # output truncated to one line so token-like content never leaks.
 # ---------------------------------------------------------------------------
+
 
 class TestEvaluateAuth(unittest.TestCase):
     def test_auth_success_is_ok(self):
@@ -470,10 +502,12 @@ class TestEvaluateAuth(unittest.TestCase):
     def test_auth_output_is_status_plus_one_line_no_token_leak(self):
         with tempfile.TemporaryDirectory() as d:
             script = _fake_probe_script(
-                Path(d), "auth",
+                Path(d),
+                "auth",
                 'echo "Logged in to github.com as testuser"\n'
                 'echo "Token: ghp_totallyFakeSecretForTestingOnly123"\n'
-                "exit 1")
+                "exit 1",
+            )
             entry = {"name": "github", "probe": [str(script)], "why": "x", "remedy": "y"}
             _status, finding = ec.evaluate_auth("github", entry)
             self.assertIn("Logged in to github.com as testuser", finding["detail"])
@@ -484,6 +518,7 @@ class TestEvaluateAuth(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # _install_hint: platform-aware remedy resolution
 # ---------------------------------------------------------------------------
+
 
 class TestInstallHint(unittest.TestCase):
     def test_picks_the_detected_platform_key(self):
@@ -516,23 +551,36 @@ class TestInstallHint(unittest.TestCase):
 # report assembly: categories + exit codes
 # ---------------------------------------------------------------------------
 
-def _github_style_declaration(bindir: Path, *, gh_exit=0, auth_exit=0,
-                               required_gh=True) -> dict:
-    _fake_probe_script(bindir, "gh", f'if [ "$1" = "--version" ]; then '
-                                      f'echo "gh version 2.41.1 (fake)"; exit {gh_exit}; fi\n'
-                                      f'if [ "$1" = "auth" ]; then exit {auth_exit}; fi')
+
+def _github_style_declaration(bindir: Path, *, gh_exit=0, auth_exit=0, required_gh=True) -> dict:
+    _fake_probe_script(
+        bindir,
+        "gh",
+        f'if [ "$1" = "--version" ]; then '
+        f'echo "gh version 2.41.1 (fake)"; exit {gh_exit}; fi\n'
+        f'if [ "$1" = "auth" ]; then exit {auth_exit}; fi',
+    )
     return {
         "requirements_version": "1.0.0",
         "plugin": "github",
-        "tools": [{
-            "name": "gh", "required": required_gh, "why": "x",
-            "probe": [str(bindir / "gh"), "--version"],
-            "version_pattern": r"gh version (\d+\.\d+\.\d+)", "min_version": "2.40",
-        }],
-        "auth": [{
-            "name": "github", "probe": [str(bindir / "gh"), "auth"],
-            "why": "x", "remedy": "gh auth login",
-        }],
+        "tools": [
+            {
+                "name": "gh",
+                "required": required_gh,
+                "why": "x",
+                "probe": [str(bindir / "gh"), "--version"],
+                "version_pattern": r"gh version (\d+\.\d+\.\d+)",
+                "min_version": "2.40",
+            }
+        ],
+        "auth": [
+            {
+                "name": "github",
+                "probe": [str(bindir / "gh"), "auth"],
+                "why": "x",
+                "remedy": "gh auth login",
+            }
+        ],
     }
 
 
@@ -542,8 +590,7 @@ class TestBuildReport(unittest.TestCase):
             root = Path(d)
             bindir = root / "bin"
             decl = _github_style_declaration(bindir, gh_exit=1)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _write_requirements(root / "github" / "requirements.json", decl)
 
             report = ec.build_report(root=root / "env")
@@ -556,8 +603,7 @@ class TestBuildReport(unittest.TestCase):
             root = Path(d)
             bindir = root / "bin"
             decl = _github_style_declaration(bindir, gh_exit=0, auth_exit=1)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _write_requirements(root / "github" / "requirements.json", decl)
 
             report = ec.build_report(root=root / "env")
@@ -570,8 +616,7 @@ class TestBuildReport(unittest.TestCase):
             root = Path(d)
             bindir = root / "bin"
             decl = _github_style_declaration(bindir, gh_exit=0, auth_exit=0)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _write_requirements(root / "github" / "requirements.json", decl)
 
             report = ec.build_report(root=root / "env")
@@ -584,8 +629,7 @@ class TestBuildReport(unittest.TestCase):
             root = Path(d)
             bindir = root / "bin"
             decl = _github_style_declaration(bindir, gh_exit=0, auth_exit=0)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _write_requirements(root / "github" / "requirements.json", decl)
             _plugin_marker(root / "env")
             _plugin_marker(root / "github")
@@ -602,8 +646,7 @@ class TestBuildReport(unittest.TestCase):
             root = Path(d)
             bindir = root / "bin"
             decl = _github_style_declaration(bindir, gh_exit=0, auth_exit=0)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _write_requirements(root / "github" / "requirements.json", decl)
 
             report = ec.build_report(root=root / "env")
@@ -617,8 +660,7 @@ class TestBuildReport(unittest.TestCase):
             root = Path(d)
             bindir = root / "bin"
             gh_decl = _github_style_declaration(bindir, gh_exit=1)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _write_requirements(root / "github" / "requirements.json", gh_decl)
 
             report = ec.build_report(root=root / "env", plugin_filter="env")
@@ -629,8 +671,7 @@ class TestBuildReport(unittest.TestCase):
     def test_unknown_plugin_filter_is_usage_error(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
 
             report = ec.build_report(root=root / "env", plugin_filter="nonexistent")
 
@@ -644,11 +685,16 @@ class TestBuildReport(unittest.TestCase):
 # the JSON `undeclared` list itself stays a neutral list, unchanged).
 # ---------------------------------------------------------------------------
 
+
 def _bare_report(**overrides) -> dict:
     report = {
-        "plugins": {}, "degraded_discovery": False,
-        "missing": [], "degraded": [], "undeclared": [],
-        "ok_count": 0, "exit_code": 0,
+        "plugins": {},
+        "degraded_discovery": False,
+        "missing": [],
+        "degraded": [],
+        "undeclared": [],
+        "ok_count": 0,
+        "exit_code": 0,
     }
     report.update(overrides)
     return report
@@ -682,6 +728,7 @@ class TestPrintHumanUndeclaredWarning(unittest.TestCase):
 # probe subcommand
 # ---------------------------------------------------------------------------
 
+
 class TestProbeSubcommand(unittest.TestCase):
     def _root_with_declaration(self, d: Path, decl: dict) -> Path:
         root = Path(d)
@@ -693,9 +740,9 @@ class TestProbeSubcommand(unittest.TestCase):
             bindir = Path(d) / "bin"
             script = _fake_probe_script(bindir, "tool", "exit 0")
             decl = {
-                "requirements_version": "1.0.0", "plugin": "env",
-                "tools": [{"name": "tool", "required": True, "why": "x",
-                            "probe": [str(script)]}],
+                "requirements_version": "1.0.0",
+                "plugin": "env",
+                "tools": [{"name": "tool", "required": True, "why": "x", "probe": [str(script)]}],
             }
             self_dir = self._root_with_declaration(Path(d), decl)
 
@@ -711,9 +758,9 @@ class TestProbeSubcommand(unittest.TestCase):
             bindir = Path(d) / "bin"
             script = _fake_probe_script(bindir, "tool", "exit 3")
             decl = {
-                "requirements_version": "1.0.0", "plugin": "env",
-                "tools": [{"name": "tool", "required": True, "why": "x",
-                            "probe": [str(script)]}],
+                "requirements_version": "1.0.0",
+                "plugin": "env",
+                "tools": [{"name": "tool", "required": True, "why": "x", "probe": [str(script)]}],
             }
             self_dir = self._root_with_declaration(Path(d), decl)
             code = ec.cmd_probe("env", "tool", self_dir)
@@ -729,7 +776,8 @@ class TestProbeSubcommand(unittest.TestCase):
     def test_probe_unknown_name_exits_2(self):
         with tempfile.TemporaryDirectory() as d:
             decl = {
-                "requirements_version": "1.0.0", "plugin": "env",
+                "requirements_version": "1.0.0",
+                "plugin": "env",
                 "tools": [{"name": "tool", "required": True, "why": "x", "probe": ["true"]}],
             }
             self_dir = self._root_with_declaration(Path(d), decl)
@@ -741,7 +789,8 @@ class TestProbeSubcommand(unittest.TestCase):
             bindir = Path(d) / "bin"
             script = _fake_probe_script(bindir, "authcheck", 'echo "ok line"; exit 0')
             decl = {
-                "requirements_version": "1.0.0", "plugin": "env",
+                "requirements_version": "1.0.0",
+                "plugin": "env",
                 "auth": [{"name": "svc", "probe": [str(script)], "why": "x", "remedy": "y"}],
             }
             self_dir = self._root_with_declaration(Path(d), decl)
@@ -753,14 +802,14 @@ class TestProbeSubcommand(unittest.TestCase):
 # CLI entry point (main())
 # ---------------------------------------------------------------------------
 
+
 class TestMain(unittest.TestCase):
     def test_check_exits_1_on_hard_failure_and_2_on_unknown_plugin(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             bindir = root / "bin"
             decl = _github_style_declaration(bindir, gh_exit=1)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             _write_requirements(root / "github" / "requirements.json", decl)
 
             out = io.StringIO()
@@ -772,15 +821,13 @@ class TestMain(unittest.TestCase):
 
             out2 = io.StringIO()
             with redirect_stdout(out2):
-                code2 = ec.main(["check", "--root", str(root / "env"),
-                                  "--plugin", "nonexistent"])
+                code2 = ec.main(["check", "--root", str(root / "env"), "--plugin", "nonexistent"])
             self.assertEqual(code2, 2)
 
     def test_bare_invocation_defaults_to_check(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            _write_requirements(root / "env" / "requirements.json",
-                                 {"requirements_version": "1.0.0", "plugin": "env"})
+            _write_requirements(root / "env" / "requirements.json", {"requirements_version": "1.0.0", "plugin": "env"})
             out = io.StringIO()
             with redirect_stdout(out):
                 code = ec.main(["--root", str(root / "env")])

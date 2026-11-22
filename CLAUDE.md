@@ -29,7 +29,7 @@ Several files are derived from the plugin/skill tree; editing the tree without t
 4. `uv run scripts/gen_codex_manifests.py` — regenerate the Codex manifests and commit the output
 5. `README.md` — the plugin-count sentence in the opening paragraph, and a `### <plugin>` section under `## Plugins`
 6. `docs/ARCHITECTURE.md` — a node in the dependency graph and a row in the skill catalog, if the plugin produces or consumes anything another plugin reads
-7. `<plugin>/requirements.json` — every CLI tool, config file, and auth session the plugin needs, each marked required or optional (`/env:check` discovers these by glob; no change to the `env` plugin is needed)
+7. `<plugin>/requirements.json` — every CLI tool, config file, and auth session the plugin needs, each marked required or optional (`/environment:check` discovers these by glob; no change to the `environment` plugin is needed)
 
 **Adding, removing, or renaming a skill:** items 3, 4, and 5, plus the skill's `SKILL.md` frontmatter `name` must equal its directory name and the directory must live under `<plugin>/skills/`.
 

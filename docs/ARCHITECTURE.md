@@ -19,7 +19,7 @@ determines whether you can build on the edge and expect it to keep working.
 
 Two conventions hold across every composed skill:
 
-- **A skill invoked standalone bootstraps its own inputs.** `itest:critique` handed
+- **A skill invoked standalone bootstraps its own inputs.** `test-integration:critique` handed
   no `stack` contract invokes `profile:stack` itself. Contracts are an optimization
   against re-discovery, not a hard prerequisite.
 - **Skills call each other by name, never by path.** No skill reaches into another
@@ -41,19 +41,19 @@ flowchart LR
     p_report["report — saved artifacts only"]
   end
 
-  subgraph itest["itest — integration test design"]
-    i_design["design"]
+  subgraph itest["test-integration — integration test design"]
+    i_design["integration-test-plan"]
     i_conv["conventions"]
     i_crit["critique"]
     i_state["state"]
   end
 
-  subgraph openapi["openapi"]
+  subgraph openapi["test-api-workflows"]
     o_init["init"]
     o_arazzo["arazzo"]
   end
 
-  subgraph cats["cats — API fuzzing"]
+  subgraph cats["test-api-fuzzing — API fuzzing"]
     c_init["init"]
     c_run["run"]
     c_report["report"]
@@ -72,10 +72,10 @@ flowchart LR
     x_report["report"]
   end
 
-  gh["github:create-issue"]
-  ghb["github:backlog"]
+  gh["issues:create-issue"]
+  ghb["issues:backlog"]
   sess["session:go"]
-  envchk["env:check"]
+  envchk["environment:check"]
 
   p_stack -- "stack" --> p_docs
   p_stack -- "stack" --> p_topo
@@ -139,7 +139,7 @@ flowchart LR
   envchk -. "requirements.json" .-> depmodel
 ```
 
-`env:check` is drawn against whole plugins because it reads every plugin's sidecar
+`environment:check` is drawn against whole plugins because it reads every plugin's sidecar
 `requirements.json` — including the plugins omitted above. It consumes no skill output
 and produces none; it is a preflight, not a stage.
 
@@ -153,23 +153,23 @@ reports browser-opening failures separately from successful generation.
 
 `profile:stack` is the gate. Its contract carries the repo inventory produced by
 `profile_inventory.py`, so no downstream skill re-runs the census. `profile:docs` is the
-second gate: `journeys` and the `itest` discovery skills read the documentary record
+second gate: `journeys` and the `test-integration` discovery skills read the documentary record
 from its contract rather than re-reading the documents.
 
-`itest:design` is the only orchestrator in the marketplace that spans plugins — it
-orchestrates skills in both `profile` and `itest`, where `loc:backfill` and
+`test-integration:integration-test-plan` is the only orchestrator in the marketplace that spans plugins — it
+orchestrates skills in both `profile` and `test-integration`, where `localization:backfill` and
 `dependency-model:synthesize` each orchestrate only within their own plugin. It runs
 the two gates in sequence, fans the remaining five phases out concurrently, holds a
 human confirmation gate, and emits the `scenario` contract. Its durable side effect is
 `docs/journeys.md` — the confirmed journey set, with the `profile:journeys` contract in
-a fenced JSON block at the end. That file is the handoff to `openapi:arazzo`, which is
+a fenced JSON block at the end. That file is the handoff to `test-api-workflows:arazzo`, which is
 why the arazzo skill can skip discovery entirely.
 
 `profile:stack` and `profile:topology` take a path only; under `synthesize --ref` they are handed the scan's `scan_root` snapshot and their contracts are saved to `<run_dir>/stack.json` and `<run_dir>/topology.json` (invoked directly, outside the dependency-model sequence, they stay in the reply, never in the target repo). `idmap.py` then reads `topology.json` and writes `<run_dir>/ids.json`, the one list of component and service ids the six discovery skills use, so a link in one skill resolves to an entry in another; without a topology contract there is no `ids.json` and the skills slug by the rule in `categories.md`.
 
 `profile:topology` is the seed for all six `dependency-model` discovery skills — the same
 refinement-tier relationship `stack` has to `topology`, and the same one-way direction
-`itest` has to `profile`.
+`test-integration` has to `profile`.
 
 ## Skill catalog
 
@@ -186,23 +186,23 @@ it needs handed to it, blank when it needs nothing from another skill.
 | `journeys` | The workflows users actually perform, ranked, with dependency edges — **candidates for a human to confirm** | `journeys` contract | `stack`, `docs` |
 | `report` | A human summary with expandable evidence, tables and offline diagrams | One self-contained HTML file | Saved `stack`, `docs`, `journeys`, `topology`; optional explicit support files |
 
-### itest
+### test-integration
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
-| `design` | A prioritized integration-test scenario plan, with a chosen boundary, a gap map, and recorded doc/code conflicts | `scenario` contract, printed plan, `docs/journeys.md` | orchestrates all four `profile` skills and the three below |
+| `integration-test-plan` | A prioritized integration-test scenario plan, with a chosen boundary, a gap map, and recorded doc/code conflicts | `scenario` contract, printed plan, `docs/journeys.md` | orchestrates all four `profile` skills and the three below |
 | `conventions` | How tests are written and run here — frameworks, runner commands, unit/integration separation, house style | `conventions` contract | `stack`; `docs` optional |
 | `critique` | Which existing tests mislead — over-mocking, implementation-detail assertions, non-determinism; keep/repair/replace/delete per test | `critique` contract | `stack`; `docs` optional |
 | `state` | How test state can be established and torn down — writable stores, factories, seeds, test-only endpoints | `state` contract | `stack`; `docs` optional |
 
-### openapi
+### test-api-workflows
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
 | `init` | The project's OpenAPI and Arazzo spec locations, discovered and verified | `.local/openapi/config.yaml` | `.local/cats/config.yaml` as a spec hint, when present |
 | `arazzo` | Confirmed journeys expressed as an Arazzo 1.0 workflow spec bound to real operations | `arazzo.yaml` | `docs/journeys.md`, `.local/openapi/config.yaml` |
 
-### cats
+### test-api-fuzzing
 
 | Skill | Value produced | Outputs | Consumes |
 |---|---|---|---|
@@ -246,24 +246,24 @@ These have no cross-plugin edges. Internal orchestration is noted where it exist
 
 | Plugin | Skills | Notes |
 |---|---|---|
-| `loc` | `analyze`, `coverage`, `detect-nonloc`, `translate-to`, `update-json`, `validate-translation`, `backfill` | `backfill` orchestrates the other six; `analyze` and `coverage` share the bundled `check-i18n.py` |
-| `github` | `backlog`, `create-issue` | Both read `.local/repos.json`; `create-issue` also reads `.local/gh-projects.json` |
-| `deps` | `bump` | Thin orchestrator over the `bumplib` CLI |
-| `ui` | `vrt` | Reads `.local/repos.json` when present, else falls back to `gh` defaults |
-| `env` | `check` | Reads every plugin's `requirements.json` |
-| `session` | `go`, `handoff` | Share the bundled `repo-state.sh`; `handoff` writes a machine-local `HANDOFF.md` that `go` reads; a SessionStart hook prompts `go`; `go` invokes `github:backlog` (optional) when the handoff queues no work |
+| `localization` | `analyze`, `coverage`, `detect-nonloc`, `translate-to`, `update-json`, `validate-translation`, `backfill` | `backfill` orchestrates the other six; `analyze` and `coverage` share the bundled `check-i18n.py` |
+| `issues` | `backlog`, `create-issue` | Both read `.local/repos.json`; `create-issue` also reads `.local/gh-projects.json` |
+| `dependencies` | `bump` | Thin orchestrator over the `bumplib` CLI |
+| `test-ui` | `vrt` | Reads `.local/repos.json` when present, else falls back to `gh` defaults |
+| `environment` | `check` | Reads every plugin's `requirements.json` |
+| `session` | `go`, `handoff` | Share the bundled `repo-state.sh`; `handoff` writes a machine-local `HANDOFF.md` that `go` reads; a SessionStart hook prompts `go`; `go` invokes `issues:backlog` (optional) when the handoff queues no work |
 
 ## Entry points
 
 | Goal | Start here | Then |
 |---|---|---|
 | Understand an unfamiliar repo | `/profile:stack` | `/profile:docs`, then `topology` or `journeys` as needed |
-| Design an integration test suite | `/itest:design` | It runs the whole `profile` + `itest` chain and gates on your confirmation |
-| Generate an Arazzo workflow spec | `/itest:design` | `/openapi:init`, then `/openapi:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
-| Fuzz an API | `/cats:init` | `/cats:run`, then `/cats:analyze`; `/cats:fp` to suppress confirmed false positives |
+| Design an integration test suite | `/test-integration:integration-test-plan` | It runs the whole `profile` + `test-integration` chain and gates on your confirmation |
+| Generate an Arazzo workflow spec | `/test-integration:integration-test-plan` | `/test-api-workflows:init`, then `/test-api-workflows:arazzo` — arazzo needs the confirmed `docs/journeys.md` |
+| Fuzz an API | `/test-api-fuzzing:init` | `/test-api-fuzzing:run`, then `/test-api-fuzzing:analyze`; `/test-api-fuzzing:fp` to suppress confirmed false positives |
 | Audit a system's deployment shape and dependencies | `/profile:stack` | `/profile:topology`, then `/dependency-model:synthesize` and `/dependency-model:report` |
-| Update dependencies | `/deps:bump` | — |
-| Confirm the tooling is installed | `/env:check` | `--fix` for declared remedies |
+| Update dependencies | `/dependencies:bump` | — |
+| Confirm the tooling is installed | `/environment:check` | `--fix` for declared remedies |
 
 ## Keeping this current
 
@@ -274,4 +274,4 @@ A plugin that adds a cross-plugin edge is not done until this document reflects 
 3. Add an entry-point row if the plugin serves a goal a user would state directly.
 
 New contracts live at `<plugin>/references/contracts/<name>.schema.json` with a worked
-example beside them in `examples/`, matching the `profile` and `itest` house style.
+example beside them in `examples/`, matching the `profile` and `test-integration` house style.
