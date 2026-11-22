@@ -18,8 +18,9 @@ optional support only when explicitly supplied: JSON (`.json`), UTF-8 text
 (`.txt`), or Markdown (`.md`). Support is displayed as attributed data or inert
 text, not rendered HTML or verified source excerpts.
 
-Use already-approved, secret-safe artifacts. The renderer does not redact
-secrets. Do not scan for extra files, follow source references, retrieve URLs,
+Use already-approved, secret-safe artifacts. `/project-profile` may pass the
+artifacts it has just produced in the same run; they need no separate
+approval, but must still be secret-safe. The renderer does not redact secrets. Do not scan for extra files, follow source references, retrieve URLs,
 inspect environments or credentials, execute the target, or invoke discovery to
 fill gaps. Missing or invalid contracts are an error to report.
 
