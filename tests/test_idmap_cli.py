@@ -15,8 +15,9 @@ TMI = REPO / "tests" / "fixtures" / "dependency_model" / "topology_tmi.json"
 
 def run(path, *flags, umask=None):
     preexec = None if umask is None else (lambda: os.umask(umask))
-    return subprocess.run([sys.executable, str(SCRIPT), str(path), *flags],
-                          capture_output=True, text=True, preexec_fn=preexec)
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), str(path), *flags], capture_output=True, text=True, preexec_fn=preexec
+    )
 
 
 def run_doc(doc, *flags):
@@ -29,9 +30,11 @@ def run_doc(doc, *flags):
 
 
 def topo(components=(), real=(), ext=()):
-    return {"components": [{"name": n} for n in components],
-            "real_dependencies": [{"name": n} for n in real],
-            "external_third_parties": [{"name": n} for n in ext]}
+    return {
+        "components": [{"name": n} for n in components],
+        "real_dependencies": [{"name": n} for n in real],
+        "external_third_parties": [{"name": n} for n in ext],
+    }
 
 
 class IdmapCliTest(unittest.TestCase):
@@ -39,10 +42,10 @@ class IdmapCliTest(unittest.TestCase):
         result = run(TMI)
         self.assertEqual(result.returncode, 0, result.stderr)
         doc = json.loads(result.stdout)
-        self.assertIn({"id": "service:nats", "name": "nats (JetStream)",
-                       "source": "real_dependencies"}, doc["services"])
-        oauth = [s for s in doc["services"]
-                 if s["id"] == "service:oauth-2.0-oidc-identity-providers"]
+        self.assertIn(
+            {"id": "service:nats", "name": "nats (JetStream)", "source": "real_dependencies"}, doc["services"]
+        )
+        oauth = [s for s in doc["services"] if s["id"] == "service:oauth-2.0-oidc-identity-providers"]
         self.assertEqual(len(oauth), 1)
         self.assertEqual(oauth[0]["source"], "external_third_parties")
         ids = [c["id"] for c in doc["components"]]
@@ -58,14 +61,16 @@ class IdmapCliTest(unittest.TestCase):
         result, _ = run_doc(topo(real=["redis"], ext=["redis", "stripe"]))
         self.assertEqual(result.returncode, 0, result.stderr)
         services = json.loads(result.stdout)["services"]
-        self.assertEqual(services, [
-            {"id": "service:redis", "name": "redis", "source": "real_dependencies"},
-            {"id": "service:stripe", "name": "stripe", "source": "external_third_parties"},
-        ])
+        self.assertEqual(
+            services,
+            [
+                {"id": "service:redis", "name": "redis", "source": "real_dependencies"},
+                {"id": "service:stripe", "name": "stripe", "source": "external_third_parties"},
+            ],
+        )
 
     def test_service_matching_a_component_is_skipped(self):
-        result, _ = run_doc(topo(components=["tmi-server", "api"], real=["tmi-server", "redis"],
-                                 ext=["api"]))
+        result, _ = run_doc(topo(components=["tmi-server", "api"], real=["tmi-server", "redis"], ext=["api"]))
         self.assertEqual(result.returncode, 0, result.stderr)
         doc = json.loads(result.stdout)
         self.assertEqual([s["name"] for s in doc["services"]], ["redis"])
@@ -94,9 +99,11 @@ class IdmapCliTest(unittest.TestCase):
         self.assertEqual(files, ["topology.json"])
 
     def test_entry_without_name_exits_2(self):
-        for doc in ({"components": [{"role": "x"}]},
-                    {"real_dependencies": [{"name": 3}]},
-                    {"external_third_parties": ["redis"]}):
+        for doc in (
+            {"components": [{"role": "x"}]},
+            {"real_dependencies": [{"name": 3}]},
+            {"external_third_parties": ["redis"]},
+        ):
             with self.subTest(doc=doc):
                 result, _ = run_doc(doc)
                 self.assertEqual(result.returncode, 2)
@@ -111,11 +118,9 @@ class IdmapCliTest(unittest.TestCase):
                     self.assertIn(key, json.loads(result.stderr)["error"])
 
     def test_null_lists_are_empty(self):
-        result, _ = run_doc({"components": None, "real_dependencies": None,
-                             "external_third_parties": None})
+        result, _ = run_doc({"components": None, "real_dependencies": None, "external_third_parties": None})
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout),
-                         {"components": [], "services": [], "skipped": []})
+        self.assertEqual(json.loads(result.stdout), {"components": [], "services": [], "skipped": []})
 
     def test_non_object_entry_says_so(self):
         result, _ = run_doc({"external_third_parties": ["redis"]})
@@ -142,8 +147,7 @@ class IdmapCliTest(unittest.TestCase):
     def test_missing_lists_are_empty(self):
         result, _ = run_doc({})
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout),
-                         {"components": [], "services": [], "skipped": []})
+        self.assertEqual(json.loads(result.stdout), {"components": [], "services": [], "skipped": []})
 
     def test_written_mode_follows_umask(self):
         """ids.json gets the mode any new file would: 0666 less the umask."""
@@ -168,8 +172,7 @@ class IdmapCliTest(unittest.TestCase):
             second = run(path, "--write")
             self.assertEqual(second.stdout, first.stdout)
             self.assertEqual(out.read_bytes(), before)
-            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()),
-                             ["ids.json", "topology.json"])
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["ids.json", "topology.json"])
             self.assertEqual(json.loads(before), json.loads(run(path).stdout))
 
 

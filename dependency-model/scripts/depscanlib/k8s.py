@@ -16,9 +16,9 @@ KIND_RE = re.compile(r'^kind:\s*["\']?(\w+)')
 NAME_RE = re.compile(r'^(\s*)(?:-\s+)?name:\s*["\']?([^"\'\s#]+)')
 PORT_RE = re.compile(r'^\s*-?\s*(?:port|targetPort|containerPort|number):\s*["\']?(\w+)')
 HOST_RE = re.compile(r'^\s*-?\s*host:\s*["\']?([^"\'\s#]+)')
-SECRET_REF_RE = re.compile(r'^(\s*)secretKeyRef:\s*(.*)$')
+SECRET_REF_RE = re.compile(r"^(\s*)secretKeyRef:\s*(.*)$")
 FLOW_FIELD_RE = re.compile(r'\b(name|key):\s*["\']?([^"\',}\s]+)')
-CONTAINER_PORT_RE = re.compile(r'^\s*-?\s*containerPort:\s*(\d+)')
+CONTAINER_PORT_RE = re.compile(r"^\s*-?\s*containerPort:\s*(\d+)")
 
 
 def split_docs(lines):
@@ -67,8 +67,8 @@ def container_name(doc, index):
         m = NAME_RE.match(doc[i])
         if m and doc[i].lstrip().startswith("- "):
             indent = len(m.group(1)) + 2
-            for nxt in doc[i + 1:i + 8]:
-                if re.match(rf'^ {{{indent}}}image:', nxt):
+            for nxt in doc[i + 1 : i + 8]:
+                if re.match(rf"^ {{{indent}}}image:", nxt):
                     return m.group(2)
     return None
 
@@ -77,14 +77,19 @@ def _secret_ref(doc, index, match, path, base):
     indent, rest = len(match.group(1)), match.group(2)
     fields = dict(FLOW_FIELD_RE.findall(rest)) if rest.startswith("{") else {}
     if not rest:
-        for nxt in doc[index + 1:index + 6]:
+        for nxt in doc[index + 1 : index + 6]:
             if nxt.strip() and len(nxt) - len(nxt.lstrip()) <= indent:
                 break
             fields.update(FLOW_FIELD_RE.findall(nxt))
     if "name" not in fields:
         return None
-    return {"env": _walk_back_name(doc, index, indent), "secret": fields["name"],
-            "key": fields.get("key"), "file": path, "line": base + index}
+    return {
+        "env": _walk_back_name(doc, index, indent),
+        "secret": fields["name"],
+        "key": fields.get("key"),
+        "file": path,
+        "line": base + index,
+    }
 
 
 def scan_k8s(root, paths):
@@ -105,18 +110,22 @@ def scan_k8s(root, paths):
                     if m and kind == "Ingress" and m.group(1) not in hosts:
                         hosts.append(m.group(1))
                 first = next((i for i, ln in enumerate(doc) if KIND_RE.match(ln)), 0)
-                rec = {"kind": kind, "name": name, "ports": ports,
-                       "file": path, "line": base + first}
+                rec = {"kind": kind, "name": name, "ports": ports, "file": path, "line": base + first}
                 if hosts:
                     rec["hosts"] = hosts
                 network.append(rec)
             for i, line in enumerate(doc):
                 m = CONTAINER_PORT_RE.match(line)
                 if m:
-                    network.append({"kind": "containerPort",
-                                    "name": container_name(doc, i) or name,
-                                    "ports": [m.group(1)], "file": path,
-                                    "line": base + i})
+                    network.append(
+                        {
+                            "kind": "containerPort",
+                            "name": container_name(doc, i) or name,
+                            "ports": [m.group(1)],
+                            "file": path,
+                            "line": base + i,
+                        }
+                    )
                 m = SECRET_REF_RE.match(line)
                 if m:
                     rec = _secret_ref(doc, i, m, path, base)

@@ -30,43 +30,50 @@ class TestCoverageConfidence(unittest.TestCase):
         self.assertEqual(coverage_confidence([], [{"path": "go.mod"}], [], 3), "low")
 
     def test_no_manifests_is_low(self):
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [], [], 3), "low")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [], [], 3), "low")
 
     def test_mostly_classified_is_high(self):
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], [], 100),
-            "high")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], [], 100), "high")
 
     def test_many_unclassified_is_partial(self):
         self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
-                                ["a.zig"] * 20, 100),
-            "partial")
+            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], ["a.zig"] * 20, 100), "partial"
+        )
 
     def test_share_of_exactly_five_percent_is_still_high(self):
         """The binding rule says at most 5%; the boundary belongs to high."""
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
-                                ["a.zig"] * 5, 100),
-            "high")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], ["a.zig"] * 5, 100), "high")
 
     def test_share_just_above_five_percent_is_partial(self):
-        self.assertEqual(
-            coverage_confidence([{"name": "python"}], [{"path": "go.mod"}],
-                                ["a.zig"] * 6, 100),
-            "partial")
+        self.assertEqual(coverage_confidence([{"name": "python"}], [{"path": "go.mod"}], ["a.zig"] * 6, 100), "partial")
 
 
 class TestBuildInventory(unittest.TestCase):
     def test_has_all_required_keys(self):
         found = inventory(PY_REPO)
-        self.assertEqual(set(found), {
-            "root", "listing_method", "languages", "manifests", "test_files",
-            "test_dirs", "test_config", "ci", "containers", "iac",
-            "entrypoints", "docs", "docs_total", "docs_sites", "unclassified",
-            "unclassified_total", "coverage_confidence", "inventory_version",
-        })
+        self.assertEqual(
+            set(found),
+            {
+                "root",
+                "listing_method",
+                "languages",
+                "manifests",
+                "test_files",
+                "test_dirs",
+                "test_config",
+                "ci",
+                "containers",
+                "iac",
+                "entrypoints",
+                "docs",
+                "docs_total",
+                "docs_sites",
+                "unclassified",
+                "unclassified_total",
+                "coverage_confidence",
+                "inventory_version",
+            },
+        )
 
     def test_root_is_absolute_and_paths_are_relative(self):
         found = inventory(PY_REPO)
@@ -98,15 +105,16 @@ class TestBuildInventory(unittest.TestCase):
     def test_infra_classified_files_are_not_unclassified(self):
         """The inventory must not contradict itself: recognized IaC is not
         unknown, and confidence does not degrade for understood files."""
-        found = inventory({
-            "pyproject.toml": "[project]\nname = 'demo'\n",
-            "uv.lock": "version = 1\n",
-            "app.py": "x = 1\n",
-            "infra/main.tf": "resource {}\n",
-            "infra/vars.tfvars": "v = 1\n",
-        })
-        self.assertEqual([r["path"] for r in found["iac"]],
-                         ["infra/main.tf", "infra/vars.tfvars"])
+        found = inventory(
+            {
+                "pyproject.toml": "[project]\nname = 'demo'\n",
+                "uv.lock": "version = 1\n",
+                "app.py": "x = 1\n",
+                "infra/main.tf": "resource {}\n",
+                "infra/vars.tfvars": "v = 1\n",
+            }
+        )
+        self.assertEqual([r["path"] for r in found["iac"]], ["infra/main.tf", "infra/vars.tfvars"])
         self.assertEqual(found["unclassified"], [])
         self.assertEqual(found["coverage_confidence"], "high")
 
@@ -122,8 +130,7 @@ class TestBuildInventory(unittest.TestCase):
         self.assertEqual(found["coverage_confidence"], "partial")
 
     def test_unrecognized_stack_reports_low_confidence_not_a_wrong_answer(self):
-        found = inventory({"main.zig": "pub fn main() void {}\n",
-                           "build.zig": "pub fn build() void {}\n"})
+        found = inventory({"main.zig": "pub fn main() void {}\n", "build.zig": "pub fn build() void {}\n"})
         self.assertEqual(found["languages"], [])
         self.assertEqual(found["manifests"], [])
         self.assertEqual(found["coverage_confidence"], "low")

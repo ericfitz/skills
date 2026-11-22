@@ -10,9 +10,11 @@ from depgraphlib.mermaid import to_mermaid
 
 
 def graph(names, edges=None):
-    return {"nodes": [{"id": f"package:{n}", "name": n, "category": "package",
-                       "lifecycle": "build"} for n in names],
-            "edges": edges or [], "cycles": []}
+    return {
+        "nodes": [{"id": f"package:{n}", "name": n, "category": "package", "lifecycle": "build"} for n in names],
+        "edges": edges or [],
+        "cycles": [],
+    }
 
 
 class TestMermaid(unittest.TestCase):
@@ -42,14 +44,16 @@ class TestMermaid(unittest.TestCase):
         self.assertIn('["has<tag>"]', out["mermaid"])
 
     def test_edges_are_emitted_between_the_opaque_ids(self):
-        g = graph(["a", "b"], edges=[{"from": "package:a", "to": "package:b",
-                                      "kind": "depends_on", "lifecycle": "build"}])
+        g = graph(
+            ["a", "b"], edges=[{"from": "package:a", "to": "package:b", "kind": "depends_on", "lifecycle": "build"}]
+        )
         out = to_mermaid(g)
         self.assertRegex(out["mermaid"], r"n\d+ --> n\d+")
 
     def test_an_edge_to_a_node_not_in_the_graph_is_skipped(self):
-        g = graph(["a"], edges=[{"from": "package:a", "to": "package:ghost",
-                                 "kind": "depends_on", "lifecycle": "build"}])
+        g = graph(
+            ["a"], edges=[{"from": "package:a", "to": "package:ghost", "kind": "depends_on", "lifecycle": "build"}]
+        )
         self.assertNotIn("-->", to_mermaid(g)["mermaid"])
 
     def test_output_is_deterministic(self):
@@ -60,8 +64,7 @@ class TestMermaid(unittest.TestCase):
 class TestComponentShape(unittest.TestCase):
     def test_a_component_node_gets_the_subroutine_shape(self):
         g = graph(["lib"])
-        g["nodes"].append({"id": "component:api", "name": "api", "category": "component",
-                           "lifecycle": "run"})
+        g["nodes"].append({"id": "component:api", "name": "api", "category": "component", "lifecycle": "run"})
         out = to_mermaid(g)["mermaid"]
         self.assertIn('[["api"]]', out)
         self.assertIn('["lib"]', out)
@@ -71,8 +74,9 @@ class TestNodeCap(unittest.TestCase):
     def test_above_the_cap_it_degrades_and_says_so(self):
         """Silent truncation would read as 'this is the whole graph'."""
         g = graph([])
-        g["nodes"] = [{"id": f"service:s{i}", "name": f"s{i}", "category": "service",
-                       "lifecycle": "run"} for i in range(70)]
+        g["nodes"] = [
+            {"id": f"service:s{i}", "name": f"s{i}", "category": "service", "lifecycle": "run"} for i in range(70)
+        ]
         out = to_mermaid(g, cap=60)
         self.assertTrue(out["degraded"])
         self.assertIsNone(out["mermaid"])
@@ -86,12 +90,11 @@ class TestNodeCap(unittest.TestCase):
 
 
 def big_graph(n_packages, services=("pg", "redis"), components=("api",)):
-    nodes = [{"id": f"package:p{i}", "name": f"p{i}", "category": "package",
-              "lifecycle": "build"} for i in range(n_packages)]
-    nodes += [{"id": f"component:{c}", "name": c, "category": "component",
-               "lifecycle": "run"} for c in components]
-    nodes += [{"id": f"service:{s}", "name": s, "category": "service",
-               "lifecycle": "run"} for s in services]
+    nodes = [
+        {"id": f"package:p{i}", "name": f"p{i}", "category": "package", "lifecycle": "build"} for i in range(n_packages)
+    ]
+    nodes += [{"id": f"component:{c}", "name": c, "category": "component", "lifecycle": "run"} for c in components]
+    nodes += [{"id": f"service:{s}", "name": s, "category": "service", "lifecycle": "run"} for s in services]
     return {"nodes": nodes, "edges": [], "cycles": []}
 
 
@@ -108,10 +111,14 @@ class TestCollapsedView(unittest.TestCase):
     def test_full_view_draws_one_arrow_per_from_to_kind(self):
         """Edges that differ only in lifecycle are one arrow, as in the
         collapsed view; a different kind is a different arrow."""
-        g = graph(["a", "b"], edges=[
-            edge("package:a", "package:b"),
-            {**edge("package:a", "package:b"), "lifecycle": "run"},
-            edge("package:a", "package:b", kind="relates_to")])
+        g = graph(
+            ["a", "b"],
+            edges=[
+                edge("package:a", "package:b"),
+                {**edge("package:a", "package:b"), "lifecycle": "run"},
+                edge("package:a", "package:b", kind="relates_to"),
+            ],
+        )
         out = to_mermaid(g)
         self.assertEqual(out["view"], "full")
         self.assertEqual(out["mermaid"].count("n0 --> n1"), 1)
@@ -119,24 +126,30 @@ class TestCollapsedView(unittest.TestCase):
 
     def test_collapsed_keeps_components_and_services(self):
         g = big_graph(61)
-        g["edges"] = [edge("package:p0", "service:pg"), edge("package:p1", "service:pg"),
-                      edge("package:p0", "package:p1"), edge("package:p2", "package:p3")]
+        g["edges"] = [
+            edge("package:p0", "service:pg"),
+            edge("package:p1", "service:pg"),
+            edge("package:p0", "package:p1"),
+            edge("package:p2", "package:p3"),
+        ]
         out = to_mermaid(g)
         self.assertEqual(out["view"], "collapsed")
         self.assertFalse(out["degraded"])
         self.assertEqual(out["collapsed"], {"package": 61})
         self.assertEqual(out["node_count"], 64)
-        self.assertEqual(out["reason"], "64 nodes exceeds the 60-node Mermaid cap; showing "
-                                        "a collapsed view of 4 nodes with the other "
-                                        "categories rolled up")
+        self.assertEqual(
+            out["reason"],
+            "64 nodes exceeds the 60-node Mermaid cap; showing "
+            "a collapsed view of 4 nodes with the other "
+            "categories rolled up",
+        )
         text = out["mermaid"]
         self.assertEqual(len([ln for ln in text.splitlines() if "[" in ln]), 4)
         self.assertEqual(text.count('["package (61)"]'), 1)
         self.assertIn('[["api"]]', text)
         self.assertIn('["pg"]', text)
         self.assertIn('["redis"]', text)
-        ids = {line.split("[")[0].strip(): line for line in text.splitlines()
-               if "[" in line}
+        ids = {line.split("[")[0].strip(): line for line in text.splitlines() if "[" in line}
         rollup = next(i for i, line in ids.items() if "package (61)" in line)
         pg = next(i for i, line in ids.items() if '["pg"]' in line)
         self.assertEqual(text.count(f"{rollup} --> {pg}"), 1)
@@ -163,9 +176,12 @@ class TestCollapsedView(unittest.TestCase):
         self.assertIsNone(out["view"])
         self.assertEqual(out["collapsed"], {})
         self.assertEqual(out["node_count"], 4)
-        self.assertEqual(out["reason"], "4 nodes exceeds the 3-node Mermaid cap, and the "
-                                        "collapsed view still has 4 nodes; a rendered graph "
-                                        "this size is unreadable")
+        self.assertEqual(
+            out["reason"],
+            "4 nodes exceeds the 3-node Mermaid cap, and the "
+            "collapsed view still has 4 nodes; a rendered graph "
+            "this size is unreadable",
+        )
 
 
 if __name__ == "__main__":

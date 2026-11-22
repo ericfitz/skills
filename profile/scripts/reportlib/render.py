@@ -50,9 +50,7 @@ def _software_name(bundle: ProfileBundle) -> str:
     readme_names = {
         name
         for item in bundle.contracts["docs"].data["corpus"]
-        if item["doc_type"] == "readme"
-        and (name := _name(item["title"]))
-        and name.casefold() not in generic_titles
+        if item["doc_type"] == "readme" and (name := _name(item["title"])) and name.casefold() not in generic_titles
     }
     if len(readme_names) == 1:
         return next(iter(readme_names))

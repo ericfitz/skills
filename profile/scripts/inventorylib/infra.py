@@ -39,12 +39,12 @@ TEMPLATE_NAMES = {"template.yaml", "template.yml"}
 SAM_TRANSFORM = "AWS::Serverless-2016-10-31"
 CFN_MARKER = "AWSTemplateFormatVersion"
 
+
 # Dockerfile.<suffix> and <name>.Dockerfile are how repos ship several images.
 def _container_kind(name):
     if name in CONTAINER_FILES:
         return CONTAINER_FILES[name]
-    if name.startswith(("Dockerfile.", "Containerfile.")) or name.endswith(
-            (".Dockerfile", ".Containerfile")):
+    if name.startswith(("Dockerfile.", "Containerfile.")) or name.endswith((".Dockerfile", ".Containerfile")):
         return "dockerfile"
     return None
 
@@ -72,7 +72,7 @@ def _kustomize_resources(root, path):
     """Paths (repo-relative) of files a kustomization.yaml lists under resources:."""
     match = KUSTOMIZE_RES_RE.search(_read(root, path) + "\n")
     out = []
-    for line in (match.group(1).splitlines() if match else []):
+    for line in match.group(1).splitlines() if match else []:
         item = line.split("#")[0].strip()
         if not item.startswith("-"):
             continue
@@ -99,8 +99,17 @@ TEST_CONFIG_FILES = {
 }
 
 ENTRYPOINT_NAMES = {
-    "main.py", "__main__.py", "manage.py", "app.py", "wsgi.py", "asgi.py",
-    "main.go", "main.rs", "Program.cs", "main.ts", "server.js",
+    "main.py",
+    "__main__.py",
+    "manage.py",
+    "app.py",
+    "wsgi.py",
+    "asgi.py",
+    "main.go",
+    "main.rs",
+    "Program.cs",
+    "main.ts",
+    "server.js",
 }
 
 # index.* is an entrypoint only at the repo root, where it is npm's default
@@ -111,9 +120,14 @@ ROOT_ONLY_ENTRYPOINTS = {"index.ts", "index.js"}
 
 # ordered: first substring found in the command wins
 TEST_COMMAND_FRAMEWORKS = (
-    ("vitest", "vitest"), ("jest", "jest"), ("playwright", "playwright"),
-    ("mocha", "mocha"), ("ava", "ava"), ("cypress", "cypress"),
-    ("pytest", "pytest"), ("go test", "go-test"),
+    ("vitest", "vitest"),
+    ("jest", "jest"),
+    ("playwright", "playwright"),
+    ("mocha", "mocha"),
+    ("ava", "ava"),
+    ("cypress", "cypress"),
+    ("pytest", "pytest"),
+    ("go test", "go-test"),
 )
 
 
@@ -122,7 +136,7 @@ def _framework_from_command(command):
     for needle, framework in TEST_COMMAND_FRAMEWORKS:
         needle_tokens = needle.split()
         for start in range(len(tokens) - len(needle_tokens) + 1):
-            if tokens[start:start + len(needle_tokens)] == needle_tokens:
+            if tokens[start : start + len(needle_tokens)] == needle_tokens:
                 return framework
     return None
 
@@ -194,25 +208,24 @@ def detect_infra(root, paths):
             iac.append({"path": path, "kind": IAC_EXTS[parsed.suffix]})
 
         if name in TEST_CONFIG_FILES:
-            test_config.append({
-                "path": path,
-                "framework": TEST_CONFIG_FILES[name],
-                "command": None,
-            })
+            test_config.append(
+                {
+                    "path": path,
+                    "framework": TEST_CONFIG_FILES[name],
+                    "command": None,
+                }
+            )
         elif name == "package.json":
             entry = _package_json_test_config(root, path)
             if entry:
                 test_config.append(entry)
 
-        if name in ENTRYPOINT_NAMES or (
-            name in ROOT_ONLY_ENTRYPOINTS and parsed.parent.as_posix() == "."
-        ):
+        if name in ENTRYPOINT_NAMES or (name in ROOT_ONLY_ENTRYPOINTS and parsed.parent.as_posix() == "."):
             entrypoints.append({"path": path, "language_hint": parsed.suffix})
 
     # Kubernetes manifests: files a kustomization references, plus YAML under
     # deploy-ish directories that declare apiVersion + kind.
-    listed = {p for rec in iac if rec["kind"] == "kustomize"
-              for p in _kustomize_resources(root, rec["path"])}
+    listed = {p for rec in iac if rec["kind"] == "kustomize" for p in _kustomize_resources(root, rec["path"])}
     have = {rec["path"] for rec in iac}
     for path in sorted(paths):
         if path in have or PurePosixPath(path).suffix not in (".yml", ".yaml"):

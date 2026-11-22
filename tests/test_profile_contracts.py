@@ -14,8 +14,7 @@ CONTRACTS = REPO / "profile" / "references" / "contracts"
 
 class TestValidator(unittest.TestCase):
     def test_accepts_valid_object(self):
-        schema = {"type": "object", "required": ["a"],
-                  "properties": {"a": {"type": "string"}}}
+        schema = {"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}}
         self.assertEqual(validate({"a": "x"}, schema), [])
 
     def test_reports_missing_required_property(self):
@@ -46,9 +45,10 @@ class TestValidator(unittest.TestCase):
 class TestProfileContracts(unittest.TestCase):
     def test_every_schema_is_valid_json_and_has_required_metadata(self):
         schemas = sorted(CONTRACTS.glob("*.schema.json"))
-        self.assertEqual([p.name for p in schemas],
-                         ["docs.schema.json", "journeys.schema.json",
-                          "stack.schema.json", "topology.schema.json"])
+        self.assertEqual(
+            [p.name for p in schemas],
+            ["docs.schema.json", "journeys.schema.json", "stack.schema.json", "topology.schema.json"],
+        )
         for path in schemas:
             with self.subTest(schema=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))
@@ -63,8 +63,8 @@ class TestProfileContracts(unittest.TestCase):
             with self.subTest(contract=name):
                 self.assertTrue(example_path.exists(), f"missing example for {name}")
                 errors = validate(
-                    json.loads(example_path.read_text(encoding="utf-8")),
-                    json.loads(path.read_text(encoding="utf-8")))
+                    json.loads(example_path.read_text(encoding="utf-8")), json.loads(path.read_text(encoding="utf-8"))
+                )
                 self.assertEqual(errors, [])
 
     def test_topology_contract_uses_no_testing_vocabulary(self):

@@ -42,8 +42,7 @@ def build_inventory(root):
     # repo the census fully understood — a self-contradictory inventory.
     known = {
         record["path"]
-        for section in (infra["ci"], infra["containers"], infra["iac"],
-                        infra["test_config"], infra["entrypoints"])
+        for section in (infra["ci"], infra["containers"], infra["iac"], infra["test_config"], infra["entrypoints"])
         for record in section
     }
     unclassified = [p for p in unclassified if p not in known]
@@ -66,6 +65,5 @@ def build_inventory(root):
         "docs_sites": docs["docs_sites"],
         "unclassified": sorted(unclassified)[:UNCLASSIFIED_LIMIT],
         "unclassified_total": len(unclassified),
-        "coverage_confidence": coverage_confidence(
-            languages, manifests, unclassified, len(paths)),
+        "coverage_confidence": coverage_confidence(languages, manifests, unclassified, len(paths)),
     }

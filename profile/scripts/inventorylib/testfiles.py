@@ -6,9 +6,21 @@ from pathlib import Path, PurePosixPath
 from inventorylib.languages import EXT_LANGUAGE
 
 TEST_DIR_NAMES = {
-    "test", "tests", "spec", "specs", "__tests__", "testing",
-    "e2e", "integration", "it", "itest", "functional", "acceptance",
-    "contract", "endtoend", "end_to_end",
+    "test",
+    "tests",
+    "spec",
+    "specs",
+    "__tests__",
+    "testing",
+    "e2e",
+    "integration",
+    "it",
+    "itest",
+    "functional",
+    "acceptance",
+    "contract",
+    "endtoend",
+    "end_to_end",
 }
 
 INTEGRATION_DIRS = {"integration", "it", "itest", "functional", "acceptance", "contract"}
@@ -16,14 +28,20 @@ E2E_DIRS = {"e2e", "endtoend", "end_to_end"}
 
 # (glob, language)
 NAME_PATTERNS = (
-    ("test_*.py", "python"), ("*_test.py", "python"),
+    ("test_*.py", "python"),
+    ("*_test.py", "python"),
     ("*_test.go", "go"),
-    ("*.test.ts", "typescript"), ("*.test.tsx", "typescript"),
-    ("*.spec.ts", "typescript"), ("*.spec.tsx", "typescript"),
-    ("*.test.js", "javascript"), ("*.spec.js", "javascript"),
-    ("*Test.java", "java"), ("*Tests.java", "java"),
+    ("*.test.ts", "typescript"),
+    ("*.test.tsx", "typescript"),
+    ("*.spec.ts", "typescript"),
+    ("*.spec.tsx", "typescript"),
+    ("*.test.js", "javascript"),
+    ("*.spec.js", "javascript"),
+    ("*Test.java", "java"),
+    ("*Tests.java", "java"),
     ("*Tests.cs", "csharp"),
-    ("*_spec.rb", "ruby"), ("*_test.rb", "ruby"),
+    ("*_spec.rb", "ruby"),
+    ("*_test.rb", "ruby"),
     ("*_test.rs", "rust"),
     ("*_test.exs", "elixir"),
 )
@@ -32,8 +50,7 @@ NAME_PATTERNS = (
 CONTENT_MARKERS = (
     ("marker:pytest.mark.integration", "integration", ("pytest.mark.integration",)),
     ("marker:pytest.mark.e2e", "e2e", ("pytest.mark.e2e",)),
-    ("buildtag:integration", "integration",
-     ("//go:build integration", "// +build integration")),
+    ("buildtag:integration", "integration", ("//go:build integration", "// +build integration")),
     ("buildtag:e2e", "e2e", ("//go:build e2e", "// +build e2e")),
     ("marker:testcontainers", "integration", ("testcontainers",)),
 )
@@ -55,9 +72,7 @@ def _is_source(path):
 def _name_signals(path):
     """Return (signals, language) for path, or ([], None) if it is not a test file."""
     parsed = PurePosixPath(path)
-    signals = [
-        f"dir:{part}" for part in parsed.parts[:-1] if part in TEST_DIR_NAMES
-    ]
+    signals = [f"dir:{part}" for part in parsed.parts[:-1] if part in TEST_DIR_NAMES]
     language = None
     for pattern, pattern_language in NAME_PATTERNS:
         if fnmatch.fnmatch(parsed.name, pattern):
@@ -74,10 +89,7 @@ def _content_signals(full_path, max_bytes):
         text = Path(full_path).read_text(encoding="utf-8", errors="replace")[:max_bytes]
     except OSError:
         return []
-    return [
-        name for name, _, needles in CONTENT_MARKERS
-        if any(needle in text for needle in needles)
-    ]
+    return [name for name, _, needles in CONTENT_MARKERS if any(needle in text for needle in needles)]
 
 
 def _resolve_kind(signals):
@@ -103,12 +115,14 @@ def classify_test_files(root, paths, max_bytes=4096):
         if not signals:
             continue
         signals = signals + _content_signals(root / path, max_bytes)
-        records.append({
-            "path": path,
-            "language": language,
-            "kind": _resolve_kind(signals),
-            "signals": sorted(set(signals)),
-        })
+        records.append(
+            {
+                "path": path,
+                "language": language,
+                "kind": _resolve_kind(signals),
+                "signals": sorted(set(signals)),
+            }
+        )
     return records
 
 

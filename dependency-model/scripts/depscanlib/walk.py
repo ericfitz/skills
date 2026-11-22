@@ -13,10 +13,29 @@ from pathlib import Path
 # Unscoped, syft catalogues an installed tree as though it were the project's
 # dependency set — 270 packages against 2 declared ones, measured on this repo.
 EXCLUDE_DIRS = {
-    ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "env",
-    "vendor", "dist", "build", "target", "out", "__pycache__",
-    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".next",
-    ".gradle", "site-packages", ".idea", ".terraform", "Pods",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    ".venv",
+    "venv",
+    "env",
+    "vendor",
+    "dist",
+    "build",
+    "target",
+    "out",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".next",
+    ".gradle",
+    "site-packages",
+    ".idea",
+    ".terraform",
+    "Pods",
 }
 
 
@@ -52,9 +71,10 @@ def _git_files(root):
     """
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
-             "--exclude-standard"],
-            capture_output=True, timeout=30, check=False,
+            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            capture_output=True,
+            timeout=30,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -83,9 +103,10 @@ def git_ignored(root):
     """
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--others", "--ignored",
-             "--exclude-standard", "--directory"],
-            capture_output=True, timeout=30, check=False,
+            ["git", "-C", str(root), "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"],
+            capture_output=True,
+            timeout=30,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return []
@@ -94,8 +115,7 @@ def git_ignored(root):
     entries = _split_git_z(proc.stdout)
     # A wholly ignored dir is listed as "bin/" and again file by file.
     dirs = [e for e in entries if e.endswith("/")]
-    return sorted(e.rstrip("/") for e in entries
-                  if not any(e != d and e.startswith(d) for d in dirs))
+    return sorted(e.rstrip("/") for e in entries if not any(e != d and e.startswith(d) for d in dirs))
 
 
 def is_unsafe_link(root, rel):

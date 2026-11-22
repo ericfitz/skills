@@ -2,6 +2,7 @@
 
 One function builds every slug, so ids written by different scripts agree.
 """
+
 import re
 
 _GROUP = re.compile(r"\([^()]*\)")
@@ -46,13 +47,10 @@ def assign_ids(names, prefix):
     counts = {}
     for s in slugs.values():
         counts[s] = counts.get(s, 0) + 1
-    ids = {n: (slugs[n] if counts[slugs[n]] == 1 else slug_keep_groups(n))
-           for n in distinct}
+    ids = {n: (slugs[n] if counts[slugs[n]] == 1 else slug_keep_groups(n)) for n in distinct}
     owner = {}
     for n in distinct:
         if ids[n] in owner:
-            raise IdCollisionError(
-                f"names {owner[ids[n]]!r} and {n!r} both produce id "
-                f"{prefix}:{ids[n]}")
+            raise IdCollisionError(f"names {owner[ids[n]]!r} and {n!r} both produce id {prefix}:{ids[n]}")
         owner[ids[n]] = n
     return {n: f"{prefix}:{ids[n]}" for n in distinct}

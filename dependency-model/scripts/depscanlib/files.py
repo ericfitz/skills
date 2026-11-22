@@ -4,12 +4,17 @@ from pathlib import PurePosixPath
 
 from depscanlib.walk import read_text
 
-COMPOSE_NAMES = {"docker-compose.yml", "docker-compose.yaml",
-                 "compose.yml", "compose.yaml"}
+COMPOSE_NAMES = {"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
 
-IAC_NAMES = {"cdk.json", "serverless.yml", "serverless.yaml",
-             "Chart.yaml", "kustomization.yaml", "kustomization.yml",
-             "Pulumi.yaml"}
+IAC_NAMES = {
+    "cdk.json",
+    "serverless.yml",
+    "serverless.yaml",
+    "Chart.yaml",
+    "kustomization.yaml",
+    "kustomization.yml",
+    "Pulumi.yaml",
+}
 IAC_EXTS = {".tf", ".tfvars", ".bicep"}
 
 # template.yaml proves nothing by its name — a GitHub issue form, a Backstage
@@ -18,8 +23,7 @@ TEMPLATE_NAMES = {"template.yaml", "template.yml"}
 SAM_TRANSFORM = "AWS::Serverless-2016-10-31"
 CFN_MARKER = "AWSTemplateFormatVersion"
 
-CI_NAMES = {".gitlab-ci.yml", "azure-pipelines.yml", "Jenkinsfile",
-            ".travis.yml", "bitbucket-pipelines.yml"}
+CI_NAMES = {".gitlab-ci.yml", "azure-pipelines.yml", "Jenkinsfile", ".travis.yml", "bitbucket-pipelines.yml"}
 CI_PATHS = {".circleci/config.yml", ".circleci/config.yaml"}
 
 YAML_EXTS = {".yaml", ".yml"}
@@ -60,8 +64,7 @@ def classify_files(root, paths):
             groups["compose"].append(path)
         elif _is_env_file(name):
             groups["env"].append(path)
-        elif (name in IAC_NAMES or suffix in IAC_EXTS
-              or (name in TEMPLATE_NAMES and _is_iac_template(root, path))):
+        elif name in IAC_NAMES or suffix in IAC_EXTS or (name in TEMPLATE_NAMES and _is_iac_template(root, path)):
             groups["iac"].append(path)
         elif suffix in YAML_EXTS and _is_kubernetes(root, path):
             groups["k8s"].append(path)

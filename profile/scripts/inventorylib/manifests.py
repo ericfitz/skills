@@ -66,9 +66,11 @@ def detect_manifests(paths):
             for lock_ecosystem, manager in locks_by_dir.get(parsed.parent.as_posix(), set())
             if lock_ecosystem == ecosystem
         )
-        found.append({
-            "path": path,
-            "ecosystem": ecosystem,
-            "package_manager": siblings[0] if siblings else default_manager,
-        })
+        found.append(
+            {
+                "path": path,
+                "ecosystem": ecosystem,
+                "package_manager": siblings[0] if siblings else default_manager,
+            }
+        )
     return found

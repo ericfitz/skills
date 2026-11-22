@@ -31,18 +31,12 @@ from jsonargs import JsonErrorParser
 
 
 def main(argv=None):
-    parser = JsonErrorParser(
-        prog="depscan.py",
-        description="Emit a deterministic JSON dependency-evidence index.")
-    parser.add_argument("path", nargs="?", default=".",
-                        help="repo root to scan (default: current directory)")
-    parser.add_argument("--json", action="store_true",
-                        help="emit JSON (default; accepted for explicitness)")
+    parser = JsonErrorParser(prog="depscan.py", description="Emit a deterministic JSON dependency-evidence index.")
+    parser.add_argument("path", nargs="?", default=".", help="repo root to scan (default: current directory)")
+    parser.add_argument("--json", action="store_true", help="emit JSON (default; accepted for explicitness)")
     parser.add_argument("--ref", help="scan a snapshot of this git ref")
-    parser.add_argument("--write", action="store_true",
-                        help="save depscan.json in the run dir; print the dir")
-    parser.add_argument("--indent", type=int, default=2,
-                        help="JSON indent; 0 for compact output")
+    parser.add_argument("--write", action="store_true", help="save depscan.json in the run dir; print the dir")
+    parser.add_argument("--indent", type=int, default=2, help="JSON indent; 0 for compact output")
     args = parser.parse_args(argv)
 
     root = Path(args.path)
@@ -59,9 +53,11 @@ def main(argv=None):
         return 2
 
     indent = args.indent if args.indent > 0 else None
-    text = json.dumps(build_scan(run.scan_root, target=root, ref=run.ref,
-                                 run_dir=run.run_dir, refused=run.refused),
-                      indent=indent, sort_keys=True)
+    text = json.dumps(
+        build_scan(run.scan_root, target=root, ref=run.ref, run_dir=run.run_dir, refused=run.refused),
+        indent=indent,
+        sort_keys=True,
+    )
     if args.write:
         (run.run_dir / "depscan.json").write_text(text + "\n", encoding="utf-8")
         print(run.run_dir)

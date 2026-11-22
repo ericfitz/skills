@@ -39,8 +39,14 @@ def _render(entries, edges):
 
 
 def _result(mermaid, count, reason, view, collapsed, degraded):
-    return {"mermaid": mermaid, "degraded": degraded, "node_count": count,
-            "reason": reason, "view": view, "collapsed": collapsed}
+    return {
+        "mermaid": mermaid,
+        "degraded": degraded,
+        "node_count": count,
+        "reason": reason,
+        "view": view,
+        "collapsed": collapsed,
+    }
 
 
 def to_mermaid(graph, cap=CAP_DEFAULT):
@@ -60,15 +66,24 @@ def to_mermaid(graph, cap=CAP_DEFAULT):
             target[n["id"]] = f"rollup:{n['category']}"
     size = len(kept) + len(rolled)
     if size > cap:
-        return _result(None, count,
-                       f"{count} nodes exceeds the {cap}-node Mermaid cap, and the "
-                       f"collapsed view still has {size} nodes; a rendered graph "
-                       f"this size is unreadable", None, {}, True)
+        return _result(
+            None,
+            count,
+            f"{count} nodes exceeds the {cap}-node Mermaid cap, and the "
+            f"collapsed view still has {size} nodes; a rendered graph "
+            f"this size is unreadable",
+            None,
+            {},
+            True,
+        )
 
     entries = [(n["id"], n["name"], n["category"] == "component") for n in kept]
     entries += [(f"rollup:{cat}", f"{cat} ({rolled[cat]})", False) for cat in sorted(rolled)]
-    mapped = {(target[a], target[b], kind) for a, b, kind in edges
-              if a in target and b in target and target[a] != target[b]}
-    reason = (f"{count} nodes exceeds the {cap}-node Mermaid cap; showing a collapsed "
-              f"view of {size} nodes with the other categories rolled up")
+    mapped = {
+        (target[a], target[b], kind) for a, b, kind in edges if a in target and b in target and target[a] != target[b]
+    }
+    reason = (
+        f"{count} nodes exceeds the {cap}-node Mermaid cap; showing a collapsed "
+        f"view of {size} nodes with the other categories rolled up"
+    )
     return _result(_render(entries, mapped), count, reason, "collapsed", rolled, False)

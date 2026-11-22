@@ -43,8 +43,7 @@ class TestCli(unittest.TestCase):
             _, first, _ = run([str(root)])
             _, second, _ = run([str(root)])
         self.assertEqual(first, second)
-        self.assertEqual(
-            first, json.dumps(json.loads(first), indent=2, sort_keys=True) + "\n")
+        self.assertEqual(first, json.dumps(json.loads(first), indent=2, sort_keys=True) + "\n")
 
     def test_indent_flag_changes_formatting(self):
         with tempfile.TemporaryDirectory() as tmp:

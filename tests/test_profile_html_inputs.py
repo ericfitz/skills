@@ -124,6 +124,7 @@ def test_optional_fields_preserve_absence_and_empty(artifacts):
 
 def test_cross_reference_diagnostics(artifacts):
     """Catch collapsed duplicate records and unreported dangling references."""
+
     def edit_docs(data):
         data["corpus"].append(dict(data["corpus"][0]))
         data["requirements"][0]["source_refs"][0]["corpus_id"] = "UNKNOWN_REQUIREMENT"
@@ -231,7 +232,11 @@ def test_explicit_support_only(artifacts, monkeypatch):
 
 @pytest.mark.parametrize(
     ("filename", "content", "context"),
-    [("support.html", b"<b>unsupported</b>", "support"), ("support.json", b"{broken", "JSON"), ("support.md", b"\xff", "UTF-8")],
+    [
+        ("support.html", b"<b>unsupported</b>", "support"),
+        ("support.json", b"{broken", "JSON"),
+        ("support.md", b"\xff", "UTF-8"),
+    ],
 )
 def test_invalid_support_fails(artifacts, filename, content, context):
     """Catch acceptance of unsupported formats or unusable support contents."""

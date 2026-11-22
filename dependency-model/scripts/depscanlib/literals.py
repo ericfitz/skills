@@ -11,9 +11,30 @@ import re
 from depscanlib.walk import read_text
 
 TEXT_SUFFIXES_SKIPPED = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".gz", ".tar",
-    ".woff", ".woff2", ".ttf", ".eot", ".so", ".dylib", ".dll", ".exe",
-    ".class", ".jar", ".wasm", ".bin", ".db", ".sqlite", ".sqlite3",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".so",
+    ".dylib",
+    ".dll",
+    ".exe",
+    ".class",
+    ".jar",
+    ".wasm",
+    ".bin",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
 }
 
 URL_RE = re.compile(r'\b([a-z][a-z0-9+.\-]{1,15})://([^\s"\'`<>,)\]}]+)')
@@ -23,10 +44,11 @@ URL_RE = re.compile(r'\b([a-z][a-z0-9+.\-]{1,15})://([^\s"\'`<>,)\]}]+)')
 # port immediately followed by '@' is not a port at all -- it is a numeric
 # password in a schemeless `user:pass@host` credential.
 HOST_PORT_RE = re.compile(
-    r'(?<![\w.:/@-])'
-    r'((?:\d{1,3}(?:\.\d{1,3}){3})|(?:[a-z][a-z0-9\-]*(?:\.[a-z0-9\-]+)*))'
-    r':(\d{2,5})(?![\w.:@])',
-    re.IGNORECASE)
+    r"(?<![\w.:/@-])"
+    r"((?:\d{1,3}(?:\.\d{1,3}){3})|(?:[a-z][a-z0-9\-]*(?:\.[a-z0-9\-]+)*))"
+    r":(\d{2,5})(?![\w.:@])",
+    re.IGNORECASE,
+)
 
 # Reject matches that are not hosts. HOST_PORT_RE cannot tell `db:5432` from
 # `size:256` (a GORM tag), `tcp:179` (a Calico protocol:port) or `main.go:16`
@@ -37,17 +59,76 @@ HOST_PORT_RE = re.compile(
 # still gets through; extend it when a real scan shows another.
 NON_HOST_KEYS = {
     # struct-tag / DDL keys (GORM, sqlx, validator, json)
-    "size", "type", "default", "column", "precision", "scale", "index",
-    "min", "max", "len", "length", "limit", "offset", "port", "timeout",
-    "rp", "ttl", "line", "col", "row",
+    "size",
+    "type",
+    "default",
+    "column",
+    "precision",
+    "scale",
+    "index",
+    "min",
+    "max",
+    "len",
+    "length",
+    "limit",
+    "offset",
+    "port",
+    "timeout",
+    "rp",
+    "ttl",
+    "line",
+    "col",
+    "row",
     # protocols and transports that prefix a port (`tcp:179`)
-    "tcp", "udp", "sctp", "icmp", "http", "https", "grpc", "ws", "wss",
-    "tls", "ssl", "ports", "pub", "sub", "makefile", "dockerfile",
+    "tcp",
+    "udp",
+    "sctp",
+    "icmp",
+    "http",
+    "https",
+    "grpc",
+    "ws",
+    "wss",
+    "tls",
+    "ssl",
+    "ports",
+    "pub",
+    "sub",
+    "makefile",
+    "dockerfile",
 }
 SOURCE_EXTS = {
-    "go", "py", "js", "jsx", "ts", "tsx", "mjs", "cjs", "java", "kt", "rb",
-    "rs", "c", "h", "cc", "cpp", "hpp", "cs", "php", "sh", "md", "yml",
-    "yaml", "json", "toml", "tf", "sql", "html", "css", "txt", "xml",
+    "go",
+    "py",
+    "js",
+    "jsx",
+    "ts",
+    "tsx",
+    "mjs",
+    "cjs",
+    "java",
+    "kt",
+    "rb",
+    "rs",
+    "c",
+    "h",
+    "cc",
+    "cpp",
+    "hpp",
+    "cs",
+    "php",
+    "sh",
+    "md",
+    "yml",
+    "yaml",
+    "json",
+    "toml",
+    "tf",
+    "sql",
+    "html",
+    "css",
+    "txt",
+    "xml",
 }
 
 
@@ -67,12 +148,13 @@ MAX_PORT = 65535
 # the list -- it fires on `authors = [...]` in every pyproject.toml, and
 # AUTH_TOKEN is already caught by TOKEN.
 SECRET_NAME_RE = re.compile(
-    r'\b((?:[A-Za-z][A-Za-z0-9_]*?)?'
-    r'(?:SECRET|TOKEN|PASSWORD|PASSWD|API[_]?KEY|APIKEY|CREDENTIAL|'
-    r'PRIVATE[_]?KEY|ACCESS[_]?KEY|CLIENT[_]?SECRET)'
-    r'[A-Za-z0-9_]*)\b'
-    r'(?=\s*[:=])',
-    re.IGNORECASE)
+    r"\b((?:[A-Za-z][A-Za-z0-9_]*?)?"
+    r"(?:SECRET|TOKEN|PASSWORD|PASSWD|API[_]?KEY|APIKEY|CREDENTIAL|"
+    r"PRIVATE[_]?KEY|ACCESS[_]?KEY|CLIENT[_]?SECRET)"
+    r"[A-Za-z0-9_]*)\b"
+    r"(?=\s*[:=])",
+    re.IGNORECASE,
+)
 
 SCHEMA_KEYS = ('"$schema"', "'$schema'", "$schema:")
 
@@ -142,7 +224,7 @@ def _redact_userinfo(rest):
 
 # Query-string / fragment `name=value` pairs, delimited by '&'. Applied only
 # to the text from the first '?' or '#' onward -- the path is never touched.
-_QUERY_KV_RE = re.compile(r'([^&=?#]+)=([^&#]*)')
+_QUERY_KV_RE = re.compile(r"([^&=?#]+)=([^&#]*)")
 
 # Deliberately separate from SECRET_NAME_RE, and deliberately wider: this list
 # is tuned for the commonest credential *query-parameter* names seen in real
@@ -154,9 +236,23 @@ _QUERY_KV_RE = re.compile(r'([^&=?#]+)=([^&#]*)')
 # name* is not. Exact match, case-insensitive: these are short, common words
 # that would over-match badly as a substring test.
 QUERY_SECRET_PARAM_NAMES = {
-    "key", "sig", "signature", "code", "auth", "pass", "pwd", "secret",
-    "token", "password", "credential", "apikey", "api_key", "access_token",
-    "refresh_token", "x-amz-signature", "x-amz-credential",
+    "key",
+    "sig",
+    "signature",
+    "code",
+    "auth",
+    "pass",
+    "pwd",
+    "secret",
+    "token",
+    "password",
+    "credential",
+    "apikey",
+    "api_key",
+    "access_token",
+    "refresh_token",
+    "x-amz-signature",
+    "x-amz-credential",
     "x-amz-security-token",
 }
 
@@ -178,8 +274,7 @@ def _redact_secret_params(text):
 
     def redact(match):
         name = match.group(1)
-        if (SECRET_NAME_RE.search(name + "=")
-                or name.lower() in QUERY_SECRET_PARAM_NAMES):
+        if SECRET_NAME_RE.search(name + "=") or name.lower() in QUERY_SECRET_PARAM_NAMES:
             return f"{name}=***"
         return match.group(0)
 
@@ -187,7 +282,7 @@ def _redact_secret_params(text):
 
 
 def _strip_trailing(value):
-    return value.rstrip('.,;:"\'`)]}>')
+    return value.rstrip(".,;:\"'`)]}>")
 
 
 def scan_literals(root, paths):
@@ -206,17 +301,14 @@ def scan_literals(root, paths):
                     scheme, rest = match.group(1), match.group(2)
                     redacted = _redact_secret_params(_redact_userinfo(rest))
                     value = _strip_trailing(f"{scheme}://{redacted}")
-                    urls.append({"value": value, "scheme": scheme,
-                                 "host": _url_host(rest),
-                                 "file": path, "line": number})
+                    urls.append(
+                        {"value": value, "scheme": scheme, "host": _url_host(rest), "file": path, "line": number}
+                    )
             for match in HOST_PORT_RE.finditer(line):
                 port = int(match.group(2))
                 if MIN_PORT <= port <= MAX_PORT and _is_host(match.group(1)):
-                    host_ports.append({"host": match.group(1), "port": port,
-                                       "file": path, "line": number})
+                    host_ports.append({"host": match.group(1), "port": port, "file": path, "line": number})
             for match in SECRET_NAME_RE.finditer(line):
-                secret_keys.append({"name": match.group(1), "file": path,
-                                    "line": number})
+                secret_keys.append({"name": match.group(1), "file": path, "line": number})
 
-    return {"url_literals": urls, "host_port_literals": host_ports,
-            "secret_shaped_keys": secret_keys}
+    return {"url_literals": urls, "host_port_literals": host_ports, "secret_shaped_keys": secret_keys}

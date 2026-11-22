@@ -10,21 +10,47 @@ import subprocess
 from pathlib import Path, PurePosixPath
 
 DOC_TYPES = (
-    "prd", "requirements", "spec", "design", "architecture", "adr",
-    "runbook", "api_reference", "user_guide", "tutorial", "readme",
-    "changelog", "unknown",
+    "prd",
+    "requirements",
+    "spec",
+    "design",
+    "architecture",
+    "adr",
+    "runbook",
+    "api_reference",
+    "user_guide",
+    "tutorial",
+    "readme",
+    "changelog",
+    "unknown",
 )
 
 DOC_EXTS = {".md", ".rst", ".adoc", ".txt"}
 
 DOC_DIRS = {
-    "docs", "doc", "documentation", "adr", "adrs", "decisions",
-    "rfc", "rfcs", "spec", "specs", "design", "wiki", "notes",
+    "docs",
+    "doc",
+    "documentation",
+    "adr",
+    "adrs",
+    "decisions",
+    "rfc",
+    "rfcs",
+    "spec",
+    "specs",
+    "design",
+    "wiki",
+    "notes",
 }
 
 DOC_NAMES = {
-    "README.md", "README.rst", "README.txt",
-    "CONTRIBUTING.md", "ARCHITECTURE.md", "CHANGELOG.md", "CHANGELOG.rst",
+    "README.md",
+    "README.rst",
+    "README.txt",
+    "CONTRIBUTING.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
+    "CHANGELOG.rst",
 }
 
 STEM_TYPES = {
@@ -118,7 +144,10 @@ def _git_available(root):
     try:
         proc = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return False
@@ -129,7 +158,10 @@ def _git_last_modified(root, path):
     try:
         proc = subprocess.run(
             ["git", "-C", str(root), "log", "-1", "--format=%cI", "--", path],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -175,10 +207,12 @@ def detect_docs(root, paths, max_git_lookups=500):
             lookups += 1
         else:
             last_modified = None
-        docs.append({
-            "path": path,
-            "doc_type_guess": guess_doc_type(path),
-            "size": _size(root, path),
-            "last_modified": last_modified,
-        })
+        docs.append(
+            {
+                "path": path,
+                "doc_type_guess": guess_doc_type(path),
+                "size": _size(root, path),
+                "last_modified": last_modified,
+            }
+        )
     return {"docs": docs, "docs_sites": _doc_sites(paths)}

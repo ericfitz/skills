@@ -27,13 +27,9 @@ from jsonargs import JsonErrorParser
 
 
 def main(argv=None):
-    parser = JsonErrorParser(
-        prog="health.py",
-        description="Derive health[] from depgraph.py output.")
-    parser.add_argument("document", metavar="DEPGRAPH_OUT.json",
-                        help="depgraph.py output (or a synthesis document)")
-    parser.add_argument("--indent", type=int, default=2,
-                        help="JSON indent; 0 for compact output")
+    parser = JsonErrorParser(prog="health.py", description="Derive health[] from depgraph.py output.")
+    parser.add_argument("document", metavar="DEPGRAPH_OUT.json", help="depgraph.py output (or a synthesis document)")
+    parser.add_argument("--indent", type=int, default=2, help="JSON indent; 0 for compact output")
     args = parser.parse_args(argv)
 
     try:

@@ -39,7 +39,12 @@ def test_cli_default_and_explicit_output(cli, artifacts, tmp_path, monkeypatch, 
     monkeypatch.chdir(caller)
     monkeypatch.setenv("HOME", str(home))
     destinations = [None, str(tmp_path / "custom report.html"), "~/home report.htm", "relative report.html"]
-    expected = [artifacts / "profile-report.html", tmp_path / "custom report.html", home / "home report.htm", caller / "relative report.html"]
+    expected = [
+        artifacts / "profile-report.html",
+        tmp_path / "custom report.html",
+        home / "home report.htm",
+        caller / "relative report.html",
+    ]
     for argument, output in zip(destinations, expected, strict=True):
         args = [str(artifacts), "--title", "Saved profile title"]
         if argument:
@@ -49,7 +54,9 @@ def test_cli_default_and_explicit_output(cli, artifacts, tmp_path, monkeypatch, 
         assert str(output.resolve()) in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("case", ["malformed", "missing", "support", "parent", "suffix", "direct", "symlink", "hardlink"])
+@pytest.mark.parametrize(
+    "case", ["malformed", "missing", "support", "parent", "suffix", "direct", "symlink", "hardlink"]
+)
 def test_invalid_input_preserves_output(cli, artifacts, tmp_path, case, capsys, monkeypatch):
     opener = Mock()
     monkeypatch.setattr(cli.webbrowser, "open", opener)
@@ -163,7 +170,9 @@ def test_support_arguments_are_forwarded(cli, artifacts, tmp_path):
     text.write_text("recorded text sentinel", encoding="utf-8")
     markdown.write_text("recorded markdown sentinel", encoding="utf-8")
     recorded.write_text('{"assertion": "recorded JSON sentinel"}', encoding="utf-8")
-    assert cli.main([str(artifacts), "--support", str(text), "--support", str(markdown), "--support", str(recorded)]) == 0
+    assert (
+        cli.main([str(artifacts), "--support", str(text), "--support", str(markdown), "--support", str(recorded)]) == 0
+    )
     html = (artifacts / "profile-report.html").read_text(encoding="utf-8")
     assert "recorded text sentinel" in html
     assert "recorded markdown sentinel" in html

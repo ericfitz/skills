@@ -91,33 +91,28 @@ class TestEachSkillOwnsItsCategory(unittest.TestCase):
             with self.subTest(skill=category):
                 text = body(skill_path(category))
                 assert_phrase_in(self, f"contracts/{category}.schema.json", text)
-                assert_phrase_in(
-                    self, f"examples/{category}.example.json", text)
+                assert_phrase_in(self, f"examples/{category}.example.json", text)
 
     def test_each_skill_names_the_shared_envelope(self):
         for category in CATEGORIES:
             with self.subTest(skill=category):
-                assert_phrase_in(
-                    self, "discovery.schema.json", body(skill_path(category)))
+                assert_phrase_in(self, "discovery.schema.json", body(skill_path(category)))
 
 
 class TestLayer2SkillsNameTheirDependencies(unittest.TestCase):
     def test_both_layer2_skills_name_the_synthesis_contract(self):
         for skill in LAYER2:
             with self.subTest(skill=skill):
-                assert_phrase_in(
-                    self, "synthesis.schema.json", body(skill_path(skill)))
+                assert_phrase_in(self, "synthesis.schema.json", body(skill_path(skill)))
 
     def test_report_names_synthesize(self):
         assert_phrase_in(self, "synthesize", body(skill_path("report")))
 
     def test_synthesize_names_depgraph(self):
-        assert_phrase_in(
-            self, "depgraph.py", body(skill_path("synthesize")))
+        assert_phrase_in(self, "depgraph.py", body(skill_path("synthesize")))
 
     def test_synthesize_names_health_script(self):
-        assert_phrase_in(
-            self, "scripts/health.py", body(skill_path("synthesize")))
+        assert_phrase_in(self, "scripts/health.py", body(skill_path("synthesize")))
 
 
 class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
@@ -146,8 +141,14 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
         # Patterns, not plain substrings: "blast radius" and "blast-radius"
         # are the same promise (C1), and "rank"/"ranking"/"ranked"/"ranks"
         # are the same promise too (C2).
-        banned = (r"criticality", r"blast[- ]radius", r"remediation",
-                  r"monitoring gap", r"chaos test", r"\brank(?:s|ing|ed)?\b")
+        banned = (
+            r"criticality",
+            r"blast[- ]radius",
+            r"remediation",
+            r"monitoring gap",
+            r"chaos test",
+            r"\brank(?:s|ing|ed)?\b",
+        )
         # Word-boundary patterns: a bare substring match ("not " inside
         # "cannot ", "never" inside "whenever") would count prose as a
         # disclaimer that never disclaimed anything.
@@ -169,7 +170,8 @@ class TestDisciplineIsStatedInEverySkill(unittest.TestCase):
                             continue
                         self.assertTrue(
                             any(re.search(pat, line) for pat in disclaim_markers),
-                            f"{skill.parent.name} promises {pattern!r}: {line}")
+                            f"{skill.parent.name} promises {pattern!r}: {line}",
+                        )
 
 
 class TestSecuritySkillCarriesTheCredentialRule(unittest.TestCase):
@@ -196,8 +198,7 @@ class TestLifecycleInstructions(unittest.TestCase):
     """Spec pin: an unenforced classification is how two skills come to
     disagree about the same entry."""
 
-    RUN_CONSTANT: ClassVar[list[str]] = [
-        "service", "network", "config", "security", "platform"]
+    RUN_CONSTANT: ClassVar[list[str]] = ["service", "network", "config", "security", "platform"]
 
     def test_platform_allows_build_only_for_ci_runner_facts(self):
         """Owner decision 2026-09-28 (#81): CI-runner facts are `build`;
@@ -247,14 +248,12 @@ class TestFailabilityRuleIsStated(unittest.TestCase):
 
 class TestRegistration(unittest.TestCase):
     def test_plugin_manifest_is_semver_and_named_for_its_directory(self):
-        data = json.loads(
-            (PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        data = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
         self.assertEqual(data["name"], "dependency-model")
         self.assertRegex(data["version"], r"^\d+\.\d+\.\d+$")
 
     def test_marketplace_entry_exists_in_the_development_category(self):
-        data = json.loads(
-            (REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        data = json.loads((REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
         entry = next(p for p in data["plugins"] if p["name"] == "dependency-model")
         self.assertEqual(entry["source"], "./dependency-model")
         self.assertEqual(entry["category"], "development")
@@ -262,9 +261,8 @@ class TestRegistration(unittest.TestCase):
     def test_verify_script_declares_the_plugin_with_all_eight_skills(self):
         text = (REPO / "scripts" / "verify-marketplace.sh").read_text(encoding="utf-8")
         self.assertIn(
-            '"dependency-model:development:'
-            'config,network,package,platform,report,security,service,synthesize"',
-            text)
+            '"dependency-model:development:config,network,package,platform,report,security,service,synthesize"', text
+        )
         self.assertIn("dependency-model/scripts/depscan.py", text)
         self.assertIn("dependency-model/scripts/depgraph.py", text)
         self.assertIn("dependency-model/scripts/health.py", text)
@@ -311,11 +309,11 @@ class TestSharedIdList(unittest.TestCase):
     def test_synthesize_runs_idmap(self):
         text = body(skill_path("synthesize"))
         self.assertIn("idmap.py", text)
-        self.assertIn("--write", text[text.index("idmap.py"):])
+        self.assertIn("--write", text[text.index("idmap.py") :])
 
     def test_running_discovery_order(self):
         text = (PLUGIN / "references" / "running-discovery.md").read_text(encoding="utf-8")
-        text = text[text.index("## The sequence"):]
+        text = text[text.index("## The sequence") :]
         scan = text.index("depscan.py")
         topology = text.index("profile:topology", scan)
         idmap = text.index("idmap.py", topology)

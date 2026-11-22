@@ -12,9 +12,12 @@ from inventorylib.manifests import detect_manifests
 class TestDetectManifests(unittest.TestCase):
     def test_detects_go_module(self):
         found = detect_manifests(["go.mod", "main.go"])
-        self.assertEqual(found, [
-            {"path": "go.mod", "ecosystem": "go", "package_manager": "go"},
-        ])
+        self.assertEqual(
+            found,
+            [
+                {"path": "go.mod", "ecosystem": "go", "package_manager": "go"},
+            ],
+        )
 
     def test_lockfile_refines_package_manager(self):
         found = detect_manifests(["pyproject.toml", "uv.lock"])
@@ -33,11 +36,14 @@ class TestDetectManifests(unittest.TestCase):
         self.assertIsNone(found[0]["package_manager"])
 
     def test_monorepo_reports_each_manifest_sorted(self):
-        found = detect_manifests([
-            "web/package.json", "web/yarn.lock", "api/go.mod",
-        ])
-        self.assertEqual([entry["path"] for entry in found],
-                         ["api/go.mod", "web/package.json"])
+        found = detect_manifests(
+            [
+                "web/package.json",
+                "web/yarn.lock",
+                "api/go.mod",
+            ]
+        )
+        self.assertEqual([entry["path"] for entry in found], ["api/go.mod", "web/package.json"])
         self.assertEqual(found[1]["package_manager"], "yarn")
 
     def test_non_manifest_files_ignored(self):

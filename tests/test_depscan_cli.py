@@ -17,9 +17,16 @@ from repobuilder import build_repo
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "dependency-model" / "scripts" / "depscan.py"
 
-FINDING_KEYS = ["env_refs", "host_port_literals", "k8s_network",
-                "resilience_calls", "resource_limits", "secret_refs",
-                "secret_shaped_keys", "url_literals"]
+FINDING_KEYS = [
+    "env_refs",
+    "host_port_literals",
+    "k8s_network",
+    "resilience_calls",
+    "resource_limits",
+    "secret_refs",
+    "secret_shaped_keys",
+    "url_literals",
+]
 
 
 class TestBuildScan(unittest.TestCase):
@@ -27,11 +34,25 @@ class TestBuildScan(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"app.py": "x = 1\n"})
             scan = build_scan(root)
-            self.assertEqual(sorted(scan),
-                             ["coverage", "exclusions", "file_classes", "files", "findings",
-                              "ignored", "listing_method", "ref", "run_dir",
-                              "scan_root", "scan_version", "syft_excludes",
-                              "target", "unsafe_links"])
+            self.assertEqual(
+                sorted(scan),
+                [
+                    "coverage",
+                    "exclusions",
+                    "file_classes",
+                    "files",
+                    "findings",
+                    "ignored",
+                    "listing_method",
+                    "ref",
+                    "run_dir",
+                    "scan_root",
+                    "scan_version",
+                    "syft_excludes",
+                    "target",
+                    "unsafe_links",
+                ],
+            )
             self.assertEqual(scan["scan_version"], "1.3.0")
             self.assertEqual(scan["target"], str(Path(root).resolve()))
 
@@ -65,10 +86,10 @@ class TestBuildScan(unittest.TestCase):
 
     def test_output_is_deterministic(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {"a.py": "x = 1\n", "docker-compose.yml":
-                                    "services:\n  db:\n    image: postgres:16\n"})
-            self.assertEqual(json.dumps(build_scan(root), sort_keys=True),
-                             json.dumps(build_scan(root), sort_keys=True))
+            root = build_repo(
+                tmp, {"a.py": "x = 1\n", "docker-compose.yml": "services:\n  db:\n    image: postgres:16\n"}
+            )
+            self.assertEqual(json.dumps(build_scan(root), sort_keys=True), json.dumps(build_scan(root), sort_keys=True))
 
 
 class TestCli(unittest.TestCase):
@@ -80,8 +101,8 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"app.py": "x = 1\n"})
             proc = subprocess.run(
-                [sys.executable, str(SCRIPT), str(root)],
-                capture_output=True, text=True, timeout=60, check=False)
+                [sys.executable, str(SCRIPT), str(root)], capture_output=True, text=True, timeout=60, check=False
+            )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertEqual(json.loads(proc.stdout)["scan_version"], "1.3.0")
 
@@ -90,7 +111,11 @@ class TestCli(unittest.TestCase):
             root = build_repo(tmp, {"app.py": "x = 1\n"})
             proc = subprocess.run(
                 [sys.executable, str(SCRIPT), str(root), "--indent", "0"],
-                capture_output=True, text=True, timeout=60, check=False)
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertNotIn("\n  ", proc.stdout)
 

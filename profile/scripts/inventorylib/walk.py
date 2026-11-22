@@ -4,10 +4,27 @@ import subprocess
 from pathlib import Path
 
 SKIP_DIRS = {
-    ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "env",
-    "vendor", "dist", "build", "target", "out", "__pycache__",
-    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".next",
-    ".gradle", "site-packages", ".idea",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    ".venv",
+    "venv",
+    "env",
+    "vendor",
+    "dist",
+    "build",
+    "target",
+    "out",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".next",
+    ".gradle",
+    "site-packages",
+    ".idea",
 }
 
 
@@ -19,9 +36,11 @@ def _git_files(root):
     """Return git's view of the repo, or None if root is not a usable git repo."""
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--cached", "--others",
-             "--exclude-standard"],
-            capture_output=True, text=True, timeout=30, check=False,
+            ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None

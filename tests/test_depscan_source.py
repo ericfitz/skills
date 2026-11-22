@@ -30,32 +30,34 @@ def kinds(findings):
 
 class TestEnvRefs(unittest.TestCase):
     def test_go_getenv_and_lookupenv(self):
-        findings, _ = scan({"main.go":
-            'package main\n\nfunc a() {\n\tx := os.Getenv("DATABASE_URL")\n'
-            '\ty, ok := os.LookupEnv("REDIS_ADDR")\n}\n'})
+        findings, _ = scan(
+            {
+                "main.go": 'package main\n\nfunc a() {\n\tx := os.Getenv("DATABASE_URL")\n'
+                '\ty, ok := os.LookupEnv("REDIS_ADDR")\n}\n'
+            }
+        )
         self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "REDIS_ADDR"])
 
     def test_python_environ_forms(self):
-        findings, _ = scan({"app.py":
-            'import os\nA = os.environ["DATABASE_URL"]\n'
-            'B = os.environ.get("REDIS_ADDR")\nC = os.getenv("QUEUE_URL")\n'})
-        self.assertEqual(names(findings, "env_refs"),
-                         ["DATABASE_URL", "QUEUE_URL", "REDIS_ADDR"])
+        findings, _ = scan(
+            {
+                "app.py": 'import os\nA = os.environ["DATABASE_URL"]\n'
+                'B = os.environ.get("REDIS_ADDR")\nC = os.getenv("QUEUE_URL")\n'
+            }
+        )
+        self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "QUEUE_URL", "REDIS_ADDR"])
 
     def test_javascript_process_env_forms(self):
-        findings, _ = scan({"server.js":
-            'const a = process.env.DATABASE_URL;\n'
-            'const b = process.env["REDIS_ADDR"];\n'})
+        findings, _ = scan({"server.js": 'const a = process.env.DATABASE_URL;\nconst b = process.env["REDIS_ADDR"];\n'})
         self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "REDIS_ADDR"])
 
     def test_typescript_is_scanned_like_javascript(self):
-        findings, _ = scan({"src/config.ts": 'export const u = process.env.API_URL;\n'})
+        findings, _ = scan({"src/config.ts": "export const u = process.env.API_URL;\n"})
         self.assertEqual(names(findings, "env_refs"), ["API_URL"])
 
     def test_records_file_and_one_indexed_line(self):
         findings, _ = scan({"app.py": 'import os\n\nX = os.getenv("A_KEY")\n'})
-        self.assertEqual(findings["env_refs"],
-                         [{"name": "A_KEY", "file": "app.py", "line": 3}])
+        self.assertEqual(findings["env_refs"], [{"name": "A_KEY", "file": "app.py", "line": 3}])
 
     def test_same_name_twice_is_two_records(self):
         findings, _ = scan({"app.py": 'os.getenv("A")\nos.getenv("A")\n'})
@@ -66,54 +68,60 @@ class TestEnvRefs(unittest.TestCase):
         self.assertEqual(findings["env_refs"], [])
 
     def test_javascript_destructured_process_env(self):
-        findings, _ = scan({"server.js": 'const { DATABASE_URL, PORT } = process.env;\n'})
+        findings, _ = scan({"server.js": "const { DATABASE_URL, PORT } = process.env;\n"})
         self.assertEqual(names(findings, "env_refs"), ["DATABASE_URL", "PORT"])
 
     def test_javascript_optional_chaining_process_env(self):
-        findings, _ = scan({"config.js": 'const u = process.env?.FOO;\n'})
+        findings, _ = scan({"config.js": "const u = process.env?.FOO;\n"})
         self.assertEqual(names(findings, "env_refs"), ["FOO"])
 
     def test_python_bare_environ_imported_from_os(self):
-        findings, _ = scan({"app.py":
-            'from os import environ\nX = environ.get("DB_URL")\n'})
+        findings, _ = scan({"app.py": 'from os import environ\nX = environ.get("DB_URL")\n'})
         self.assertEqual(names(findings, "env_refs"), ["DB_URL"])
 
 
 class TestResilienceCalls(unittest.TestCase):
     def test_go_context_with_timeout_and_deadline(self):
-        findings, _ = scan({"db.go":
-            'ctx, cancel := context.WithTimeout(parent, 5*time.Second)\n'
-            'ctx2, c2 := context.WithDeadline(parent, t)\n'})
+        findings, _ = scan(
+            {
+                "db.go": "ctx, cancel := context.WithTimeout(parent, 5*time.Second)\n"
+                "ctx2, c2 := context.WithDeadline(parent, t)\n"
+            }
+        )
         self.assertEqual(kinds(findings), ["deadline", "timeout"])
 
     def test_go_struct_timeout_field(self):
-        findings, _ = scan({"client.go": 'c := &http.Client{Timeout: 3 * time.Second}\n'})
+        findings, _ = scan({"client.go": "c := &http.Client{Timeout: 3 * time.Second}\n"})
         self.assertIn("timeout", kinds(findings))
 
     def test_python_timeout_kwarg_and_retry_decorator(self):
-        findings, _ = scan({"client.py":
-            'import requests\nfrom tenacity import retry\n\n'
-            '@retry\ndef get():\n    return requests.get(url, timeout=5)\n'})
+        findings, _ = scan(
+            {
+                "client.py": "import requests\nfrom tenacity import retry\n\n"
+                "@retry\ndef get():\n    return requests.get(url, timeout=5)\n"
+            }
+        )
         self.assertEqual(kinds(findings), ["retry", "timeout"])
 
     def test_javascript_abort_signal_and_axios_timeout(self):
-        findings, _ = scan({"api.ts":
-            'const s = AbortSignal.timeout(2000);\n'
-            'const c = axios.create({ timeout: 3000 });\n'})
+        findings, _ = scan(
+            {"api.ts": "const s = AbortSignal.timeout(2000);\nconst c = axios.create({ timeout: 3000 });\n"}
+        )
         self.assertEqual(kinds(findings), ["timeout"])
 
     def test_circuit_breaker_libraries_are_recognised(self):
-        findings, _ = scan({
-            "b.go": 'import "github.com/sony/gobreaker"\n',
-            "b.py": 'import pybreaker\n',
-            "b.js": 'const CircuitBreaker = require("opossum");\n',
-        })
+        findings, _ = scan(
+            {
+                "b.go": 'import "github.com/sony/gobreaker"\n',
+                "b.py": "import pybreaker\n",
+                "b.js": 'const CircuitBreaker = require("opossum");\n',
+            }
+        )
         by_file = {r["file"]: r["kind"] for r in findings["resilience_calls"]}
-        self.assertEqual(by_file, {"b.go": "circuit-breaker", "b.py": "circuit-breaker",
-                                   "b.js": "circuit-breaker"})
+        self.assertEqual(by_file, {"b.go": "circuit-breaker", "b.py": "circuit-breaker", "b.js": "circuit-breaker"})
 
     def test_records_the_matched_text_verbatim_as_raw(self):
-        findings, _ = scan({"db.go": 'context.WithTimeout(parent, 5*time.Second)\n'})
+        findings, _ = scan({"db.go": "context.WithTimeout(parent, 5*time.Second)\n"})
         record = findings["resilience_calls"][0]
         self.assertIn("WithTimeout", record["raw"])
         self.assertEqual(record["file"], "db.go")
@@ -125,8 +133,7 @@ class TestResilienceCalls(unittest.TestCase):
         sorted paths, so routing through it would pass even if scan_source
         never sorted anything itself."""
         with tempfile.TemporaryDirectory() as tmp:
-            root = build_repo(tmp, {"b.py": 'requests.get(u, timeout=1)\n',
-                                    "a.py": 'requests.get(u, timeout=2)\n'})
+            root = build_repo(tmp, {"b.py": "requests.get(u, timeout=1)\n", "a.py": "requests.get(u, timeout=2)\n"})
             findings, _ = scan_source(root, ["b.py", "a.py"])
         files = [r["file"] for r in findings["resilience_calls"]]
         self.assertEqual(files, ["a.py", "b.py"])
@@ -140,22 +147,20 @@ class TestResilienceCalls(unittest.TestCase):
         self.assertEqual(len(record["raw"]), 200)
 
     def test_raw_is_cut_before_a_following_statement_on_the_same_line(self):
-        findings, _ = scan({"a.js":
-            'const retry = require("p-retry"); const pw = "hunter2-secret";\n'})
+        findings, _ = scan({"a.js": 'const retry = require("p-retry"); const pw = "hunter2-secret";\n'})
         raw = findings["resilience_calls"][0]["raw"]
         self.assertNotIn("hunter2", raw)
         self.assertNotIn(";", raw)
         self.assertIn("p-retry", raw)
 
     def test_raw_is_cut_before_a_python_trailing_comment(self):
-        findings, _ = scan({"a.py": '@retry(stop=3)  # token=abc123secret\n'})
+        findings, _ = scan({"a.py": "@retry(stop=3)  # token=abc123secret\n"})
         raw = findings["resilience_calls"][0]["raw"]
         self.assertNotIn("abc123", raw)
         self.assertEqual(raw, "@retry(stop=3)")
 
     def test_raw_is_cut_before_a_go_line_comment(self):
-        findings, _ = scan({"a.go":
-            'import "github.com/sony/gobreaker" // key=sk-live-123\n'})
+        findings, _ = scan({"a.go": 'import "github.com/sony/gobreaker" // key=sk-live-123\n'})
         raw = findings["resilience_calls"][0]["raw"]
         self.assertNotIn("sk-live", raw)
         self.assertNotIn("//", raw)
@@ -166,22 +171,22 @@ class TestResilienceCalls(unittest.TestCase):
         self.assertNotIn("zzz", findings["resilience_calls"][0]["raw"])
 
     def test_timeout_raw_is_cut_before_a_trailing_comment(self):
-        findings, _ = scan({"a.py": 'requests.get(u, timeout=5 # secret\n'})
+        findings, _ = scan({"a.py": "requests.get(u, timeout=5 # secret\n"})
         self.assertNotIn("secret", findings["resilience_calls"][0]["raw"])
 
     def test_timeout_kwarg_not_confused_with_equality_check(self):
-        findings, _ = scan({"app.py": 'if timeout == 30:\n    pass\n'})
+        findings, _ = scan({"app.py": "if timeout == 30:\n    pass\n"})
         self.assertEqual(kinds(findings), [])
 
 
 class TestSkippedLanguages(unittest.TestCase):
     def test_out_of_scope_source_is_reported_not_silently_dropped(self):
         """D9: the gap must be visible in the contract."""
-        _, skipped = scan({"main.rs": "fn main() {}\n", "lib.rs": "pub fn a() {}\n",
-                           "app.py": "x = 1\n"})
-        self.assertEqual(skipped, [{
-            "reason": "source-literal scanning covers go, js, python, and ts only",
-            "language": "rust", "count": 2}])
+        _, skipped = scan({"main.rs": "fn main() {}\n", "lib.rs": "pub fn a() {}\n", "app.py": "x = 1\n"})
+        self.assertEqual(
+            skipped,
+            [{"reason": "source-literal scanning covers go, js, python, and ts only", "language": "rust", "count": 2}],
+        )
 
     def test_in_scope_only_repo_reports_nothing_skipped(self):
         _, skipped = scan({"app.py": "x = 1\n", "main.go": "package main\n"})
@@ -192,8 +197,7 @@ class TestSkippedLanguages(unittest.TestCase):
         self.assertEqual(skipped, [])
 
     def test_the_three_in_scope_ecosystems_are_the_documented_ones(self):
-        self.assertEqual(sorted(set(SOURCE_LANGUAGES.values())),
-                         ["go", "js", "python", "ts"])
+        self.assertEqual(sorted(set(SOURCE_LANGUAGES.values())), ["go", "js", "python", "ts"])
 
 
 if __name__ == "__main__":

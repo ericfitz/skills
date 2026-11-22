@@ -12,8 +12,7 @@ EXAMPLES = REPO / "dependency-model" / "references" / "contracts" / "examples"
 
 
 def run(contract, path):
-    return subprocess.run([sys.executable, str(SCRIPT), contract, str(path)],
-                          capture_output=True, text=True)
+    return subprocess.run([sys.executable, str(SCRIPT), contract, str(path)], capture_output=True, text=True)
 
 
 class ValidateCliTest(unittest.TestCase):
@@ -55,20 +54,19 @@ class ValidateCliTest(unittest.TestCase):
             return run("discovery", path)
 
     def test_min_items_rejects_empty_evidence(self):
-        result = self.run_doc(self.service_doc_with(
-            [{"component_id": "component:api", "evidence": []}]))
+        result = self.run_doc(self.service_doc_with([{"component_id": "component:api", "evidence": []}]))
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("at least 1", result.stdout)
 
     def test_used_by_extra_property_rejected(self):
-        result = self.run_doc(self.service_doc_with(
-            [{"component_id": "component:api", "evidence": ["a.go:1"], "role": "x"}]))
+        result = self.run_doc(
+            self.service_doc_with([{"component_id": "component:api", "evidence": ["a.go:1"], "role": "x"}])
+        )
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("unexpected property 'role'", result.stdout)
 
     def test_used_by_valid_entry_accepted(self):
-        result = self.run_doc(self.service_doc_with(
-            [{"component_id": "component:api", "evidence": ["a.go:1"]}]))
+        result = self.run_doc(self.service_doc_with([{"component_id": "component:api", "evidence": ["a.go:1"]}]))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_unknown_contract(self):

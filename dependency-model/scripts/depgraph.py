@@ -41,15 +41,15 @@ from jsonargs import JsonErrorParser
 
 def main(argv=None):
     parser = JsonErrorParser(
-        prog="depgraph.py",
-        description="Merge dependency-model discovery envelopes into a graph document.")
-    parser.add_argument("envelopes", nargs="+", metavar="ENVELOPE.json",
-                        help="discovery envelope JSON files to merge")
-    parser.add_argument("--topology", metavar="topology.json",
-                        help="profile:topology contract; its components[] become "
-                             "component:<slug> nodes")
-    parser.add_argument("--indent", type=int, default=2,
-                        help="JSON indent; 0 for compact output")
+        prog="depgraph.py", description="Merge dependency-model discovery envelopes into a graph document."
+    )
+    parser.add_argument("envelopes", nargs="+", metavar="ENVELOPE.json", help="discovery envelope JSON files to merge")
+    parser.add_argument(
+        "--topology",
+        metavar="topology.json",
+        help="profile:topology contract; its components[] become component:<slug> nodes",
+    )
+    parser.add_argument("--indent", type=int, default=2, help="JSON indent; 0 for compact output")
     args = parser.parse_args(argv)
 
     loaded = []
@@ -72,9 +72,10 @@ def main(argv=None):
         sys.stderr.write("\n")
         return 2
     try:
-        components = [{"id": ids[c["name"]], "name": c["name"],
-                       "role": c.get("role"), "evidence": list(c.get("evidence") or [])}
-                      for c in topo_components]
+        components = [
+            {"id": ids[c["name"]], "name": c["name"], "role": c.get("role"), "evidence": list(c.get("evidence") or [])}
+            for c in topo_components
+        ]
         merged = merge_envelopes(loaded)
         graph, unresolved = link_graph(merged, components)
     except MixedProvenanceError as exc:
@@ -92,13 +93,18 @@ def main(argv=None):
         sys.stderr.write("\n")
         return 2
     for name, roles in sorted(conflicts.items()):
-        sys.stderr.write(f"depgraph.py: component {name!r} is listed with roles "
-                         f"{', '.join(map(repr, roles))}; kept {roles[0]!r}\n")
+        sys.stderr.write(
+            f"depgraph.py: component {name!r} is listed with roles {', '.join(map(repr, roles))}; kept {roles[0]!r}\n"
+        )
     if unresolved:
-        sys.stderr.write(f"depgraph.py: {len(unresolved)} link(s) match no node; "
-                         "see `unresolved` in the output\n")
-    document = {"inventory": merged, "components": components, "graph": graph,
-                "mermaid": to_mermaid(graph), "unresolved": unresolved}
+        sys.stderr.write(f"depgraph.py: {len(unresolved)} link(s) match no node; see `unresolved` in the output\n")
+    document = {
+        "inventory": merged,
+        "components": components,
+        "graph": graph,
+        "mermaid": to_mermaid(graph),
+        "unresolved": unresolved,
+    }
 
     indent = args.indent if args.indent > 0 else None
     print(json.dumps(document, indent=indent, sort_keys=True))

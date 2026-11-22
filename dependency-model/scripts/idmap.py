@@ -70,14 +70,16 @@ def build_document(topology):
     services, skipped = [], []
     for name, sid in service_ids.items():
         if sid.partition(":")[2] in component_parts:
-            skipped.append({"name": name, "reason":
-                            f"matches component:{sid.partition(':')[2]}; "
-                            "the system's own listener, not a service"})
+            skipped.append(
+                {
+                    "name": name,
+                    "reason": f"matches component:{sid.partition(':')[2]}; the system's own listener, not a service",
+                }
+            )
         else:
             services.append({"id": sid, "name": name, "source": sources[name]})
     return {
-        "components": sorted(({"id": cid, "name": n} for n, cid in component_ids.items()),
-                             key=lambda e: e["id"]),
+        "components": sorted(({"id": cid, "name": n} for n, cid in component_ids.items()), key=lambda e: e["id"]),
         "services": sorted(services, key=lambda e: e["id"]),
         "skipped": sorted(skipped, key=lambda e: e["name"]),
     }
@@ -103,12 +105,12 @@ def write_atomic(path, text):
 
 def main(argv=None):
     parser = JsonErrorParser(
-        prog="idmap.py",
-        description="Write the shared component/service id list for a topology contract.")
-    parser.add_argument("topology", metavar="TOPOLOGY.json",
-                        help="profile:topology contract")
-    parser.add_argument("--write", action="store_true",
-                        help="write ids.json beside the topology file and print its path")
+        prog="idmap.py", description="Write the shared component/service id list for a topology contract."
+    )
+    parser.add_argument("topology", metavar="TOPOLOGY.json", help="profile:topology contract")
+    parser.add_argument(
+        "--write", action="store_true", help="write ids.json beside the topology file and print its path"
+    )
     args = parser.parse_args(argv)
 
     try:

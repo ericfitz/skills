@@ -24,14 +24,11 @@ from inventorylib.report import build_inventory
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="profile_inventory.py",
-        description="Emit a deterministic JSON inventory of a repository.")
-    parser.add_argument("path", nargs="?", default=".",
-                        help="repo root to inventory (default: current directory)")
-    parser.add_argument("--json", action="store_true",
-                        help="emit JSON (default; accepted for explicitness)")
-    parser.add_argument("--indent", type=int, default=2,
-                        help="JSON indent; 0 for compact output")
+        prog="profile_inventory.py", description="Emit a deterministic JSON inventory of a repository."
+    )
+    parser.add_argument("path", nargs="?", default=".", help="repo root to inventory (default: current directory)")
+    parser.add_argument("--json", action="store_true", help="emit JSON (default; accepted for explicitness)")
+    parser.add_argument("--indent", type=int, default=2, help="JSON indent; 0 for compact output")
     args = parser.parse_args(argv)
 
     root = Path(args.path)

@@ -82,9 +82,7 @@ INVALID_POETRY_SHAPES = {
     "tool_is_a_string": 'tool = "x"\n',
     "poetry_is_a_string": '[tool]\npoetry = "x"\n',
     "group_dev_is_a_string": '[tool.poetry.group]\ndev = "x"\n',
-    "dependencies_is_an_array_of_tables": (
-        '[[tool.poetry.dependencies]]\nname = "requests"\n'
-    ),
+    "dependencies_is_an_array_of_tables": ('[[tool.poetry.dependencies]]\nname = "requests"\n'),
 }
 
 # Same class of defect (I7), one pass above the poetry pass: PEP 621
@@ -96,20 +94,16 @@ INVALID_PEP621_SHAPES = {
     "dependencies_is_an_int": '[project]\nname = "x"\ndependencies = 5\n',
 }
 
-PEP621_DEPENDENCIES_IS_A_BARE_STRING = (
-    '[project]\nname = "x"\ndependencies = "requests"\n'
-)
+PEP621_DEPENDENCIES_IS_A_BARE_STRING = '[project]\nname = "x"\ndependencies = "requests"\n'
 
 # Same class of defect, two passes further: PEP 735 [dependency-groups].
 # classify_roots must return {} for these, not raise.
 INVALID_DEPENDENCY_GROUPS_SHAPES = {
     "dependency_groups_is_a_string": 'dependency-groups = "x"\n',
-    "group_value_is_an_int": '[dependency-groups]\ndev = 5\n',
+    "group_value_is_an_int": "[dependency-groups]\ndev = 5\n",
 }
 
-DEPENDENCY_GROUPS_DEV_IS_A_BARE_STRING = (
-    '[dependency-groups]\ndev = "pytest"\n'
-)
+DEPENDENCY_GROUPS_DEV_IS_A_BARE_STRING = '[dependency-groups]\ndev = "pytest"\n'
 
 # Same class of defect in _package_json: dependencies/devDependencies are
 # JSON objects by spec, but a malformed package.json can put anything there.
@@ -118,9 +112,7 @@ INVALID_PACKAGE_JSON_SHAPES = {
     "dev_dependencies_is_an_int": '{"name": "x", "devDependencies": 5}',
 }
 
-PACKAGE_JSON_DEPENDENCIES_IS_A_BARE_STRING = (
-    '{"name": "x", "dependencies": "left-pad"}'
-)
+PACKAGE_JSON_DEPENDENCIES_IS_A_BARE_STRING = '{"name": "x", "dependencies": "left-pad"}'
 
 # Same class of defect in _cargo: [dependencies]/[dev-dependencies] are TOML
 # tables by spec, but a malformed Cargo.toml can put anything there.
@@ -322,25 +314,21 @@ class TestPropagate(unittest.TestCase):
     ]
 
     def test_transitive_of_a_build_root_is_build(self):
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, self.RELS)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, self.RELS)
         self.assertEqual(out["a2"], "build")
 
     def test_transitive_of_a_run_root_is_run(self):
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, self.RELS)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, self.RELS)
         self.assertEqual(out["a4"], "run")
 
     def test_run_wins_when_reachable_from_both(self):
         """A package pulled in by both a dev tool and the app ships."""
         rels = [*self.RELS, {"parent": "a2", "child": "a3", "type": "dependency-of"}]
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, rels)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, rels)
         self.assertEqual(out["a2"], "run")
 
     def test_roots_keep_their_own_classification(self):
-        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"},
-                                     self.ARTIFACTS, self.RELS)
+        out = pkglifecycle.propagate({"pytest": "build", "pyyaml": "run"}, self.ARTIFACTS, self.RELS)
         self.assertEqual(out["a1"], "build")
         self.assertEqual(out["a3"], "run")
 
@@ -357,8 +345,10 @@ class TestPropagate(unittest.TestCase):
         self.assertEqual(out["a2"], "run")
 
     def test_a_cycle_terminates(self):
-        rels = [{"parent": "a1", "child": "a2", "type": "dependency-of"},
-                {"parent": "a2", "child": "a1", "type": "dependency-of"}]
+        rels = [
+            {"parent": "a1", "child": "a2", "type": "dependency-of"},
+            {"parent": "a2", "child": "a1", "type": "dependency-of"},
+        ]
         out = pkglifecycle.propagate({"pytest": "build"}, self.ARTIFACTS, rels)
         self.assertEqual(out["a1"], "build")
 
@@ -368,11 +358,15 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = build_repo(tmp, {"pyproject.toml": PYPROJECT})
             syft = Path(tmp) / "syft.json"
-            syft.write_text(json.dumps({
-                "artifacts": [{"id": "a1", "name": "pytest"},
-                              {"id": "a3", "name": "pyyaml"}],
-                "artifactRelationships": [],
-            }), encoding="utf-8")
+            syft.write_text(
+                json.dumps(
+                    {
+                        "artifacts": [{"id": "a1", "name": "pytest"}, {"id": "a3", "name": "pyyaml"}],
+                        "artifactRelationships": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
             rc = pkglifecycle.main([str(root), "--syft-json", str(syft)])
             self.assertEqual(rc, 0)
 

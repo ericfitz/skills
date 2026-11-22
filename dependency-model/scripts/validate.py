@@ -15,6 +15,7 @@ from pathlib import Path
 
 CONTRACTS = Path(__file__).resolve().parents[1] / "references" / "contracts"
 
+
 def resolve_refs(schema, base_dir, _seen=None, _root=None):
     """Return schema with local-file $ref pointers replaced by their targets.
 
@@ -36,15 +37,13 @@ def resolve_refs(schema, base_dir, _seen=None, _root=None):
     if not isinstance(schema, dict):
         return schema
     if "$ref" not in schema:
-        return {key: resolve_refs(value, base_dir, _seen, root)
-                for key, value in schema.items()}
+        return {key: resolve_refs(value, base_dir, _seen, root) for key, value in schema.items()}
 
     ref = schema["$ref"]
     if not isinstance(ref, str):
         raise ValueError(f"unsupported $ref {ref!r}: a $ref must be a string")
     if "://" in ref or "#" in ref:
-        raise ValueError(
-            f"unsupported $ref {ref!r}: only local file refs are supported")
+        raise ValueError(f"unsupported $ref {ref!r}: only local file refs are supported")
     target_path = (Path(base_dir) / ref).resolve()
     if not target_path.is_relative_to(root):
         raise ValueError(f"$ref {ref!r} resolves outside {str(root)!r}")
@@ -96,8 +95,7 @@ def validate(instance, schema, path="$", base_dir=None):
     if expected:
         types = expected if isinstance(expected, list) else [expected]
         if not any(TYPE_CHECKS[t](instance) for t in types if t in TYPE_CHECKS):
-            return [f"{path}: expected type {'|'.join(types)}, "
-                    f"got {type(instance).__name__}"]
+            return [f"{path}: expected type {'|'.join(types)}, got {type(instance).__name__}"]
 
     if "enum" in schema and instance not in schema["enum"]:
         errors.append(f"{path}: {instance!r} not in enum {schema['enum']!r}")
@@ -109,8 +107,7 @@ def validate(instance, schema, path="$", base_dir=None):
         props = schema.get("properties", {})
         for name, subschema in props.items():
             if name in instance:
-                errors.extend(
-                    validate(instance[name], subschema, f"{path}.{name}"))
+                errors.extend(validate(instance[name], subschema, f"{path}.{name}"))
         extra = schema.get("additionalProperties", True)
         for name in instance:
             if name in props or extra is True:
@@ -118,8 +115,7 @@ def validate(instance, schema, path="$", base_dir=None):
             if extra is False:
                 errors.append(f"{path}: unexpected property {name!r}")
             elif isinstance(extra, dict):
-                errors.extend(
-                    validate(instance[name], extra, f"{path}.{name}"))
+                errors.extend(validate(instance[name], extra, f"{path}.{name}"))
 
     if isinstance(instance, list) and len(instance) < schema.get("minItems", 0):
         n = schema["minItems"]
@@ -127,8 +123,7 @@ def validate(instance, schema, path="$", base_dir=None):
 
     if isinstance(instance, list) and "items" in schema:
         for index, item in enumerate(instance):
-            errors.extend(
-                validate(item, schema["items"], f"{path}[{index}]"))
+            errors.extend(validate(item, schema["items"], f"{path}[{index}]"))
 
     return errors
 

@@ -18,17 +18,15 @@ def merge_envelopes(envelopes):
     findings, and collapsing them would let a report state as fact that a
     system has no dependencies of a kind when the scan simply broke.
     """
-    provenance = {(e.get("target"), json.dumps(e.get("ref"), sort_keys=True))
-                  for e in envelopes}
+    provenance = {(e.get("target"), json.dumps(e.get("ref"), sort_keys=True)) for e in envelopes}
     if len(provenance) > 1:
-        raise MixedProvenanceError(
-            f"envelopes disagree on target/ref: {sorted(provenance)}")
+        raise MixedProvenanceError(f"envelopes disagree on target/ref: {sorted(provenance)}")
     categories = {}
     for envelope in envelopes:
         for name, block in (envelope.get("categories") or {}).items():
             target = categories.setdefault(
-                name, {"status": block.get("status", "discovered"),
-                       "dependencies": [], "assumptions": []})
+                name, {"status": block.get("status", "discovered"), "dependencies": [], "assumptions": []}
+            )
             if block.get("status") == "failed":
                 target["status"] = "failed"
             seen = {d["id"] for d in target["dependencies"] if "id" in d}

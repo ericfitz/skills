@@ -69,8 +69,7 @@ def _neighbor_condition(dep, category):
         declared = (dep.get("details") or {}).get("declared_value")
         if declared:
             expectation = _declared(declared, evidence)
-    return {"kind": kind, "subject_id": dep["id"], "expectation": expectation,
-            "required_for": [], "evidence": evidence}
+    return {"kind": kind, "subject_id": dep["id"], "expectation": expectation, "required_for": [], "evidence": evidence}
 
 
 def _own_bounds(dep):
@@ -80,24 +79,40 @@ def _own_bounds(dep):
     conditions = []
     timeout, retry = res.get("timeout"), res.get("retry")
     if timeout:
-        conditions.append({"kind": "bound", "subject_id": dep["id"],
-                           "expectation": _declared(f"timeout: {timeout.get('value')}",
-                                                    timeout.get("evidence")),
-                           "required_for": [], "evidence": list(timeout.get("evidence") or [])})
+        conditions.append(
+            {
+                "kind": "bound",
+                "subject_id": dep["id"],
+                "expectation": _declared(f"timeout: {timeout.get('value')}", timeout.get("evidence")),
+                "required_for": [],
+                "evidence": list(timeout.get("evidence") or []),
+            }
+        )
     else:
-        conditions.append({"kind": "bound", "subject_id": dep["id"], "expectation": None,
-                           "required_for": [], "evidence": list(dep.get("evidence") or [])})
+        conditions.append(
+            {
+                "kind": "bound",
+                "subject_id": dep["id"],
+                "expectation": None,
+                "required_for": [],
+                "evidence": list(dep.get("evidence") or []),
+            }
+        )
     if retry:
-        conditions.append({"kind": "bound", "subject_id": dep["id"],
-                           "expectation": _declared(f"retry: {retry.get('description')}",
-                                                    retry.get("evidence")),
-                           "required_for": [], "evidence": list(retry.get("evidence") or [])})
+        conditions.append(
+            {
+                "kind": "bound",
+                "subject_id": dep["id"],
+                "expectation": _declared(f"retry: {retry.get('description')}", retry.get("evidence")),
+                "required_for": [],
+                "evidence": list(retry.get("evidence") or []),
+            }
+        )
     return conditions
 
 
 def _sort_key(c):
-    return (KIND_RANK[c["kind"]], c["subject_id"],
-            (c["expectation"] or {}).get("value") or "")
+    return (KIND_RANK[c["kind"]], c["subject_id"], (c["expectation"] or {}).get("value") or "")
 
 
 def derive_health(document):
@@ -149,9 +164,13 @@ def derive_health(document):
             required_for[anchor] = [anchor]
             continue
         required_for[anchor] = sorted(
-            e["from"] for e in document["graph"]["edges"]
-            if e["kind"] == "depends_on" and e["to"] == anchor
-            and e["from"] in nodes and nodes[e["from"]]["category"] == "component")
+            e["from"]
+            for e in document["graph"]["edges"]
+            if e["kind"] == "depends_on"
+            and e["to"] == anchor
+            and e["from"] in nodes
+            and nodes[e["from"]]["category"] == "component"
+        )
 
     health, linked = [], set()
     for anchor in sorted(anchors):
@@ -170,7 +189,7 @@ def derive_health(document):
                 c["required_for"] = list(required_for[anchor])
             health.append({"service_id": anchor, "conditions": ordered})
 
-    unattached = sorted(i for i, d in deps.items()
-                        if i not in anchors and i not in linked
-                        and _stands_alone(d, category_of[i]))
+    unattached = sorted(
+        i for i, d in deps.items() if i not in anchors and i not in linked and _stands_alone(d, category_of[i])
+    )
     return {"health": health, "unattached": unattached}

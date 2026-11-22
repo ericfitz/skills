@@ -25,8 +25,8 @@ def _require(d, field, category):
         return d[field]
     except KeyError as exc:
         raise InvalidDependencyError(
-            f"dependency in category {category!r} is missing required "
-            f"field {field!r}: {d!r}") from exc
+            f"dependency in category {category!r} is missing required field {field!r}: {d!r}"
+        ) from exc
 
 
 def dedupe_components(components):
@@ -64,18 +64,21 @@ def component_nodes(components):
     `component`, lifecycle `run` (the component is the running thing)."""
     components = dedupe_components(components)
     ids = assign_ids([c["name"] for c in components], "component")
-    return [{"id": ids[c["name"]], "name": c["name"],
-             "category": "component", "lifecycle": "run"} for c in components]
+    return [{"id": ids[c["name"]], "name": c["name"], "category": "component", "lifecycle": "run"} for c in components]
 
 
 def _build_nodes(merged, components=None):
     nodes = component_nodes(components)
     for category, block in merged.get("categories", {}).items():
         for d in block.get("dependencies") or []:
-            nodes.append({"id": _require(d, "id", category),
-                          "name": _require(d, "name", category),
-                          "category": category,
-                          "lifecycle": _require(d, "lifecycle", category)})
+            nodes.append(
+                {
+                    "id": _require(d, "id", category),
+                    "name": _require(d, "name", category),
+                    "category": category,
+                    "lifecycle": _require(d, "lifecycle", category),
+                }
+            )
     nodes.sort(key=lambda n: n["id"])
     return nodes
 
@@ -116,9 +119,8 @@ def _resolver(nodes):
             return target
         steps = [by_canonical.get(canonical_id(target), [])]
         if target.startswith("service:"):
-            component = "component:" + target[len("service:"):]
-            steps.append([component] if component in known_ids
-                         else by_canonical.get(canonical_id(component), []))
+            component = "component:" + target[len("service:") :]
+            steps.append([component] if component in known_ids else by_canonical.get(canonical_id(component), []))
         category, rest = _category_and_rest(target)
         try:
             key = (category, slug(rest))
@@ -130,6 +132,7 @@ def _resolver(nodes):
             if candidates:
                 return candidates[0] if len(set(candidates)) == 1 else None
         return None
+
     return resolve
 
 
@@ -153,17 +156,20 @@ def _build_edges(merged, nodes):
                 continue
             for use in d.get("details", {}).get("used_by") or []:
                 if not isinstance(use, dict):
-                    raise InvalidDependencyError(
-                        f"used_by entry of {source!r} is not an object: {use!r}")
+                    raise InvalidDependencyError(f"used_by entry of {source!r} is not an object: {use!r}")
                 target = _require(use, "component_id", category)
                 node = resolve(target)
                 if node in component_ids:
                     edges.add((node, source, "depends_on", "run"))
                 else:
                     unresolved.add((source, target, "used_by"))
-    return ([{"from": f, "to": t, "kind": k, "lifecycle": lc}
-             for f, t, k, lc in sorted(edges, key=lambda e: (e[0], e[1], e[2]))],
-            [{"from": f, "to": t, "kind": k} for f, t, k in sorted(unresolved)])
+    return (
+        [
+            {"from": f, "to": t, "kind": k, "lifecycle": lc}
+            for f, t, k, lc in sorted(edges, key=lambda e: (e[0], e[1], e[2]))
+        ],
+        [{"from": f, "to": t, "kind": k} for f, t, k in sorted(unresolved)],
+    )
 
 
 def _depends_on_adjacency(edges):

@@ -10,9 +10,11 @@ from depgraphlib.merge import MixedProvenanceError, merge_envelopes
 
 
 def env(category, deps, status="discovered"):
-    return {"contract_version": "1.0.0", "target": "/r",
-            "categories": {category: {"status": status, "dependencies": deps,
-                                      "assumptions": []}}}
+    return {
+        "contract_version": "1.0.0",
+        "target": "/r",
+        "categories": {category: {"status": status, "dependencies": deps, "assumptions": []}},
+    }
 
 
 class TestMergeEnvelopes(unittest.TestCase):
@@ -51,8 +53,10 @@ class TestMergeEnvelopes(unittest.TestCase):
     def test_output_is_deterministic(self):
         envs = [env("network", []), env("service", [])]
         import json
-        self.assertEqual(json.dumps(merge_envelopes(envs), sort_keys=True),
-                         json.dumps(merge_envelopes(envs), sort_keys=True))
+
+        self.assertEqual(
+            json.dumps(merge_envelopes(envs), sort_keys=True), json.dumps(merge_envelopes(envs), sort_keys=True)
+        )
 
     def test_envelopes_from_different_refs_are_refused(self):
         """Merging two branches' discoveries would report a system that exists
@@ -71,8 +75,7 @@ class TestMergeEnvelopes(unittest.TestCase):
     def test_matching_refs_merge(self):
         a, b = env("service", []), env("network", [])
         a["ref"] = b["ref"] = {"name": "main", "commit": "a" * 40}
-        self.assertEqual(sorted(merge_envelopes([a, b])["categories"]),
-                         ["network", "service"])
+        self.assertEqual(sorted(merge_envelopes([a, b])["categories"]), ["network", "service"])
 
     def test_ref_key_order_does_not_matter(self):
         """Envelopes are written by LLM agents; the same ref may arrive with

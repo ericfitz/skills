@@ -35,9 +35,12 @@ class Run:
 def _resolve_commit(root, ref):
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--verify", "--quiet",
-             f"{ref}^{{commit}}"],
-            capture_output=True, text=True, timeout=30, check=False)
+            ["git", "-C", str(root), "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         raise RefError(f"cannot run git: {exc}") from exc
     if proc.returncode != 0:
@@ -52,12 +55,14 @@ def _inside_only(refused):
     links and links resolving outside the destination (committed ones are
     real, measured on tmi). Each is left out, never followed, and recorded.
     """
+
     def keep(member, path):
         try:
             return tarfile.data_filter(member, path)
         except tarfile.FilterError:
             refused.append(member.name)
             return None
+
     return keep
 
 
@@ -68,8 +73,7 @@ def _extract(root, commit, dest):
     """
     refused = []
     staging = Path(tempfile.mkdtemp(dir=dest.parent, prefix="snapshot-"))
-    proc = subprocess.Popen(["git", "-C", str(root), "archive", commit],
-                            stdout=subprocess.PIPE)
+    proc = subprocess.Popen(["git", "-C", str(root), "archive", commit], stdout=subprocess.PIPE)
     try:
         with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
             tar.extractall(staging, filter=_inside_only(refused))

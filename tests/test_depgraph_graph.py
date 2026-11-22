@@ -18,23 +18,22 @@ from depgraphlib.graph import (
 
 
 def dep(id_, name, lifecycle="run", related=None, depends=None):
-    d = {"id": id_, "name": name, "lifecycle": lifecycle,
-         "evidence": [], "related_ids": related or [], "details": {}}
+    d = {"id": id_, "name": name, "lifecycle": lifecycle, "evidence": [], "related_ids": related or [], "details": {}}
     if depends is not None:
         d["details"]["depends_on"] = depends
     return d
 
 
 def merged(**cats):
-    return {"categories": {k: {"status": "discovered", "dependencies": v,
-                               "assumptions": []} for k, v in cats.items()}}
+    return {"categories": {k: {"status": "discovered", "dependencies": v, "assumptions": []} for k, v in cats.items()}}
 
 
 class TestNodes(unittest.TestCase):
     def test_one_node_per_dependency_carrying_category_and_lifecycle(self):
         g = build_graph(merged(service=[dep("service:pg", "postgres")]))
-        self.assertEqual(g["nodes"], [{"id": "service:pg", "name": "postgres",
-                                       "category": "service", "lifecycle": "run"}])
+        self.assertEqual(
+            g["nodes"], [{"id": "service:pg", "name": "postgres", "category": "service", "lifecycle": "run"}]
+        )
 
     def test_nodes_are_sorted_by_id(self):
         g = build_graph(merged(service=[dep("service:b", "b"), dep("service:a", "a")]))
@@ -54,42 +53,50 @@ def service_used_by(id_, name, *component_ids):
 class TestUsedBy(unittest.TestCase):
     def test_used_by_becomes_component_edge(self):
         graph, unresolved = link_graph(
-            merged(service=[service_used_by("service:pg", "pg", "component:api")]),
-            [{"name": "api"}])
-        self.assertIn({"from": "component:api", "to": "service:pg",
-                       "kind": "depends_on", "lifecycle": "run"}, graph["edges"])
+            merged(service=[service_used_by("service:pg", "pg", "component:api")]), [{"name": "api"}]
+        )
+        self.assertIn(
+            {"from": "component:api", "to": "service:pg", "kind": "depends_on", "lifecycle": "run"}, graph["edges"]
+        )
         self.assertEqual(unresolved, [])
 
     def test_used_by_unknown_component_is_unresolved(self):
         graph, unresolved = link_graph(
-            merged(service=[service_used_by("service:pg", "pg", "component:ghost")]),
-            [{"name": "api"}])
+            merged(service=[service_used_by("service:pg", "pg", "component:ghost")]), [{"name": "api"}]
+        )
         self.assertEqual(graph["edges"], [])
-        self.assertEqual(unresolved, [{"from": "service:pg", "to": "component:ghost",
-                                       "kind": "used_by"}])
+        self.assertEqual(unresolved, [{"from": "service:pg", "to": "component:ghost", "kind": "used_by"}])
 
     def test_used_by_duplicates_collapse(self):
         graph, _ = link_graph(
-            merged(service=[service_used_by("service:pg", "pg", "component:api", "component:api"),
-                            service_used_by("service:redis", "redis", "component:api")]),
-            [{"name": "api"}])
+            merged(
+                service=[
+                    service_used_by("service:pg", "pg", "component:api", "component:api"),
+                    service_used_by("service:redis", "redis", "component:api"),
+                ]
+            ),
+            [{"name": "api"}],
+        )
         pairs = [(e["from"], e["to"]) for e in graph["edges"]]
-        self.assertEqual(sorted(pairs), [("component:api", "service:pg"),
-                                         ("component:api", "service:redis")])
+        self.assertEqual(sorted(pairs), [("component:api", "service:pg"), ("component:api", "service:redis")])
         again, _ = link_graph(
-            merged(service=[service_used_by("service:pg", "pg", "component:api"),
-                            service_used_by("service:pg2", "pg2", "component:api")]),
-            [{"name": "api"}])
+            merged(
+                service=[
+                    service_used_by("service:pg", "pg", "component:api"),
+                    service_used_by("service:pg2", "pg2", "component:api"),
+                ]
+            ),
+            [{"name": "api"}],
+        )
         self.assertEqual(len(again["edges"]), 2)
 
     def test_used_by_non_component_node_is_unresolved(self):
         graph, unresolved = link_graph(
-            merged(service=[service_used_by("service:pg", "pg", "service:redis"),
-                            dep("service:redis", "redis")]),
-            [{"name": "api"}])
+            merged(service=[service_used_by("service:pg", "pg", "service:redis"), dep("service:redis", "redis")]),
+            [{"name": "api"}],
+        )
         self.assertEqual(graph["edges"], [])
-        self.assertEqual(unresolved, [{"from": "service:pg", "to": "service:redis",
-                                       "kind": "used_by"}])
+        self.assertEqual(unresolved, [{"from": "service:pg", "to": "service:redis", "kind": "used_by"}])
 
     def test_used_by_read_only_for_services(self):
         d = dep("config:x", "x")
@@ -103,13 +110,18 @@ class TestUsedBy(unittest.TestCase):
         self.assertEqual([n["id"] for n in nodes], ["component:api"])
 
     def test_duplicate_components_keep_every_evidence_entry(self):
-        out = dedupe_components([{"name": "api", "role": "http", "evidence": ["a:1"]},
-                                 {"name": "api", "role": None, "evidence": ["b:2", "a:1"]}])
+        out = dedupe_components(
+            [
+                {"name": "api", "role": "http", "evidence": ["a:1"]},
+                {"name": "api", "role": None, "evidence": ["b:2", "a:1"]},
+            ]
+        )
         self.assertEqual(out, [{"name": "api", "role": "http", "evidence": ["a:1", "b:2"]}])
 
     def test_a_null_role_takes_the_later_duplicates_role(self):
-        out = dedupe_components([{"name": "api", "role": None, "evidence": []},
-                                 {"name": "api", "role": "http", "evidence": []}])
+        out = dedupe_components(
+            [{"name": "api", "role": None, "evidence": []}, {"name": "api", "role": "http", "evidence": []}]
+        )
         self.assertEqual(out[0]["role"], "http")
 
     def test_dedupe_does_not_mutate_its_input(self):
@@ -118,67 +130,97 @@ class TestUsedBy(unittest.TestCase):
         self.assertEqual(first, {"name": "api", "role": None, "evidence": ["a:1"]})
 
     def test_role_conflicts_name_each_distinct_role(self):
-        self.assertEqual(role_conflicts([{"name": "api", "role": "http"},
-                                         {"name": "api", "role": None},
-                                         {"name": "api", "role": "grpc"},
-                                         {"name": "api", "role": "http"},
-                                         {"name": "worker", "role": "jobs"}]),
-                         {"api": ["http", "grpc"]})
+        self.assertEqual(
+            role_conflicts(
+                [
+                    {"name": "api", "role": "http"},
+                    {"name": "api", "role": None},
+                    {"name": "api", "role": "grpc"},
+                    {"name": "api", "role": "http"},
+                    {"name": "worker", "role": "jobs"},
+                ]
+            ),
+            {"api": ["http", "grpc"]},
+        )
 
 
 class TestEdges(unittest.TestCase):
     def test_depends_on_edges_come_from_package_details(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:b-2"]),
-            dep("package:b-2", "b", "build")]))
-        self.assertEqual(g["edges"], [{"from": "package:a-1", "to": "package:b-2",
-                                       "kind": "depends_on", "lifecycle": "build"}])
+        g = build_graph(
+            merged(
+                package=[dep("package:a-1", "a", "build", depends=["package:b-2"]), dep("package:b-2", "b", "build")]
+            )
+        )
+        self.assertEqual(
+            g["edges"], [{"from": "package:a-1", "to": "package:b-2", "kind": "depends_on", "lifecycle": "build"}]
+        )
 
     def test_relates_to_edges_come_from_related_ids(self):
-        g = build_graph(merged(
-            service=[dep("service:pg", "postgres", related=["network:pg-5432"])],
-            network=[dep("network:pg-5432", "postgres:5432")]))
-        self.assertEqual(g["edges"], [{"from": "service:pg", "to": "network:pg-5432",
-                                       "kind": "relates_to", "lifecycle": "run"}])
+        g = build_graph(
+            merged(
+                service=[dep("service:pg", "postgres", related=["network:pg-5432"])],
+                network=[dep("network:pg-5432", "postgres:5432")],
+            )
+        )
+        self.assertEqual(
+            g["edges"], [{"from": "service:pg", "to": "network:pg-5432", "kind": "relates_to", "lifecycle": "run"}]
+        )
 
     def test_the_two_edge_kinds_are_not_conflated(self):
         """A consumer asking what must be reachable at runtime filters to run
         edges; one asking what we build against filters to build."""
-        g = build_graph(merged(
-            package=[dep("package:a-1", "a", "build", depends=["package:b-2"]),
-                     dep("package:b-2", "b", "build")],
-            service=[dep("service:pg", "pg", related=["network:x"])],
-            network=[dep("network:x", "x")]))
+        g = build_graph(
+            merged(
+                package=[dep("package:a-1", "a", "build", depends=["package:b-2"]), dep("package:b-2", "b", "build")],
+                service=[dep("service:pg", "pg", related=["network:x"])],
+                network=[dep("network:x", "x")],
+            )
+        )
         kinds = {e["kind"] for e in g["edges"]}
         self.assertEqual(kinds, {"depends_on", "relates_to"})
 
     def test_an_edge_to_an_unknown_id_is_reported_unresolved_not_dropped(self):
-        g, unresolved = link_graph(merged(service=[dep("service:a", "a", related=["service:ghost"]),
-                                        dep("service:b", "b", depends=["service:gone"])]))
+        g, unresolved = link_graph(
+            merged(
+                service=[
+                    dep("service:a", "a", related=["service:ghost"]),
+                    dep("service:b", "b", depends=["service:gone"]),
+                ]
+            )
+        )
         self.assertEqual(g["edges"], [])
-        self.assertEqual(unresolved, [
-            {"from": "service:a", "to": "service:ghost", "kind": "relates_to"},
-            {"from": "service:b", "to": "service:gone", "kind": "depends_on"}])
+        self.assertEqual(
+            unresolved,
+            [
+                {"from": "service:a", "to": "service:ghost", "kind": "relates_to"},
+                {"from": "service:b", "to": "service:gone", "kind": "depends_on"},
+            ],
+        )
 
     def test_a_case_or_underscore_variant_resolves_to_the_real_node(self):
-        g, unresolved = link_graph(merged(
-            network=[dep("network:nats-4222", "nats", related=["config:TMI_NATS_URL"])],
-            config=[dep("config:tmi-nats-url", "TMI_NATS_URL")]))
-        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]],
-                         [("network:nats-4222", "config:tmi-nats-url")])
+        g, unresolved = link_graph(
+            merged(
+                network=[dep("network:nats-4222", "nats", related=["config:TMI_NATS_URL"])],
+                config=[dep("config:tmi-nats-url", "TMI_NATS_URL")],
+            )
+        )
+        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]], [("network:nats-4222", "config:tmi-nats-url")])
         self.assertEqual(unresolved, [])
 
     def test_an_ambiguous_canonical_match_stays_unresolved(self):
-        g, unresolved = link_graph(merged(
-            service=[dep("service:a", "a", related=["config:X-Y"])],
-            config=[dep("config:x_y", "x_y"), dep("config:x-y", "x-y")]))
+        g, unresolved = link_graph(
+            merged(
+                service=[dep("service:a", "a", related=["config:X-Y"])],
+                config=[dep("config:x_y", "x_y"), dep("config:x-y", "x-y")],
+            )
+        )
         self.assertEqual(g["edges"], [])
         self.assertEqual(len(unresolved), 1)
 
     def test_edges_are_sorted_and_deduplicated(self):
-        g = build_graph(merged(service=[
-            dep("service:a", "a", related=["service:b", "service:b"]),
-            dep("service:b", "b")]))
+        g = build_graph(
+            merged(service=[dep("service:a", "a", related=["service:b", "service:b"]), dep("service:b", "b")])
+        )
         self.assertEqual(len(g["edges"]), 1)
 
 
@@ -194,68 +236,83 @@ class TestComponents(unittest.TestCase):
         self.assertEqual(slug("TMI_NATS/url.v2"), "tmi-nats-url.v2")
 
     def test_each_component_is_a_run_node_outside_the_inventory(self):
-        g = build_graph(merged(service=[dep("service:pg", "postgres")]),
-                        [{"name": "tmiserver"}, {"name": "tooling CLIs"}])
-        self.assertEqual([n for n in g["nodes"] if n["category"] == "component"], [
-            {"id": "component:tmiserver", "name": "tmiserver",
-             "category": "component", "lifecycle": "run"},
-            {"id": "component:tooling-clis", "name": "tooling CLIs",
-             "category": "component", "lifecycle": "run"}])
+        g = build_graph(
+            merged(service=[dep("service:pg", "postgres")]), [{"name": "tmiserver"}, {"name": "tooling CLIs"}]
+        )
+        self.assertEqual(
+            [n for n in g["nodes"] if n["category"] == "component"],
+            [
+                {"id": "component:tmiserver", "name": "tmiserver", "category": "component", "lifecycle": "run"},
+                {"id": "component:tooling-clis", "name": "tooling CLIs", "category": "component", "lifecycle": "run"},
+            ],
+        )
 
     def test_a_link_to_a_component_id_resolves(self):
         g, unresolved = link_graph(
-            merged(network=[dep("network:api-8080", "api:8080", related=["component:api"])]),
-            [{"name": "api"}])
+            merged(network=[dep("network:api-8080", "api:8080", related=["component:api"])]), [{"name": "api"}]
+        )
         self.assertEqual(unresolved, [])
-        self.assertEqual(g["edges"], [{"from": "network:api-8080", "to": "component:api",
-                                       "kind": "relates_to", "lifecycle": "run"}])
+        self.assertEqual(
+            g["edges"], [{"from": "network:api-8080", "to": "component:api", "kind": "relates_to", "lifecycle": "run"}]
+        )
 
     def test_a_service_link_naming_a_component_resolves_to_the_component(self):
         """The system's own listener is not a service (categories.md), so
         service:<x> written for a first-party component means component:<x>."""
         g, unresolved = link_graph(
-            merged(network=[dep("network:api-8080", "api:8080", related=["service:api"])]),
-            [{"name": "api"}])
+            merged(network=[dep("network:api-8080", "api:8080", related=["service:api"])]), [{"name": "api"}]
+        )
         self.assertEqual(unresolved, [])
         self.assertEqual(g["edges"][0]["to"], "component:api")
 
     def test_a_real_service_node_wins_over_a_same_named_component(self):
         g, unresolved = link_graph(
-            merged(service=[dep("service:api", "api")],
-                   network=[dep("network:api-8080", "api:8080", related=["service:api"])]),
-            [{"name": "api"}])
+            merged(
+                service=[dep("service:api", "api")],
+                network=[dep("network:api-8080", "api:8080", related=["service:api"])],
+            ),
+            [{"name": "api"}],
+        )
         self.assertEqual(unresolved, [])
         self.assertEqual(g["edges"][0]["to"], "service:api")
 
     def test_without_components_a_service_link_to_a_non_node_stays_unresolved(self):
-        _, unresolved = link_graph(
-            merged(network=[dep("network:api-8080", "api:8080", related=["service:api"])]))
-        self.assertEqual(unresolved, [{"from": "network:api-8080", "to": "service:api",
-                                       "kind": "relates_to"}])
+        _, unresolved = link_graph(merged(network=[dep("network:api-8080", "api:8080", related=["service:api"])]))
+        self.assertEqual(unresolved, [{"from": "network:api-8080", "to": "service:api", "kind": "relates_to"}])
 
 
 class TestCycles(unittest.TestCase):
     def test_a_two_node_cycle_is_reported(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:b-2"]),
-            dep("package:b-2", "b", "build", depends=["package:a-1"])]))
+        g = build_graph(
+            merged(
+                package=[
+                    dep("package:a-1", "a", "build", depends=["package:b-2"]),
+                    dep("package:b-2", "b", "build", depends=["package:a-1"]),
+                ]
+            )
+        )
         self.assertEqual(len(g["cycles"]), 1)
         self.assertEqual(sorted(g["cycles"][0]), ["package:a-1", "package:b-2"])
 
     def test_an_acyclic_graph_reports_none(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:b-2"]),
-            dep("package:b-2", "b", "build")]))
+        g = build_graph(
+            merged(
+                package=[dep("package:a-1", "a", "build", depends=["package:b-2"]), dep("package:b-2", "b", "build")]
+            )
+        )
         self.assertEqual(g["cycles"], [])
 
     def test_a_self_loop_is_a_cycle(self):
-        g = build_graph(merged(package=[
-            dep("package:a-1", "a", "build", depends=["package:a-1"])]))
+        g = build_graph(merged(package=[dep("package:a-1", "a", "build", depends=["package:a-1"])]))
         self.assertEqual(g["cycles"], [["package:a-1"]])
 
     def test_cycles_are_deterministic(self):
-        m = merged(package=[dep("package:a-1", "a", "build", depends=["package:b-2"]),
-                            dep("package:b-2", "b", "build", depends=["package:a-1"])])
+        m = merged(
+            package=[
+                dep("package:a-1", "a", "build", depends=["package:b-2"]),
+                dep("package:b-2", "b", "build", depends=["package:a-1"]),
+            ]
+        )
         self.assertEqual(build_graph(m)["cycles"], build_graph(m)["cycles"])
 
     def test_a_symmetric_relates_to_pair_is_not_reported_as_a_cycle(self):
@@ -263,9 +320,12 @@ class TestCycles(unittest.TestCase):
         related_ids links are routinely symmetric, so walking the combined
         edge set would report a 2-cycle for every service<->network
         association -- noise that would drown any real depends_on cycle."""
-        g = build_graph(merged(
-            service=[dep("service:pg", "pg", related=["network:x"])],
-            network=[dep("network:x", "x", related=["service:pg"])]))
+        g = build_graph(
+            merged(
+                service=[dep("service:pg", "pg", related=["network:x"])],
+                network=[dep("network:x", "x", related=["service:pg"])],
+            )
+        )
         self.assertEqual({e["kind"] for e in g["edges"]}, {"relates_to"})
         self.assertEqual(len(g["edges"]), 2)
         self.assertEqual(g["cycles"], [])
@@ -275,8 +335,7 @@ class TestInvalidDependency(unittest.TestCase):
     def test_missing_lifecycle_raises_invalid_dependency_not_a_keyerror(self):
         from depgraphlib.graph import InvalidDependencyError
 
-        bad = {"id": "service:pg", "name": "postgres",
-               "evidence": [], "related_ids": [], "details": {}}
+        bad = {"id": "service:pg", "name": "postgres", "evidence": [], "related_ids": [], "details": {}}
         with self.assertRaises(InvalidDependencyError):
             build_graph(merged(service=[bad]))
 
@@ -291,12 +350,12 @@ class TestInvalidDependency(unittest.TestCase):
 
         import depgraph
 
-        bad = {"id": "service:pg", "name": "postgres",
-               "evidence": [], "related_ids": [], "details": {}}
-        envelope = {"contract_version": "1.0.0", "target": "/r",
-                   "categories": {"service": {"status": "discovered",
-                                              "dependencies": [bad],
-                                              "assumptions": []}}}
+        bad = {"id": "service:pg", "name": "postgres", "evidence": [], "related_ids": [], "details": {}}
+        envelope = {
+            "contract_version": "1.0.0",
+            "target": "/r",
+            "categories": {"service": {"status": "discovered", "dependencies": [bad], "assumptions": []}},
+        }
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump(envelope, f)
             path = f.name
@@ -334,10 +393,11 @@ class TestInvalidDependency(unittest.TestCase):
         not catch it."""
         import json
 
-        envelope = {"contract_version": "1.0.0", "target": "/r",
-                   "categories": {"service": {"status": "discovered",
-                                              "dependencies": ["just-a-string"],
-                                              "assumptions": []}}}
+        envelope = {
+            "contract_version": "1.0.0",
+            "target": "/r",
+            "categories": {"service": {"status": "discovered", "dependencies": ["just-a-string"], "assumptions": []}},
+        }
         code, err = self._run_cli_with_envelope(envelope)
         self.assertEqual(code, 2)
         self.assertIn("error", json.loads(err))
@@ -345,12 +405,19 @@ class TestInvalidDependency(unittest.TestCase):
     def test_a_null_details_object_is_exit_2_not_a_traceback(self):
         import json
 
-        bad = {"id": "service:pg", "name": "postgres", "lifecycle": "run",
-               "evidence": [], "related_ids": [], "details": None}
-        envelope = {"contract_version": "1.0.0", "target": "/r",
-                   "categories": {"service": {"status": "discovered",
-                                              "dependencies": [bad],
-                                              "assumptions": []}}}
+        bad = {
+            "id": "service:pg",
+            "name": "postgres",
+            "lifecycle": "run",
+            "evidence": [],
+            "related_ids": [],
+            "details": None,
+        }
+        envelope = {
+            "contract_version": "1.0.0",
+            "target": "/r",
+            "categories": {"service": {"status": "discovered", "dependencies": [bad], "assumptions": []}},
+        }
         code, err = self._run_cli_with_envelope(envelope)
         self.assertEqual(code, 2)
         self.assertIn("error", json.loads(err))
@@ -358,8 +425,7 @@ class TestInvalidDependency(unittest.TestCase):
     def test_a_non_dict_category_value_is_exit_2_not_a_traceback(self):
         import json
 
-        envelope = {"contract_version": "1.0.0", "target": "/r",
-                   "categories": {"service": "oops"}}
+        envelope = {"contract_version": "1.0.0", "target": "/r", "categories": {"service": "oops"}}
         code, err = self._run_cli_with_envelope(envelope)
         self.assertEqual(code, 2)
         self.assertIn("error", json.loads(err))
@@ -423,83 +489,97 @@ TMI_STILL_UNRESOLVED = [
 
 class TestFallbackMatching(unittest.TestCase):
     def test_reslug_match(self):
-        g, unresolved = link_graph(merged(
-            service=[dep("service:nats", "nats")],
-            config=[dep("config:tmi-nats-url", "TMI_NATS_URL",
-                        related=["service:nats-(jetstream)"])]))
+        g, unresolved = link_graph(
+            merged(
+                service=[dep("service:nats", "nats")],
+                config=[dep("config:tmi-nats-url", "TMI_NATS_URL", related=["service:nats-(jetstream)"])],
+            )
+        )
         self.assertEqual(unresolved, [])
-        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]],
-                         [("config:tmi-nats-url", "service:nats")])
+        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]], [("config:tmi-nats-url", "service:nats")])
 
     def test_name_match(self):
-        g, unresolved = link_graph(merged(
-            service=[dep("service:gdrive", "Google Drive / Google Workspace APIs")],
-            config=[dep("config:drive-enabled", "DRIVE_ENABLED",
-                        related=["service:google-drive-google-workspace-apis"])]))
+        g, unresolved = link_graph(
+            merged(
+                service=[dep("service:gdrive", "Google Drive / Google Workspace APIs")],
+                config=[
+                    dep("config:drive-enabled", "DRIVE_ENABLED", related=["service:google-drive-google-workspace-apis"])
+                ],
+            )
+        )
         self.assertEqual(unresolved, [])
         self.assertEqual([e["to"] for e in g["edges"]], ["service:gdrive"])
 
     def test_ambiguous_fallback_stays_unresolved(self):
-        _, unresolved = link_graph(merged(
-            service=[dep("service:nats", "nats"), dep("service:nats-server", "nats"),
-                     dep("service:nats-(tls)", "other")],
-            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]))
-        self.assertEqual(unresolved, [{"from": "config:c",
-                                       "to": "service:nats-(jetstream)",
-                                       "kind": "relates_to"}])
+        _, unresolved = link_graph(
+            merged(
+                service=[
+                    dep("service:nats", "nats"),
+                    dep("service:nats-server", "nats"),
+                    dep("service:nats-(tls)", "other"),
+                ],
+                config=[dep("config:c", "C", related=["service:nats-(jetstream)"])],
+            )
+        )
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:nats-(jetstream)", "kind": "relates_to"}])
 
     def test_ambiguous_name_match_stays_unresolved(self):
-        _, unresolved = link_graph(merged(
-            service=[dep("service:a", "Google Drive"), dep("service:b", "google-drive")],
-            config=[dep("config:c", "C", related=["service:google-drive"])]))
-        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:google-drive",
-                                       "kind": "relates_to"}])
+        _, unresolved = link_graph(
+            merged(
+                service=[dep("service:a", "Google Drive"), dep("service:b", "google-drive")],
+                config=[dep("config:c", "C", related=["service:google-drive"])],
+            )
+        )
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:google-drive", "kind": "relates_to"}])
 
     def test_ambiguous_reslug_does_not_fall_through_to_name(self):
-        _, unresolved = link_graph(merged(
-            service=[dep("service:nats", "other"), dep("service:nats-(tls)", "other2"),
-                     dep("service:x", "nats")],
-            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]))
+        _, unresolved = link_graph(
+            merged(
+                service=[dep("service:nats", "other"), dep("service:nats-(tls)", "other2"), dep("service:x", "nats")],
+                config=[dep("config:c", "C", related=["service:nats-(jetstream)"])],
+            )
+        )
         self.assertEqual([u["to"] for u in unresolved], ["service:nats-(jetstream)"])
 
     def test_ambiguous_canonical_does_not_fall_through_to_a_unique_component(self):
         """Canonical collisions are also re-slug and name collisions, so only
         the service-to-component step can be unique after an ambiguous
         canonical one; the first step with candidates must still decide."""
-        g, unresolved = link_graph(merged(
-            service=[dep("service:Nats_X", "a"), dep("service:nats-x", "b")],
-            config=[dep("config:c", "C", related=["service:NATS-X"])]),
-            [{"name": "nats-x"}])
+        g, unresolved = link_graph(
+            merged(
+                service=[dep("service:Nats_X", "a"), dep("service:nats-x", "b")],
+                config=[dep("config:c", "C", related=["service:NATS-X"])],
+            ),
+            [{"name": "nats-x"}],
+        )
         self.assertEqual(g["edges"], [])
         self.assertEqual([u["to"] for u in unresolved], ["service:NATS-X"])
 
     def test_component_retry_does_not_fuzzy_match_components(self):
-        g, unresolved = link_graph(merged(
-            service=[dep("service:nats", "nats")],
-            config=[dep("config:c", "C", related=["service:nats-(jetstream)"])]),
-            [{"name": "nats"}])
+        g, unresolved = link_graph(
+            merged(
+                service=[dep("service:nats", "nats")],
+                config=[dep("config:c", "C", related=["service:nats-(jetstream)"])],
+            ),
+            [{"name": "nats"}],
+        )
         self.assertEqual(unresolved, [])
-        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]],
-                         [("config:c", "service:nats")])
+        self.assertEqual([(e["from"], e["to"]) for e in g["edges"]], [("config:c", "service:nats")])
 
     def test_fallbacks_never_cross_categories(self):
-        _, unresolved = link_graph(merged(
-            config=[dep("config:nats", "nats"),
-                    dep("config:c", "C", related=["service:nats-(jetstream)"])]))
-        self.assertEqual(unresolved, [{"from": "config:c",
-                                       "to": "service:nats-(jetstream)",
-                                       "kind": "relates_to"}])
+        _, unresolved = link_graph(
+            merged(config=[dep("config:nats", "nats"), dep("config:c", "C", related=["service:nats-(jetstream)"])])
+        )
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:nats-(jetstream)", "kind": "relates_to"}])
 
     def test_unsluggable_target_is_unresolved(self):
-        _, unresolved = link_graph(merged(
-            service=[dep("service:nats", "nats")],
-            config=[dep("config:c", "C", related=["service:()"])]))
-        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:()",
-                                       "kind": "relates_to"}])
+        _, unresolved = link_graph(
+            merged(service=[dep("service:nats", "nats")], config=[dep("config:c", "C", related=["service:()"])])
+        )
+        self.assertEqual(unresolved, [{"from": "config:c", "to": "service:()", "kind": "relates_to"}])
 
     def test_tmi_regression(self):
-        fixture = json.loads((Path(__file__).parent / "fixtures" / "dependency_model"
-                              / "tmi_links.json").read_text())
+        fixture = json.loads((Path(__file__).parent / "fixtures" / "dependency_model" / "tmi_links.json").read_text())
         out_links = {}
         for link in fixture["links"]:
             out_links.setdefault(link["from"], []).append(link)
@@ -507,18 +587,18 @@ class TestFallbackMatching(unittest.TestCase):
         for node in fixture["nodes"]:
             if node["category"] == "component":
                 continue
-            related = [x["to"] for x in out_links.get(node["id"], [])
-                       if x["kind"] == "relates_to"]
-            depends = [x["to"] for x in out_links.get(node["id"], [])
-                       if x["kind"] == "depends_on"]
+            related = [x["to"] for x in out_links.get(node["id"], []) if x["kind"] == "relates_to"]
+            depends = [x["to"] for x in out_links.get(node["id"], []) if x["kind"] == "depends_on"]
             cats.setdefault(node["category"], []).append(
-                dep(node["id"], node["name"], related=related, depends=depends or None))
-        components = [{"name": n["name"]} for n in fixture["nodes"]
-                      if n["category"] == "component"]
+                dep(node["id"], node["name"], related=related, depends=depends or None)
+            )
+        components = [{"name": n["name"]} for n in fixture["nodes"] if n["category"] == "component"]
         self.assertEqual(len(components), 8)
         graph, unresolved = link_graph(merged(**cats), components)
-        self.assertEqual(sorted(n["id"] for n in graph["nodes"] if n["category"] == "component"),
-                         sorted(n["id"] for n in fixture["nodes"] if n["category"] == "component"))
+        self.assertEqual(
+            sorted(n["id"] for n in graph["nodes"] if n["category"] == "component"),
+            sorted(n["id"] for n in fixture["nodes"] if n["category"] == "component"),
+        )
         resolved = sorted((e["from"], e["to"]) for e in graph["edges"])
         self.assertEqual(len(resolved), 26)
         self.assertEqual(resolved, TMI_RESOLVED)
@@ -542,10 +622,13 @@ class TestCliOutputShape(unittest.TestCase):
 
         import depgraph
 
-        envelope = {"contract_version": "1.0.0", "target": "/r",
-                   "categories": {"service": {"status": "discovered",
-                                              "dependencies": [dep("service:pg", "postgres")],
-                                              "assumptions": []}}}
+        envelope = {
+            "contract_version": "1.0.0",
+            "target": "/r",
+            "categories": {
+                "service": {"status": "discovered", "dependencies": [dep("service:pg", "postgres")], "assumptions": []}
+            },
+        }
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump(envelope, f)
             path = f.name
@@ -558,8 +641,7 @@ class TestCliOutputShape(unittest.TestCase):
 
         self.assertEqual(set(out), {"inventory", "components", "graph", "mermaid", "unresolved"})
         self.assertEqual(set(out["graph"]), {"nodes", "edges", "cycles"})
-        self.assertEqual(out["inventory"]["categories"]["service"]["dependencies"],
-                         [dep("service:pg", "postgres")])
+        self.assertEqual(out["inventory"]["categories"]["service"]["dependencies"], [dep("service:pg", "postgres")])
         self.assertEqual(out["components"], [])
 
     def test_topology_components_become_contract_shaped_components_and_nodes(self):
@@ -570,13 +652,18 @@ class TestCliOutputShape(unittest.TestCase):
 
         import depgraph
 
-        envelope = {"contract_version": "1.0.0", "target": "/r",
-                    "categories": {"network": {"status": "discovered",
-                                               "dependencies": [dep("network:api-8080", "api:8080",
-                                                                    related=["service:api"])],
-                                               "assumptions": []}}}
-        topology = {"components": [{"name": "api", "role": "HTTP API",
-                                    "evidence": ["cmd/api/main.go:1"]}]}
+        envelope = {
+            "contract_version": "1.0.0",
+            "target": "/r",
+            "categories": {
+                "network": {
+                    "status": "discovered",
+                    "dependencies": [dep("network:api-8080", "api:8080", related=["service:api"])],
+                    "assumptions": [],
+                }
+            },
+        }
+        topology = {"components": [{"name": "api", "role": "HTTP API", "evidence": ["cmd/api/main.go:1"]}]}
         paths = []
         for doc in (envelope, topology):
             with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
@@ -589,11 +676,13 @@ class TestCliOutputShape(unittest.TestCase):
         with redirect_stdout(buf):
             self.assertEqual(depgraph.main([paths[0], "--topology", paths[1], "--indent", "0"]), 0)
         out = json.loads(buf.getvalue())
-        self.assertEqual(out["components"], [{"id": "component:api", "name": "api",
-                                              "role": "HTTP API",
-                                              "evidence": ["cmd/api/main.go:1"]}])
-        self.assertIn({"id": "component:api", "name": "api", "category": "component",
-                       "lifecycle": "run"}, out["graph"]["nodes"])
+        self.assertEqual(
+            out["components"],
+            [{"id": "component:api", "name": "api", "role": "HTTP API", "evidence": ["cmd/api/main.go:1"]}],
+        )
+        self.assertIn(
+            {"id": "component:api", "name": "api", "category": "component", "lifecycle": "run"}, out["graph"]["nodes"]
+        )
         self.assertEqual(out["unresolved"], [])
         self.assertIn('[["api"]]', out["mermaid"]["mermaid"])
 

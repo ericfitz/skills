@@ -122,8 +122,7 @@ def _cargo(path, out):
         out.setdefault(_name(dep), BUILD)
 
 
-_GO_REQUIRE = re.compile(r"^\s*(?:require\s+)?([a-z0-9][\w.\-/]*\.[\w.\-/]+)\s+v\S+",
-                         re.IGNORECASE)
+_GO_REQUIRE = re.compile(r"^\s*(?:require\s+)?([a-z0-9][\w.\-/]*\.[\w.\-/]+)\s+v\S+", re.IGNORECASE)
 
 
 def _go_mod(path, out):
@@ -148,12 +147,25 @@ MANIFESTS = {
 # Ecosystems we can detect but not classify. Their presence becomes an
 # assumption rather than a silent gap.
 UNPARSEABLE = {
-    "Gemfile": "ruby", "composer.json": "php", "pom.xml": "java",
-    "build.gradle": "java", "build.gradle.kts": "java",
+    "Gemfile": "ruby",
+    "composer.json": "php",
+    "pom.xml": "java",
+    "build.gradle": "java",
+    "build.gradle.kts": "java",
 }
 
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "vendor", "dist",
-             "build", "target", "site-packages", "__pycache__"}
+SKIP_DIRS = {
+    ".git",
+    "node_modules",
+    ".venv",
+    "venv",
+    "vendor",
+    "dist",
+    "build",
+    "target",
+    "site-packages",
+    "__pycache__",
+}
 
 
 def _walk(root):
@@ -215,8 +227,8 @@ def propagate(roots, artifacts, relationships):
 
 def main(argv=None):
     parser = JsonErrorParser(
-        prog="pkglifecycle.py",
-        description="Derive build-vs-run lifecycle for syft-catalogued packages.")
+        prog="pkglifecycle.py", description="Derive build-vs-run lifecycle for syft-catalogued packages."
+    )
     parser.add_argument("path", help="repo root")
     parser.add_argument("--syft-json", required=True, help="syft-json output file")
     parser.add_argument("--indent", type=int, default=2)
@@ -234,13 +246,11 @@ def main(argv=None):
         sys.stderr.write("\n")
         return 2
 
-    lifecycle = propagate(classify_roots(root),
-                          syft.get("artifacts") or [],
-                          syft.get("artifactRelationships") or [])
+    lifecycle = propagate(classify_roots(root), syft.get("artifacts") or [], syft.get("artifactRelationships") or [])
     indent = args.indent if args.indent > 0 else None
-    print(json.dumps({"lifecycle": lifecycle,
-                      "unresolved": unresolved_ecosystems(root)},
-                     indent=indent, sort_keys=True))
+    print(
+        json.dumps({"lifecycle": lifecycle, "unresolved": unresolved_ecosystems(root)}, indent=indent, sort_keys=True)
+    )
     return 0
 
 

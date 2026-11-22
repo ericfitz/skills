@@ -15,7 +15,7 @@ from depscanlib.walk import read_text
 # A trailing `# ...` comment is ordinary on a hand-maintained resource line
 # (`memory: 2Gi  # raised after OOM`); every pattern below tolerates one so a
 # comment doesn't silently drop the whole line.
-_COMMENT_TAIL = r'\s*(?:#.*)?$'
+_COMMENT_TAIL = r"\s*(?:#.*)?$"
 
 DOCKERFILE_NAMES = {"Dockerfile", "Containerfile"}
 
@@ -30,14 +30,12 @@ def _is_dockerfile_name(name):
     if name in DOCKERFILE_NAMES:
         return True
     lower = name.lower()
-    return (lower.startswith("dockerfile.") or lower.startswith("containerfile.") or
-            lower.endswith(".dockerfile"))
+    return lower.startswith("dockerfile.") or lower.startswith("containerfile.") or lower.endswith(".dockerfile")
 
 
 K8S_CPU_RE = re.compile(r'^\s*cpu:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL)
 K8S_MEMORY_RE = re.compile(r'^\s*memory:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL)
-K8S_GPU_RE = re.compile(r'^\s*[\w.\-/]*gpu:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL,
-                        re.IGNORECASE)
+K8S_GPU_RE = re.compile(r'^\s*[\w.\-/]*gpu:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL, re.IGNORECASE)
 K8S_STORAGE_RE = re.compile(r'^\s*(?:ephemeral-)?storage:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL)
 
 COMPOSE_RES_RES = (
@@ -49,15 +47,13 @@ COMPOSE_RES_RES = (
     (re.compile(r'^\s*shm_size:\s*["\']?([^"\'\n#]+?)["\']?' + _COMMENT_TAIL), "memory"),
 )
 
-FROM_RE = re.compile(
-    r'^\s*FROM\s+(?:--platform=(?P<platform>\S+)\s+)?(?P<image>\S+)',
-    re.IGNORECASE)
+FROM_RE = re.compile(r"^\s*FROM\s+(?:--platform=(?P<platform>\S+)\s+)?(?P<image>\S+)", re.IGNORECASE)
 
 
 # A resource figure is a number with an optional unit/suffix (`500m`, `2Gi`,
 # `1.5`, `4G`, `0.5`). YAML booleans and prose (`true`, `default`) under a
 # `storage:`/`memory:`-style key are not quantities.
-QUANTITY_RE = re.compile(r'^\d+(?:\.\d+)?\s*[A-Za-z]{0,3}$')
+QUANTITY_RE = re.compile(r"^\d+(?:\.\d+)?\s*[A-Za-z]{0,3}$")
 
 
 def _is_quantity(raw):
@@ -66,8 +62,7 @@ def _is_quantity(raw):
 
 def _record(kind, raw, path, line, source, bound=None, component=None):
     """bound is "request" or "limit" (None when the file doesn't say)."""
-    rec = {"kind": kind, "raw": raw.strip(), "file": path, "line": line,
-           "source": source}
+    rec = {"kind": kind, "raw": raw.strip(), "file": path, "line": line, "source": source}
     if bound:
         rec["bound"] = bound
     if component:
@@ -81,20 +76,17 @@ def _scan_dockerfile(root, path, out):
         if not match:
             continue
         if match.group("platform"):
-            out.append(_record("arch", match.group("platform"), path, number,
-                               "dockerfile"))
-        out.append(_record("runtime-version", match.group("image"), path, number,
-                           "dockerfile"))
+            out.append(_record("arch", match.group("platform"), path, number, "dockerfile"))
+        out.append(_record("runtime-version", match.group("image"), path, number, "dockerfile"))
 
 
-SECTION_RE = re.compile(r'^(\s*)(requests|limits|reservations):\s*(?:\{(.*)\})?' + _COMMENT_TAIL)
+SECTION_RE = re.compile(r"^(\s*)(requests|limits|reservations):\s*(?:\{(.*)\})?" + _COMMENT_TAIL)
 FLOW_PAIR_RE = re.compile(r'([\w.\-/]+):\s*["\']?([^"\',}]+)')
 BOUNDS = {"requests": "request", "reservations": "request", "limits": "limit"}
-K8S_KEY_KINDS = {"cpu": "cpu", "memory": "memory", "storage": "disk",
-                 "ephemeral-storage": "disk"}
-IMAGE_RE = re.compile(r'^(\s*)image:')
+K8S_KEY_KINDS = {"cpu": "cpu", "memory": "memory", "storage": "disk", "ephemeral-storage": "disk"}
+IMAGE_RE = re.compile(r"^(\s*)image:")
 LIST_NAME_RE = re.compile(r'^(\s*)-\s+name:\s*["\']?([^"\'\s#]+)')
-SERVICE_RE = re.compile(r'^  ([\w][\w.\-]*):\s*(?:#.*)?$')
+SERVICE_RE = re.compile(r"^  ([\w][\w.\-]*):\s*(?:#.*)?$")
 
 
 def _flow_kind(key):
@@ -103,7 +95,7 @@ def _flow_kind(key):
 
 def _scan_kubernetes(root, path, out):
     lines = read_text(root, path).splitlines()
-    section = None      # (indent, bound) of the enclosing requests:/limits: block
+    section = None  # (indent, bound) of the enclosing requests:/limits: block
     component = None
     for number, line in enumerate(lines, start=1):
         if line.startswith("---"):
@@ -113,7 +105,7 @@ def _scan_kubernetes(root, path, out):
             section = None
         if IMAGE_RE.match(line):
             # the container's `- name:` sits just above, at the item level
-            for prev in reversed(lines[max(0, number - 12):number - 1]):
+            for prev in reversed(lines[max(0, number - 12) : number - 1]):
                 m = LIST_NAME_RE.match(prev)
                 if m and len(m.group(1)) + 2 == indent:
                     component = m.group(2)
@@ -125,19 +117,22 @@ def _scan_kubernetes(root, path, out):
                 for key, value in FLOW_PAIR_RE.findall(m.group(3)):
                     kind = _flow_kind(key)
                     if kind and _is_quantity(value):
-                        out.append(_record(kind, value, path, number,
-                                           "kubernetes", bound, component))
+                        out.append(_record(kind, value, path, number, "kubernetes", bound, component))
             else:
                 section = (indent, bound)
             continue
-        for pattern, kind in ((K8S_GPU_RE, "gpu"), (K8S_CPU_RE, "cpu"),
-                              (K8S_MEMORY_RE, "memory"), (K8S_STORAGE_RE, "disk")):
+        for pattern, kind in (
+            (K8S_GPU_RE, "gpu"),
+            (K8S_CPU_RE, "cpu"),
+            (K8S_MEMORY_RE, "memory"),
+            (K8S_STORAGE_RE, "disk"),
+        ):
             match = pattern.match(line)
             if match:
                 if _is_quantity(match.group(1)):
-                    out.append(_record(kind, match.group(1), path, number,
-                                       "kubernetes", section and section[1],
-                                       component))
+                    out.append(
+                        _record(kind, match.group(1), path, number, "kubernetes", section and section[1], component)
+                    )
                 break
 
 
@@ -158,11 +153,14 @@ def _scan_compose(root, path, out):
             match = pattern.match(line)
             if match:
                 if _is_quantity(match.group(1)):
-                    bound = ("request" if "reservation" in line.split(":")[0]
-                             else "limit" if "mem_limit" in line else
-                             section and section[1])
-                    out.append(_record(kind, match.group(1), path, number,
-                                       "compose", bound or None, service))
+                    bound = (
+                        "request"
+                        if "reservation" in line.split(":")[0]
+                        else "limit"
+                        if "mem_limit" in line
+                        else section and section[1]
+                    )
+                    out.append(_record(kind, match.group(1), path, number, "compose", bound or None, service))
                 break
 
 
