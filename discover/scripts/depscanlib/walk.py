@@ -1,8 +1,7 @@
 """Repo file listing: git-aware, with a filesystem fallback.
 
-Deliberately duplicates profile's walk rather than importing inventorylib:
-plugins install independently, so a cross-plugin Python import would break
-at install time.
+Deliberately duplicates the walk in inventorylib rather than importing it, so
+depscanlib has no dependency on inventorylib.
 """
 
 import os

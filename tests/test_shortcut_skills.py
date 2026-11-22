@@ -48,6 +48,18 @@ class TestShortcutSkills(unittest.TestCase):
                 seen = list(dict.fromkeys(skill for _, skill in REF.findall(body) if skill != name))
                 self.assertEqual(seen, chain)
 
+    def test_only_shortcuts_disable_model_invocation(self):
+        found = set()
+        for skill in sorted(REPO.glob("*/skills/*/SKILL.md")):
+            _, front, _ = skill.read_text(encoding="utf-8").split("---\n", 2)
+            if re.search(r"(?m)^disable-model-invocation: true$", front):
+                found.add((skill.parts[-4], skill.parts[-2]))
+        self.assertEqual(found, set(SHORTCUTS))
+
+    def test_project_profile_hands_topology_the_stack_contract(self):
+        _, body = split("discover", "project-profile")
+        self.assertIn("`discover:topology` with `[path]` and the stack contract", " ".join(body.split()))
+
 
 if __name__ == "__main__":
     unittest.main()

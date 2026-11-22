@@ -14,7 +14,7 @@ determines whether you can build on the edge and expect it to keep working.
 | Coupling | Mechanism | Stability |
 |---|---|---|
 | **Contract** | A versioned JSON schema under `<plugin>/references/contracts/`. The producing skill emits exactly one conforming JSON object into the conversation; the consumer is handed it, or invokes the producer itself when running standalone. | **Supported interface.** Build on these. |
-| **Artifact** | A file on disk that one skill writes and another reads from a well-known path — `docs/journeys.md`, `results_dir/latest.db`, `SEM@<sha>` source comments. | Stable path, but the format is owned by the writer. |
+| **Artifact** | A file on disk that one skill writes and another reads from a well-known path — `docs/journeys.md`, `results_dir/latest.db`. | Stable path, but the format is owned by the writer. |
 | **Local config** | `.local/<plugin>/config.yaml` and the shared `.local/repos.json` / `.local/gh-projects.json`. Provisioned out of band or by an `init` skill; consumer skills read, never write. | Per-repo and machine-local; never committed except where noted. |
 
 Two conventions hold across every composed skill:

@@ -270,7 +270,7 @@ class TestRegistration(unittest.TestCase):
         self.assertEqual(entry["source"], "./discover")
         self.assertEqual(entry["category"], "development")
 
-    def test_verify_script_declares_the_plugin_with_all_eight_skills(self):
+    def test_verify_script_declares_the_plugin_with_its_full_skill_list(self):
         text = (REPO / "scripts" / "verify-marketplace.sh").read_text(encoding="utf-8")
         self.assertIn(
             '"discover:development:config,dependency-model,dependency-report,docs,journeys,network,package,platform,'
