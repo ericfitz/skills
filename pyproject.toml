@@ -13,7 +13,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.17.0",
+    "ruff>=0.17.6",
 ]
 
 # This repo is a collection of standalone script trees, not an installable
